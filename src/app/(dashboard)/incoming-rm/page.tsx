@@ -64,7 +64,7 @@ export default function RMControlCenterPage() {
   };
 
   const fetchLots = async () => {
-    const { data } = await supabase.from('production_lots').select('id, lot_no, sku_id').order('created_at', { ascending: false });
+    const { data } = await supabase.from('production_lots').select('id, lot_no, sku_id, products(sku, product_name)').order('created_at', { ascending: false });
     if (data) setLotOptions(data);
   };
 
@@ -617,7 +617,7 @@ export default function RMControlCenterPage() {
                   <SelectTrigger className="w-full bg-white"><SelectValue placeholder="-- ค้นหาและเลือก LOT การผลิต --" /></SelectTrigger>
                   <SelectContent>
                     {lotOptions.map((lot) => (
-                      <SelectItem key={lot.id} value={lot.id}>{lot.sku_id} (LOT: {lot.lot_no})</SelectItem>
+                      <SelectItem key={lot.id} value={lot.id}>{(lot.products as any)?.sku} - {(lot.products as any)?.product_name} (LOT: {lot.lot_no})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
