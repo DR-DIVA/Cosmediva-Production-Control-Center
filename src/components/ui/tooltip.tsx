@@ -24,7 +24,7 @@ export function TooltipContent({
   className,
   sideOffset = 4,
   ...props
-}: TooltipPrimitive.Popup.Props) {
+}: TooltipPrimitive.Popup.Props & { sideOffset?: number }) {
   return (
     <TooltipPrimitive.Portal>
       <TooltipPrimitive.Positioner sideOffset={sideOffset}>

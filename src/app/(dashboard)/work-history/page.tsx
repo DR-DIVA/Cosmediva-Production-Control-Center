@@ -118,8 +118,8 @@ export default function WorkHistoryPage() {
                 if (hTime >= startDateTime && hTime <= endDateTime) {
                   items.push({
                     taskId: task.id,
-                    lotNo: task.production_lots?.lot_no,
-                    sku: task.production_lots?.products?.sku,
+                    lotNo: Array.isArray(task.production_lots) ? (task.production_lots as any)[0]?.lot_no : (task.production_lots as any)?.lot_no,
+                    sku: Array.isArray(task.production_lots) ? (task.production_lots as any)[0]?.products?.sku || (task.production_lots as any)[0]?.products?.[0]?.sku : (task.production_lots as any)?.products?.sku,
                     process: mappedProcess,
                     tankNum: `ถัง/ชุด ${tankNum}`,
                     action: h.status,
@@ -240,7 +240,7 @@ export default function WorkHistoryPage() {
             </div>
             <div className="space-y-2 flex-1 max-w-[250px]">
               <label className="text-sm font-medium text-slate-700">แผนก (Process)</label>
-              <Select value={processFilter} onValueChange={setProcessFilter}>
+              <Select value={processFilter} onValueChange={(val) => setProcessFilter(val || '')}>
                 <SelectTrigger>
                   <SelectValue placeholder="เลือกแผนก" />
                 </SelectTrigger>
