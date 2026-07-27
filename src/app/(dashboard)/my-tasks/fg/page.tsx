@@ -1,0 +1,1030 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { Card, CardContent } from '@/components/ui/card'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Loader2, Boxes, ChevronDown, ChevronRight, Clock, Archive, List as ListIcon, Calendar as CalendarIcon, User, Package, Send, PackageOpen, Warehouse } from 'lucide-react'
+import { toast } from 'sonner'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { differenceInDays, startOfDay } from 'date-fns'
+import { TaskCalendar } from '@/components/ui/TaskCalendar'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+
+export default function FgTasksPage() {
+  const [tasks, setTasks] = useState<any[]>([])
+  const [rooms, setRooms] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [inventory, setInventory] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
+  const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+  const [filterDate, setFilterDate] = useState<string>('')
+  
+  // Receive Dialog State
+  const [receiveDialog, setReceiveDialog] = useState<{ 
+    open: boolean, taskId: string, currentTank: number, task: any, locationId: string, 
+    cartons: number, boxLot: string, qtyPcs: number,
+    mfgDate: string, expDate: string, productName: string, orderNo: string,
+    docNoBook: string, docNoNumber: string,
+    isReadOnly?: boolean
+  }>({
+    open: false, taskId: '', currentTank: 0, task: null, locationId: '', cartons: 0, boxLot: '', qtyPcs: 0,
+    mfgDate: '', expDate: '', productName: '', orderNo: '', docNoBook: 'E1', docNoNumber: '0001'
+  })
+
+  // Dispatch Dialog State
+  const [dispatchDialog, setDispatchDialog] = useState<{ open: boolean, invItem: any, qtyPcs: number, refDoc: string }>({
+    open: false, invItem: null, qtyPcs: 0, refDoc: ''
+  })
+  
+  const supabase = createClient()
+
+  useEffect(() => {
+    fetchFgTasks()
+    fetchRooms()
+    fetchUser()
+    fetchLocations()
+    fetchInventory()
+  }, [])
+
+  const fetchUser = async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      setCurrentUser(user.email || 'Unknown User')
+    }
+  }
+
+  const fetchRooms = async () => {
+    const { data } = await supabase.from('rooms').select('*').order('room_name')
+    if (data) setRooms(data)
+  }
+
+  const fetchLocations = async () => {
+    const { data } = await supabase.from('fg_locations').select('*').order('zone').order('rack')
+    if (data) setLocations(data)
+  }
+
+  const fetchInventory = async () => {
+    const { data } = await supabase.from('fg_inventory').select(`
+      *,
+      products:sku_id(sku, product_name),
+      fg_locations:location_id(zone, rack, level)
+    `).gt('available_qty_pcs', 0).order('exp_date', { ascending: true }) // FEFO ordering
+    if (data) setInventory(data)
+  }
+
+  const fetchFgTasks = async () => {
+    setLoading(true)
+    const { data, error } = await supabase.from('production_logs')
+      .select(`
+        id,
+        status,
+        note,
+        tank_start,
+        tank_end,
+        tank_details,
+        start_time,
+        activity_date,
+        room_id,
+        piece_quantity,
+        production_lot_id,
+        production_lots (
+          id,
+          lot_no,
+          total_tanks,
+          sku_id,
+          planned_quantity,
+          order_quantity,
+          pcs_per_carton,
+          products:sku_id (sku, product_name)
+        ),
+        processes (
+          id,
+          process_name
+        ),
+        rooms (
+          id,
+          room_name
+        )
+      `)
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      toast.error('โหลดข้อมูลล้มเหลว')
+    } else if (data) {
+      const fgTasks = data.filter(t => 
+        (t.processes as any)?.process_name?.toLowerCase().includes('fg') || 
+        (t.processes as any)?.process_name?.toLowerCase().includes('คลัง')
+      )
+      setTasks(fgTasks)
+      setSelectedTask((prev: any) => prev ? fgTasks.find(t => t.id === prev.id) || null : null)
+    }
+    setLoading(false)
+  }
+
+  const toggleRow = (id: string) => {
+    setExpandedRow(expandedRow === id ? null : id)
+  }
+
+  const getVarianceBadge = (task: any) => {
+    if (!task.activity_date) return null
+    const planned = startOfDay(new Date(task.activity_date))
+    const actual = startOfDay(task.end_time ? new Date(task.end_time) : new Date())
+    const diff = differenceInDays(actual, planned)
+    if (diff > 0) return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 ml-2">ล่าช้า {diff} วัน</Badge>
+    if (diff < 0) return <Badge variant="outline" className="bg-sky-50 text-sky-600 border-sky-200 ml-2">เร็วกว่าแผน {Math.abs(diff)} วัน</Badge>
+    return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30 ml-2">ตรงตามแผน</Badge>
+  }
+
+  const isDelayed = (task: any) => {
+    if (!task.activity_date) return false
+    const planned = startOfDay(new Date(task.activity_date))
+    const actual = startOfDay(task.end_time ? new Date(task.end_time) : new Date())
+    return differenceInDays(actual, planned) > 0
+  }
+
+  const updateTaskStatus = async (taskId: string, newStatus: string) => {
+    const updateData: any = { status: newStatus }
+    if (newStatus === 'IN_PROGRESS') {
+      if (!tasks.find(t => t.id === taskId)?.start_time) {
+         updateData.start_time = new Date().toISOString()
+      }
+    } else if (newStatus === 'DONE') {
+      updateData.end_time = new Date().toISOString()
+    }
+
+    const { error } = await supabase.from('production_logs').update(updateData).eq('id', taskId)
+    if (error) toast.error('อัปเดตสถานะไม่สำเร็จ')
+    else { toast.success('อัปเดตสถานะเรียบร้อย'); fetchFgTasks(); }
+  }
+
+  const updateQcStatus = async (invId: string, newStatus: string) => {
+    const { error } = await supabase.from('fg_inventory').update({ qc_status: newStatus }).eq('id', invId)
+    if (error) {
+      toast.error('อัปเดตสถานะ QC ไม่สำเร็จ')
+    } else {
+      toast.success('อัปเดตสถานะ QC เรียบร้อยแล้ว')
+      fetchInventory()
+    }
+  }
+
+  // FG no longer uses tank-based logic. We receive the entire LOT at once.
+  const handleTankClick = undefined;
+  const executeTankUpdate = undefined;
+
+  const confirmReceive = async () => {
+    if (!receiveDialog.locationId || !receiveDialog.qtyPcs || !receiveDialog.cartons) {
+      toast.error('กรุณากรอกข้อมูลให้ครบถ้วน')
+      return
+    }
+
+    const mfgDate = receiveDialog.mfgDate ? new Date(receiveDialog.mfgDate) : new Date()
+    const expDate = receiveDialog.expDate ? new Date(receiveDialog.expDate) : (() => {
+      const d = new Date(mfgDate);
+      d.setFullYear(d.getFullYear() + 3);
+      return d;
+    })();
+
+    let details = typeof receiveDialog.task?.tank_details === 'object' && receiveDialog.task?.tank_details !== null ? { ...receiveDialog.task.tank_details } : {}
+    details.fg_receive_info = {
+      user: currentUser,
+      timestamp: new Date().toISOString(),
+      cartons: receiveDialog.cartons,
+      pcs: receiveDialog.qtyPcs,
+      doc_book: receiveDialog.docNoBook,
+      doc_no: receiveDialog.docNoNumber
+    }
+
+    // Insert into inventory
+    const { error: invError } = await supabase.from('fg_inventory').insert({
+      sku_id: receiveDialog.task?.production_lots?.sku_id,
+      lot_no: receiveDialog.task?.production_lots?.lot_no,
+      box_lot_no: receiveDialog.boxLot,
+      mfg_date: mfgDate.toISOString().split('T')[0],
+      exp_date: expDate.toISOString().split('T')[0],
+      receive_qty_cartons: receiveDialog.cartons,
+      receive_qty_pcs: receiveDialog.qtyPcs,
+      available_qty_pcs: receiveDialog.qtyPcs,
+      location_id: receiveDialog.locationId === 'UNSPECIFIED' ? null : receiveDialog.locationId,
+      qc_status: 'QUARANTINE'
+    })
+
+    if (invError) {
+      toast.error('บันทึกเข้าคลังไม่สำเร็จ: ' + invError.message)
+      return
+    }
+
+    // Update log status
+    const { error: logError } = await supabase.from('production_logs').update({
+      status: 'DONE',
+      tank_details: details,
+      end_time: new Date().toISOString()
+    }).eq('id', receiveDialog.taskId)
+
+    if (logError) {
+      toast.error('อัปเดตสถานะงานไม่สำเร็จ')
+    } else {
+      toast.success('รับเข้า FG เรียบร้อย')
+      fetchInventory()
+      fetchFgTasks()
+      setReceiveDialog(prev => ({...prev, open: false}))
+    }
+  }
+
+  const handleDispatch = async () => {
+    if (!dispatchDialog.invItem || dispatchDialog.qtyPcs <= 0) return
+    if (dispatchDialog.qtyPcs > dispatchDialog.invItem.available_qty_pcs) {
+      toast.error('ยอดจ่ายออกเกินกว่ายอดคงเหลือ!')
+      return
+    }
+    
+    // Insert Tx
+    const { error: txError } = await supabase.from('inventory_transactions').insert({
+      inventory_id: dispatchDialog.invItem.id,
+      transaction_type: 'OUT',
+      quantity_pcs: dispatchDialog.qtyPcs,
+      reference_document: dispatchDialog.refDoc,
+      user_id: currentUser,
+      timestamp: new Date().toISOString()
+    })
+    
+    // Deduct stock
+    const newAvail = dispatchDialog.invItem.available_qty_pcs - dispatchDialog.qtyPcs
+    await supabase.from('fg_inventory').update({ available_qty_pcs: newAvail }).eq('id', dispatchDialog.invItem.id)
+    
+    toast.success('บันทึกจ่ายสินค้าออกเรียบร้อย')
+    setDispatchDialog(prev => ({...prev, open: false}))
+    fetchInventory()
+  }
+
+  const handlePrint = () => {
+    const printContent = document.getElementById('e-form-printable-area');
+    if (!printContent) return;
+
+    // Set custom filename for Save as PDF
+    const originalTitle = document.title;
+    const sku = receiveDialog.task?.production_lots?.products?.sku || 'Unknown';
+    const lotRaw = receiveDialog.task?.production_lots?.lot_no || 'Unknown';
+    const lot = lotRaw.replace(/\//g, '-');
+    const now = new Date();
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear().toString().substr(-2)}`;
+    document.title = `CosmeFlow OS_ใบรับมอบสินค้า FG ${sku} L.${lot}_${dateStr}`;
+
+    const printWindow = document.createElement('div');
+    printWindow.id = 'print-window';
+    printWindow.className = "bg-white w-full h-full font-sans text-sm text-black";
+    printWindow.innerHTML = printContent.innerHTML;
+    document.body.appendChild(printWindow);
+
+    const style = document.createElement('style');
+    style.innerHTML = `
+      @media print {
+        body > :not(#print-window) { display: none !important; }
+        body { margin: 0 !important; padding: 0 !important; background: white !important; }
+        #print-window { 
+          display: block !important;
+          width: 100%;
+          height: 100%;
+          padding: 5mm 15mm;
+          box-sizing: border-box;
+          zoom: 0.96;
+        }
+        @page { size: A5 landscape; margin: 0; }
+      }
+      @media screen {
+        #print-window { display: none !important; }
+      }
+    `;
+    document.head.appendChild(style);
+    window.print();
+    setTimeout(() => {
+      document.title = originalTitle;
+      document.head.removeChild(style);
+      if (document.body.contains(printWindow)) {
+        document.body.removeChild(printWindow);
+      }
+    }, 1000);
+  }
+
+  const getTaskTotals = (task: any) => {
+    const details = typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details : {}
+    let totalCartonsFromPof = 0
+    let boxLots = new Set<string>()
+    const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
+    
+    Object.keys(details).forEach(k => {
+       if (!k.includes('_history') && typeof details[k] === 'object') {
+           if (details[k].cartons) totalCartonsFromPof += details[k].cartons
+           if (details[k].box_lot) boxLots.add(details[k].box_lot)
+       }
+    })
+    return {
+      totalCartonsFromPof,
+      totalPcsFromPof: totalCartonsFromPof * pcsPerCarton,
+      combinedBoxLot: Array.from(boxLots).join(', '),
+      details
+    }
+  }
+
+  const getLotCumulativeTotals = (lotId: string) => {
+    let cumulativeCartons = 0
+    let cumulativePcs = 0
+    
+    const lotTasks = tasks.filter(t => t.production_lot_id === lotId)
+    lotTasks.forEach(t => {
+      const pcsPerCarton = t.production_lots?.pcs_per_carton || 1
+      const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {}
+      Object.keys(details).forEach(k => {
+         if (!k.includes('_history') && typeof details[k] === 'object') {
+             if (details[k].cartons) {
+               cumulativeCartons += details[k].cartons
+               cumulativePcs += (details[k].cartons * pcsPerCarton)
+             }
+         }
+      })
+    })
+    return { cumulativeCartons, cumulativePcs }
+  }
+
+  const renderWarehouse = (task: any) => {
+    const { totalCartonsFromPof, totalPcsFromPof, combinedBoxLot, details } = getTaskTotals(task)
+    const fgInfo = details.fg_receive_info
+
+    return (
+      <div className="p-6 bg-[#F8F6F0] border-b shadow-inner">
+        <div className="flex justify-between items-center mb-4">
+          <div>
+            <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-2">
+              <Boxes className="w-5 h-5 text-indigo-500" />
+              สรุปยอดส่งมอบเข้าคลัง (FG)
+              {getVarianceBadge(task)}
+            </h3>
+            <div className="text-sm text-slate-600 space-y-1">
+              <p>ยอดที่ส่งมาจากงานลงลัง POF: <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} ลัง</span> ({totalPcsFromPof.toLocaleString()} ชิ้น)</p>
+              {combinedBoxLot && <p>Box Lot: <span className="font-medium text-amber-700">{combinedBoxLot}</span></p>}
+            </div>
+          </div>
+          <div className="flex gap-2 items-center">
+            {task.status === 'DONE' && (
+              <div className="text-right mr-2">
+                <Badge className="bg-green-100 text-green-700 p-2 px-3 text-sm mb-2 flex items-center justify-center">
+                  <Archive className="w-4 h-4 mr-2" /> รับเข้าเสร็จสิ้น
+                </Badge>
+                {fgInfo && (
+                  <div className="text-xs text-slate-500 space-y-1">
+                    <div className="flex items-center justify-end gap-1"><User className="w-3 h-3" /> ผู้ตรวจรับ: {fgInfo.user}</div>
+                    <div className="flex items-center justify-end gap-1"><Clock className="w-3 h-3" /> {new Date(fgInfo.timestamp).toLocaleString('th-TH')}</div>
+                  </div>
+                )}
+              </div>
+            )}
+            <Button size="lg" onClick={async () => {
+              const mfg = task.production_lots?.mfg_date || ''
+              const exp = task.production_lots?.exp_date || ''
+              const prodName = task.production_lots?.products?.product_name || ''
+              const ord = task.production_lots?.po_no || task.production_lots?.order_no || ''
+              const fgInfo = task.tank_details?.fg_receive_info
+              
+              let bookNo = 1, docNo = 1;
+              if (!fgInfo) {
+                const { count } = await supabase.from('fg_inventory').select('id', { count: 'exact', head: true })
+                const total = (count || 0) + 1
+                bookNo = Math.floor((total - 1) / 9999) + 1
+                docNo = ((total - 1) % 9999) + 1
+              }
+              
+              setReceiveDialog({ 
+                open: true, 
+                taskId: task.id, 
+                currentTank: 0, 
+                task, 
+                locationId: '', 
+                cartons: fgInfo ? fgInfo.cartons : totalCartonsFromPof, 
+                boxLot: combinedBoxLot, 
+                qtyPcs: fgInfo ? fgInfo.pcs : totalPcsFromPof,
+                mfgDate: mfg,
+                expDate: exp,
+                productName: prodName,
+                orderNo: ord,
+                docNoBook: fgInfo ? fgInfo.doc_book : `E${bookNo}`,
+                docNoNumber: fgInfo ? fgInfo.doc_no : String(docNo).padStart(4, '0'),
+                isReadOnly: task.status === 'DONE'
+              })
+            }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold border-2 border-indigo-400 shadow-lg">
+              <span className="text-xl mr-2">📄</span>
+              ใบส่งมอบ-รับมอบสินค้า (E-Form)
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
+            <Warehouse className="w-8 h-8 text-yellow-400 shrink-0" />
+            CosmeFlow FG Warehouse
+          </h1>
+          <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
+             <div>จัดการรับเข้า, สต๊อกคงเหลือ และเบิกจ่ายสินค้า FG แบบเต็มรูปแบบ</div>
+             <div className="flex items-center mt-1 text-[#8B7355] font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
+              Every Item. Every Movement. Fully Visible.
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="w-64">
+            <Input 
+              placeholder="ค้นหา SKU หรือ LOT..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+      </div>
+
+      <Tabs defaultValue="inbound" className="w-full">
+        <TabsList className="grid w-full grid-cols-3 max-w-2xl bg-white border shadow-sm h-12 mb-6">
+          <TabsTrigger value="inbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+            <Archive className="w-4 h-4 mr-2" /> 1. คิวรับเข้า (Inbound)
+          </TabsTrigger>
+          <TabsTrigger value="inventory" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+            <Package className="w-4 h-4 mr-2" /> 2. สต๊อกสินค้า (Inventory)
+          </TabsTrigger>
+          <TabsTrigger value="outbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+            <Send className="w-4 h-4 mr-2" /> 3. เบิกจ่าย (Dispatch)
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="inbound">
+          <Card className="shadow-sm overflow-hidden border ring-1 ring-slate-200">
+            <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
+              <h2 className="font-semibold text-slate-700">คิวงานรอรับเข้าจาก POF</h2>
+            </div>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-[#F8F6F0]">
+                    <TableRow>
+                      <TableHead className="w-[50px]"></TableHead>
+                      <TableHead>สินค้า / SKU</TableHead>
+                      <TableHead>LOT No.</TableHead>
+                      <TableHead>Box Lot</TableHead>
+                      <TableHead>ยอดส่งมอบ (จาก POF)</TableHead>
+                      <TableHead>ยอดสะสมรวม (ชิ้น)</TableHead>
+                      <TableHead>ยอดสะสมรวม (ลัง)</TableHead>
+                      <TableHead>วันที่ส่งมา</TableHead>
+                      <TableHead>สถานะคิว</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {loading ? (
+                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto" />กำลังโหลด...</TableCell></TableRow>
+                    ) : tasks.filter(t => {
+                      const term = searchQuery.toLowerCase()
+                      const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
+                      const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
+                      return sku.includes(term) || lotNo.includes(term)
+                    }).length === 0 ? (
+                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500">ไม่มีคิวงานนำส่ง FG</TableCell></TableRow>
+                    ) : tasks.filter(t => {
+                      const term = searchQuery.toLowerCase()
+                      const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
+                      const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
+                      return sku.includes(term) || lotNo.includes(term)
+                    }).map((task) => {
+                      const { totalCartonsFromPof, totalPcsFromPof, combinedBoxLot } = getTaskTotals(task);
+                      const { cumulativeCartons, cumulativePcs } = getLotCumulativeTotals(task.production_lot_id);
+                      return (
+                      <React.Fragment key={task.id}>
+                        <TableRow className={`cursor-pointer hover:bg-[#F8F6F0] ${expandedRow === task.id ? 'bg-slate-100' : ''}`} onClick={() => toggleRow(task.id)}>
+                          <TableCell>{expandedRow === task.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
+                          <TableCell className="font-medium text-indigo-700">
+                            {task.production_lots?.products?.sku || '-'}
+                            <div className="text-xs text-slate-500 font-normal">{task.production_lots?.products?.product_name || ''}</div>
+                          </TableCell>
+                          <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
+                          <TableCell>
+                            <span className="font-medium text-amber-700">{combinedBoxLot || '-'}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} ลัง</span>
+                            <span className="text-xs text-slate-500 ml-1">({totalPcsFromPof.toLocaleString()} ชิ้น)</span>
+                          </TableCell>
+                          <TableCell className="font-semibold text-emerald-600">
+                            {cumulativePcs.toLocaleString()} ชิ้น
+                          </TableCell>
+                          <TableCell className="font-semibold text-emerald-600">
+                            {cumulativeCartons.toLocaleString()} ลัง
+                          </TableCell>
+                          <TableCell>{task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}</TableCell>
+                          <TableCell>
+                            {task.status === 'DONE' ? <Badge className="bg-green-100 text-green-700">นำส่งสำเร็จ</Badge> : task.status === 'IN_PROGRESS' ? <Badge variant="outline" className="text-indigo-600 border-indigo-200">กำลังรับเข้า</Badge> : <Badge variant="outline">รอรับเข้า</Badge>}
+                          </TableCell>
+                        </TableRow>
+                        {expandedRow === task.id && (
+                          <TableRow><TableCell colSpan={6} className="p-0 border-b-0">{renderWarehouse(task)}</TableCell></TableRow>
+                        )}
+                      </React.Fragment>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="inventory">
+          <Card className="shadow-sm border ring-1 ring-slate-200">
+            <div className="p-4 bg-[#F8F6F0] border-b">
+              <h2 className="font-semibold text-slate-700">สต๊อกสินค้าคงเหลือ (Real-time Balance)</h2>
+            </div>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-[#F8F6F0]">
+                  <TableRow>
+                    <TableHead>สินค้า / SKU</TableHead>
+                    <TableHead>Lot No.</TableHead>
+                    <TableHead>Box Lot</TableHead>
+                    <TableHead>ยอดคงเหลือ</TableHead>
+                    <TableHead>ตำแหน่งจัดเก็บ</TableHead>
+                    <TableHead>วันหมดอายุ (EXP)</TableHead>
+                    <TableHead>สถานะ QC</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {inventory.filter(item => {
+                      const term = searchQuery.toLowerCase()
+                      const sku = (item.products?.sku || '').toLowerCase()
+                      const lotNo = (item.lot_no || '').toLowerCase()
+                      return sku.includes(term) || lotNo.includes(term)
+                    }).length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center h-32">ไม่มีสินค้าในคลัง</TableCell></TableRow>
+                  ) : inventory.filter(item => {
+                      const term = searchQuery.toLowerCase()
+                      const sku = (item.products?.sku || '').toLowerCase()
+                      const lotNo = (item.lot_no || '').toLowerCase()
+                      return sku.includes(term) || lotNo.includes(term)
+                    }).map(item => (
+                    <TableRow key={item.id}>
+                      <TableCell className="font-medium text-slate-800">
+                        {item.products?.sku}
+                        <div className="text-xs text-slate-500 font-normal">{item.products?.product_name}</div>
+                      </TableCell>
+                      <TableCell>{item.lot_no}</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-amber-50">{item.box_lot_no}</Badge></TableCell>
+                      <TableCell className="font-bold text-indigo-600">{item.available_qty_pcs.toLocaleString()} ชิ้น</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5 text-sm text-slate-600">
+                          <PackageOpen className="w-4 h-4 text-slate-400" />
+                          {item.fg_locations ? `${item.fg_locations.zone} / ${item.fg_locations.rack} (Lv.${item.fg_locations.level})` : 'ไม่ระบุ'}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        {item.exp_date ? new Date(item.exp_date).toLocaleDateString('th-TH') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className="focus:outline-none">
+                            {item.qc_status === 'RELEASED' ? (
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none cursor-pointer">พร้อมขาย (Released)</Badge>
+                            ) : item.qc_status === 'QUARANTINE' ? (
+                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none cursor-pointer">กักกัน (Quarantine)</Badge>
+                            ) : (
+                              <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none cursor-pointer">Reject</Badge>
+                            )}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'RELEASED')} className="text-emerald-600 font-medium">
+                              พร้อมขาย (Released)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'QUARANTINE')} className="text-amber-600 font-medium">
+                              กักกัน (Quarantine)
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'REJECTED')} className="text-red-600 font-medium">
+                              Reject (ไม่ผ่าน)
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="outbound">
+           <Card className="shadow-sm border ring-1 ring-slate-200">
+            <div className="p-4 bg-[#F8F6F0] border-b">
+              <h2 className="font-semibold text-slate-700">เบิกจ่ายสินค้า (ตามหลัก FEFO)</h2>
+            </div>
+            <CardContent className="p-6">
+              <p className="text-sm text-slate-500 mb-6">กรุณาเลือกรายการสินค้าจากคลังที่ต้องการเบิกจ่าย (ระบบจะเรียงลำดับ Lot ที่หมดอายุก่อนให้อัตโนมัติ)</p>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {inventory.filter(i => (i.qc_status === 'RELEASED' || i.qc_status === 'QUARANTINE')).filter(item => {
+                  const term = searchQuery.toLowerCase()
+                  const sku = (item.products?.sku || '').toLowerCase()
+                  const lotNo = (item.lot_no || '').toLowerCase()
+                  return sku.includes(term) || lotNo.includes(term)
+                }).map(item => (
+                  <Card key={item.id} className="border-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer" onClick={() => setDispatchDialog({ open: true, invItem: item, qtyPcs: item.available_qty_pcs, refDoc: '' })}>
+                    <CardContent className="p-4 relative">
+                       {item.qc_status === 'QUARANTINE' && <Badge className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-500 text-white border-none text-[10px]">รอตรวจ QC (ห้ามเบิก)</Badge>}
+                       <h4 className="font-bold text-slate-800">{item.products?.sku}</h4>
+                       <div className="text-xs text-slate-500 line-clamp-1 mb-2">{item.products?.product_name}</div>
+                       <div className="flex justify-between items-center text-sm mb-1">
+                         <span className="text-slate-500">Lot:</span> <span className="font-medium">{item.lot_no}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-sm mb-1">
+                         <span className="text-slate-500">Box Lot:</span> <span className="text-amber-600 font-medium">{item.box_lot_no}</span>
+                       </div>
+                       <div className="flex justify-between items-center text-sm mb-1">
+                         <span className="text-slate-500">Location:</span> 
+                         <span>{item.fg_locations ? `${item.fg_locations.zone} / ${item.fg_locations.rack}` : '-'}</span>
+                       </div>
+                       <div className="mt-4 pt-3 border-t flex justify-between items-center">
+                         <span className="text-xs text-red-500 font-medium">EXP: {new Date(item.exp_date).toLocaleDateString('th-TH')}</span>
+                         <span className="font-bold text-indigo-600 text-lg">{item.available_qty_pcs} ชิ้น</span>
+                       </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      <Dialog open={receiveDialog.open} onOpenChange={(open) => !open && setReceiveDialog(prev => ({...prev, open: false}))}>
+        <DialogContent className="max-w-[95vw] md:max-w-[900px] h-[95vh] max-h-[95vh] overflow-y-auto bg-slate-100 p-6 flex flex-col items-center">
+          
+          {/* A5 Paper Form container */}
+          <div id="e-form-printable-area" className="bg-white w-full max-w-[840px] shadow-lg border border-gray-300 p-6 font-sans text-sm relative">
+             
+             {/* Header */}
+             <div className="flex justify-between items-start mb-4">
+                <div className="flex flex-col items-center justify-center w-[120px]">
+                  <img src="https://cosmediva.co.th/wp-content/uploads/2020/02/logo-cosme-gold.png" alt="COSMEDIVA" className="w-[80px] h-auto object-contain mb-1" />
+                </div>
+                
+                <div className="flex-1 text-center flex flex-col items-center">
+                  <h1 className="text-2xl font-bold mb-4 font-serif">ใบส่งมอบ - รับมอบสินค้า</h1>
+                  <div className="text-left space-y-1 ml-4 text-[13px]">
+                    <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 border border-black flex items-center justify-center font-bold text-lg leading-none">✓</div>
+                       <span>สินค้าสำเร็จรูป</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                       <div className="w-4 h-4 border border-black"></div>
+                       <span>สินค้าอื่นๆ .................................................</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="w-[150px] text-right text-[13px] space-y-2 pt-2">
+                  <div className="flex justify-between"><span>เล่มที่</span> <span>{receiveDialog.docNoBook}</span></div>
+                  <div className="flex justify-between">
+                    <span>เลขที่</span> 
+                    <span className="font-mono">{receiveDialog.docNoNumber}</span>
+                  </div>
+                </div>
+             </div>
+
+             {/* Department & Date */}
+             <div className="flex justify-between items-end mb-2 text-[13px]">
+               <div className="space-y-2">
+                 <div className="flex items-center gap-2">
+                   <span className="font-semibold w-24">แผนกผู้ส่งมอบ</span>
+                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">✓</div> แผนกแพ็คกิ้ง</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกคลังสินค้า</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกอื่นๆ ...................................</div>
+                 </div>
+                 <div className="flex items-center gap-2">
+                   <span className="font-semibold w-24">แผนกผู้รับมอบ</span>
+                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกแพ็คกิ้ง</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">✓</div> แผนกคลังสินค้า</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกอื่นๆ ...................................</div>
+                 </div>
+               </div>
+               <div>
+                 <span className="mr-2">วันที่</span>
+                 <span className="border-b border-black border-dashed px-4 font-handwriting text-[#4A4238]">
+                   {new Date().toLocaleDateString('en-GB').replace(/\//g, ' / ')}
+                 </span>
+               </div>
+             </div>
+
+             {/* Table */}
+             <div className="border-2 border-black w-full mb-2 text-[13px]">
+               <Table className="w-full !border-collapse">
+                 <TableHeader>
+                   <TableRow className="border-b-2 border-black">
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-12 p-2">ลำดับ</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-28 p-2">รหัสสินค้า</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center p-2">ชื่อสินค้า</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-20 p-2">LOT.</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-32 p-2">จำนวน</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-24 p-2">เลขที่กล่อง</TableHead>
+                     <TableHead className="font-semibold text-black text-center w-32 p-2">เลขที่ใบสั่งซื้อ</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                   {/* Main Row */}
+                   <TableRow className="border-b border-black/30 h-8">
+                     <TableCell className="border-r border-black text-center py-1">1</TableCell>
+                     <TableCell className="border-r border-black text-center py-1">{receiveDialog.task?.production_lots?.products?.sku}</TableCell>
+                     <TableCell className="border-r border-black py-1 px-2">{receiveDialog.productName || receiveDialog.task?.production_lots?.products?.product_name}</TableCell>
+                     <TableCell className="border-r border-black text-center py-1">
+                        <div>{receiveDialog.task?.production_lots?.lot_no}</div>
+                        {(() => {
+                           const mfg = receiveDialog.mfgDate ? new Date(receiveDialog.mfgDate) : new Date();
+                           const exp = receiveDialog.expDate ? new Date(receiveDialog.expDate) : (() => { const d = new Date(mfg); d.setFullYear(d.getFullYear()+3); return d; })();
+                           const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getFullYear().toString().substr(-2)}`;
+                           return (
+                             <div className="text-[11px] font-handwriting text-[#4A4238] leading-tight mt-1">
+                               <div>MFD: {fmtDate(mfg)}</div>
+                               <div>EXP: {fmtDate(exp)}</div>
+                             </div>
+                           );
+                        })()}
+                     </TableCell>
+                     <TableCell className="border-r border-black text-center py-1">
+                        <span className="font-handwriting text-[#4A4238] text-[15px]">
+                          {receiveDialog.cartons} x {receiveDialog.task?.production_lots?.pcs_per_carton || 1} = {receiveDialog.qtyPcs}
+                        </span>
+                     </TableCell>
+                     <TableCell className="border-r border-black text-center py-1">
+                        <span className="font-handwriting text-[#4A4238] text-[15px]">
+                           {(() => {
+                              const t = receiveDialog.task;
+                              if (!t) return '-';
+                              let cartonsBefore = 0;
+                              const sameLotTasks = tasks.filter((x: any) => x.production_lot_id === t.production_lot_id);
+                              for (let i = 1; i < parseInt(t.tank_end); i++) {
+                                const taskForTank = sameLotTasks.find((x: any) => {
+                                  if (i >= parseInt(x.tank_start) && i <= parseInt(x.tank_end)) {
+                                    const d = typeof x.tank_details === 'object' && x.tank_details !== null ? (x.tank_details as any) : {};
+                                    return d[i] && d[i].cartons !== undefined;
+                                  }
+                                  return false;
+                                });
+                                if (taskForTank) {
+                                  const d = taskForTank.tank_details as any;
+                                  cartonsBefore += Number(d[i].cartons) || 0;
+                                }
+                              }
+                              const start = cartonsBefore + 1;
+                              const end = cartonsBefore + receiveDialog.cartons;
+                              return receiveDialog.cartons > 0 ? `${start} - ${end}` : '-';
+                           })()}
+                        </span>
+                     </TableCell>
+                     <TableCell className="text-center py-1 font-handwriting text-[#4A4238]">{receiveDialog.orderNo || '-'}</TableCell>
+                   </TableRow>
+                   
+                   {/* Empty padding rows to make the table look full */}
+                   {[...Array(3)].map((_, idx) => (
+                     <TableRow key={idx} className="border-b border-black/30 h-8">
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell className="border-r border-black"></TableCell>
+                       <TableCell></TableCell>
+                     </TableRow>
+                   ))}
+
+                   {/* Total Row */}
+                   <TableRow className="h-8">
+                     <TableCell colSpan={4} className="border-r border-black text-center font-bold">รวม</TableCell>
+                     <TableCell className="border-r border-black text-center font-bold font-handwriting text-[#4A4238]">{receiveDialog.qtyPcs}</TableCell>
+                     <TableCell className="border-r border-black"></TableCell>
+                     <TableCell></TableCell>
+                   </TableRow>
+                 </TableBody>
+               </Table>
+             </div>
+
+             {/* Remark */}
+             <div className="mb-2 text-[13px] text-[#4A4238] font-handwriting font-medium">
+               หมายเหตุ: กล่องล็อต {receiveDialog.boxLot || '-'}
+             </div>
+
+             {/* Signatures */}
+             <div className="border-2 border-black w-full flex text-[13px] relative mt-1">
+               {/* Col 1 */}
+               <div className="flex-1 border-r border-black p-3 space-y-4 relative">
+                  <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">ผู้ส่งมอบ</span>
+                     <div className="flex-1 border-b border-black border-dashed relative">
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
+                     </div>
+                     <span className="whitespace-nowrap">วันที่</span>
+                     <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
+                        {new Date().toLocaleDateString('en-GB')}
+                     </span>
+                  </div>
+                   <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">ผู้อนุมัติส่ง</span>
+                     <div className="flex-1 border-b border-black border-dashed relative">
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
+                     </div>
+                     <span className="whitespace-nowrap">วันที่</span>
+                     <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
+                        {new Date().toLocaleDateString('en-GB')}
+                     </span>
+                  </div>
+               </div>
+               {/* Col 2 */}
+               <div className="flex-1 border-r border-black p-3 space-y-4">
+                  <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">ผู้รับมอบ</span>
+                     <div className="flex-1 border-b border-black border-dashed relative">
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{receiveDialog.task?.tank_details?.fg_receive_info?.user || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
+                     </div>
+                     <span className="whitespace-nowrap">วันที่</span>
+                     <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
+                        {new Date().toLocaleDateString('en-GB')}
+                     </span>
+                  </div>
+                  <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">ผู้ตรวจสอบ</span>
+                     <div className="flex-1 border-b border-black border-dashed relative">
+                       {/* QC Check goes here later */}
+                     </div>
+                     <span className="whitespace-nowrap">วันที่</span>
+                     <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
+                        {new Date().toLocaleDateString('en-GB')}
+                     </span>
+                  </div>
+               </div>
+               {/* Col 3 */}
+               <div className="w-[180px] p-3 space-y-4 relative">
+                  <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">ผู้อนุมัติ</span>
+                     <span className="flex-1 border-b border-black border-dashed inline-block"></span>
+                  </div>
+                  <div className="flex items-end gap-1">
+                     <span className="whitespace-nowrap">วันที่</span>
+                     <span className="flex-1 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
+                        {new Date().toLocaleDateString('en-GB')}
+                     </span>
+                  </div>
+                  <div className="absolute bottom-1 right-2 text-[8px] text-slate-500">FG-WF-001A</div>
+               </div>
+             </div>
+
+           </div> {/* End A5 Form */}
+          
+          {/* Actions / Inputs for Receiving */}
+          <div className="w-full max-w-[840px] bg-white rounded-lg shadow p-6 mt-6 border-t-4 border-indigo-500 shrink-0">
+            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><Archive className="w-5 h-5 text-indigo-500" /> ตรวจสอบยอดและยืนยันรับเข้า (โดย FG)</h4>
+            
+            {/* Summary Panel */}
+            {(() => {
+              const t = receiveDialog.task;
+              if (!t) return null;
+              
+              let cartonsBefore = 0;
+              const sameLotTasks = tasks.filter((x: any) => x.production_lot_id === t.production_lot_id);
+              for (let i = 1; i < parseInt(t.tank_end); i++) {
+                const taskForTank = sameLotTasks.find((x: any) => {
+                  if (i >= parseInt(x.tank_start) && i <= parseInt(x.tank_end)) {
+                    const d = typeof x.tank_details === 'object' && x.tank_details !== null ? (x.tank_details as any) : {};
+                    return d[i] && d[i].cartons !== undefined;
+                  }
+                  return false;
+                });
+                if (taskForTank) {
+                  const d = taskForTank.tank_details as any;
+                  cartonsBefore += Number(d[i].cartons) || 0;
+                }
+              }
+              const startBox = cartonsBefore + 1;
+              const endBox = cartonsBefore + receiveDialog.cartons;
+              const boxString = receiveDialog.cartons > 0 ? `${startBox}-${endBox}` : '-';
+              
+              const mfg = receiveDialog.mfgDate ? new Date(receiveDialog.mfgDate) : new Date();
+              const exp = receiveDialog.expDate ? new Date(receiveDialog.expDate) : (() => { const d = new Date(mfg); d.setFullYear(d.getFullYear()+3); return d; })();
+              const fmtDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}${(d.getMonth()+1).toString().padStart(2,'0')}${d.getFullYear().toString().substr(-2)}`;
+              const fmtFullDate = (d: Date) => `${d.getDate().toString().padStart(2,'0')}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getFullYear()}`;
+              
+              const pcsPerCarton = t.production_lots?.pcs_per_carton || 1;
+              const plannedQty = t.production_lots?.planned_quantity || t.production_lots?.order_quantity || 0;
+              const totalCartons = plannedQty / pcsPerCarton;
+              const accumulatedPcs = endBox * pcsPerCarton;
+
+              return (
+                <div className="bg-slate-100 border border-slate-300 rounded-md p-4 mb-5 text-[13px] text-slate-800 space-y-1 font-mono shadow-sm">
+                  <div>วันที่ : {fmtFullDate(new Date())}</div>
+                  <div>งาน : {t.production_lots?.products?.sku || '-'}</div>
+                  <div>SO/ใบสั่งผลิต : {t.production_lots?.po_no || t.production_lots?.order_no || '-'}</div>
+                  <div>LOT: {t.production_lots?.lot_no || '-'}</div>
+                  <div>MFD: {fmtDate(mfg)}</div>
+                  <div>EXP: {fmtDate(exp)}</div>
+                  <div>จำนวน : {receiveDialog.cartons} ลัง x {pcsPerCarton} ชิ้น = {receiveDialog.qtyPcs.toLocaleString()} ชิ้น</div>
+                  <div>เลขที่กล่อง : {boxString}</div>
+                  <div>[ยอดสะสม ({endBox} ลัง/ {totalCartons.toFixed(2).replace(/\.00$/,'')} ลัง) x {pcsPerCarton} ชิ้น   = {accumulatedPcs.toLocaleString()} ชิ้น/  {plannedQty.toLocaleString()} ชิ้น  ]</div>
+                  <div>ใบส่งมอบ : {receiveDialog.docNoBook}/{receiveDialog.docNoNumber}</div>
+                </div>
+              )
+            })()}
+
+
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#F8F6F0]/ p-5 rounded-lg border border-slate-200">
+               <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-700">ยอดรับจริง (ลัง) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
+                 <Input type="number" min={0} className="bg-white text-lg font-bold text-indigo-700 h-12" value={receiveDialog.cartons} disabled={receiveDialog.isReadOnly} onChange={(e) => setReceiveDialog(prev => ({...prev, cartons: parseInt(e.target.value) || 0}))} />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-sm font-semibold text-slate-700">ยอดรับจริง (ชิ้น) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
+                 <Input type="number" min={0} className="bg-white text-lg font-bold text-indigo-700 h-12" value={receiveDialog.qtyPcs} disabled={receiveDialog.isReadOnly} onChange={(e) => setReceiveDialog(prev => ({...prev, qtyPcs: parseInt(e.target.value) || 0}))} />
+               </div>
+               {!receiveDialog.isReadOnly && (
+                 <div className="space-y-2">
+                   <label className="text-sm font-semibold text-slate-700">ตำแหน่งจัดเก็บ (Location) <span className="text-red-500">*</span></label>
+                   <Select value={receiveDialog.locationId} onValueChange={(val) => setReceiveDialog(prev => ({...prev, locationId: val || ''}))}>
+                     <SelectTrigger className="bg-white h-12">
+                       <SelectValue placeholder="-- เลือกโซน/ชั้นวาง --" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="UNSPECIFIED" className="font-medium text-slate-600">-- ยังไม่ระบุ --</SelectItem>
+                       {locations.map(loc => (
+                         <SelectItem key={loc.id} value={loc.id}>
+                           {loc.zone} - {loc.rack} (ชั้น {loc.level})
+                         </SelectItem>
+                       ))}
+                     </SelectContent>
+                   </Select>
+                 </div>
+               )}
+            </div>
+            
+            <div className="flex justify-end gap-3 mt-4 shrink-0">
+              <Button variant="outline" size="lg" className="border-slate-300" onClick={handlePrint}>
+                <span className="mr-2">🖨️</span> พิมพ์ / ดาวน์โหลด PDF
+              </Button>
+              <Button variant="outline" size="lg" onClick={() => setReceiveDialog(prev => ({...prev, open: false}))}>ปิดหน้าต่าง</Button>
+              {!receiveDialog.isReadOnly && (
+                <Button size="lg" className="bg-[#D4AF37] hover:bg-[#B8962A] text-white shadow-md text-base px-8" onClick={confirmReceive}>
+                  <span className="text-xl mr-2">✍️</span>
+                  ลงนามรับมอบ ({currentUser}) และรับเข้าคลัง
+                </Button>
+              )}
+            </div>
+          </div>
+
+        </DialogContent>
+      </Dialog>
+
+      {/* Dispatch Dialog */}
+      <Dialog open={dispatchDialog.open} onOpenChange={(open) => !open && setDispatchDialog(prev => ({...prev, open: false}))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>ทำรายการเบิกจ่าย</DialogTitle>
+          </DialogHeader>
+          {dispatchDialog.invItem && (
+            <div className="py-4 space-y-4">
+              <div className="bg-[#F8F6F0] p-3 rounded">
+                <div className="font-medium text-slate-800">{dispatchDialog.invItem.products?.sku}</div>
+                <div className="text-sm text-slate-500">Lot: {dispatchDialog.invItem.lot_no} | Box Lot: {dispatchDialog.invItem.box_lot_no}</div>
+                <div className="text-sm font-bold text-indigo-600 mt-2">ยอดคงเหลือ: {dispatchDialog.invItem.available_qty_pcs} ชิ้น</div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">ยอดที่ต้องการเบิก (ชิ้น)</label>
+                <Input type="number" min={1} max={dispatchDialog.invItem.available_qty_pcs} value={dispatchDialog.qtyPcs} onChange={(e) => setDispatchDialog(prev => ({...prev, qtyPcs: parseInt(e.target.value) || 0}))} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">เอกสารอ้างอิง (PO, ใบเบิก)</label>
+                <Input placeholder="เช่น PO-2026-001" value={dispatchDialog.refDoc} onChange={(e) => setDispatchDialog(prev => ({...prev, refDoc: e.target.value}))} />
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDispatchDialog(prev => ({...prev, open: false}))}>ยกเลิก</Button>
+            <Button className="bg-[#D4AF37] hover:bg-[#B8962A]" onClick={handleDispatch}>ยืนยันจ่ายออก</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
