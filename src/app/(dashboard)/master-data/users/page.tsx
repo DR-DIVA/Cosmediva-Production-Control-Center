@@ -158,6 +158,7 @@ export default function UsersPage() {
                       <SelectItem value="production">ฝ่ายผลิต (Production)</SelectItem>
                       <SelectItem value="qc">ฝ่ายตรวจสอบคุณภาพ (QC)</SelectItem>
                       <SelectItem value="warehouse">ฝ่ายคลังสินค้า (Warehouse)</SelectItem>
+                      <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
