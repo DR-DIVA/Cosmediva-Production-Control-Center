@@ -24,7 +24,7 @@ import {
 } from "@/components/ui/select"
 import { Label } from '@/components/ui/label'
 
-import { getUsers, createUser } from '@/app/actions/users'
+import { getUsers, createUser, updateUser, deleteUser } from '@/app/actions/users'
 
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([])
@@ -38,6 +38,14 @@ export default function UsersPage() {
   const [newUserName, setNewUserName] = useState('')
   const [newUserRole, setNewUserRole] = useState('')
   const [newUserPassword, setNewUserPassword] = useState('123456') // Default password
+
+  // Edit User State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingUser, setEditingUser] = useState<any>(null)
+  const [editUserName, setEditUserName] = useState('')
+  const [editUserRole, setEditUserRole] = useState('')
+  const [editUserPassword, setEditUserPassword] = useState('')
+
 
   const fetchUsersData = async () => {
     try {
@@ -100,6 +108,68 @@ export default function UsersPage() {
       setIsSubmitting(false)
     }
   }
+
+  
+  const handleEditClick = (user: any) => {
+    setEditingUser(user)
+    setEditUserName(user.full_name || '')
+    setEditUserRole(user.role || '')
+    setEditUserPassword('')
+    setIsEditModalOpen(true)
+  }
+
+  const handleUpdateUser = async () => {
+    if (!editUserName || !editUserRole) {
+      toast.error('กรุณากรอกข้อมูลให้ครบถ้วน')
+      return
+    }
+    
+    setIsSubmitting(true)
+    const toastId = toast.loading('กำลังอัปเดตข้อมูล...')
+    
+    try {
+      const res = await updateUser(editingUser.id, {
+        full_name: editUserName,
+        role: editUserRole,
+        password: editUserPassword || undefined
+      })
+      
+      if (res.success) {
+        toast.success('อัปเดตข้อมูลสำเร็จเรียบร้อย', { id: toastId })
+        setIsEditModalOpen(false)
+        await fetchUsersData()
+      } else {
+        toast.error('เกิดข้อผิดพลาด: ' + res.error, { id: toastId })
+      }
+    } catch (err) {
+      toast.error('เกิดข้อผิดพลาดในการส่งข้อมูล', { id: toastId })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const handleDeleteUser = async () => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบพนักงานคนนี้?')) return;
+    
+    setIsSubmitting(true)
+    const toastId = toast.loading('กำลังลบพนักงาน...')
+    
+    try {
+      const res = await deleteUser(editingUser.id)
+      if (res.success) {
+        toast.success('ลบพนักงานสำเร็จ', { id: toastId })
+        setIsEditModalOpen(false)
+        await fetchUsersData()
+      } else {
+        toast.error('เกิดข้อผิดพลาด: ' + res.error, { id: toastId })
+      }
+    } catch (err) {
+      toast.error('เกิดข้อผิดพลาดในการส่งข้อมูล', { id: toastId })
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
 
   return (
     <div className="p-6 max-w-6xl mx-auto space-y-6">
@@ -242,7 +312,7 @@ export default function UsersPage() {
                         {new Date(user.created_at).toLocaleDateString('th-TH')}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900">แก้ไข</Button>
+                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-900" onClick={() => handleEditClick(user)}>แก้ไข</Button>
                       </td>
                     </tr>
                   ))

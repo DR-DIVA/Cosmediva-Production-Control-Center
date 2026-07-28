@@ -74,3 +74,93 @@ export async function createUser(formData: {
     return { success: false, error: err.message || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ' }
   }
 }
+
+export async function updateUser(userId: string, formData: {
+  full_name: string
+  role: string
+  password?: string
+}) {
+  try {
+    const adminClient = createAdminClient()
+
+    // 1. Update auth user if password is provided
+    if (formData.password) {
+      const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
+        password: formData.password,
+        user_metadata: {
+          full_name: formData.full_name,
+          role: formData.role
+        }
+      })
+      if (authError) {
+        console.error('Error updating auth password:', authError)
+        return { success: false, error: authError.message }
+      }
+    } else {
+      // Just update metadata
+      const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
+        user_metadata: {
+          full_name: formData.full_name,
+          role: formData.role
+        }
+      })
+      if (authError) {
+        console.error('Error updating auth metadata:', authError)
+        return { success: false, error: authError.message }
+      }
+    }
+
+    // 2. Update profiles table
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .update({
+        full_name: formData.full_name,
+        role: formData.role
+      })
+      .eq('id', userId)
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError)
+      return { success: false, error: profileError.message }
+    }
+
+    revalidatePath('/master-data/users')
+    return { success: true }
+    
+  } catch (err: any) {
+    console.error('Unexpected error in updateUser:', err)
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ' }
+  }
+}
+
+export async function deleteUser(userId: string) {
+  try {
+    const adminClient = createAdminClient()
+    
+    // Deleting the auth user automatically cascades to profiles if we set up FK correctly, 
+    // but we can manually delete profile first to be safe, or just delete auth user.
+    // Actually, Supabase admin deleteUser will delete auth, which cascades to public schema if ON DELETE CASCADE is set.
+    // If not, it's safer to delete profile first.
+    const { error: profileError } = await adminClient
+      .from('profiles')
+      .delete()
+      .eq('id', userId)
+      
+    if (profileError) {
+       // Proceed anyway, might be missing
+       console.warn('Profile deletion warning (might be absent):', profileError)
+    }
+
+    const { error: authError } = await adminClient.auth.admin.deleteUser(userId)
+    if (authError) {
+      console.error('Error deleting auth user:', authError)
+      return { success: false, error: authError.message }
+    }
+
+    revalidatePath('/master-data/users')
+    return { success: true }
+  } catch (err: any) {
+    console.error('Unexpected error in deleteUser:', err)
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดไม่ทราบสาเหตุ' }
+  }
+}
