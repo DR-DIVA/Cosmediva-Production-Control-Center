@@ -150,7 +150,7 @@ export default function UsersPage() {
                 <div className="grid gap-2">
                   <Label htmlFor="role">สิทธิ์การใช้งาน (Role)</Label>
                   <Select value={newUserRole} onValueChange={(val) => setNewUserRole(val || '')} disabled={isSubmitting}>
-                    <SelectTrigger>
+                    <SelectTrigger className="w-full">
                       <SelectValue placeholder="เลือกสิทธิ์การใช้งาน" />
                     </SelectTrigger>
                     <SelectContent>
