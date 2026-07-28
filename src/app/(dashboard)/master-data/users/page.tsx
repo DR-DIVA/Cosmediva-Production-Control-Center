@@ -155,7 +155,8 @@ export default function UsersPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">ผู้ดูแลระบบ (Admin)</SelectItem>
-                      <SelectItem value="production">ฝ่ายผลิต (Production)</SelectItem>
+                      <SelectItem value="production_mx">แผนกผสม (MX)</SelectItem>
+                      <SelectItem value="production_pk">แผนกบรรจุ (PK)</SelectItem>
                       <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
                       <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
                       <SelectItem value="warehouse">ฝ่ายคลังสินค้า (Warehouse)</SelectItem>
