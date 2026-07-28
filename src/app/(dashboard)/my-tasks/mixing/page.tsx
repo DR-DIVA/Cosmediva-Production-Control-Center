@@ -185,14 +185,17 @@ export default function MixingTasksPage() {
     
     const currentStatus = details[currentTank]?.status || details[currentTank] || 'WAITING'
     let nextStatus = 'SOAKING'
-    if (currentStatus === 'SOAKING') nextStatus = 'MIXING'
-    else if (currentStatus === 'MIXING') nextStatus = 'DONE'
-    else if (currentStatus === 'DONE') nextStatus = 'SENT_TO_QC'
-    else if (currentStatus === 'QC_PASS') nextStatus = 'SENT_TO_PACKING'
+    let actionText = 'เริ่มแช่สาร'
+    if (currentStatus === 'SOAKING') { nextStatus = 'MIXING'; actionText = 'เริ่มผสม'; }
+    else if (currentStatus === 'MIXING') { nextStatus = 'DONE'; actionText = 'ผสมเสร็จแล้ว'; }
+    else if (currentStatus === 'DONE') { nextStatus = 'SENT_TO_QC'; actionText = 'ส่งตรวจ QC'; }
+    else if (currentStatus === 'QC_PASS') { nextStatus = 'SENT_TO_PACKING'; actionText = 'ส่งไปห้องบรรจุ'; }
     else if (currentStatus === 'SENT_TO_QC' || currentStatus === 'SENT_TO_PACKING') {
       toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
       return
     }
+
+    if (!window.confirm(`ยืนยันการเปลี่ยนสถานะถังที่ ${currentTank} เป็น "${actionText}" ใช่หรือไม่?`)) return;
 
     if (nextStatus === 'WAITING') {
       delete details[currentTank]

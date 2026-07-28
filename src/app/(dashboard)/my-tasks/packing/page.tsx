@@ -264,11 +264,16 @@ export default function PackingTasksPage() {
     
     const currentStatus = details[currentTank]?.status || details[currentTank] || 'WAITING'
     let nextStatus = 'IN_PROGRESS'
-    if (currentStatus === 'IN_PROGRESS') nextStatus = 'DONE'
-    else if (currentStatus === 'DONE') nextStatus = 'SENT_TO_POF'
+    let actionText = 'เริ่มบรรจุ'
+    if (currentStatus === 'IN_PROGRESS') { nextStatus = 'DONE'; actionText = 'บรรจุเสร็จ'; }
+    else if (currentStatus === 'DONE') { nextStatus = 'SENT_TO_POF'; actionText = 'ส่งไปห้องลงลัง (POF)'; }
     else if (currentStatus === 'SENT_TO_POF') {
       toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
       return
+    }
+
+    if (nextStatus !== 'DONE') {
+      if (!window.confirm(`ยืนยันการเปลี่ยนสถานะถังที่ ${currentTank} เป็น "${actionText}" ใช่หรือไม่?`)) return;
     }
 
     if (nextStatus === 'DONE') {
