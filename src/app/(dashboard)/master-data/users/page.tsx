@@ -156,7 +156,7 @@ export default function UsersPage() {
                     <SelectContent>
                       <SelectItem value="admin">ผู้ดูแลระบบ (Admin)</SelectItem>
                       <SelectItem value="production">ฝ่ายผลิต (Production)</SelectItem>
-                      <SelectItem value="qc">ฝ่ายตรวจสอบคุณภาพ (QC)</SelectItem>
+                      <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
                       <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
                       <SelectItem value="warehouse">ฝ่ายคลังสินค้า (Warehouse)</SelectItem>
                       <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
