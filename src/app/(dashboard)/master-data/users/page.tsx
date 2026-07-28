@@ -159,7 +159,10 @@ export default function UsersPage() {
                       <SelectItem value="production_pk">แผนกบรรจุ (PK)</SelectItem>
                       <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
                       <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
-                      <SelectItem value="warehouse">ฝ่ายคลังสินค้า (Warehouse)</SelectItem>
+                      <SelectItem value="warehouse_mmrm">คลังวัตถุดิบ (MMRM)</SelectItem>
+                      <SelectItem value="warehouse_mmbu">คลัง Bulk (MMBU)</SelectItem>
+                      <SelectItem value="warehouse_mmpm">คลังบรรจุภัณฑ์ (MMPM)</SelectItem>
+                      <SelectItem value="warehouse_mmfg">คลังสินค้าสำเร็จรูป (MMFG)</SelectItem>
                       <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
                     </SelectContent>
                   </Select>
