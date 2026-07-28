@@ -157,6 +157,7 @@ export default function UsersPage() {
                       <SelectItem value="admin">ผู้ดูแลระบบ (Admin)</SelectItem>
                       <SelectItem value="production">ฝ่ายผลิต (Production)</SelectItem>
                       <SelectItem value="qc">ฝ่ายตรวจสอบคุณภาพ (QC)</SelectItem>
+                      <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
                       <SelectItem value="warehouse">ฝ่ายคลังสินค้า (Warehouse)</SelectItem>
                       <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
                     </SelectContent>
@@ -229,7 +230,7 @@ export default function UsersPage() {
                       <td className="px-4 py-3">
                         <Badge variant="outline" className={
                           user.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
-                          user.role === 'qc' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30' :
+                          user.role === 'qc' || user.role === 'qa' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30' :
                           'bg-slate-100 text-slate-700'
                         }>
                           {user.role}
