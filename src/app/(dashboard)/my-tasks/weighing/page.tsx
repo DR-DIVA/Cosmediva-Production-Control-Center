@@ -185,12 +185,15 @@ export default function WeighingTasksPage() {
     // Toggle logic: WAITING -> IN_PROGRESS -> DONE -> MOVED -> WAITING
     const currentStatus = details[currentBasket] || 'WAITING'
     let nextStatus = 'IN_PROGRESS'
-    if (currentStatus === 'IN_PROGRESS') nextStatus = 'DONE'
-    else if (currentStatus === 'DONE') nextStatus = 'MOVED'
+    let actionText = 'เริ่มชั่งสาร'
+    if (currentStatus === 'IN_PROGRESS') { nextStatus = 'DONE'; actionText = 'ชั่งเสร็จแล้ว'; }
+    else if (currentStatus === 'DONE') { nextStatus = 'MOVED'; actionText = 'ส่งมอบไปห้องผสม'; }
     else if (currentStatus === 'MOVED') {
       toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
       return
     }
+
+    if (!window.confirm(`ยืนยันการเปลี่ยนสถานะชุดที่ ${currentBasket} เป็น "${actionText}" ใช่หรือไม่?`)) return;
 
     if (nextStatus === 'WAITING') {
       delete details[currentBasket]
