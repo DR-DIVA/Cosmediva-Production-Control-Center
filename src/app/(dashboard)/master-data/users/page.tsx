@@ -254,6 +254,74 @@ export default function UsersPage() {
         </div>
       </div>
 
+      {/* Edit User Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>แก้ไขข้อมูลพนักงาน</DialogTitle>
+            <DialogDescription>
+              ปรับปรุงข้อมูลพนักงาน เปลี่ยนสิทธิ์ หรือตั้งรหัสผ่านใหม่
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>รหัสพนักงาน</Label>
+              <Input value={editingUser?.employee_id || ''} disabled className="bg-slate-100" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">ชื่อ-นามสกุล</Label>
+              <Input 
+                id="edit-name" 
+                placeholder="เช่น สมชาย ใจดี" 
+                value={editUserName}
+                onChange={(e) => setEditUserName(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="edit-role">สิทธิ์การใช้งาน (Role)</Label>
+              <Select value={editUserRole} onValueChange={(val) => setEditUserRole(val || '')} disabled={isSubmitting}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="เลือกสิทธิ์การใช้งาน" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">ผู้ดูแลระบบ (Admin)</SelectItem>
+                  <SelectItem value="production_mx">แผนกผสม (MX)</SelectItem>
+                  <SelectItem value="production_pk">แผนกบรรจุและลงลัง (PK/POF)</SelectItem>
+                  <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
+                  <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
+                  <SelectItem value="warehouse_mmrm_bu">คลังวัตถุดิบ (MMRM/BU)</SelectItem>
+                  <SelectItem value="warehouse_mmpm_fg">คลังบรรจุภัณฑ์และ FG (MMPM/FG)</SelectItem>
+                  <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid gap-2 p-3 bg-slate-50 border rounded-lg mt-2">
+              <Label htmlFor="edit-password" className="text-slate-500 flex items-center gap-2">
+                <KeyRound className="w-4 h-4" /> 
+                รีเซ็ตรหัสผ่านใหม่ (ไม่บังคับ)
+              </Label>
+              <Input 
+                id="edit-password" 
+                placeholder="ปล่อยว่างไว้หากไม่ต้องการเปลี่ยน" 
+                value={editUserPassword}
+                onChange={(e) => setEditUserPassword(e.target.value)}
+                disabled={isSubmitting}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex justify-between items-center sm:justify-between w-full">
+            <Button variant="destructive" onClick={handleDeleteUser} disabled={isSubmitting}>ลบพนักงาน</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setIsEditModalOpen(false)} disabled={isSubmitting}>ยกเลิก</Button>
+              <Button onClick={handleUpdateUser} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white" disabled={isSubmitting}>
+                {isSubmitting ? 'กำลังบันทึก...' : 'บันทึกแก้ไข'}
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Card>
         <CardHeader>
           <CardTitle>รายชื่อพนักงานทั้งหมด</CardTitle>
