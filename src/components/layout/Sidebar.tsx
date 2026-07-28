@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { 
@@ -23,27 +23,31 @@ import {
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
 
+
 const routes = [
   {
     label: 'CosmeFlow Executive',
     subtitle: 'Turn Factory Data into Business Decisions.',
     icon: LayoutDashboard,
     href: '/dashboard',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner']
   },
   {
     label: 'CosmeFlow Planning',
     subtitle: 'Plan Smarter. Produce Better.',
     icon: ListTodo,
     href: '/planner',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner']
   },
   {
     label: 'CosmeFlow RM Control',
     subtitle: 'ระบบควบคุมวัตถุดิบและความพร้อมในการผลิต',
     icon: FileText,
     href: '/incoming-rm',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx']
   },
   {
     label: 'CosmeFlow Production',
@@ -51,12 +55,13 @@ const routes = [
     icon: CheckSquare,
     href: '/my-tasks', // Used as base route for expansion
     color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner', 'production_mx', 'production_pk', 'warehouse_mmrm_bu'],
     subRoutes: [
-      { label: 'ภาพรวม (Overview)', href: '/my-tasks/overview' },
-      { label: 'ชั่งสาร (Weighing)', href: '/my-tasks/weighing' },
-      { label: 'งานผสม (Mixing)', href: '/my-tasks/mixing' },
-      { label: 'งานบรรจุ (Packing)', href: '/my-tasks/packing' },
-      { label: 'งานลงลัง (Cartoning/POF)', href: '/my-tasks/pof' }
+      { label: 'ภาพรวม (Overview)', href: '/my-tasks/overview', allowedRoles: ['admin', 'planner'] },
+      { label: 'ชั่งสาร (Weighing)', href: '/my-tasks/weighing', allowedRoles: ['admin', 'production_mx', 'warehouse_mmrm_bu'] },
+      { label: 'งานผสม (Mixing)', href: '/my-tasks/mixing', allowedRoles: ['admin', 'production_mx'] },
+      { label: 'งานบรรจุ (Packing)', href: '/my-tasks/packing', allowedRoles: ['admin', 'production_pk'] },
+      { label: 'งานลงลัง (Cartoning/POF)', href: '/my-tasks/pof', allowedRoles: ['admin', 'production_pk'] }
     ]
   },
   {
@@ -64,50 +69,58 @@ const routes = [
     subtitle: 'Quality You Can Trust. Visibility You Can Share.',
     icon: ClipboardList,
     href: '/qc-queue',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'qc', 'qa', 'planner']
   },
   {
     label: 'CosmeFlow Assurance',
     subtitle: 'ระบบจัดการปัญหาและคุณภาพ',
     icon: AlertTriangle,
     href: '/issues',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'qa']
   },
   {
     label: 'CosmeFlow FG Warehouse',
     subtitle: 'Every Item. Every Movement. Fully Visible.',
     icon: Package,
-    href: '/my-tasks/fg', // Currently points to FG tasks, can be changed later
-    color: 'text-[#D4AF37]'
+    href: '/my-tasks/fg',
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'warehouse_mmpm_fg', 'planner']
   },
   {
     label: 'CosmeFlow Purchase',
     subtitle: 'From Request to Receipt, Simplified.',
     icon: ShoppingCart,
     href: '/purchase',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner']
   },
   {
     label: 'CosmeFlow Maintenance',
     subtitle: 'Keep Every Machine Running at Its Best.',
     icon: Settings,
     href: '/maintenance',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin']
   },
   {
     label: 'CosmeFlow People',
     subtitle: 'Connecting People with Performance.',
     icon: Users,
     href: '/people',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin']
   },
   {
     label: 'ข้อมูลหลัก (Master Data)',
     icon: Database,
     href: '/master-data',
-    color: 'text-[#D4AF37]'
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin']
   },
 ]
+
 
 interface SidebarProps {
   isCollapsed?: boolean;
@@ -120,6 +133,16 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
   const router = useRouter()
   const supabase = createClient()
   
+  const [userRole, setUserRole] = useState<string | null>(null)
+
+  useEffect(() => {
+    const fetchRole = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUserRole(user?.user_metadata?.role || 'user')
+    }
+    fetchRole()
+  }, [])
+
   // Track expanded state for routes with subRoutes
   const [expanded, setExpanded] = useState<Record<string, boolean>>({
     '/my-tasks': pathname.startsWith('/my-tasks')
@@ -140,6 +163,24 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
     }
   }
 
+  // Filter routes based on role
+  const filteredRoutes = routes.filter(route => {
+    if (!route.allowedRoles) return true; // if no restrictions, allow all
+    return userRole && route.allowedRoles.includes(userRole);
+  }).map(route => {
+    // Also filter subRoutes if they exist
+    if (route.subRoutes) {
+      return {
+        ...route,
+        subRoutes: route.subRoutes.filter(sub => {
+          if (!sub.allowedRoles) return true;
+          return userRole && sub.allowedRoles.includes(userRole);
+        })
+      }
+    }
+    return route;
+  })
+
   return (
     <div className="space-y-4 py-4 flex flex-col h-full bg-[#2D2721] text-white overflow-y-auto overflow-x-hidden sidebar-scroll">
       <div className="px-3 py-2 flex-1">
@@ -159,7 +200,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
           </button>
         </div>
         <div className="space-y-2">
-          {routes.map((route) => (
+          {filteredRoutes.map((route) => (
             <div key={route.href}>
               {route.subRoutes ? (
                 <details 

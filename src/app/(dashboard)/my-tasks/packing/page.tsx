@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 // Force rebuild
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
