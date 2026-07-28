@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -44,7 +44,7 @@ export default function WeighingTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email || 'Unknown User')
+      setCurrentUser(user.email?.split('@')[0] || 'Unknown User')
     }
   }
 
@@ -80,12 +80,12 @@ export default function WeighingTasksPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('โหลดข้อมูลล้มเหลว')
+      toast.error('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง')
       console.error(error)
     } else if (data) {
-      // Filter for weighing tasks (process name contains 'ชั่ง' or 'mm-rm')
+      // Filter for weighing tasks (process name contains 'เธเธฑเนเธ' or 'mm-rm')
       const weighingTasks = data.filter(t => 
-        (t.processes as any)?.process_name?.toLowerCase().includes('ชั่ง') || 
+        (t.processes as any)?.process_name?.toLowerCase().includes('เธเธฑเนเธ') || 
         (t.processes as any)?.process_name?.toLowerCase().includes('weigh')
       )
       setTasks(weighingTasks)
@@ -111,7 +111,7 @@ export default function WeighingTasksPage() {
       const historyItems: any[] = []
       data.forEach(task => {
         const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (!pName || (!pName.toLowerCase().includes('ชั่ง') && !pName.toLowerCase().includes('weigh'))) return
+        if (!pName || (!pName.toLowerCase().includes('เธเธฑเนเธ') && !pName.toLowerCase().includes('weigh'))) return
         
         const details = task.tank_details || {}
         Object.keys(details).forEach(key => {
@@ -172,9 +172,9 @@ export default function WeighingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('อัปเดตสถานะไม่สำเร็จ')
+      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธกเนเธชเธณเน€เธฃเนเธ')
     } else {
-      toast.success('อัปเดตสถานะเรียบร้อย')
+      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธข')
       fetchWeighingTasks()
     }
   }
@@ -188,7 +188,7 @@ export default function WeighingTasksPage() {
     if (currentStatus === 'IN_PROGRESS') nextStatus = 'DONE'
     else if (currentStatus === 'DONE') nextStatus = 'MOVED'
     else if (currentStatus === 'MOVED') {
-      toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
+      toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธชเนเธเธ•เนเธญเนเธเนเธฅเนเธงเนเธ”เน')
       return
     }
 
@@ -233,13 +233,13 @@ export default function WeighingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('อัปเดตสถานะชุดชั่งสารไม่สำเร็จ')
+      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธเธธเธ”เธเธฑเนเธเธชเธฒเธฃเนเธกเนเธชเธณเน€เธฃเนเธ')
     } else {
-      toast.success(`อัปเดตชุดชั่งสารที่ ${currentBasket} เป็นสถานะ ${nextStatus}`)
+      toast.success(`เธญเธฑเธเน€เธ”เธ•เธเธธเธ”เธเธฑเนเธเธชเธฒเธฃเธ—เธตเน ${currentBasket} เน€เธเนเธเธชเธ–เธฒเธเธฐ ${nextStatus}`)
       
       // --- AUTO HAND-OFF TO MIXING ---
       if (nextStatus === 'MOVED') {
-        const { data: mixProcess } = await supabase.from('processes').select('id').like('process_name', '%ผสม%').limit(1).single()
+        const { data: mixProcess } = await supabase.from('processes').select('id').like('process_name', '%เธเธชเธก%').limit(1).single()
         if (mixProcess) {
           const { data: existingMixLog } = await supabase.from('production_logs')
             .select('id, tank_details')
@@ -308,14 +308,14 @@ export default function WeighingTasksPage() {
           <div>
             <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-2">
               <ShoppingBasket className="w-5 h-5 text-purple-500" />
-              สถานะการชั่งสารคิวนี้ (ถังที่ {start} ถึง {end}) จากทั้งหมด {total} ถัง
+              เธชเธ–เธฒเธเธฐเธเธฒเธฃเธเธฑเนเธเธชเธฒเธฃเธเธดเธงเธเธตเน (เธ–เธฑเธเธ—เธตเน {start} เธ–เธถเธ {end}) เธเธฒเธเธ—เธฑเนเธเธซเธกเธ” {total} เธ–เธฑเธ
             </h3>
 
           </div>
           <div className="space-x-2">
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
               <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-emerald-600 hover:bg-emerald-700">
-                <Play className="w-4 h-4 mr-2" /> เริ่มชั่งสาร
+                <Play className="w-4 h-4 mr-2" /> เน€เธฃเธดเนเธกเธเธฑเนเธเธชเธฒเธฃ
               </Button>
             )}
 
@@ -342,13 +342,13 @@ export default function WeighingTasksPage() {
             const history = details[`${b}_history`] || []
             const tooltipContent = history.length > 0 ? (
               <div className="space-y-1">
-                <p className="font-semibold text-orange-300 border-b border-slate-700 pb-1 mb-2">ประวัติถัง {b}</p>
+                <p className="font-semibold text-orange-300 border-b border-slate-700 pb-1 mb-2">เธเธฃเธฐเธงเธฑเธ•เธดเธ–เธฑเธ {b}</p>
                 {history.map((h: any, i: number) => {
                   let statusText = ''
                   let badgeColor = 'bg-slate-700 text-slate-100'
-                  if (h.status === 'IN_PROGRESS') { statusText = 'เริ่มชั่ง'; badgeColor = 'bg-yellow-600 text-white' }
-                  if (h.status === 'DONE') { statusText = 'ชั่งเสร็จ'; badgeColor = 'bg-green-500 text-white' }
-                  if (h.status === 'MOVED') { statusText = 'ไปห้องผสม'; badgeColor = 'bg-sky-500 text-white' }
+                  if (h.status === 'IN_PROGRESS') { statusText = 'เน€เธฃเธดเนเธกเธเธฑเนเธ'; badgeColor = 'bg-yellow-600 text-white' }
+                  if (h.status === 'DONE') { statusText = 'เธเธฑเนเธเน€เธชเธฃเนเธ'; badgeColor = 'bg-green-500 text-white' }
+                  if (h.status === 'MOVED') { statusText = 'เนเธเธซเนเธญเธเธเธชเธก'; badgeColor = 'bg-sky-500 text-white' }
                   return (
                     <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
                       <div className="flex items-center gap-1.5">
@@ -380,7 +380,7 @@ export default function WeighingTasksPage() {
                       className={`flex flex-col items-center justify-center p-2 rounded-lg border ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
                     >
                       <ShoppingBasket className="w-6 h-6 mb-1" />
-                      <span className="text-[10px] font-medium">ชุดที่ {b}</span>
+                      <span className="text-[10px] font-medium">เธเธธเธ”เธ—เธตเน {b}</span>
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
@@ -411,7 +411,7 @@ export default function WeighingTasksPage() {
         {task.start_time && (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
             <Clock className="w-4 h-4" /> 
-            เริ่มเมื่อ: {new Date(task.start_time).toLocaleString('th-TH')}
+            เน€เธฃเธดเนเธกเน€เธกเธทเนเธญ: {new Date(task.start_time).toLocaleString('th-TH')}
           </div>
         )}
       </div>
@@ -424,10 +424,10 @@ export default function WeighingTasksPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Scale className="w-8 h-8 text-yellow-400" />
-            งานชั่งสาร (Weighing)
+            เธเธฒเธเธเธฑเนเธเธชเธฒเธฃ (Weighing)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>รายการงานชั่งสารประจำวัน</div>
+             <div>เธฃเธฒเธขเธเธฒเธฃเธเธฒเธเธเธฑเนเธเธชเธฒเธฃเธเธฃเธฐเธเธณเธงเธฑเธ</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
@@ -437,7 +437,7 @@ export default function WeighingTasksPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="w-64">
             <Input 
-              placeholder="ค้นหา SKU หรือ LOT..." 
+              placeholder="เธเนเธเธซเธฒ SKU เธซเธฃเธทเธญ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -448,14 +448,14 @@ export default function WeighingTasksPage() {
               size="sm"
               onClick={() => setViewMode('list')}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
+              <ListIcon className="w-4 h-4 mr-2" /> เนเธเธเธ•เธฒเธฃเธฒเธ
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
+              <CalendarIcon className="w-4 h-4 mr-2" /> เธเธเธดเธ—เธดเธ
             </Button>
           </div>
         </div>
@@ -465,11 +465,11 @@ export default function WeighingTasksPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
-            คิวงานชั่งสาร
+            เธเธดเธงเธเธฒเธเธเธฑเนเธเธชเธฒเธฃ
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            ประวัติการทำงานวันนี้
+            เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธงเธฑเธเธเธตเน
           </TabsTrigger>
         </TabsList>
 
@@ -484,11 +484,11 @@ export default function WeighingTasksPage() {
         <Card className="shadow-md overflow-hidden border-0 ring-1 ring-slate-200">
           <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">ตัวกรองวันที่ตามแผน:</span>
+              <span className="text-sm font-medium text-slate-700">เธ•เธฑเธงเธเธฃเธญเธเธงเธฑเธเธ—เธตเนเธ•เธฒเธกเนเธเธ:</span>
               <Input type="date" className="w-40 h-8 text-xs bg-white" value={filterDate} onChange={(e) => setFilterDate(e.target.value)} />
               {filterDate && (
                 <Button variant="ghost" size="sm" onClick={() => setFilterDate('')} className="h-8 text-xs text-slate-500">
-                  แสดงทั้งหมด
+                  เนเธชเธ”เธเธ—เธฑเนเธเธซเธกเธ”
                 </Button>
               )}
             </div>
@@ -499,13 +499,13 @@ export default function WeighingTasksPage() {
                 <TableHeader className="bg-[#F8F6F0]">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>สินค้า / SKU</TableHead>
+                    <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
-                    <TableHead>ถังที่ (ตามแผน)</TableHead>
-                    <TableHead>จำนวนถัง (รวม)</TableHead>
-                    <TableHead>Bulk size (kg/ถัง)</TableHead>
-                    <TableHead>วันที่จัดคิว (แผน)</TableHead>
-                    <TableHead>สถานะ</TableHead>
+                    <TableHead>เธ–เธฑเธเธ—เธตเน (เธ•เธฒเธกเนเธเธ)</TableHead>
+                    <TableHead>เธเธณเธเธงเธเธ–เธฑเธ (เธฃเธงเธก)</TableHead>
+                    <TableHead>Bulk size (kg/เธ–เธฑเธ)</TableHead>
+                    <TableHead>เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง (เนเธเธ)</TableHead>
+                    <TableHead>เธชเธ–เธฒเธเธฐ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -513,7 +513,7 @@ export default function WeighingTasksPage() {
                     <TableRow>
                       <TableCell colSpan={8} className="text-center h-32 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-purple-500" />
-                        กำลังโหลดข้อมูล...
+                        เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...
                       </TableCell>
                     </TableRow>
                   ) : tasks.filter(t => {
@@ -526,7 +526,7 @@ export default function WeighingTasksPage() {
                   }).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center h-32 text-slate-500">
-                        ไม่มีคิวงานชั่งสาร{filterDate ? 'ในวันที่เลือก' : ''}
+                        เนเธกเนเธกเธตเธเธดเธงเธเธฒเธเธเธฑเนเธเธชเธฒเธฃ{filterDate ? 'เนเธเธงเธฑเธเธ—เธตเนเน€เธฅเธทเธญเธ' : ''}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -556,16 +556,16 @@ export default function WeighingTasksPage() {
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start || '-'} - {task.tank_end || '-'}</TableCell>
-                          <TableCell>{(task.tank_end - task.tank_start + 1) || task.production_lots?.total_tanks || 0} ถัง</TableCell>
+                          <TableCell>{(task.tank_end - task.tank_start + 1) || task.production_lots?.total_tanks || 0} เธ–เธฑเธ</TableCell>
                           <TableCell>{task.production_lots?.kg_per_tank || '-'} kg</TableCell>
                           <TableCell>
                           {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}
                         </TableCell>
                         <TableCell>
-                          {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">รอชั่งสาร (แผน)</Badge>}
-                          {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">รอชั่งสาร</Badge>}
-                          {task.status === 'IN_PROGRESS' && <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30">กำลังชั่ง</Badge>}
-                          {task.status === 'DONE' && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">ชั่งเสร็จแล้ว</Badge>}
+                          {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">เธฃเธญเธเธฑเนเธเธชเธฒเธฃ (เนเธเธ)</Badge>}
+                          {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">เธฃเธญเธเธฑเนเธเธชเธฒเธฃ</Badge>}
+                          {task.status === 'IN_PROGRESS' && <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30">เธเธณเธฅเธฑเธเธเธฑเนเธ</Badge>}
+                          {task.status === 'DONE' && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">เธเธฑเนเธเน€เธชเธฃเนเธเนเธฅเนเธง</Badge>}
                           </TableCell>
                         </TableRow>
                         {expandedRow === task.id && (
@@ -589,23 +589,23 @@ export default function WeighingTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
+              <CardTitle>เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธฅเนเธงเธงเธฑเธเธเธตเน</CardTitle>
             </CardHeader>
             <CardContent>
               {todayHistory.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  ไม่มีประวัติการทำงานของวันนี้
+                  เนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธเธงเธฑเธเธเธตเน
                 </div>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">เวลา</th>
-                        <th className="px-4 py-3 font-medium">ผู้ดำเนินการ</th>
+                        <th className="px-4 py-3 font-medium">เน€เธงเธฅเธฒ</th>
+                        <th className="px-4 py-3 font-medium">เธเธนเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ</th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
-                        <th className="px-4 py-3 font-medium">ชุดที่</th>
-                        <th className="px-4 py-3 font-medium">สถานะ</th>
+                        <th className="px-4 py-3 font-medium">เธเธธเธ”เธ—เธตเน</th>
+                        <th className="px-4 py-3 font-medium">เธชเธ–เธฒเธเธฐ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -616,9 +616,9 @@ export default function WeighingTasksPage() {
                         if (item.action === 'MOVED') statusColor = "bg-sky-100 text-sky-700"
                         
                         let statusText = item.action
-                        if (item.action === 'DONE') statusText = 'ชั่งเสร็จ'
-                        if (item.action === 'IN_PROGRESS') statusText = 'เริ่มชั่ง'
-                        if (item.action === 'MOVED') statusText = 'ไปห้องผสม'
+                        if (item.action === 'DONE') statusText = 'เธเธฑเนเธเน€เธชเธฃเนเธ'
+                        if (item.action === 'IN_PROGRESS') statusText = 'เน€เธฃเธดเนเธกเธเธฑเนเธ'
+                        if (item.action === 'MOVED') statusText = 'เนเธเธซเนเธญเธเธเธชเธก'
 
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
@@ -629,7 +629,7 @@ export default function WeighingTasksPage() {
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                               {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap font-semibold">ชุดที่ {item.tankNum}</td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold">เธเธธเธ”เธ—เธตเน {item.tankNum}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <Badge variant="secondary" className={statusColor}>
                                 {statusText}
@@ -653,7 +653,7 @@ export default function WeighingTasksPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl mb-4">
               <ShoppingBasket className="w-6 h-6 text-sky-500" />
-              รายละเอียดงานชั่งสาร
+              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธเธเธฑเนเธเธชเธฒเธฃ
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 border-t pt-4">
