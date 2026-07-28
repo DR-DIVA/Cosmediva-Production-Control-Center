@@ -53,7 +53,7 @@ export async function createUser(formData: {
     // 2. Insert into profiles (bypass RLS)
     const { error: profileError } = await adminClient
       .from('profiles')
-      .insert({
+      .upsert({
         id: userId,
         employee_id: formData.employee_id,
         full_name: formData.full_name,
