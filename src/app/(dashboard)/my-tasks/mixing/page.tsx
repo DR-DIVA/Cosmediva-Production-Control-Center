@@ -44,7 +44,7 @@ export default function MixingTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email?.split('@')[0] || 'Unknown User')
+      setCurrentUser(user.email || 'Unknown User')
     }
   }
 
@@ -79,10 +79,10 @@ export default function MixingTasksPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง')
+      toast.error('โหลดข้อมูลล้มเหลว')
     } else if (data) {
       const mixingTasks = data.filter(t => 
-        (t.processes as any)?.process_name?.toLowerCase().includes('เธเธชเธก') || 
+        (t.processes as any)?.process_name?.toLowerCase().includes('ผสม') || 
         (t.processes as any)?.process_name?.toLowerCase().includes('mix')
       )
       setTasks(mixingTasks)
@@ -108,7 +108,7 @@ export default function MixingTasksPage() {
       const historyItems: any[] = []
       data.forEach(task => {
         const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (!pName || (!pName.toLowerCase().includes('เธเธชเธก') && !pName.toLowerCase().includes('mix'))) return
+        if (!pName || (!pName.toLowerCase().includes('ผสม') && !pName.toLowerCase().includes('mix'))) return
         
         const details = task.tank_details || {}
         Object.keys(details).forEach(key => {
@@ -172,9 +172,9 @@ export default function MixingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('อัปเดตสถานะเรียบร้อย')
       fetchMixingTasks()
     }
   }
@@ -190,7 +190,7 @@ export default function MixingTasksPage() {
     else if (currentStatus === 'DONE') nextStatus = 'SENT_TO_QC'
     else if (currentStatus === 'QC_PASS') nextStatus = 'SENT_TO_PACKING'
     else if (currentStatus === 'SENT_TO_QC' || currentStatus === 'SENT_TO_PACKING') {
-      toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธชเนเธเธ•เนเธญเนเธเนเธฅเนเธงเนเธ”เน')
+      toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
       return
     }
 
@@ -235,13 +235,13 @@ export default function MixingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธเธฒเธฃเธเธชเธกเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะการผสมไม่สำเร็จ')
     } else {
-      toast.success(`เธญเธฑเธเน€เธ”เธ•เธ–เธฑเธเธ—เธตเน ${currentTank} เน€เธเนเธเธชเธ–เธฒเธเธฐ ${nextStatus}`)
+      toast.success(`อัปเดตถังที่ ${currentTank} เป็นสถานะ ${nextStatus}`)
       
       // --- AUTO HAND-OFF TO QC ---
       if (nextStatus === 'SENT_TO_QC') {
-        const { data: qcProcess } = await supabase.from('processes').select('id').eq('process_name', 'เธฃเธญ QC').single()
+        const { data: qcProcess } = await supabase.from('processes').select('id').eq('process_name', 'รอ QC').single()
         if (qcProcess) {
           const { data: existingQCLog } = await supabase.from('production_logs')
             .select('id, tank_details')
@@ -281,7 +281,7 @@ export default function MixingTasksPage() {
           }
         }
       } else if (nextStatus === 'SENT_TO_PACKING') {
-        const { data: packingProcess } = await supabase.from('processes').select('id').ilike('process_name', '%เธเธฃเธฃเธเธธ%').limit(1).single()
+        const { data: packingProcess } = await supabase.from('processes').select('id').ilike('process_name', '%บรรจุ%').limit(1).single()
         if (packingProcess) {
           const { data: existingPackingLog } = await supabase.from('production_logs')
             .select('id, tank_details')
@@ -343,10 +343,10 @@ export default function MixingTasksPage() {
           <div>
             <h3 className="font-semibold text-slate-700 flex items-center gap-2">
               <Beaker className="w-5 h-5 text-[#D4AF37]" />
-              เธชเธ–เธฒเธเธฐเธเธฒเธฃเธเธชเธกเธเธดเธงเธเธตเน (เธ–เธฑเธเธ—เธตเน {start} เธ–เธถเธ {end}) เธเธฒเธเธ—เธฑเนเธเธซเธกเธ” {total} เธ–เธฑเธ
+              สถานะการผสมคิวนี้ (ถังที่ {start} ถึง {end}) จากทั้งหมด {total} ถัง
             </h3>
             <div className="flex items-center gap-2 mt-3">
-              <span className="text-sm font-medium text-slate-600">เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง:</span>
+              <span className="text-sm font-medium text-slate-600">วันที่จัดคิว:</span>
               <span className="text-sm text-slate-800 font-medium">
                 {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
               </span>
@@ -355,7 +355,7 @@ export default function MixingTasksPage() {
           <div className="space-x-2">
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
               <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover">
-                <Play className="w-4 h-4 mr-2" /> เน€เธฃเธดเนเธกเธเธชเธก
+                <Play className="w-4 h-4 mr-2" /> เริ่มผสม
               </Button>
             )}
           </div>
@@ -397,16 +397,16 @@ export default function MixingTasksPage() {
             const history = details[`${t}_history`] || []
             const tooltipContent = history.length > 0 ? (
               <div className="space-y-1">
-                <p className="font-semibold text-[#4A4238]/ border-b border-slate-700 pb-1 mb-2">เธเธฃเธฐเธงเธฑเธ•เธดเธ–เธฑเธ {t}</p>
+                <p className="font-semibold text-[#4A4238]/ border-b border-slate-700 pb-1 mb-2">ประวัติถัง {t}</p>
                 {history.map((h: any, i: number) => {
                   let statusText = h.status
                   let badgeColor = 'bg-slate-700 text-slate-100'
-                  if (h.status === 'SOAKING') { statusText = 'เนเธเนเธชเธฒเธฃ'; badgeColor = 'bg-orange-500 text-white' }
-                  if (h.status === 'MIXING') { statusText = 'เธเธชเธก'; badgeColor = 'bg-[#D4AF37] text-white' }
-                  if (h.status === 'DONE') { statusText = 'เน€เธชเธฃเนเธ'; badgeColor = 'bg-purple-500 text-white' }
-                  if (h.status === 'SENT_TO_QC') { statusText = 'เธชเนเธ QC'; badgeColor = 'bg-teal-500 text-white' }
+                  if (h.status === 'SOAKING') { statusText = 'แช่สาร'; badgeColor = 'bg-orange-500 text-white' }
+                  if (h.status === 'MIXING') { statusText = 'ผสม'; badgeColor = 'bg-[#D4AF37] text-white' }
+                  if (h.status === 'DONE') { statusText = 'เสร็จ'; badgeColor = 'bg-purple-500 text-white' }
+                  if (h.status === 'SENT_TO_QC') { statusText = 'ส่ง QC'; badgeColor = 'bg-teal-500 text-white' }
                   if (h.status === 'QC_PASS') { statusText = 'QC PASS'; badgeColor = 'bg-green-600 text-white' }
-                  if (h.status === 'SENT_TO_PACKING') { statusText = 'เธชเนเธเธเธฃเธฃเธเธธ'; badgeColor = 'bg-indigo-500 text-white' }
+                  if (h.status === 'SENT_TO_PACKING') { statusText = 'ส่งบรรจุ'; badgeColor = 'bg-indigo-500 text-white' }
                   if (h.status === 'PAUSED') { statusText = 'QC HOLD'; badgeColor = 'bg-orange-600 text-white' }
                   if (h.status === 'FAILED') { statusText = 'QC REJECT'; badgeColor = 'bg-red-600 text-white' }
                   if (h.status === 'REPROCESS') { statusText = 'QC REPROCESS'; badgeColor = 'bg-purple-600 text-white' }
@@ -418,7 +418,7 @@ export default function MixingTasksPage() {
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-slate-400">
                         <User className="w-3 h-3 shrink-0" />
-                        <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
+                        <span className="text-[10px] truncate max-w-[120px]">{h.user?.split('@')[0]}</span>
                       </div>
                       {h.note && (
                         <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
@@ -448,7 +448,7 @@ export default function MixingTasksPage() {
                       className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
                     >
                       <Beaker className={`w-8 h-8 mb-2 ${animate}`} />
-                      <span className="text-xs font-bold">เธ–เธฑเธ {t}</span>
+                      <span className="text-xs font-bold">ถัง {t}</span>
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
@@ -466,7 +466,7 @@ export default function MixingTasksPage() {
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg shadow-sm max-w-2xl">
             <div className="flex items-center gap-2 text-red-700 font-semibold mb-1">
               <AlertTriangle className="w-4 h-4" />
-              <span>เธเธฑเธเธซเธฒเธเธฒเธฃเธเธฅเธดเธ• (Issues)</span>
+              <span>ปัญหาการผลิต (Issues)</span>
             </div>
             <div className="text-sm text-red-600 whitespace-pre-wrap pl-6">
               {task.note.split('\n').map((line: string, i: number) => (
@@ -497,7 +497,7 @@ export default function MixingTasksPage() {
         {task.start_time && (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
             <Clock className="w-4 h-4" /> 
-            เน€เธฃเธดเนเธกเน€เธกเธทเนเธญ: {new Date(task.start_time).toLocaleString('th-TH')}
+            เริ่มเมื่อ: {new Date(task.start_time).toLocaleString('th-TH')}
             {task.sub_step && <span className="ml-2 font-semibold">({task.sub_step})</span>}
           </div>
         )}
@@ -511,10 +511,10 @@ export default function MixingTasksPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <FlaskConical className="w-8 h-8 text-yellow-400" />
-            เธเธฒเธเธเธชเธก (Mixing)
+            งานผสม (Mixing)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>เธฃเธฒเธขเธเธฒเธฃเธเธฒเธเธเธชเธกเธเธฃเธฐเธเธณเธงเธฑเธ</div>
+             <div>รายการงานผสมประจำวัน</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
@@ -524,7 +524,7 @@ export default function MixingTasksPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="w-64">
             <Input 
-              placeholder="เธเนเธเธซเธฒ SKU เธซเธฃเธทเธญ LOT..." 
+              placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -535,14 +535,14 @@ export default function MixingTasksPage() {
               size="sm"
               onClick={() => setViewMode('list')}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> เนเธเธเธ•เธฒเธฃเธฒเธ
+              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> เธเธเธดเธ—เธดเธ
+              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
             </Button>
           </div>
         </div>
@@ -552,11 +552,11 @@ export default function MixingTasksPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
-            เธเธดเธงเธเธฒเธเธเธชเธก
+            คิวงานผสม
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธงเธฑเธเธเธตเน
+            ประวัติการทำงานวันนี้
           </TabsTrigger>
         </TabsList>
 
@@ -571,7 +571,7 @@ export default function MixingTasksPage() {
         <Card className="shadow-md overflow-hidden border-0 ring-1 ring-slate-200">
           <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">เธ•เธฑเธงเธเธฃเธญเธเธงเธฑเธเธ—เธตเนเธ•เธฒเธกเนเธเธ:</span>
+              <span className="text-sm font-medium text-slate-700">ตัวกรองวันที่ตามแผน:</span>
               <Input 
                 type="date" 
                 className="w-40 h-8 text-xs bg-white"
@@ -580,7 +580,7 @@ export default function MixingTasksPage() {
               />
               {filterDate && (
                 <Button variant="ghost" size="sm" onClick={() => setFilterDate('')} className="h-8 text-xs text-slate-500">
-                  เนเธชเธ”เธเธ—เธฑเนเธเธซเธกเธ”
+                  แสดงทั้งหมด
                 </Button>
               )}
             </div>
@@ -591,13 +591,13 @@ export default function MixingTasksPage() {
                 <TableHeader className="bg-[#F8F6F0]">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
+                    <TableHead>สินค้า / SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
-                    <TableHead>เธ–เธฑเธเธ—เธตเน (เธ•เธฒเธกเนเธเธ)</TableHead>
-                    <TableHead>เธเธณเธเธงเธเธ–เธฑเธ (เธฃเธงเธก)</TableHead>
-                    <TableHead>Bulk size (kg/เธ–เธฑเธ)</TableHead>
-                    <TableHead>เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง (เนเธเธ)</TableHead>
-                    <TableHead>เธชเธ–เธฒเธเธฐ</TableHead>
+                    <TableHead>ถังที่ (ตามแผน)</TableHead>
+                    <TableHead>จำนวนถัง (รวม)</TableHead>
+                    <TableHead>Bulk size (kg/ถัง)</TableHead>
+                    <TableHead>วันที่จัดคิว (แผน)</TableHead>
+                    <TableHead>สถานะ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -605,7 +605,7 @@ export default function MixingTasksPage() {
                     <TableRow>
                       <TableCell colSpan={8} className="text-center h-32 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-[#D4AF37]" />
-                        เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...
+                        กำลังโหลดข้อมูล...
                       </TableCell>
                     </TableRow>
                   ) : tasks.filter(t => {
@@ -618,7 +618,7 @@ export default function MixingTasksPage() {
                   }).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center h-32 text-slate-500">
-                        เนเธกเนเธกเธตเธเธดเธงเธเธฒเธเธเธชเธก{filterDate ? 'เนเธเธงเธฑเธเธ—เธตเนเน€เธฅเธทเธญเธ' : ''}
+                        ไม่มีคิวงานผสม{filterDate ? 'ในวันที่เลือก' : ''}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -644,7 +644,7 @@ export default function MixingTasksPage() {
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start} - {task.tank_end}</TableCell>
-                          <TableCell>{task.production_lots?.total_tanks || 0} เธ–เธฑเธ</TableCell>
+                          <TableCell>{task.production_lots?.total_tanks || 0} ถัง</TableCell>
                           <TableCell>{task.production_lots?.kg_per_tank || '-'} kg</TableCell>
                           <TableCell>
                             {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}
@@ -663,14 +663,14 @@ export default function MixingTasksPage() {
                                }
                                
                                if (allMixDone && task.status !== 'WAITING' && task.status !== 'PLANNED' && task.status) {
-                                  return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">เธเธชเธกเน€เธชเธฃเนเธเธชเธดเนเธ</Badge>;
+                                  return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">ผสมเสร็จสิ้น</Badge>;
                                }
                                
-                               if (task.status === 'PLANNED' || !task.status) return <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">เธฃเธญเธเธชเธก (เนเธเธ)</Badge>;
-                               if (task.status === 'WAITING') return <Badge variant="outline" className="bg-slate-100 text-slate-600">เธฃเธญเธเธชเธก</Badge>;
-                               if (task.status === 'IN_PROGRESS' && task.sub_step === 'SOAKING') return <Badge variant="outline" className="bg-sky-50 text-sky-600 border-sky-200">เนเธเนเธชเธฒเธฃ</Badge>;
-                               if (task.status === 'IN_PROGRESS') return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30">เธเธณเธฅเธฑเธเธเธชเธก</Badge>;
-                               if (task.status === 'DONE') return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">เธเธชเธกเน€เธชเธฃเนเธเธชเธดเนเธ</Badge>;
+                               if (task.status === 'PLANNED' || !task.status) return <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">รอผสม (แผน)</Badge>;
+                               if (task.status === 'WAITING') return <Badge variant="outline" className="bg-slate-100 text-slate-600">รอผสม</Badge>;
+                               if (task.status === 'IN_PROGRESS' && task.sub_step === 'SOAKING') return <Badge variant="outline" className="bg-sky-50 text-sky-600 border-sky-200">แช่สาร</Badge>;
+                               if (task.status === 'IN_PROGRESS') return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30">กำลังผสม</Badge>;
+                               if (task.status === 'DONE') return <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">ผสมเสร็จสิ้น</Badge>;
                                if (task.status === 'QC_PASS') return <Badge variant="outline" className="bg-purple-50 text-purple-600 border-purple-200">QC Pass</Badge>;
                                return null;
                             })()}
@@ -697,23 +697,23 @@ export default function MixingTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธฅเนเธงเธงเธฑเธเธเธตเน</CardTitle>
+              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
             </CardHeader>
             <CardContent>
               {todayHistory.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  เนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธเธงเธฑเธเธเธตเน
+                  ไม่มีประวัติการทำงานของวันนี้
                 </div>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">เน€เธงเธฅเธฒ</th>
-                        <th className="px-4 py-3 font-medium">เธเธนเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ</th>
+                        <th className="px-4 py-3 font-medium">เวลา</th>
+                        <th className="px-4 py-3 font-medium">ผู้ดำเนินการ</th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
-                        <th className="px-4 py-3 font-medium">เธ–เธฑเธเธ—เธตเน</th>
-                        <th className="px-4 py-3 font-medium">เธชเธ–เธฒเธเธฐ</th>
+                        <th className="px-4 py-3 font-medium">ถังที่</th>
+                        <th className="px-4 py-3 font-medium">สถานะ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -724,22 +724,22 @@ export default function MixingTasksPage() {
                         if (item.action === 'SENT_TO_QC') statusColor = "bg-sky-100 text-sky-700"
                         
                         let statusText = item.action
-                        if (item.action === 'DONE') statusText = 'เธเธชเธกเน€เธชเธฃเนเธ'
-                        if (item.action === 'IN_PROGRESS') statusText = 'เธเธณเธฅเธฑเธเธ”เธณเน€เธเธดเธเธเธฒเธฃ'
-                        if (item.action === 'SOAKING') statusText = 'เธเธณเธฅเธฑเธเนเธเน'
-                        if (item.action === 'MIXING') statusText = 'เธเธณเธฅเธฑเธเธเธฑเนเธ'
-                        if (item.action === 'SENT_TO_QC') statusText = 'เธชเนเธ QC'
+                        if (item.action === 'DONE') statusText = 'ผสมเสร็จ'
+                        if (item.action === 'IN_PROGRESS') statusText = 'กำลังดำเนินการ'
+                        if (item.action === 'SOAKING') statusText = 'กำลังแช่'
+                        if (item.action === 'MIXING') statusText = 'กำลังปั่น'
+                        if (item.action === 'SENT_TO_QC') statusText = 'ส่ง QC'
 
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                             <td className="px-4 py-3 whitespace-nowrap">
                               {new Date(item.timestamp).toLocaleTimeString('th-TH')}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">{item.user}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                               {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap font-semibold">เธ–เธฑเธเธ—เธตเน {item.tankNum}</td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold">ถังที่ {item.tankNum}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <Badge variant="secondary" className={statusColor}>
                                 {statusText}
@@ -763,7 +763,7 @@ export default function MixingTasksPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl mb-4">
               <Beaker className="w-6 h-6 text-pink-500" />
-              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธเธเธชเธก
+              รายละเอียดงานผสม
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 border-t pt-4">

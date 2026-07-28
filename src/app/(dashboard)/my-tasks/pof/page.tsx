@@ -53,14 +53,14 @@ export default function PofTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email?.split('@')[0] || 'Unknown User')
+      setCurrentUser(user.email || 'Unknown User')
     }
   }
 
   const fetchRooms = async () => {
     const { data } = await supabase.from('rooms').select('*').order('room_name')
     if (data) {
-      const allowedRooms = ['POF 1', 'POF 2', 'PVC Shrink', 'เธฅเธเธฅเธฑเธเธญเธขเนเธฒเธเน€เธ”เธตเธขเธง', 'POF - เธญเธทเนเธเน']
+      const allowedRooms = ['POF 1', 'POF 2', 'PVC Shrink', 'ลงลังอย่างเดียว', 'POF - อื่นๆ']
       const filteredRooms = data.filter((r: any) => allowedRooms.includes(r.room_name))
       
       // Sort to match exact requested order
@@ -110,12 +110,12 @@ export default function PofTasksPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง')
+      toast.error('โหลดข้อมูลล้มเหลว')
       console.error(error)
     } else if (data) {
       const pofTasks = data.filter(t => 
         (t.processes as any)?.process_name?.toLowerCase().includes('pof') || 
-        (t.processes as any)?.process_name?.toLowerCase().includes('เธญเธธเนเธกเธเธเน')
+        (t.processes as any)?.process_name?.toLowerCase().includes('อุโมงค์')
       )
       setAllTasks(data)
       setTasks(pofTasks)
@@ -141,7 +141,7 @@ export default function PofTasksPage() {
       const historyItems: any[] = []
       data.forEach(task => {
         const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (!pName || (!pName.toLowerCase().includes('pof') && !pName.toLowerCase().includes('เธญเธธเนเธกเธเธเน'))) return
+        if (!pName || (!pName.toLowerCase().includes('pof') && !pName.toLowerCase().includes('อุโมงค์'))) return
         
         const details = task.tank_details || {}
         Object.keys(details).forEach(key => {
@@ -184,7 +184,7 @@ export default function PofTasksPage() {
 
     const handleDefectSubmit = async () => {
     if (!defectLotId || !defectQuantity) {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธญเธเธเนเธญเธกเธนเธฅเนเธซเนเธเธฃเธเธ–เนเธงเธ')
+      toast.error('กรุณาระอกข้อมูลให้ครบถ้วน')
       return
     }
     const { error } = await supabase.from('production_logs').insert({
@@ -196,9 +196,9 @@ export default function PofTasksPage() {
       activity_date: new Date().toISOString().split('T')[0]
     })
     if (error) {
-      toast.error('เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('บันทึกของเสียไม่สำเร็จ')
     } else {
-      toast.success('เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเธเธฃเธฐเธเธณเธงเธฑเธเธชเธณเน€เธฃเนเธ')
+      toast.success('บันทึกของเสียประจำวันสำเร็จ')
       setIsDefectModalOpen(false)
       setDefectLotId('')
       setDefectQuantity('')
@@ -222,9 +222,9 @@ export default function PofTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('อัปเดตสถานะเรียบร้อย')
       fetchPofTasks()
     }
   }
@@ -236,9 +236,9 @@ export default function PofTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธซเนเธญเธ/เธเธธเธ”เธเธเธดเธเธฑเธ•เธดเธเธฒเธเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตห้อง/จุดปฏิบัติงานไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธซเนเธญเธเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('อัปเดตห้องเรียบร้อย')
       fetchPofTasks()
     }
   }
@@ -251,7 +251,7 @@ export default function PofTasksPage() {
     let nextStatus = 'IN_PROGRESS'
     if (currentStatus === 'IN_PROGRESS') nextStatus = 'DONE'
     else if (currentStatus === 'DONE') {
-      toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเน€เธชเธฃเนเธเธชเธดเนเธเนเธฅเนเธงเนเธ”เน')
+      toast.error('ไม่สามารถแก้ไขรายการที่เสร็จสิ้นแล้วได้')
       return
     }
 
@@ -267,7 +267,7 @@ export default function PofTasksPage() {
       
       const sameLotPackingTasks = allTasks.filter(t => 
         t.production_lot_id === task.production_lot_id && 
-        ((t.processes as any)?.process_name?.toLowerCase().includes('เธเธฃเธฃเธเธธ') || (t.processes as any)?.process_name?.toLowerCase().includes('packing'))
+        ((t.processes as any)?.process_name?.toLowerCase().includes('บรรจุ') || (t.processes as any)?.process_name?.toLowerCase().includes('packing'))
       );
       const packingTask = sameLotPackingTasks.find(t => currentTank >= parseInt(t.tank_start) && currentTank <= parseInt(t.tank_end) && (t.tank_details as any)?.[currentTank]?.pieces !== undefined);
       
@@ -288,11 +288,11 @@ export default function PofTasksPage() {
     const handleQtyConfirm = async () => {
     const qtyNum = Number(qtyDialog.qty)
     if (!qtyDialog.qty || isNaN(qtyNum) || qtyNum < 0) {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธขเธญเธ”เธเธฒเธ FG (เธฅเธฑเธ) เธ—เธตเนเธ–เธนเธเธ•เนเธญเธ')
+      toast.error('กรุณาระบุยอดงาน FG (ลัง) ที่ถูกต้อง')
       return
     }
     if (!qtyDialog.boxLot || qtyDialog.boxLot.trim() === '') {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเนเธญเธกเธนเธฅเธเธฅเนเธญเธเธเธดเธกเธเนเธฅเนเธญเธ• (เน€เธเนเธ Lot.009/26)')
+      toast.error('กรุณาระบุข้อมูลกล่องพิมพ์ล็อต (เช่น Lot.009/26)')
       return
     }
     
@@ -301,7 +301,7 @@ export default function PofTasksPage() {
     
     const maxCartons = qtyDialog.maxCartons || Infinity;
     if (maxCartons !== Infinity && qtyNum > maxCartons) {
-      toast.error(`เธขเธญเธ”เธฅเธฑเธเธ—เธตเนเธฃเธฐเธเธธเน€เธเธดเธเธเธงเนเธฒเธขเธญเธ”เธชเธนเธเธชเธธเธ”เธเธญเธเธ–เธฑเธเธเธตเน (${maxCartons} เธฅเธฑเธ)`);
+      toast.error(`ยอดลังที่ระบุเกินกว่ายอดสูงสุดของถังนี้ (${maxCartons} ลัง)`);
       return;
     }
 
@@ -357,16 +357,16 @@ export default function PofTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธ–เธฑเธเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะถังไม่สำเร็จ')
     } else {
-      toast.success(`เธญเธฑเธเน€เธ”เธ• POF เธ–เธฑเธเธ—เธตเน ${currentTank} เน€เธเนเธเธชเธ–เธฒเธเธฐ ${nextStatus}`)
+      toast.success(`อัปเดต POF ถังที่ ${currentTank} เป็นสถานะ ${nextStatus}`)
       
       // --- AUTO HAND-OFF TO FG ---
       if (nextStatus === 'DONE') {
         const passedBoxLot = boxLot || details[currentTank]?.box_lot || ''
         const passedCartons = qty > 0 ? qty : (details[currentTank]?.cartons || 0)
         
-        const { data: fgProcess } = await supabase.from('processes').select('id').or('process_name.ilike.%FG%,process_name.ilike.%เธเธฅเธฑเธ%').limit(1).single()
+        const { data: fgProcess } = await supabase.from('processes').select('id').or('process_name.ilike.%FG%,process_name.ilike.%คลัง%').limit(1).single()
         if (fgProcess) {
           const fgDetails: any = {}
           fgDetails[currentTank] = { status: 'WAITING', box_lot: passedBoxLot, cartons: passedCartons }
@@ -409,20 +409,20 @@ export default function PofTasksPage() {
           <div>
             <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-2">
               <PackageOpen className="w-5 h-5 text-orange-500" />
-              เธชเธ–เธฒเธเธฐเธเธฒเธฃเธฅเธเธฅเธฑเธ เธเธดเธงเธเธตเน (เธ–เธฑเธเธ—เธตเน {start} เธ–เธถเธ {end}) เธเธฒเธเธ—เธฑเนเธเธซเธกเธ” {total} เธ–เธฑเธ
+              สถานะการลงลัง คิวนี้ (ถังที่ {start} ถึง {end}) จากทั้งหมด {total} ถัง
             </h3>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง:</span>
+                <span className="text-sm font-medium text-slate-600">วันที่จัดคิว:</span>
                 <span className="text-sm text-slate-800 font-medium">
                   {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">เธเธธเธ”เธฅเธเธฅเธฑเธ:</span>
+                <span className="text-sm font-medium text-slate-600">จุดลงลัง:</span>
                 <Select value={task.room_id || ''} onValueChange={(val) => updateTaskRoom(task.id, val)}>
                   <SelectTrigger className="w-40 h-8 text-xs bg-white">
-                    <SelectValue placeholder="เธฃเธฐเธเธธเน€เธเธฃเธทเนเธญเธเธญเธ">
+                    <SelectValue placeholder="ระบุเครื่องอบ">
                       {rooms.find(r => r.id === task.room_id)?.room_name}
                     </SelectValue>
                   </SelectTrigger>
@@ -440,7 +440,7 @@ export default function PofTasksPage() {
           <div className="flex gap-2">
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
               <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-orange-600 hover:bg-orange-700">
-                <ArrowDownToLine className="w-4 h-4 mr-2" /> เน€เธฃเธดเนเธกเธฅเธเธฅเธฑเธ
+                <ArrowDownToLine className="w-4 h-4 mr-2" /> เริ่มลงลัง
               </Button>
             )}
 
@@ -488,20 +488,20 @@ export default function PofTasksPage() {
                }
                const startCarton = cartonsBefore + 1;
                const endCarton = cartonsBefore + actualCartons;
-               cartonRangeText = `เธฅเธฑเธเธ—เธตเน ${startCarton}-${endCarton}`;
+               cartonRangeText = `ลังที่ ${startCarton}-${endCarton}`;
             }
 
             const tooltipContent = history.length > 0 ? (
               <div className="space-y-1 min-w-[150px]">
                 <div className="border-b border-slate-700 pb-1.5 mb-2">
-                  <p className="font-semibold text-orange-300">เธเธฃเธฐเธงเธฑเธ•เธดเธ–เธฑเธ {t}</p>
+                  <p className="font-semibold text-orange-300">ประวัติถัง {t}</p>
                   <div className="text-[10px] text-slate-300 mt-1 flex flex-col gap-0.5">
-                    <div className="flex justify-between"><span>Actual Yield:</span> <span className={actualCartons > 0 ? "text-emerald-400 font-medium" : ""}>{actualCartons > 0 ? actualCartons.toLocaleString() : '-'} เธฅเธฑเธ</span></div>
+                    <div className="flex justify-between"><span>Actual Yield:</span> <span className={actualCartons > 0 ? "text-emerald-400 font-medium" : ""}>{actualCartons > 0 ? actualCartons.toLocaleString() : '-'} ลัง</span></div>
                     {cartonRangeText && <div className="text-emerald-400 mt-0.5 font-medium">{cartonRangeText}</div>}
                   </div>
                   {tankBoxLot && (
                     <div className="text-[10px] text-amber-300 mt-1 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded w-fit border border-amber-500/20">
-                      ๐“ฆ {tankBoxLot}
+                      📦 {tankBoxLot}
                     </div>
                   )}
                 </div>
@@ -509,11 +509,11 @@ export default function PofTasksPage() {
                   let statusText = ''
                   let badgeClass = 'bg-slate-700 text-slate-100 border-none'
                   if (h.status === 'IN_PROGRESS') {
-                    statusText = 'เน€เธฃเธดเนเธกเธฅเธเธฅเธฑเธ'
+                    statusText = 'เริ่มลงลัง'
                     badgeClass = 'bg-orange-500 text-white border-orange-600'
                   }
                   if (h.status === 'DONE') {
-                    statusText = 'เธฅเธเธฅเธฑเธเน€เธชเธฃเนเธ'
+                    statusText = 'ลงลังเสร็จ'
                     badgeClass = 'bg-green-500 text-white border-green-600'
                   }
                   return (
@@ -524,11 +524,11 @@ export default function PofTasksPage() {
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-slate-400">
                         <User className="w-3 h-3 shrink-0" />
-                        <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
+                        <span className="text-[10px] truncate max-w-[120px]">{h.user?.split('@')[0]}</span>
                       </div>
                       {h.cartons && (
                         <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
-                          เนเธ”เน {h.cartons.toLocaleString()} เธฅเธฑเธ
+                          ได้ {h.cartons.toLocaleString()} ลัง
                         </div>
                       )}
                     </div>
@@ -552,7 +552,7 @@ export default function PofTasksPage() {
                       className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-300 ${color} ${isClickable ? 'cursor-pointer hover:scale-105 hover:shadow-md' : 'opacity-70'} overflow-hidden group`}
                     >
                       <Package className={`w-8 h-8 mb-2 ${animate}`} />
-                      <span className="text-xs font-bold">เธ–เธฑเธ {t}</span>
+                      <span className="text-xs font-bold">ถัง {t}</span>
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
@@ -583,7 +583,7 @@ export default function PofTasksPage() {
         {task.start_time && (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
             <Clock className="w-4 h-4" /> 
-            เน€เธฃเธดเนเธกเธฅเธเธฅเธฑเธเน€เธกเธทเนเธญ: {new Date(task.start_time).toLocaleString('th-TH')}
+            เริ่มลงลังเมื่อ: {new Date(task.start_time).toLocaleString('th-TH')}
           </div>
         )}
       </div>
@@ -596,10 +596,10 @@ export default function PofTasksPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Boxes className="w-8 h-8 text-yellow-400 shrink-0" />
-            เธเธฒเธเธฅเธเธฅเธฑเธ (Cartoning/POF)
+            งานลงลัง (Cartoning/POF)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>เธฃเธฒเธขเธเธฒเธฃเธเธฒเธเธฅเธเธฅเธฑเธ เธเธฃเธฐเธเธณเธงเธฑเธ</div>
+             <div>รายการงานลงลัง ประจำวัน</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
@@ -609,7 +609,7 @@ export default function PofTasksPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="w-64">
             <Input 
-              placeholder="เธเนเธเธซเธฒ SKU เธซเธฃเธทเธญ LOT..." 
+              placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -620,14 +620,14 @@ export default function PofTasksPage() {
               size="sm"
               onClick={() => setViewMode('list')}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> เนเธเธเธ•เธฒเธฃเธฒเธ
+              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> เธเธเธดเธ—เธดเธ
+              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
             </Button>
           </div>
         </div>
@@ -637,11 +637,11 @@ export default function PofTasksPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
-            เธเธดเธงเธเธฒเธเธซเนเธญเธเธญเธธเนเธกเธเธเนเธฅเธเธฅเธฑเธ
+            คิวงานห้องอุโมงค์ลงลัง
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธงเธฑเธเธเธตเน
+            ประวัติการทำงานวันนี้
           </TabsTrigger>
         </TabsList>
 
@@ -656,7 +656,7 @@ export default function PofTasksPage() {
         <Card className="shadow-md overflow-hidden border-0 ring-1 ring-slate-200">
           <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">เธ•เธฑเธงเธเธฃเธญเธเธงเธฑเธเธ—เธตเนเธ•เธฒเธกเนเธเธ:</span>
+              <span className="text-sm font-medium text-slate-700">ตัวกรองวันที่ตามแผน:</span>
               <Input 
                 type="date" 
                 className="w-40 h-8 text-xs bg-white"
@@ -665,7 +665,7 @@ export default function PofTasksPage() {
               />
               {filterDate && (
                 <Button variant="ghost" size="sm" onClick={() => setFilterDate('')} className="h-8 text-xs text-slate-500">
-                  เนเธชเธ”เธเธ—เธฑเนเธเธซเธกเธ”
+                  แสดงทั้งหมด
                 </Button>
               )}
             </div>
@@ -676,16 +676,16 @@ export default function PofTasksPage() {
                 <TableHeader className="bg-[#F8F6F0]">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
+                    <TableHead>สินค้า / SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
-                    <TableHead>เธ–เธฑเธเธ—เธตเน</TableHead>
-                    <TableHead>เธเธณเธเธงเธเธ–เธฑเธ (เธฃเธงเธก)</TableHead>
-                    <TableHead>Bulk size (kg/เธ–เธฑเธ)</TableHead>
-                    <TableHead>STD Yield (เธฅเธฑเธ)</TableHead>
-                    <TableHead>Actual Yield (เธฅเธฑเธ)</TableHead>
-                    <TableHead>เธชเธฃเธธเธเธขเธญเธ”เธชเธฐเธชเธก</TableHead>
-                    <TableHead>เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง (เนเธเธ)</TableHead>
-                    <TableHead>เธชเธ–เธฒเธเธฐ</TableHead>
+                    <TableHead>ถังที่</TableHead>
+                    <TableHead>จำนวนถัง (รวม)</TableHead>
+                    <TableHead>Bulk size (kg/ถัง)</TableHead>
+                    <TableHead>STD Yield (ลัง)</TableHead>
+                    <TableHead>Actual Yield (ลัง)</TableHead>
+                    <TableHead>สรุปยอดสะสม</TableHead>
+                    <TableHead>วันที่จัดคิว (แผน)</TableHead>
+                    <TableHead>สถานะ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -693,7 +693,7 @@ export default function PofTasksPage() {
                     <TableRow>
                       <TableCell colSpan={11} className="text-center h-32 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-orange-500" />
-                        เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...
+                        กำลังโหลดข้อมูล...
                       </TableCell>
                     </TableRow>
                   ) : tasks.filter(t => {
@@ -706,7 +706,7 @@ export default function PofTasksPage() {
                   }).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={11} className="text-center h-32 text-slate-500">
-                        เนเธกเนเธกเธตเธเธดเธงเธเธฒเธเธญเธ POF{filterDate ? 'เนเธเธงเธฑเธเธ—เธตเนเน€เธฅเธทเธญเธ' : ''}
+                        ไม่มีคิวงานอบ POF{filterDate ? 'ในวันที่เลือก' : ''}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -747,7 +747,7 @@ export default function PofTasksPage() {
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start} - {task.tank_end}</TableCell>
-                          <TableCell>{task.production_lots?.total_tanks || 0} เธ–เธฑเธ</TableCell>
+                          <TableCell>{task.production_lots?.total_tanks || 0} ถัง</TableCell>
                           <TableCell>{kgPerTank > 0 ? `${kgPerTank} kg` : '-'}</TableCell>
                           <TableCell>{stdYieldCartons > 0 ? stdYieldCartons.toLocaleString() : '-'}</TableCell>
                           <TableCell className={actualYieldCartons > 0 ? "text-emerald-600 font-medium" : ""}>{actualYieldCartons > 0 ? actualYieldCartons.toLocaleString() : '-'}</TableCell>
@@ -778,17 +778,17 @@ export default function PofTasksPage() {
                               const totalCartons = plannedQty / pcsPerCarton;
                               const calcPieces = cumulativeCartons * pcsPerCarton;
                               
-                              return `[เธขเธญเธ”เธชเธฐเธชเธก (${cumulativeCartons.toLocaleString()} เธฅเธฑเธ/${Math.ceil(totalCartons).toLocaleString()}เธฅเธฑเธ) x${pcsPerCarton} เธเธดเนเธ = ${calcPieces.toLocaleString()} เธเธดเนเธ/ ${plannedQty.toLocaleString()} เธเธดเนเธ]`;
+                              return `[ยอดสะสม (${cumulativeCartons.toLocaleString()} ลัง/${Math.ceil(totalCartons).toLocaleString()}ลัง) x${pcsPerCarton} ชิ้น = ${calcPieces.toLocaleString()} ชิ้น/ ${plannedQty.toLocaleString()} ชิ้น]`;
                             })()}
                           </TableCell>
                           <TableCell>
                             {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}
                           </TableCell>
                           <TableCell>
-                            {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">เธฃเธญเธฅเธเธฅเธฑเธ (เนเธเธ)</Badge>}
-                            {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">เธฃเธญเธฅเธเธฅเธฑเธ</Badge>}
-                            {task.status === 'IN_PROGRESS' && <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">เธเธณเธฅเธฑเธเธญเธเธเธดเธฅเนเธก</Badge>}
-                            {task.status === 'DONE' && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">เน€เธชเธฃเนเธเนเธฅเนเธง</Badge>}
+                            {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">รอลงลัง (แผน)</Badge>}
+                            {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">รอลงลัง</Badge>}
+                            {task.status === 'IN_PROGRESS' && <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">กำลังอบฟิล์ม</Badge>}
+                            {task.status === 'DONE' && <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">เสร็จแล้ว</Badge>}
                           </TableCell>
                         </TableRow>
                         {expandedRow === task.id && (
@@ -812,23 +812,23 @@ export default function PofTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธฅเนเธงเธงเธฑเธเธเธตเน</CardTitle>
+              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
             </CardHeader>
             <CardContent>
               {todayHistory.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  เนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธเธงเธฑเธเธเธตเน
+                  ไม่มีประวัติการทำงานของวันนี้
                 </div>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">เน€เธงเธฅเธฒ</th>
-                        <th className="px-4 py-3 font-medium">เธเธนเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ</th>
+                        <th className="px-4 py-3 font-medium">เวลา</th>
+                        <th className="px-4 py-3 font-medium">ผู้ดำเนินการ</th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
-                        <th className="px-4 py-3 font-medium">เธเธธเธ”เธ—เธตเน</th>
-                        <th className="px-4 py-3 font-medium">เธชเธ–เธฒเธเธฐ</th>
+                        <th className="px-4 py-3 font-medium">ชุดที่</th>
+                        <th className="px-4 py-3 font-medium">สถานะ</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -839,20 +839,20 @@ export default function PofTasksPage() {
                         if (item.action === 'MOVED') statusColor = "bg-sky-100 text-sky-700"
                         
                         let statusText = item.action
-                        if (item.action === 'DONE') statusText = 'เธฅเธเธฅเธฑเธเน€เธชเธฃเนเธ'
-                        if (item.action === 'IN_PROGRESS') statusText = 'เธเธณเธฅเธฑเธเธ”เธณเน€เธเธดเธเธเธฒเธฃ'
-                        if (item.action === 'MOVED') statusText = 'เนเธเน€เธเนเธฒเธเธฅเธฑเธ FG'
+                        if (item.action === 'DONE') statusText = 'ลงลังเสร็จ'
+                        if (item.action === 'IN_PROGRESS') statusText = 'กำลังดำเนินการ'
+                        if (item.action === 'MOVED') statusText = 'ไปเข้าคลัง FG'
 
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                             <td className="px-4 py-3 whitespace-nowrap">
                               {new Date(item.timestamp).toLocaleTimeString('th-TH')}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">{item.user}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                               {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap font-semibold">เธเธธเธ”เธ—เธตเน {item.tankNum}</td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold">ชุดที่ {item.tankNum}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <Badge variant="secondary" className={statusColor}>
                                 {statusText}
@@ -876,7 +876,7 @@ export default function PofTasksPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl mb-4">
               <Package className="w-6 h-6 text-orange-500" />
-              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธเธซเนเธญเธเธญเธธเนเธกเธเธเน (POF)
+              รายละเอียดงานห้องอุโมงค์ (POF)
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 border-t pt-4">
@@ -889,21 +889,21 @@ export default function PofTasksPage() {
       <Dialog open={qtyDialog.open} onOpenChange={(open) => !open && setQtyDialog(prev => ({ ...prev, open: false }))}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>เธฃเธฐเธเธธเธขเธญเธ”เธเธฒเธ FG (เธฅเธฑเธ)</DialogTitle>
+            <DialogTitle>ระบุยอดงาน FG (ลัง)</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">
-                เธขเธญเธ”เธเธฒเธเธ—เธตเนเนเธเนเธเนเธชเนเธฅเธฑเธเนเธ”เนเธเธฃเธดเธ เธชเธณเธซเธฃเธฑเธเธ–เธฑเธเธ—เธตเน {qtyDialog.tankNum}
+                ยอดงานที่แพ็คใส่ลังได้จริง สำหรับถังที่ {qtyDialog.tankNum}
                 {qtyDialog.task && qtyDialog.maxCartons !== undefined && (
                   <span className="text-xs text-slate-500 block mt-1 font-normal">
-                    (เนเธชเนเนเธ”เนเธชเธนเธเธชเธธเธ”เนเธกเนเน€เธเธดเธ {qtyDialog.maxCartons} เธฅเธฑเธ)
+                    (ใส่ได้สูงสุดไม่เกิน {qtyDialog.maxCartons} ลัง)
                   </span>
                 )}
               </label>
               <Input 
                 type="number" 
-                placeholder="เธเธณเธเธงเธเธฅเธฑเธ"
+                placeholder="จำนวนลัง"
                 value={qtyDialog.qty}
                 min={1}
                 max={qtyDialog.maxCartons}
@@ -922,19 +922,19 @@ export default function PofTasksPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium text-slate-700">
-                เธเธฅเนเธญเธเธเธดเธกเธเนเธฅเนเธญเธ•เธญเธฐเนเธฃ (Box Lot No.) <span className="text-red-500">*</span>
+                กล่องพิมพ์ล็อตอะไร (Box Lot No.) <span className="text-red-500">*</span>
               </label>
               <Input 
                 value={qtyDialog.boxLot}
                 onChange={(e) => setQtyDialog(prev => ({ ...prev, boxLot: e.target.value }))}
-                placeholder="เน€เธเนเธ Lot.009/26"
+                placeholder="เช่น Lot.009/26"
                 className="text-lg"
               />
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <Button variant="outline" onClick={() => setQtyDialog(prev => ({ ...prev, open: false }))}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={handleQtyConfirm} className="bg-orange-600 hover:bg-orange-700 text-white">เธขเธทเธเธขเธฑเธ</Button>
+            <Button variant="outline" onClick={() => setQtyDialog(prev => ({ ...prev, open: false }))}>ยกเลิก</Button>
+            <Button onClick={handleQtyConfirm} className="bg-orange-600 hover:bg-orange-700 text-white">ยืนยัน</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -942,13 +942,13 @@ export default function PofTasksPage() {
       <Dialog open={isDefectModalOpen} onOpenChange={setIsDefectModalOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเธเธฃเธฐเธเธณเธงเธฑเธ (Daily Defect Report)</DialogTitle>
+            <DialogTitle>บันทึกของเสียประจำวัน (Daily Defect Report)</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium">เน€เธฅเธทเธญเธ LOT เธเธฒเธ</label>
+              <label className="text-sm font-medium">เลือก LOT งาน</label>
               <Select value={defectLotId} onValueChange={(val) => setDefectLotId(val || '')}>
-                <SelectTrigger><SelectValue placeholder="เน€เธฅเธทเธญเธ LOT" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="เลือก LOT" /></SelectTrigger>
                 <SelectContent>
                   {tasks.map(task => (
                     <SelectItem key={task.production_lots?.id} value={task.production_lots?.id || ''}>
@@ -959,26 +959,26 @@ export default function PofTasksPage() {
               </Select>
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">เธเธณเธเธงเธเธเธดเนเธเธ—เธตเนเน€เธชเธตเธข</label>
+              <label className="text-sm font-medium">จำนวนชิ้นที่เสีย</label>
               <Input 
                 type="number" 
-                placeholder="เธฃเธฐเธเธธเธเธณเธเธงเธเธเธดเนเธ" 
+                placeholder="ระบุจำนวนชิ้น" 
                 value={defectQuantity} 
                 onChange={e => setDefectQuantity(e.target.value)} 
               />
             </div>
             <div className="space-y-2">
-              <label className="text-sm font-medium">เธชเธฒเน€เธซเธ•เธธ / เธซเธกเธฒเธขเน€เธซเธ•เธธ</label>
+              <label className="text-sm font-medium">สาเหตุ / หมายเหตุ</label>
               <Input 
-                placeholder="เน€เธเนเธ เธเธตเธฅเนเธ•เธ, เธเธดเธฅเนเธกเธขเนเธ" 
+                placeholder="เช่น ซีลแตก, ฟิล์มย่น" 
                 value={defectNote} 
                 onChange={e => setDefectNote(e.target.value)} 
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDefectModalOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDefectSubmit}>เธเธฑเธเธ—เธถเธเธเนเธญเธกเธนเธฅ</Button>
+            <Button variant="outline" onClick={() => setIsDefectModalOpen(false)}>ยกเลิก</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDefectSubmit}>บันทึกข้อมูล</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

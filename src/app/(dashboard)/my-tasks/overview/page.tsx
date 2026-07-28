@@ -14,12 +14,12 @@ import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 
 const COLUMNS = [
-  { id: 'MM-RM', title: '1. เธเธฑเนเธเธชเธฒเธฃ (MM-RM)', keywords: ['เธเธฑเนเธ', 'mm-rm'], colorClasses: { bg: 'bg-amber-50', header: 'bg-amber-100', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-200 text-amber-800', cardBorder: 'border-t-amber-500' } },
-  { id: 'MIX', title: '2. เธซเนเธญเธเธเธชเธก (Mix 1-6)', keywords: ['เธเธชเธก', 'mix'], colorClasses: { bg: 'bg-[#D4AF37]/', header: 'bg-[#D4AF37]/', border: 'border-[#D4AF37]/30', text: 'text-[#4A4238]', badge: 'bg-[#D4AF37]/ text-[#4A4238]', cardBorder: 'border-t-blue-500' } },
-  { id: 'QC', title: '3. เธชเธ–เธฒเธเธฐ QC', keywords: ['qc', 'quarantine', 'passed', 'rejected'], colorClasses: { bg: 'bg-purple-50', header: 'bg-purple-100', border: 'border-purple-200', text: 'text-purple-800', badge: 'bg-purple-200 text-purple-800', cardBorder: 'border-t-purple-500' } },
-  { id: 'PACKING', title: '4. เธซเนเธญเธเธเธฃเธฃเธเธธ (Packing)', keywords: ['เธเธฃเธฃเธเธธ', 'packing'], colorClasses: { bg: 'bg-emerald-50', header: 'bg-emerald-100', border: 'border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-200 text-emerald-800', cardBorder: 'border-t-emerald-500' } },
-  { id: 'POF', title: '5. เธซเนเธญเธเธญเธธเนเธกเธเธเน (POF)', keywords: ['pof', 'เธญเธธเนเธกเธเธเน'], colorClasses: { bg: 'bg-cyan-50', header: 'bg-cyan-100', border: 'border-cyan-200', text: 'text-cyan-800', badge: 'bg-cyan-200 text-cyan-800', cardBorder: 'border-t-cyan-500' } },
-  { id: 'FG', title: '6. เน€เธเนเธฒเธเธฅเธฑเธ FG', keywords: ['fg', 'เธเธฅเธฑเธ', 'store'], colorClasses: { bg: 'bg-[#F8F6F0]', header: 'bg-slate-200', border: 'border-slate-300', text: 'text-slate-800', badge: 'bg-slate-300 text-slate-800', cardBorder: 'border-t-slate-500' } }
+  { id: 'MM-RM', title: '1. ชั่งสาร (MM-RM)', keywords: ['ชั่ง', 'mm-rm'], colorClasses: { bg: 'bg-amber-50', header: 'bg-amber-100', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-200 text-amber-800', cardBorder: 'border-t-amber-500' } },
+  { id: 'MIX', title: '2. ห้องผสม (Mix 1-6)', keywords: ['ผสม', 'mix'], colorClasses: { bg: 'bg-[#D4AF37]/', header: 'bg-[#D4AF37]/', border: 'border-[#D4AF37]/30', text: 'text-[#4A4238]', badge: 'bg-[#D4AF37]/ text-[#4A4238]', cardBorder: 'border-t-blue-500' } },
+  { id: 'QC', title: '3. สถานะ QC', keywords: ['qc', 'quarantine', 'passed', 'rejected'], colorClasses: { bg: 'bg-purple-50', header: 'bg-purple-100', border: 'border-purple-200', text: 'text-purple-800', badge: 'bg-purple-200 text-purple-800', cardBorder: 'border-t-purple-500' } },
+  { id: 'PACKING', title: '4. ห้องบรรจุ (Packing)', keywords: ['บรรจุ', 'packing'], colorClasses: { bg: 'bg-emerald-50', header: 'bg-emerald-100', border: 'border-emerald-200', text: 'text-emerald-800', badge: 'bg-emerald-200 text-emerald-800', cardBorder: 'border-t-emerald-500' } },
+  { id: 'POF', title: '5. ห้องอุโมงค์ (POF)', keywords: ['pof', 'อุโมงค์'], colorClasses: { bg: 'bg-cyan-50', header: 'bg-cyan-100', border: 'border-cyan-200', text: 'text-cyan-800', badge: 'bg-cyan-200 text-cyan-800', cardBorder: 'border-t-cyan-500' } },
+  { id: 'FG', title: '6. เข้าคลัง FG', keywords: ['fg', 'คลัง', 'store'], colorClasses: { bg: 'bg-[#F8F6F0]', header: 'bg-slate-200', border: 'border-slate-300', text: 'text-slate-800', badge: 'bg-slate-300 text-slate-800', cardBorder: 'border-t-slate-500' } }
 ]
 
 const parseRanges = (str: string) => {
@@ -214,9 +214,9 @@ export default function MyTasksPage() {
       .eq('id', logId)
 
     if (error) {
-      toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธ”เน')
+      toast.error('ไม่สามารถอัปเดตสถานะได้')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง')
+      toast.success('อัปเดตสถานะเรียบร้อยแล้ว')
       if (newStatus === 'PAUSED') {
         setIsPauseDialogOpen(false)
         setIsWaitDialogOpen(false)
@@ -229,16 +229,16 @@ export default function MyTasksPage() {
         const lotId = sourceTask.production_lots?.id || sourceTask.production_lot_id;
         
         let nextProcessName = '';
-        if (extraData.isWeighingTask) nextProcessName = 'เธเธชเธก'; // to Mix
-        else if (extraData.isMixTask) nextProcessName = 'เธฃเธญ QC'; // to QC
-        else if (extraData.isPackingTask) nextProcessName = 'เธฃเธญเธญเธธเนเธกเธเธเน'; // to POF
-        else if (extraData.isPofTask) nextProcessName = 'เธฃเธญเน€เธเนเธฒเธเธฅเธฑเธ FG'; // to FG
+        if (extraData.isWeighingTask) nextProcessName = 'ผสม'; // to Mix
+        else if (extraData.isMixTask) nextProcessName = 'รอ QC'; // to QC
+        else if (extraData.isPackingTask) nextProcessName = 'รออุโมงค์'; // to POF
+        else if (extraData.isPofTask) nextProcessName = 'รอเข้าคลัง FG'; // to FG
 
         if (nextProcessName && lotId) {
           const { data: nextProc } = await supabase.from('processes').select('id').eq('process_name', nextProcessName).single()
           if (nextProc) {
             let merged = false;
-            if (nextProcessName === 'เธฃเธญเธญเธธเนเธกเธเธเน' || nextProcessName === 'เธฃเธญเน€เธเนเธฒเธเธฅเธฑเธ FG') {
+            if (nextProcessName === 'รออุโมงค์' || nextProcessName === 'รอเข้าคลัง FG') {
                const { data: existingTasks } = await supabase.from('production_logs')
                  .select('*')
                  .eq('production_lot_id', lotId)
@@ -289,15 +289,15 @@ export default function MyTasksPage() {
     if (!activeStartTask) return
     
     if (!tankStart || !tankEnd) {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธฅเธณเธ”เธฑเธเธ–เธฑเธเน€เธฃเธดเนเธกเธ•เนเธเนเธฅเธฐเธชเธดเนเธเธชเธธเธ”')
+      toast.error('กรุณาระบุลำดับถังเริ่มต้นและสิ้นสุด')
       return
     }
 
-    const isMixColumn = activeStartTask.processes?.process_name?.includes('เธเธชเธก') || activeStartTask.rooms?.room_name?.includes('Mix')
-    const isPackingColumn = activeStartTask.processes?.process_name?.includes('เธเธฃเธฃเธเธธ')
+    const isMixColumn = activeStartTask.processes?.process_name?.includes('ผสม') || activeStartTask.rooms?.room_name?.includes('Mix')
+    const isPackingColumn = activeStartTask.processes?.process_name?.includes('บรรจุ')
     
     if ((isMixColumn || isPackingColumn) && !selectedRoomId) {
-      toast.error('เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธซเนเธญเธ')
+      toast.error('กรุณาเลือกห้อง')
       return
     }
 
@@ -329,7 +329,7 @@ export default function MyTasksPage() {
         ...(isMixColumn ? { sub_step: 'SOAK' } : {})
       }).eq('id', activeStartTask.id)
       
-      toast.success('เนเธเนเธเธเธฒเธเนเธฅเธฐเน€เธฃเธดเนเธกเธเธฒเธเธเธฒเธเธชเนเธงเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง')
+      toast.success('แบ่งงานและเริ่มงานบางส่วนเรียบร้อยแล้ว')
       setIsStartDialogOpen(false)
       fetchTasks()
       return
@@ -358,7 +358,7 @@ export default function MyTasksPage() {
   const handleEstimateClick = (task: any) => {
     setActiveStartTask(task)
     if (!task.start_time) {
-      toast.error('เธขเธฑเธเนเธกเนเนเธ”เนเน€เธฃเธดเนเธกเธเธฒเธ (เนเธกเนเธกเธตเน€เธงเธฅเธฒ Start Time)')
+      toast.error('ยังไม่ได้เริ่มงาน (ไม่มีเวลา Start Time)')
       return
     }
     const startMs = new Date(task.start_time).getTime()
@@ -383,12 +383,12 @@ export default function MyTasksPage() {
       }
 
       if (minPcs === maxPcs) {
-        setEstimatedPiecesStr(`${minPcs} เธเธดเนเธ`)
+        setEstimatedPiecesStr(`${minPcs} ชิ้น`)
       } else {
-        setEstimatedPiecesStr(`${minPcs} - ${maxPcs} เธเธดเนเธ`)
+        setEstimatedPiecesStr(`${minPcs} - ${maxPcs} ชิ้น`)
       }
     } else {
-      setEstimatedPiecesStr('เนเธกเนเธเธเธเนเธญเธกเธนเธฅ Capacity เธเธญเธเธชเธดเธเธเนเธฒเธเธตเน')
+      setEstimatedPiecesStr('ไม่พบข้อมูล Capacity ของสินค้านี้')
     }
 
     setIsEstimateDialogOpen(true)
@@ -445,10 +445,10 @@ export default function MyTasksPage() {
          // Keep IN_PROGRESS, just update pieces
          const { error } = await supabase.from('production_logs').update({ piece_quantity: newTotalPieces }).eq('id', activeStartTask.id)
          if (error) {
-           toast.error('เธญเธฑเธเน€เธ”เธ•เธขเธญเธ”เนเธกเนเธชเธณเน€เธฃเนเธ')
+           toast.error('อัปเดตยอดไม่สำเร็จ')
            return
          }
-         toast.success('เธญเธฑเธเน€เธ”เธ•เธขเธญเธ”เธฅเธฑเธเธชเธณเน€เธฃเนเธ')
+         toast.success('อัปเดตยอดลังสำเร็จ')
          setIsFinishDialogOpen(false)
          setManualPieces('')
          setCartonsQuantity('')
@@ -463,7 +463,7 @@ export default function MyTasksPage() {
       const completedEnd = parseInt(finishedTankEnd)
 
       if (isNaN(completedEnd) || completedEnd < originalStart || completedEnd > originalEnd) {
-        toast.error('เธฅเธณเธ”เธฑเธเธ–เธฑเธเธ—เธตเนเน€เธชเธฃเนเธเธชเธดเนเธเนเธกเนเธ–เธนเธเธ•เนเธญเธ')
+        toast.error('ลำดับถังที่เสร็จสิ้นไม่ถูกต้อง')
         return
       }
 
@@ -489,23 +489,23 @@ export default function MyTasksPage() {
         })
 
         if (err1) {
-          toast.error('เน€เธเธดเธ”เธเนเธญเธเธดเธ”เธเธฅเธฒเธ”เนเธเธเธฒเธฃเนเธเนเธเธเธฒเธ: ' + err1.message)
+          toast.error('เกิดข้อผิดพลาดในการแบ่งงาน: ' + err1.message)
           return
         }
 
         // 2. Create Next task for [originalStart - completedEnd]
         let nextProcessName = '';
-        if (activeStartTask.processes?.process_name?.includes('เธเธฑเนเธเธชเธฒเธฃ')) nextProcessName = 'เธเธชเธก';
-        else if (activeStartTask.processes?.process_name?.includes('เธเธชเธก') || activeStartTask.rooms?.room_name?.includes('Mix')) nextProcessName = 'เธฃเธญ QC';
-        else if (activeStartTask.processes?.process_name?.includes('เธเธฃเธฃเธเธธ')) nextProcessName = 'เธฃเธญเธญเธธเนเธกเธเธเน';
-        else if (activeStartTask.processes?.process_name?.includes('เธญเธธเนเธกเธเธเน') || activeStartTask.processes?.process_name?.includes('POF')) nextProcessName = 'เธฃเธญเน€เธเนเธฒเธเธฅเธฑเธ FG';
+        if (activeStartTask.processes?.process_name?.includes('ชั่งสาร')) nextProcessName = 'ผสม';
+        else if (activeStartTask.processes?.process_name?.includes('ผสม') || activeStartTask.rooms?.room_name?.includes('Mix')) nextProcessName = 'รอ QC';
+        else if (activeStartTask.processes?.process_name?.includes('บรรจุ')) nextProcessName = 'รออุโมงค์';
+        else if (activeStartTask.processes?.process_name?.includes('อุโมงค์') || activeStartTask.processes?.process_name?.includes('POF')) nextProcessName = 'รอเข้าคลัง FG';
 
         if (nextProcessName) {
           const { data: nextProc } = await supabase.from('processes').select('id').eq('process_name', nextProcessName).single()
           if (nextProc) {
             const lotId = activeStartTask.production_lots?.id || activeStartTask.production_lot_id;
             let merged = false;
-            if (nextProcessName === 'เธฃเธญเธญเธธเนเธกเธเธเน' || nextProcessName === 'เธฃเธญเน€เธเนเธฒเธเธฅเธฑเธ FG') {
+            if (nextProcessName === 'รออุโมงค์' || nextProcessName === 'รอเข้าคลัง FG') {
                const { data: existingTasks } = await supabase.from('production_logs')
                  .select('*')
                  .eq('production_lot_id', lotId)
@@ -545,7 +545,7 @@ export default function MyTasksPage() {
           start_time: null // clear start time so they can restart it
         }).eq('id', activeStartTask.id)
 
-        toast.success('เนเธเนเธเธเธฒเธเนเธฅเธฐเธเธเธเธฒเธเธเธฒเธเธชเนเธงเธเน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง')
+        toast.success('แบ่งงานและจบงานบางส่วนเรียบร้อยแล้ว')
         setIsFinishDialogOpen(false)
         fetchTasks()
         return
@@ -554,10 +554,10 @@ export default function MyTasksPage() {
 
     // Normal full completion
     let extraObj: any = { 
-      isWeighingTask: activeStartTask?.processes?.process_name?.includes('เธเธฑเนเธเธชเธฒเธฃ'), 
-      isMixTask: activeStartTask?.processes?.process_name?.includes('เธเธชเธก') || activeStartTask?.rooms?.room_name?.includes('Mix'),
-      isPackingTask: activeStartTask?.processes?.process_name?.includes('เธเธฃเธฃเธเธธ'),
-      isPofTask: activeStartTask?.processes?.process_name?.includes('เธญเธธเนเธกเธเธเน') || activeStartTask?.processes?.process_name?.includes('POF'),
+      isWeighingTask: activeStartTask?.processes?.process_name?.includes('ชั่งสาร'), 
+      isMixTask: activeStartTask?.processes?.process_name?.includes('ผสม') || activeStartTask?.rooms?.room_name?.includes('Mix'),
+      isPackingTask: activeStartTask?.processes?.process_name?.includes('บรรจุ'),
+      isPofTask: activeStartTask?.processes?.process_name?.includes('อุโมงค์') || activeStartTask?.processes?.process_name?.includes('POF'),
       sourceTask: activeStartTask 
     }
     if (manualPieces) extraObj.piece_quantity = parseFloat(manualPieces)
@@ -572,7 +572,7 @@ export default function MyTasksPage() {
 
   const handleWaitConfirm = async () => {
     if (!activeWaitTask || !missingMaterial) return
-    updateStatus(activeWaitTask.id, 'WAITING', { note: `[เธชเธฒเธฃเธเธฒเธ”] ${missingMaterial}` })
+    updateStatus(activeWaitTask.id, 'WAITING', { note: `[สารขาด] ${missingMaterial}` })
     setIsWaitDialogOpen(false)
   }
 
@@ -591,12 +591,12 @@ export default function MyTasksPage() {
       const passedEnd = parseInt(qcPassTankEnd)
 
       if (isNaN(passedEnd) || passedEnd < originalStart || passedEnd > originalEnd) {
-        toast.error('เธฅเธณเธ”เธฑเธเธ–เธฑเธเธ—เธตเน Pass เนเธกเนเธ–เธนเธเธ•เนเธญเธ')
+        toast.error('ลำดับถังที่ Pass ไม่ถูกต้อง')
         return
       }
 
       // Create packing task for [originalStart - passedEnd]
-      const { data: packProc } = await supabase.from('processes').select('id').eq('process_name', 'เธฃเธญเธเธฃเธฃเธเธธ').single()
+      const { data: packProc } = await supabase.from('processes').select('id').eq('process_name', 'รอบรรจุ').single()
       if (packProc) {
         await supabase.from('production_logs').insert({
           production_lot_id: activeStartTask.production_lots?.id || activeStartTask.production_lot_id,
@@ -621,7 +621,7 @@ export default function MyTasksPage() {
         }).eq('id', activeStartTask.id)
       }
 
-      toast.success('เธ—เธณเธฃเธฒเธขเธเธฒเธฃ QC Pass เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง')
+      toast.success('ทำรายการ QC Pass เรียบร้อยแล้ว')
       setIsQcPassDialogOpen(false)
       fetchTasks()
     }
@@ -642,7 +642,7 @@ export default function MyTasksPage() {
       qc_fg_passed_carton_ranges: qcFgPassRanges
     }).eq('id', lotId)
 
-    toast.success('เธเธฑเธเธ—เธถเธเธขเธญเธ” QC Pass (เน€เธเนเธฒเธเธฅเธฑเธ) เธชเธณเน€เธฃเนเธ')
+    toast.success('บันทึกยอด QC Pass (เข้าคลัง) สำเร็จ')
     setIsQcFgPassDialogOpen(false)
     fetchTasks()
   }
@@ -663,9 +663,9 @@ export default function MyTasksPage() {
 
   const renderBatteryBar = (subStep: string | null) => {
     const steps = [
-      { id: 'SOAK', label: 'เนเธเน', icon: <Droplet className="w-3 h-3"/> },
-      { id: 'MIX', label: 'เธเธชเธก', icon: <Beaker className="w-3 h-3"/> },
-      { id: 'STORE', label: 'เน€เธเนเธเธเธฒเธ', icon: <Archive className="w-3 h-3"/> }
+      { id: 'SOAK', label: 'แช่', icon: <Droplet className="w-3 h-3"/> },
+      { id: 'MIX', label: 'ผสม', icon: <Beaker className="w-3 h-3"/> },
+      { id: 'STORE', label: 'เก็บงาน', icon: <Archive className="w-3 h-3"/> }
     ]
     
     let activeIndex = -1
@@ -697,7 +697,7 @@ export default function MyTasksPage() {
     if (!subStep) {
       return (
         <Button onClick={() => handleStartClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover" size="sm">
-          <Play className="w-4 h-4 mr-1" /> เน€เธฃเธดเนเธก: เนเธเน
+          <Play className="w-4 h-4 mr-1" /> เริ่ม: แช่
         </Button>
       )
     }
@@ -705,7 +705,7 @@ export default function MyTasksPage() {
     if (subStep === 'SOAK') {
       return (
         <Button onClick={() => handleStartClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover" size="sm">
-          <Play className="w-4 h-4 mr-1" /> เน€เธฃเธดเนเธก: เธเธชเธก
+          <Play className="w-4 h-4 mr-1" /> เริ่ม: ผสม
         </Button>
       )
     }
@@ -713,7 +713,7 @@ export default function MyTasksPage() {
     if (subStep === 'MIX') {
       return (
         <Button onClick={() => handleStartClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover" size="sm">
-          <Play className="w-4 h-4 mr-1" /> เน€เธฃเธดเนเธก: เน€เธเนเธเธเธฒเธ
+          <Play className="w-4 h-4 mr-1" /> เริ่ม: เก็บงาน
         </Button>
       )
     }
@@ -721,7 +721,7 @@ export default function MyTasksPage() {
     if (subStep === 'STORE') {
       return (
         <Button onClick={() => handleFinishClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover" size="sm">
-          <Square className="w-4 h-4 mr-1" /> เธเธเธเธฒเธ (เธเธเธเธฒเธฃเธเธชเธก)
+          <Square className="w-4 h-4 mr-1" /> จบงาน (จบการผสม)
         </Button>
       )
     }
@@ -742,10 +742,10 @@ export default function MyTasksPage() {
         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex justify-between items-center shadow-sm mb-6">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 text-red-500 mr-3" />
-            <p className="text-sm text-red-700 font-medium">โ ๏ธ เธซเธฑเธงเธซเธเนเธฒเธซเนเธญเธเธขเธฑเธเนเธกเนเธกเธตเธเธฒเธฃเธฃเธฒเธขเธเธฒเธเธเธญเธเน€เธชเธตเธขเธเธฃเธฐเธเธณเธงเธฑเธ เนเธเธฃเธ”เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเน€เธเธทเนเธญเธเธงเธฒเธกเนเธกเนเธเธขเธณเธเธญเธเธฃเธฐเธเธ</p>
+            <p className="text-sm text-red-700 font-medium">⚠️ หัวหน้าห้องยังไม่มีการรายงานของเสียประจำวัน โปรดบันทึกของเสียเพื่อความแม่นยำของระบบ</p>
           </div>
           <Button size="sm" variant="destructive" onClick={() => setIsDefectModalOpen(true)}>
-            <ClipboardCheck className="w-4 h-4 mr-2" /> เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเน€เธ”เธตเนเธขเธงเธเธตเน
+            <ClipboardCheck className="w-4 h-4 mr-2" /> บันทึกของเสียเดี๋ยวนี้
           </Button>
         </div>
       )}
@@ -797,7 +797,7 @@ export default function MyTasksPage() {
               <div className="p-3 flex-1 overflow-y-auto space-y-3 custom-scrollbar">
                 {colTasks.length === 0 ? (
                   <div className="text-center py-8 text-sm text-slate-400 border-2 border-dashed border-slate-200 rounded-lg">
-                    เนเธกเนเธกเธตเธเธฒเธเธเนเธฒเธ
+                    ไม่มีงานค้าง
                   </div>
                 ) : null}
 
@@ -821,7 +821,7 @@ export default function MyTasksPage() {
                       </div>
                       
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-gray-500">เธฅเธณเธ”เธฑเธเธ–เธฑเธ:</span>
+                        <span className="text-gray-500">ลำดับถัง:</span>
                         <span className="font-medium">{task.tank_start || '?'} - {task.tank_end || '?'} / {task.production_lots?.total_tanks || '?'}</span>
                       </div>
 
@@ -831,13 +831,13 @@ export default function MyTasksPage() {
                             const rms = (task as any).rm_items;
                             const isReady = rms.every((r: any) => r.status === 'READY');
                             if (isReady) {
-                              return <Badge className="bg-green-500 w-full justify-center hover:bg-green-600">๐ข เธเธฃเนเธญเธกเธเธฑเนเธ (RM Ready)</Badge>;
+                              return <Badge className="bg-green-500 w-full justify-center hover:bg-green-600">🟢 พร้อมชั่ง (RM Ready)</Badge>;
                             } else {
                               const pendingRMs = rms.filter((r: any) => r.status !== 'READY');
                               const maxEta = pendingRMs.reduce((max: string, r: any) => (!max || (r.eta_date && r.eta_date > max)) ? r.eta_date : max, '');
                               return (
                                 <Badge className="bg-red-500 hover:bg-red-600 w-full justify-center text-[10px] sm:text-xs">
-                                  ๐”ด เธฃเธญเธงเธฑเธ•เธ–เธธเธ”เธดเธ (ETA: {maxEta ? new Date(maxEta).toLocaleDateString('th-TH') : 'เนเธกเนเธฃเธฐเธเธธ'})
+                                  🔴 รอวัตถุดิบ (ETA: {maxEta ? new Date(maxEta).toLocaleDateString('th-TH') : 'ไม่ระบุ'})
                                 </Badge>
                               );
                             }
@@ -848,9 +848,9 @@ export default function MyTasksPage() {
                       {col.id === 'POF' ? (
                         <div className="mt-2 p-2 bg-[#D4AF37]/ rounded-md border border-[#D4AF37]/30">
                           <div className="flex justify-between items-center text-xs">
-                            <span className="text-gray-700">เธขเธญเธ”เธฅเธฑเธเธชเธฐเธชเธกเนเธเธ–เธฑเธ:</span>
+                            <span className="text-gray-700">ยอดลังสะสมในถัง:</span>
                             <span className={`font-bold ${calculatePofTargetCartons(task).targetCartons <= Math.floor((task.piece_quantity || 0) / (task.production_lots?.pcs_per_carton || 1)) ? 'text-green-600' : 'text-[#D4AF37]'}`}>
-                              {Math.floor((task.piece_quantity || 0) / (task.production_lots?.pcs_per_carton || 1))} / {calculatePofTargetCartons(task).targetCartons} เธฅเธฑเธ
+                              {Math.floor((task.piece_quantity || 0) / (task.production_lots?.pcs_per_carton || 1))} / {calculatePofTargetCartons(task).targetCartons} ลัง
                             </span>
                           </div>
                         </div>
@@ -863,22 +863,22 @@ export default function MyTasksPage() {
                           <div className="mt-2 space-y-1">
                             <div className="p-2 bg-[#F8F6F0] rounded-md border border-slate-200">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-700">เธขเธญเธ”เธฅเธฑเธเธชเธฐเธชเธกเธ—เธฑเนเธเธซเธกเธ”:</span>
+                                <span className="text-gray-700">ยอดลังสะสมทั้งหมด:</span>
                                 <span className="font-bold text-slate-700">
-                                  {totalCartons} / {totalOrderCartons} เธฅเธฑเธ
+                                  {totalCartons} / {totalOrderCartons} ลัง
                                 </span>
                               </div>
                             </div>
                             <div className="p-1.5 bg-green-50 rounded-md border border-green-200">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-green-700 font-semibold">โ… QC passed เธเธฒเธขเนเธ”เน:</span>
-                                <span className="font-bold text-green-700">{passedCartons} เธฅเธฑเธ</span>
+                                <span className="text-green-700 font-semibold">✅ QC passed ขายได้:</span>
+                                <span className="font-bold text-green-700">{passedCartons} ลัง</span>
                               </div>
                             </div>
                             <div className="p-1.5 bg-orange-50 rounded-md border border-orange-200">
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-orange-700 font-semibold">โณ FG เธฃเธญเธ•เธฃเธงเธ:</span>
-                                <span className="font-bold text-orange-700">{waitingCartons > 0 ? waitingCartons : 0} เธฅเธฑเธ</span>
+                                <span className="text-orange-700 font-semibold">⏳ FG รอตรวจ:</span>
+                                <span className="font-bold text-orange-700">{waitingCartons > 0 ? waitingCartons : 0} ลัง</span>
                               </div>
                             </div>
                           </div>
@@ -887,14 +887,14 @@ export default function MyTasksPage() {
                         task.piece_quantity ? (
                           <div className="mt-2 p-1.5 bg-purple-50 rounded-md border border-purple-100">
                             <div className="flex justify-between items-center text-xs mb-1">
-                              <span className="text-gray-600">เธ—เธณเนเธฅเนเธง (เธเนเธญเธเธเธฑเธ):</span>
-                              <span className="font-bold text-purple-700">{task.piece_quantity} เธเธดเนเธ</span>
+                              <span className="text-gray-600">ทำแล้ว (ก่อนพัก):</span>
+                              <span className="font-bold text-purple-700">{task.piece_quantity} ชิ้น</span>
                             </div>
                             {col.id === 'PACKING' && task.production_lots?.kg_per_tank && task.production_lots?.g_per_piece && (
                               <div className="flex justify-between items-center text-xs">
-                                <span className="text-gray-600">เธขเธญเธ”เธเธเน€เธซเธฅเธทเธญ:</span>
+                                <span className="text-gray-600">ยอดคงเหลือ:</span>
                                 <span className="font-bold text-amber-600">
-                                  {Math.round((((task.tank_end ? parseInt(task.tank_end) : 1) - (task.tank_start ? parseInt(task.tank_start) : 1) + 1) * task.production_lots.kg_per_tank * 1000) / task.production_lots.g_per_piece) - task.piece_quantity} เธเธดเนเธ
+                                  {Math.round((((task.tank_end ? parseInt(task.tank_end) : 1) - (task.tank_start ? parseInt(task.tank_start) : 1) + 1) * task.production_lots.kg_per_tank * 1000) / task.production_lots.g_per_piece) - task.piece_quantity} ชิ้น
                                 </span>
                               </div>
                             )}
@@ -905,12 +905,12 @@ export default function MyTasksPage() {
                       {col.id === 'MIX' && renderBatteryBar(task.sub_step)}
 
                       {task.note && (
-                        <div className={`text-xs p-1.5 rounded border ${task.note.includes('[เธชเธฒเธฃเธเธฒเธ”]') ? 'bg-red-50 text-red-700 border-red-200 font-bold' : task.note.includes('[เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเน€เธเธดเธ]') ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-orange-50 text-orange-800 border-orange-100'}`}>
+                        <div className={`text-xs p-1.5 rounded border ${task.note.includes('[สารขาด]') ? 'bg-red-50 text-red-700 border-red-200 font-bold' : task.note.includes('[ประวัติการเบิก]') ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-orange-50 text-orange-800 border-orange-100'}`}>
                           {task.note.split('\\n').map((line: string, i: number) => (
                             <div key={i} className="mb-0.5">
                               {line.includes('[') ? 
                                 <span><strong>{line.split(']')[0] + ']'}</strong> {line.split(']').slice(1).join(']')}</span> : 
-                                <span><strong>เธซเธกเธฒเธขเน€เธซเธ•เธธ:</strong> {line}</span>}
+                                <span><strong>หมายเหตุ:</strong> {line}</span>}
                             </div>
                           ))}
                         </div>
@@ -932,49 +932,49 @@ export default function MyTasksPage() {
                           <>
                             {task.status !== 'IN_PROGRESS' && (
                               <Button onClick={() => handleStartClick(task)} className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white" size="sm">
-                                <Play className="w-3 h-3 mr-1" /> เน€เธฃเธดเนเธก
+                                <Play className="w-3 h-3 mr-1" /> เริ่ม
                               </Button>
                             )}
                             {task.status === 'IN_PROGRESS' && (
                               <>
                                 {col.id === 'MIX' && task.sub_step === 'SOAK' && (
                                   <Button onClick={() => updateStatus(task.id, 'IN_PROGRESS', { sub_step: 'MIX' })} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white" size="sm">
-                                    <Play className="w-3 h-3 mr-1" /> เน€เธฃเธดเนเธกเธเธชเธก
+                                    <Play className="w-3 h-3 mr-1" /> เริ่มผสม
                                   </Button>
                                 )}
                                 {col.id === 'MIX' && task.sub_step === 'MIX' && (
                                   <Button onClick={() => updateStatus(task.id, 'IN_PROGRESS', { sub_step: 'STORE' })} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white" size="sm">
-                                    <Play className="w-3 h-3 mr-1" /> เน€เธเนเธเธเธฒเธ
+                                    <Play className="w-3 h-3 mr-1" /> เก็บงาน
                                   </Button>
                                 )}
                                 {col.id === 'FG' ? (
                                   <Button onClick={async () => {
-                                    if(confirm('เธ•เนเธญเธเธเธฒเธฃเธเธดเธ”เธเธเธญเธญเน€เธ”เธญเธฃเนเธเธตเนเนเธเนเธซเธฃเธทเธญเนเธกเน?')) {
+                                    if(confirm('ต้องการปิดจบออเดอร์นี้ใช่หรือไม่?')) {
                                       const lotId = task.production_lots?.id || task.production_lot_id;
                                       await supabase.from('production_lots').update({ current_status: 'COMPLETED' }).eq('id', lotId)
                                       await supabase.from('production_logs').update({ status: 'COMPLETED', end_time: new Date().toISOString() }).eq('production_lot_id', lotId).in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED'])
                                       fetchTasks()
                                     }
                                   }} className="flex-1 bg-green-600 hover:bg-green-700 text-white" size="sm">
-                                    <CheckCircle className="w-3 h-3 mr-1" /> เธเธดเธ” PO Order
+                                    <CheckCircle className="w-3 h-3 mr-1" /> ปิด PO Order
                                   </Button>
                                 ) : col.id === 'POF' ? (
                                   <Button onClick={() => handleFinishClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white" size="sm">
-                                    เธญเธฑเธเน€เธ”เธ•เธขเธญเธ”เธฅเธฑเธ / เธเธ
+                                    อัปเดตยอดลัง / จบ
                                   </Button>
                                 ) : (
                                   <Button onClick={() => handleFinishClick(task)} className="flex-1 bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white" size="sm">
-                                    <Square className="w-3 h-3 mr-1" /> เธเธ
+                                    <Square className="w-3 h-3 mr-1" /> จบ
                                   </Button>
                                 )}
                                 {col.id === 'MM-RM' && (
                                   <Button onClick={() => handleWaitClick(task)} className="flex-1 bg-red-600 hover:bg-red-700 text-white" size="sm">
-                                    เธฃเธญเธชเธฒเธฃ
+                                    รอสาร
                                   </Button>
                                 )}
                                 {col.id === 'PACKING' && (
                                   <Button onClick={() => handleEstimateClick(task)} className="flex-1 bg-purple-600 hover:bg-purple-700 text-white" size="sm">
-                                    เธชเธญเธเธ–เธฒเธกเธขเธญเธ”
+                                    สอบถามยอด
                                   </Button>
                                 )}
                               </>
@@ -1000,20 +1000,20 @@ export default function MyTasksPage() {
       <Dialog open={isEstimateDialogOpen} onOpenChange={setIsEstimateDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>เธชเธญเธเธ–เธฒเธกเธขเธญเธ”เธเธฃเธฐเธกเธฒเธ“เธเธฒเธฃ (เธเธฃเธฃเธเธธ)</DialogTitle>
+            <DialogTitle>สอบถามยอดประมาณการ (บรรจุ)</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4 text-center">
             <div className="space-y-2">
-              <p className="text-gray-500 text-sm">เน€เธงเธฅเธฒเธ—เธตเนเธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธเนเธฅเนเธง</p>
-              <p className="text-3xl font-bold text-[#D4AF37]">{elapsedHoursStr} <span className="text-lg font-medium text-gray-500">เธเธฑเนเธงเนเธกเธ</span></p>
+              <p className="text-gray-500 text-sm">เวลาที่ดำเนินการไปแล้ว</p>
+              <p className="text-3xl font-bold text-[#D4AF37]">{elapsedHoursStr} <span className="text-lg font-medium text-gray-500">ชั่วโมง</span></p>
             </div>
             <div className="space-y-2 mt-4">
-              <p className="text-gray-500 text-sm">เธขเธญเธ”เธ—เธตเนเธ—เธณเนเธ”เนเธเธฃเธฐเธกเธฒเธ“เธเธฒเธฃ</p>
+              <p className="text-gray-500 text-sm">ยอดที่ทำได้ประมาณการ</p>
               <p className="text-3xl font-bold text-purple-600">{estimatedPiecesStr}</p>
             </div>
           </div>
           <DialogFooter>
-            <Button onClick={() => setIsEstimateDialogOpen(false)} className="bg-purple-600 hover:bg-purple-700 text-white w-full">เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธ</Button>
+            <Button onClick={() => setIsEstimateDialogOpen(false)} className="bg-purple-600 hover:bg-purple-700 text-white w-full">ปิดหน้าต่าง</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1021,29 +1021,29 @@ export default function MyTasksPage() {
       <Dialog open={isPauseDialogOpen} onOpenChange={setIsPauseDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>เธฃเธฐเธเธธเน€เธซเธ•เธธเธเธฅเธเธฒเธฃเธเธฑเธเธเธฒเธ</DialogTitle>
+            <DialogTitle>ระบุเหตุผลการพักงาน</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>เธชเธฒเน€เธซเธ•เธธเธ—เธตเนเธ•เนเธญเธเธซเธขเธธเธ”เธเธฑเธเธเธฑเนเธงเธเธฃเธฒเธง</Label>
+              <Label>สาเหตุที่ต้องหยุดพักชั่วคราว</Label>
               <select 
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 value={pauseReason}
                 onChange={(e) => setPauseReason(e.target.value)}
               >
-                <option value="">-- เน€เธฅเธทเธญเธเธชเธฒเน€เธซเธ•เธธ --</option>
-                <option value="เธเธฑเธเน€เธ—เธตเนเธขเธ เธ—เธณเธ•เนเธญเธเนเธฒเธข">เธเธฑเธเน€เธ—เธตเนเธขเธ เธ—เธณเธ•เนเธญเธเนเธฒเธข</option>
-                <option value="เน€เธฅเธดเธเธเธฒเธ เธ—เธณเธ•เนเธญเธเธฃเธธเนเธเธเธตเนเน€เธเนเธฒ">เน€เธฅเธดเธเธเธฒเธ เธ—เธณเธ•เนเธญเธเธฃเธธเนเธเธเธตเนเน€เธเนเธฒ</option>
-                <option value="เน€เธเธฃเธทเนเธญเธเน€เธชเธตเธขเธฃเธญเธเนเธฒเธ">เน€เธเธฃเธทเนเธญเธเน€เธชเธตเธขเธฃเธญเธเนเธฒเธ</option>
-                <option value="เธฃเธญเธเธฅ QC">เธฃเธญเธเธฅ QC</option>
-                <option value="เธญเธทเนเธเน">เธญเธทเนเธเน</option>
+                <option value="">-- เลือกสาเหตุ --</option>
+                <option value="พักเที่ยง ทำต่อบ่าย">พักเที่ยง ทำต่อบ่าย</option>
+                <option value="เลิกงาน ทำต่อพรุ่งนี้เช้า">เลิกงาน ทำต่อพรุ่งนี้เช้า</option>
+                <option value="เครื่องเสียรอช่าง">เครื่องเสียรอช่าง</option>
+                <option value="รอผล QC">รอผล QC</option>
+                <option value="อื่นๆ">อื่นๆ</option>
               </select>
             </div>
-            {pauseReason === 'เธญเธทเนเธเน' && (
+            {pauseReason === 'อื่นๆ' && (
               <div className="space-y-2">
-                <Label>เธฃเธฐเธเธธเธชเธฒเน€เธซเธ•เธธเน€เธเธดเนเธกเน€เธ•เธดเธก</Label>
+                <Label>ระบุสาเหตุเพิ่มเติม</Label>
                 <Textarea 
-                  placeholder="เน€เธเนเธ เธ•เธดเธ”เธเธฃเธฐเธเธธเธก, เนเธเธ”เธฑเธ..." 
+                  placeholder="เช่น ติดประชุม, ไฟดับ..." 
                   onChange={(e) => setPauseReason(e.target.value)}
                   className="min-h-[60px]"
                 />
@@ -1051,10 +1051,10 @@ export default function MyTasksPage() {
             )}
             {activeStartTask && getTaskColumn(activeStartTask) === 'PACKING' && (
               <div className="space-y-2 mt-2">
-                <Label>เธขเธญเธ”เธ—เธตเนเธ—เธณเนเธ”เนเธเนเธญเธเธเธฑเธ (เธเธดเนเธ/เธเธงเธ”)</Label>
+                <Label>ยอดที่ทำได้ก่อนพัก (ชิ้น/ขวด)</Label>
                 <Input 
                   type="number" 
-                  placeholder="เธฃเธฐเธเธธเธเธณเธเธงเธเธเธดเนเธ" 
+                  placeholder="ระบุจำนวนชิ้น" 
                   value={manualPieces}
                   onChange={(e) => setManualPieces(e.target.value)}
                 />
@@ -1062,8 +1062,8 @@ export default function MyTasksPage() {
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsPauseDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={() => updateStatus(activeTaskId!, 'PAUSED', { note: pauseReason, piece_quantity: manualPieces ? parseFloat(manualPieces) : undefined })} className="bg-orange-600 hover:bg-orange-700 text-white">เธขเธทเธเธขเธฑเธเธเธฑเธเธเธฒเธ</Button>
+            <Button variant="outline" onClick={() => setIsPauseDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={() => updateStatus(activeTaskId!, 'PAUSED', { note: pauseReason, piece_quantity: manualPieces ? parseFloat(manualPieces) : undefined })} className="bg-orange-600 hover:bg-orange-700 text-white">ยืนยันพักงาน</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1071,51 +1071,51 @@ export default function MyTasksPage() {
       <Dialog open={isStartDialogOpen} onOpenChange={setIsStartDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>เน€เธฃเธดเนเธกเธเธฒเธ (เธฃเธฐเธเธธเธฅเธณเธ”เธฑเธเธ–เธฑเธ)</DialogTitle>
+            <DialogTitle>เริ่มงาน (ระบุลำดับถัง)</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>เน€เธฃเธดเนเธกเธ–เธฑเธเธ—เธตเน (Tank Start)</Label>
+                <Label>เริ่มถังที่ (Tank Start)</Label>
                 <Input 
                   type="number"
-                  placeholder="เน€เธเนเธ 26" 
+                  placeholder="เช่น 26" 
                   value={tankStart}
                   onChange={(e) => setTankStart(e.target.value)}
                 />
               </div>
               <div className="space-y-2">
-                <Label>เธ–เธถเธเธ–เธฑเธเธ—เธตเน (Tank End)</Label>
+                <Label>ถึงถังที่ (Tank End)</Label>
                 <Input 
                   type="number"
-                  placeholder="เน€เธเนเธ 41" 
+                  placeholder="เช่น 41" 
                   value={tankEnd}
                   onChange={(e) => setTankEnd(e.target.value)}
                 />
               </div>
             </div>
-            {activeStartTask && (activeStartTask.processes?.process_name?.includes('เธเธชเธก') || activeStartTask.rooms?.room_name?.includes('Mix') || activeStartTask.processes?.process_name?.includes('เธเธฃเธฃเธเธธ')) && (
+            {activeStartTask && (activeStartTask.processes?.process_name?.includes('ผสม') || activeStartTask.rooms?.room_name?.includes('Mix') || activeStartTask.processes?.process_name?.includes('บรรจุ')) && (
               <div className="space-y-2 col-span-2">
-                <Label>เน€เธฅเธทเธญเธเธซเนเธญเธ</Label>
+                <Label>เลือกห้อง</Label>
                 <select 
                   className="w-full border rounded p-2"
                   value={selectedRoomId}
                   onChange={(e) => setSelectedRoomId(e.target.value)}
                 >
-                  <option value="">-- เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธซเนเธญเธ --</option>
-                  {rooms.filter(r => activeStartTask.processes?.process_name?.includes('เธเธชเธก') ? r.room_name.includes('Mix') : r.room_name.includes('เธซเนเธญเธ')).map(r => (
+                  <option value="">-- กรุณาเลือกห้อง --</option>
+                  {rooms.filter(r => activeStartTask.processes?.process_name?.includes('ผสม') ? r.room_name.includes('Mix') : r.room_name.includes('ห้อง')).map(r => (
                     <option key={r.id} value={r.id}>{r.room_name}</option>
                   ))}
                 </select>
               </div>
             )}
             <div className="text-sm text-gray-500 bg-gray-50 p-2 rounded">
-              เธเธณเธเธงเธเธ–เธฑเธเธฃเธงเธก: {activeStartTask?.production_lots?.total_tanks || '?'} เนเธ
+              จำนวนถังรวม: {activeStartTask?.production_lots?.total_tanks || '?'} ใบ
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStartDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={handleStartConfirm} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">เธขเธทเธเธขเธฑเธเน€เธฃเธดเนเธกเธเธฒเธ</Button>
+            <Button variant="outline" onClick={() => setIsStartDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleStartConfirm} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">ยืนยันเริ่มงาน</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1124,15 +1124,15 @@ export default function MyTasksPage() {
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>
-              {activeStartTask && getTaskColumn(activeStartTask) === 'POF' ? 'เธญเธฑเธเน€เธ”เธ•เธขเธญเธ”เธฅเธฑเธ' : 'เธขเธทเธเธขเธฑเธเธเธเธเธฒเธ'}
+              {activeStartTask && getTaskColumn(activeStartTask) === 'POF' ? 'อัปเดตยอดลัง' : 'ยืนยันจบงาน'}
             </DialogTitle>
           </DialogHeader>
           <div className="py-4">
             {activeStartTask && getTaskColumn(activeStartTask) !== 'POF' && (
               <>
-                <p className="mb-4 text-center">เธฃเธฐเธเธธเธฅเธณเธ”เธฑเธเธ–เธฑเธเธ—เธตเนเธ—เธณเน€เธชเธฃเนเธเธชเธดเนเธเธชเธณเธซเธฃเธฑเธเธเธฒเธเธเธตเน</p>
+                <p className="mb-4 text-center">ระบุลำดับถังที่ทำเสร็จสิ้นสำหรับงานนี้</p>
                 <div className="grid grid-cols-4 items-center gap-4">
-                  <Label className="text-right">เธ—เธณเน€เธชเธฃเนเธเธ–เธถเธเธ–เธฑเธเธ—เธตเน</Label>
+                  <Label className="text-right">ทำเสร็จถึงถังที่</Label>
                   <Input 
                     type="number" 
                     value={finishedTankEnd} 
@@ -1158,13 +1158,13 @@ export default function MyTasksPage() {
             )}
             {activeStartTask && getTaskColumn(activeStartTask) === 'PACKING' && (
               <div className="grid grid-cols-4 items-center gap-4 mt-4">
-                <Label className="text-right text-purple-600 font-bold">เธขเธญเธ”เธ—เธตเนเธ—เธณเนเธ”เน (เธเธดเนเธ/เธเธงเธ”)</Label>
+                <Label className="text-right text-purple-600 font-bold">ยอดที่ทำได้ (ชิ้น/ขวด)</Label>
                 <Input 
                   type="number" 
                   value={manualPieces} 
                   onChange={(e) => setManualPieces(e.target.value)} 
                   className="col-span-3 border-purple-300 bg-purple-50 font-bold" 
-                  placeholder="เธเธณเธเธงเธ“เธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+                  placeholder="คำนวณอัตโนมัติ"
                 />
               </div>
             )}
@@ -1172,11 +1172,11 @@ export default function MyTasksPage() {
               <>
                 <div className="mb-4 p-3 bg-[#D4AF37]/ border border-[#D4AF37]/30 rounded-lg text-center">
                   <p className="text-sm font-medium text-slate-700">
-                    เธขเธญเธ”เธฅเธฑเธเธชเธฐเธชเธกเนเธเธ–เธฑเธเธเธตเน: <span className="text-[#D4AF37] font-bold text-lg">{Math.floor((activeStartTask.piece_quantity || 0) / (activeStartTask.production_lots?.pcs_per_carton || 1))}</span> / <span className="font-bold text-lg">{calculatePofTargetCartons(activeStartTask).targetCartons}</span> เธฅเธฑเธ
+                    ยอดลังสะสมในถังนี้: <span className="text-[#D4AF37] font-bold text-lg">{Math.floor((activeStartTask.piece_quantity || 0) / (activeStartTask.production_lots?.pcs_per_carton || 1))}</span> / <span className="font-bold text-lg">{calculatePofTargetCartons(activeStartTask).targetCartons}</span> ลัง
                   </p>
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4 mt-2">
-                  <Label className="text-right">เธเธฃเธฃเธเธธ/เธฅเธฑเธ (เธเธดเนเธ)</Label>
+                  <Label className="text-right">บรรจุ/ลัง (ชิ้น)</Label>
                   <Input 
                     type="number" 
                     value={piecesPerCarton} 
@@ -1192,7 +1192,7 @@ export default function MyTasksPage() {
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4 mt-4">
-                  <Label className="text-right">เธเธณเธเธงเธเธฅเธฑเธ</Label>
+                  <Label className="text-right">จำนวนลัง</Label>
                   <Input 
                     type="number" 
                     value={cartonsQuantity} 
@@ -1208,22 +1208,22 @@ export default function MyTasksPage() {
                   />
                 </div>
                 <div className="grid grid-cols-4 items-center gap-4 mt-4">
-                  <Label className="text-right text-purple-600 font-bold">เธขเธญเธ”เธชเนเธเธกเธญเธ (เธเธดเนเธ)</Label>
+                  <Label className="text-right text-purple-600 font-bold">ยอดส่งมอบ (ชิ้น)</Label>
                   <Input 
                     type="number" 
                     value={manualPieces} 
                     readOnly
                     className={`col-span-3 font-bold ${isOverLimit ? 'border-red-500 bg-red-50 text-red-600' : 'border-purple-300 bg-purple-50'}`} 
-                    placeholder="เธเธณเธเธงเธ“เธญเธฑเธ•เนเธเธกเธฑเธ•เธด"
+                    placeholder="คำนวณอัตโนมัติ"
                   />
                 </div>
                 {isOverLimit && (
                   <div className="col-span-4 mt-2">
                     <p className="text-sm text-red-500 text-center font-medium">
-                      โ ๏ธ เธขเธญเธ”เธชเนเธเธกเธญเธเน€เธเธดเธเธเธฃเธดเธกเธฒเธ“เธเธดเนเธ/เธ–เธฑเธ (เธชเธนเธเธชเธธเธ” {maxAllowedPieces} เธเธดเนเธ)
+                      ⚠️ ยอดส่งมอบเกินปริมาณชิ้น/ถัง (สูงสุด {maxAllowedPieces} ชิ้น)
                     </p>
                     <p className="text-xs text-red-500 text-center mt-1">
-                      เธเธฃเธธเธ“เธฒเธเธฃเธญเธเนเธกเนเน€เธเธดเธเธขเธญเธ”เธเธตเน เนเธฅเธฐเธเธณเธชเนเธงเธเธ—เธตเนเน€เธเธดเธเนเธเธเธฑเธเธ—เธถเธเนเธเธเธฒเธเธเธญเธเธ–เธฑเธเธ–เธฑเธ”เนเธ
+                      กรุณากรอกไม่เกินยอดนี้ และนำส่วนที่เกินไปบันทึกในงานของถังถัดไป
                     </p>
                   </div>
                 )}
@@ -1231,14 +1231,14 @@ export default function MyTasksPage() {
             )}
             {activeStartTask?.tank_end && getTaskColumn(activeStartTask) !== 'POF' && parseInt(finishedTankEnd) < parseInt(activeStartTask.tank_end) && (
               <p className="text-sm text-amber-600 text-center mt-4">
-                *เธฃเธฐเธเธเธเธฐเธ”เธถเธเธ–เธฑเธเธ—เธตเน {parseInt(finishedTankEnd) + 1} เธ–เธถเธ {activeStartTask.tank_end} เน€เธเนเธเธเธฒเธเธ—เธณเธ•เนเธญ
+                *ระบบจะดึงถังที่ {parseInt(finishedTankEnd) + 1} ถึง {activeStartTask.tank_end} เป็นงานทำต่อ
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsFinishDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
+            <Button variant="outline" onClick={() => setIsFinishDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={handleFinishConfirm} disabled={isOverLimit} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
-              {activeStartTask && getTaskColumn(activeStartTask) === 'POF' ? 'เธเธฑเธเธ—เธถเธเธขเธญเธ”' : 'เธขเธทเธเธขเธฑเธเธเธเธเธฒเธ'}
+              {activeStartTask && getTaskColumn(activeStartTask) === 'POF' ? 'บันทึกยอด' : 'ยืนยันจบงาน'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1247,22 +1247,22 @@ export default function MyTasksPage() {
       <Dialog open={isWaitDialogOpen} onOpenChange={setIsWaitDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>เธฃเธฐเธเธธเธเธทเนเธญเธชเธฒเธฃเธ—เธตเนเธเธฒเธ” (เธฃเธญเธชเธฒเธฃ)</DialogTitle>
+            <DialogTitle>ระบุชื่อสารที่ขาด (รอสาร)</DialogTitle>
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <Label>เธฃเธฒเธขเธเธฒเธฃเธชเธฒเธฃเน€เธเธกเธตเธ—เธตเนเนเธกเนเน€เธเธตเธขเธเธเธญ</Label>
+              <Label>รายการสารเคมีที่ไม่เพียงพอ</Label>
               <Input 
-                placeholder="เน€เธเนเธ Vitamin C, เธชเธฒเธฃ BZ" 
+                placeholder="เช่น Vitamin C, สาร BZ" 
                 value={missingMaterial}
                 onChange={(e) => setMissingMaterial(e.target.value)}
               />
             </div>
-            <p className="text-xs text-red-500">เธเนเธญเธกเธนเธฅเธเธตเนเธเธฐเธ–เธนเธเนเธชเธ”เธเน€เธเนเธเธชเธตเนเธ”เธเธเธเธเธฒเธฃเนเธ”เธเธฒเธ เน€เธเธทเนเธญเนเธซเนเธเนเธฒเธขเธงเธฒเธเนเธเธเธเธฑเธ”เธเธทเนเธญเธ•เธดเธ”เธ•เธฒเธก</p>
+            <p className="text-xs text-red-500">ข้อมูลนี้จะถูกแสดงเป็นสีแดงบนการ์ดงาน เพื่อให้ฝ่ายวางแผนจัดซื้อติดตาม</p>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsWaitDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={handleWaitConfirm} className="bg-red-600 hover:bg-red-700 text-white">เธขเธทเธเธขเธฑเธเธเธฒเธฃเธฃเธญเธชเธฒเธฃ</Button>
+            <Button variant="outline" onClick={() => setIsWaitDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleWaitConfirm} className="bg-red-600 hover:bg-red-700 text-white">ยืนยันการรอสาร</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1270,12 +1270,12 @@ export default function MyTasksPage() {
       <Dialog open={isQcPassDialogOpen} onOpenChange={setIsQcPassDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>QC Pass (เธฃเธฐเธเธธเธ–เธฑเธเธ—เธตเนเธเนเธฒเธ)</DialogTitle>
+            <DialogTitle>QC Pass (ระบุถังที่ผ่าน)</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="mb-4 text-center">เธฃเธฐเธเธธเธฅเธณเธ”เธฑเธเธ–เธฑเธเธ—เธตเนเธเนเธฒเธเธเธฒเธฃเธ•เธฃเธงเธเธชเธญเธ QC</p>
+            <p className="mb-4 text-center">ระบุลำดับถังที่ผ่านการตรวจสอบ QC</p>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">เธเนเธฒเธเธ–เธถเธเธ–เธฑเธเธ—เธตเน</Label>
+              <Label className="text-right">ผ่านถึงถังที่</Label>
               <Input 
                 type="number" 
                 value={qcPassTankEnd} 
@@ -1287,13 +1287,13 @@ export default function MyTasksPage() {
             </div>
             {activeStartTask?.tank_end && parseInt(qcPassTankEnd) < parseInt(activeStartTask.tank_end) && (
               <p className="text-sm text-green-600 text-center mt-4">
-                *เธฃเธฐเธเธเธเธฐเธ•เธฑเธ”เธ–เธฑเธเธ—เธตเน {activeStartTask.tank_start} - {qcPassTankEnd} เนเธเธซเนเธญเธเธเธฃเธฃเธเธธ<br/>เนเธฅเธฐเน€เธเนเธเธ–เธฑเธเธ—เธตเนเน€เธซเธฅเธทเธญเนเธงเนเธฃเธญ QC เธ•เนเธญ
+                *ระบบจะตัดถังที่ {activeStartTask.tank_start} - {qcPassTankEnd} ไปห้องบรรจุ<br/>และเก็บถังที่เหลือไว้รอ QC ต่อ
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsQcPassDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={handleQcPassConfirm} className="bg-green-600 hover:bg-green-700 text-white">เธขเธทเธเธขเธฑเธ QC Pass</Button>
+            <Button variant="outline" onClick={() => setIsQcPassDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleQcPassConfirm} className="bg-green-600 hover:bg-green-700 text-white">ยืนยัน QC Pass</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1301,28 +1301,28 @@ export default function MyTasksPage() {
       <Dialog open={isQcFgPassDialogOpen} onOpenChange={setIsQcFgPassDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>QC Pass (เน€เธเนเธฒเธเธฅเธฑเธ FG)</DialogTitle>
+            <DialogTitle>QC Pass (เข้าคลัง FG)</DialogTitle>
           </DialogHeader>
           <div className="py-4">
-            <p className="mb-4 text-center text-sm text-gray-600">เธฃเธฐเธเธธเธเนเธงเธเธฅเธฑเธเธ—เธตเนเธ•เธฃเธงเธเธชเธญเธเธเนเธฒเธ เน€เธเนเธ &quot;1-50, 52-60&quot;</p>
+            <p className="mb-4 text-center text-sm text-gray-600">ระบุช่วงลังที่ตรวจสอบผ่าน เช่น &quot;1-50, 52-60&quot;</p>
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right text-xs">เธเนเธงเธเธฅเธฑเธเธ—เธตเนเธเนเธฒเธ</Label>
+              <Label className="text-right text-xs">ช่วงลังที่ผ่าน</Label>
               <Input 
                 value={qcFgPassRanges} 
                 onChange={(e) => setQcFgPassRanges(e.target.value)} 
                 className="col-span-3" 
-                placeholder="เน€เธเนเธ 1-50, 52-60"
+                placeholder="เช่น 1-50, 52-60"
               />
             </div>
             {qcFgPassRanges && (
               <p className="text-sm text-green-600 text-center mt-4 font-semibold">
-                *เธเธณเธเธงเธเธ—เธตเนเธเธฅเนเธญเธขเธเนเธฒเธเธฃเธงเธก: {parseRanges(qcFgPassRanges)} เธฅเธฑเธ
+                *จำนวนที่ปล่อยผ่านรวม: {parseRanges(qcFgPassRanges)} ลัง
               </p>
             )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsQcFgPassDialogOpen(false)}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button onClick={handleQcFgPassConfirm} className="bg-green-600 hover:bg-green-700 text-white">เธขเธทเธเธขเธฑเธ QC Pass</Button>
+            <Button variant="outline" onClick={() => setIsQcFgPassDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleQcFgPassConfirm} className="bg-green-600 hover:bg-green-700 text-white">ยืนยัน QC Pass</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

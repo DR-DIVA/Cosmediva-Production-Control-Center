@@ -60,7 +60,7 @@ export default function FgTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email?.split('@')[0] || 'Unknown User')
+      setCurrentUser(user.email || 'Unknown User')
     }
   }
 
@@ -120,11 +120,11 @@ export default function FgTasksPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง')
+      toast.error('โหลดข้อมูลล้มเหลว')
     } else if (data) {
       const fgTasks = data.filter(t => 
         (t.processes as any)?.process_name?.toLowerCase().includes('fg') || 
-        (t.processes as any)?.process_name?.toLowerCase().includes('เธเธฅเธฑเธ')
+        (t.processes as any)?.process_name?.toLowerCase().includes('คลัง')
       )
       setTasks(fgTasks)
       setSelectedTask((prev: any) => prev ? fgTasks.find(t => t.id === prev.id) || null : null)
@@ -141,9 +141,9 @@ export default function FgTasksPage() {
     const planned = startOfDay(new Date(task.activity_date))
     const actual = startOfDay(task.end_time ? new Date(task.end_time) : new Date())
     const diff = differenceInDays(actual, planned)
-    if (diff > 0) return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 ml-2">เธฅเนเธฒเธเนเธฒ {diff} เธงเธฑเธ</Badge>
-    if (diff < 0) return <Badge variant="outline" className="bg-sky-50 text-sky-600 border-sky-200 ml-2">เน€เธฃเนเธงเธเธงเนเธฒเนเธเธ {Math.abs(diff)} เธงเธฑเธ</Badge>
-    return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30 ml-2">เธ•เธฃเธเธ•เธฒเธกเนเธเธ</Badge>
+    if (diff > 0) return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200 ml-2">ล่าช้า {diff} วัน</Badge>
+    if (diff < 0) return <Badge variant="outline" className="bg-sky-50 text-sky-600 border-sky-200 ml-2">เร็วกว่าแผน {Math.abs(diff)} วัน</Badge>
+    return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30 ml-2">ตรงตามแผน</Badge>
   }
 
   const isDelayed = (task: any) => {
@@ -164,16 +164,16 @@ export default function FgTasksPage() {
     }
 
     const { error } = await supabase.from('production_logs').update(updateData).eq('id', taskId)
-    if (error) toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธกเนเธชเธณเน€เธฃเนเธ')
-    else { toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธข'); fetchFgTasks(); }
+    if (error) toast.error('อัปเดตสถานะไม่สำเร็จ')
+    else { toast.success('อัปเดตสถานะเรียบร้อย'); fetchFgTasks(); }
   }
 
   const updateQcStatus = async (invId: string, newStatus: string) => {
     const { error } = await supabase.from('fg_inventory').update({ qc_status: newStatus }).eq('id', invId)
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐ QC เนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะ QC ไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐ QC เน€เธฃเธตเธขเธเธฃเนเธญเธขเนเธฅเนเธง')
+      toast.success('อัปเดตสถานะ QC เรียบร้อยแล้ว')
       fetchInventory()
     }
   }
@@ -184,7 +184,7 @@ export default function FgTasksPage() {
 
   const confirmReceive = async () => {
     if (!receiveDialog.locationId || !receiveDialog.qtyPcs || !receiveDialog.cartons) {
-      toast.error('เธเธฃเธธเธ“เธฒเธเธฃเธญเธเธเนเธญเธกเธนเธฅเนเธซเนเธเธฃเธเธ–เนเธงเธ')
+      toast.error('กรุณากรอกข้อมูลให้ครบถ้วน')
       return
     }
 
@@ -220,7 +220,7 @@ export default function FgTasksPage() {
     })
 
     if (invError) {
-      toast.error('เธเธฑเธเธ—เธถเธเน€เธเนเธฒเธเธฅเธฑเธเนเธกเนเธชเธณเน€เธฃเนเธ: ' + invError.message)
+      toast.error('บันทึกเข้าคลังไม่สำเร็จ: ' + invError.message)
       return
     }
 
@@ -232,9 +232,9 @@ export default function FgTasksPage() {
     }).eq('id', receiveDialog.taskId)
 
     if (logError) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธเธฒเธเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะงานไม่สำเร็จ')
     } else {
-      toast.success('เธฃเธฑเธเน€เธเนเธฒ FG เน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('รับเข้า FG เรียบร้อย')
       fetchInventory()
       fetchFgTasks()
       setReceiveDialog(prev => ({...prev, open: false}))
@@ -244,7 +244,7 @@ export default function FgTasksPage() {
   const handleDispatch = async () => {
     if (!dispatchDialog.invItem || dispatchDialog.qtyPcs <= 0) return
     if (dispatchDialog.qtyPcs > dispatchDialog.invItem.available_qty_pcs) {
-      toast.error('เธขเธญเธ”เธเนเธฒเธขเธญเธญเธเน€เธเธดเธเธเธงเนเธฒเธขเธญเธ”เธเธเน€เธซเธฅเธทเธญ!')
+      toast.error('ยอดจ่ายออกเกินกว่ายอดคงเหลือ!')
       return
     }
     
@@ -262,7 +262,7 @@ export default function FgTasksPage() {
     const newAvail = dispatchDialog.invItem.available_qty_pcs - dispatchDialog.qtyPcs
     await supabase.from('fg_inventory').update({ available_qty_pcs: newAvail }).eq('id', dispatchDialog.invItem.id)
     
-    toast.success('เธเธฑเธเธ—เธถเธเธเนเธฒเธขเธชเธดเธเธเนเธฒเธญเธญเธเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+    toast.success('บันทึกจ่ายสินค้าออกเรียบร้อย')
     setDispatchDialog(prev => ({...prev, open: false}))
     fetchInventory()
   }
@@ -278,7 +278,7 @@ export default function FgTasksPage() {
     const lot = lotRaw.replace(/\//g, '-');
     const now = new Date();
     const dateStr = `${now.getDate().toString().padStart(2, '0')}.${(now.getMonth()+1).toString().padStart(2, '0')}.${now.getFullYear().toString().substr(-2)}`;
-    document.title = `CosmeFlow OS_เนเธเธฃเธฑเธเธกเธญเธเธชเธดเธเธเนเธฒ FG ${sku} L.${lot}_${dateStr}`;
+    document.title = `CosmeFlow OS_ใบรับมอบสินค้า FG ${sku} L.${lot}_${dateStr}`;
 
     const printWindow = document.createElement('div');
     printWindow.id = 'print-window';
@@ -366,11 +366,11 @@ export default function FgTasksPage() {
           <div>
             <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-2">
               <Boxes className="w-5 h-5 text-indigo-500" />
-              เธชเธฃเธธเธเธขเธญเธ”เธชเนเธเธกเธญเธเน€เธเนเธฒเธเธฅเธฑเธ (FG)
+              สรุปยอดส่งมอบเข้าคลัง (FG)
               {getVarianceBadge(task)}
             </h3>
             <div className="text-sm text-slate-600 space-y-1">
-              <p>เธขเธญเธ”เธ—เธตเนเธชเนเธเธกเธฒเธเธฒเธเธเธฒเธเธฅเธเธฅเธฑเธ POF: <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} เธฅเธฑเธ</span> ({totalPcsFromPof.toLocaleString()} เธเธดเนเธ)</p>
+              <p>ยอดที่ส่งมาจากงานลงลัง POF: <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} ลัง</span> ({totalPcsFromPof.toLocaleString()} ชิ้น)</p>
               {combinedBoxLot && <p>Box Lot: <span className="font-medium text-amber-700">{combinedBoxLot}</span></p>}
             </div>
           </div>
@@ -378,11 +378,11 @@ export default function FgTasksPage() {
             {task.status === 'DONE' && (
               <div className="text-right mr-2">
                 <Badge className="bg-green-100 text-green-700 p-2 px-3 text-sm mb-2 flex items-center justify-center">
-                  <Archive className="w-4 h-4 mr-2" /> เธฃเธฑเธเน€เธเนเธฒเน€เธชเธฃเนเธเธชเธดเนเธ
+                  <Archive className="w-4 h-4 mr-2" /> รับเข้าเสร็จสิ้น
                 </Badge>
                 {fgInfo && (
                   <div className="text-xs text-slate-500 space-y-1">
-                    <div className="flex items-center justify-end gap-1"><User className="w-3 h-3" /> เธเธนเนเธ•เธฃเธงเธเธฃเธฑเธ: {fgInfo.user}</div>
+                    <div className="flex items-center justify-end gap-1"><User className="w-3 h-3" /> ผู้ตรวจรับ: {fgInfo.user}</div>
                     <div className="flex items-center justify-end gap-1"><Clock className="w-3 h-3" /> {new Date(fgInfo.timestamp).toLocaleString('th-TH')}</div>
                   </div>
                 )}
@@ -421,8 +421,8 @@ export default function FgTasksPage() {
                 isReadOnly: task.status === 'DONE'
               })
             }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold border-2 border-indigo-400 shadow-lg">
-              <span className="text-xl mr-2">๐“</span>
-              เนเธเธชเนเธเธกเธญเธ-เธฃเธฑเธเธกเธญเธเธชเธดเธเธเนเธฒ (E-Form)
+              <span className="text-xl mr-2">📄</span>
+              ใบส่งมอบ-รับมอบสินค้า (E-Form)
             </Button>
           </div>
         </div>
@@ -439,7 +439,7 @@ export default function FgTasksPage() {
             CosmeFlow FG Warehouse
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>เธเธฑเธ”เธเธฒเธฃเธฃเธฑเธเน€เธเนเธฒ, เธชเธ•เนเธญเธเธเธเน€เธซเธฅเธทเธญ เนเธฅเธฐเน€เธเธดเธเธเนเธฒเธขเธชเธดเธเธเนเธฒ FG เนเธเธเน€เธ•เนเธกเธฃเธนเธเนเธเธ</div>
+             <div>จัดการรับเข้า, สต๊อกคงเหลือ และเบิกจ่ายสินค้า FG แบบเต็มรูปแบบ</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Every Item. Every Movement. Fully Visible.
@@ -449,7 +449,7 @@ export default function FgTasksPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="w-64">
             <Input 
-              placeholder="เธเนเธเธซเธฒ SKU เธซเธฃเธทเธญ LOT..." 
+              placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -460,20 +460,20 @@ export default function FgTasksPage() {
       <Tabs defaultValue="inbound" className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-2xl bg-white border shadow-sm h-12 mb-6">
           <TabsTrigger value="inbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
-            <Archive className="w-4 h-4 mr-2" /> 1. เธเธดเธงเธฃเธฑเธเน€เธเนเธฒ (Inbound)
+            <Archive className="w-4 h-4 mr-2" /> 1. คิวรับเข้า (Inbound)
           </TabsTrigger>
           <TabsTrigger value="inventory" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
-            <Package className="w-4 h-4 mr-2" /> 2. เธชเธ•เนเธญเธเธชเธดเธเธเนเธฒ (Inventory)
+            <Package className="w-4 h-4 mr-2" /> 2. สต๊อกสินค้า (Inventory)
           </TabsTrigger>
           <TabsTrigger value="outbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
-            <Send className="w-4 h-4 mr-2" /> 3. เน€เธเธดเธเธเนเธฒเธข (Dispatch)
+            <Send className="w-4 h-4 mr-2" /> 3. เบิกจ่าย (Dispatch)
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="inbound">
           <Card className="shadow-sm overflow-hidden border ring-1 ring-slate-200">
             <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
-              <h2 className="font-semibold text-slate-700">เธเธดเธงเธเธฒเธเธฃเธญเธฃเธฑเธเน€เธเนเธฒเธเธฒเธ POF</h2>
+              <h2 className="font-semibold text-slate-700">คิวงานรอรับเข้าจาก POF</h2>
             </div>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -481,26 +481,26 @@ export default function FgTasksPage() {
                   <TableHeader className="bg-[#F8F6F0]">
                     <TableRow>
                       <TableHead className="w-[50px]"></TableHead>
-                      <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
+                      <TableHead>สินค้า / SKU</TableHead>
                       <TableHead>LOT No.</TableHead>
                       <TableHead>Box Lot</TableHead>
-                      <TableHead>เธขเธญเธ”เธชเนเธเธกเธญเธ (เธเธฒเธ POF)</TableHead>
-                      <TableHead>เธขเธญเธ”เธชเธฐเธชเธกเธฃเธงเธก (เธเธดเนเธ)</TableHead>
-                      <TableHead>เธขเธญเธ”เธชเธฐเธชเธกเธฃเธงเธก (เธฅเธฑเธ)</TableHead>
-                      <TableHead>เธงเธฑเธเธ—เธตเนเธชเนเธเธกเธฒ</TableHead>
-                      <TableHead>เธชเธ–เธฒเธเธฐเธเธดเธง</TableHead>
+                      <TableHead>ยอดส่งมอบ (จาก POF)</TableHead>
+                      <TableHead>ยอดสะสมรวม (ชิ้น)</TableHead>
+                      <TableHead>ยอดสะสมรวม (ลัง)</TableHead>
+                      <TableHead>วันที่ส่งมา</TableHead>
+                      <TableHead>สถานะคิว</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {loading ? (
-                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto" />เธเธณเธฅเธฑเธเนเธซเธฅเธ”...</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto" />กำลังโหลด...</TableCell></TableRow>
                     ) : tasks.filter(t => {
                       const term = searchQuery.toLowerCase()
                       const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
                       const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
                       return sku.includes(term) || lotNo.includes(term)
                     }).length === 0 ? (
-                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500">เนเธกเนเธกเธตเธเธดเธงเธเธฒเธเธเธณเธชเนเธ FG</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500">ไม่มีคิวงานนำส่ง FG</TableCell></TableRow>
                     ) : tasks.filter(t => {
                       const term = searchQuery.toLowerCase()
                       const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
@@ -522,18 +522,18 @@ export default function FgTasksPage() {
                             <span className="font-medium text-amber-700">{combinedBoxLot || '-'}</span>
                           </TableCell>
                           <TableCell>
-                            <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} เธฅเธฑเธ</span>
-                            <span className="text-xs text-slate-500 ml-1">({totalPcsFromPof.toLocaleString()} เธเธดเนเธ)</span>
+                            <span className="font-bold text-indigo-600">{totalCartonsFromPof.toLocaleString()} ลัง</span>
+                            <span className="text-xs text-slate-500 ml-1">({totalPcsFromPof.toLocaleString()} ชิ้น)</span>
                           </TableCell>
                           <TableCell className="font-semibold text-emerald-600">
-                            {cumulativePcs.toLocaleString()} เธเธดเนเธ
+                            {cumulativePcs.toLocaleString()} ชิ้น
                           </TableCell>
                           <TableCell className="font-semibold text-emerald-600">
-                            {cumulativeCartons.toLocaleString()} เธฅเธฑเธ
+                            {cumulativeCartons.toLocaleString()} ลัง
                           </TableCell>
                           <TableCell>{task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}</TableCell>
                           <TableCell>
-                            {task.status === 'DONE' ? <Badge className="bg-green-100 text-green-700">เธเธณเธชเนเธเธชเธณเน€เธฃเนเธ</Badge> : task.status === 'IN_PROGRESS' ? <Badge variant="outline" className="text-indigo-600 border-indigo-200">เธเธณเธฅเธฑเธเธฃเธฑเธเน€เธเนเธฒ</Badge> : <Badge variant="outline">เธฃเธญเธฃเธฑเธเน€เธเนเธฒ</Badge>}
+                            {task.status === 'DONE' ? <Badge className="bg-green-100 text-green-700">นำส่งสำเร็จ</Badge> : task.status === 'IN_PROGRESS' ? <Badge variant="outline" className="text-indigo-600 border-indigo-200">กำลังรับเข้า</Badge> : <Badge variant="outline">รอรับเข้า</Badge>}
                           </TableCell>
                         </TableRow>
                         {expandedRow === task.id && (
@@ -552,19 +552,19 @@ export default function FgTasksPage() {
         <TabsContent value="inventory">
           <Card className="shadow-sm border ring-1 ring-slate-200">
             <div className="p-4 bg-[#F8F6F0] border-b">
-              <h2 className="font-semibold text-slate-700">เธชเธ•เนเธญเธเธชเธดเธเธเนเธฒเธเธเน€เธซเธฅเธทเธญ (Real-time Balance)</h2>
+              <h2 className="font-semibold text-slate-700">สต๊อกสินค้าคงเหลือ (Real-time Balance)</h2>
             </div>
             <CardContent className="p-0">
               <Table>
                 <TableHeader className="bg-[#F8F6F0]">
                   <TableRow>
-                    <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
+                    <TableHead>สินค้า / SKU</TableHead>
                     <TableHead>Lot No.</TableHead>
                     <TableHead>Box Lot</TableHead>
-                    <TableHead>เธขเธญเธ”เธเธเน€เธซเธฅเธทเธญ</TableHead>
-                    <TableHead>เธ•เธณเนเธซเธเนเธเธเธฑเธ”เน€เธเนเธ</TableHead>
-                    <TableHead>เธงเธฑเธเธซเธกเธ”เธญเธฒเธขเธธ (EXP)</TableHead>
-                    <TableHead>เธชเธ–เธฒเธเธฐ QC</TableHead>
+                    <TableHead>ยอดคงเหลือ</TableHead>
+                    <TableHead>ตำแหน่งจัดเก็บ</TableHead>
+                    <TableHead>วันหมดอายุ (EXP)</TableHead>
+                    <TableHead>สถานะ QC</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -574,7 +574,7 @@ export default function FgTasksPage() {
                       const lotNo = (item.lot_no || '').toLowerCase()
                       return sku.includes(term) || lotNo.includes(term)
                     }).length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center h-32">เนเธกเนเธกเธตเธชเธดเธเธเนเธฒเนเธเธเธฅเธฑเธ</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="text-center h-32">ไม่มีสินค้าในคลัง</TableCell></TableRow>
                   ) : inventory.filter(item => {
                       const term = searchQuery.toLowerCase()
                       const sku = (item.products?.sku || '').toLowerCase()
@@ -588,11 +588,11 @@ export default function FgTasksPage() {
                       </TableCell>
                       <TableCell>{item.lot_no}</TableCell>
                       <TableCell><Badge variant="outline" className="bg-amber-50">{item.box_lot_no}</Badge></TableCell>
-                      <TableCell className="font-bold text-indigo-600">{item.available_qty_pcs.toLocaleString()} เธเธดเนเธ</TableCell>
+                      <TableCell className="font-bold text-indigo-600">{item.available_qty_pcs.toLocaleString()} ชิ้น</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-sm text-slate-600">
                           <PackageOpen className="w-4 h-4 text-slate-400" />
-                          {item.fg_locations ? `${item.fg_locations.zone} / ${item.fg_locations.rack} (Lv.${item.fg_locations.level})` : 'เนเธกเนเธฃเธฐเธเธธ'}
+                          {item.fg_locations ? `${item.fg_locations.zone} / ${item.fg_locations.rack} (Lv.${item.fg_locations.level})` : 'ไม่ระบุ'}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -602,22 +602,22 @@ export default function FgTasksPage() {
                         <DropdownMenu>
                           <DropdownMenuTrigger className="focus:outline-none">
                             {item.qc_status === 'RELEASED' ? (
-                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none cursor-pointer">เธเธฃเนเธญเธกเธเธฒเธข (Released)</Badge>
+                              <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 border-none cursor-pointer">พร้อมขาย (Released)</Badge>
                             ) : item.qc_status === 'QUARANTINE' ? (
-                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none cursor-pointer">เธเธฑเธเธเธฑเธ (Quarantine)</Badge>
+                              <Badge className="bg-amber-100 text-amber-700 hover:bg-amber-200 border-none cursor-pointer">กักกัน (Quarantine)</Badge>
                             ) : (
                               <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none cursor-pointer">Reject</Badge>
                             )}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'RELEASED')} className="text-emerald-600 font-medium">
-                              เธเธฃเนเธญเธกเธเธฒเธข (Released)
+                              พร้อมขาย (Released)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'QUARANTINE')} className="text-amber-600 font-medium">
-                              เธเธฑเธเธเธฑเธ (Quarantine)
+                              กักกัน (Quarantine)
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => updateQcStatus(item.id, 'REJECTED')} className="text-red-600 font-medium">
-                              Reject (เนเธกเนเธเนเธฒเธ)
+                              Reject (ไม่ผ่าน)
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -633,10 +633,10 @@ export default function FgTasksPage() {
         <TabsContent value="outbound">
            <Card className="shadow-sm border ring-1 ring-slate-200">
             <div className="p-4 bg-[#F8F6F0] border-b">
-              <h2 className="font-semibold text-slate-700">เน€เธเธดเธเธเนเธฒเธขเธชเธดเธเธเนเธฒ (เธ•เธฒเธกเธซเธฅเธฑเธ FEFO)</h2>
+              <h2 className="font-semibold text-slate-700">เบิกจ่ายสินค้า (ตามหลัก FEFO)</h2>
             </div>
             <CardContent className="p-6">
-              <p className="text-sm text-slate-500 mb-6">เธเธฃเธธเธ“เธฒเน€เธฅเธทเธญเธเธฃเธฒเธขเธเธฒเธฃเธชเธดเธเธเนเธฒเธเธฒเธเธเธฅเธฑเธเธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเน€เธเธดเธเธเนเธฒเธข (เธฃเธฐเธเธเธเธฐเน€เธฃเธตเธขเธเธฅเธณเธ”เธฑเธ Lot เธ—เธตเนเธซเธกเธ”เธญเธฒเธขเธธเธเนเธญเธเนเธซเนเธญเธฑเธ•เนเธเธกเธฑเธ•เธด)</p>
+              <p className="text-sm text-slate-500 mb-6">กรุณาเลือกรายการสินค้าจากคลังที่ต้องการเบิกจ่าย (ระบบจะเรียงลำดับ Lot ที่หมดอายุก่อนให้อัตโนมัติ)</p>
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                 {inventory.filter(i => (i.qc_status === 'RELEASED' || i.qc_status === 'QUARANTINE')).filter(item => {
                   const term = searchQuery.toLowerCase()
@@ -646,7 +646,7 @@ export default function FgTasksPage() {
                 }).map(item => (
                   <Card key={item.id} className="border-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer" onClick={() => setDispatchDialog({ open: true, invItem: item, qtyPcs: item.available_qty_pcs, refDoc: '' })}>
                     <CardContent className="p-4 relative">
-                       {item.qc_status === 'QUARANTINE' && <Badge className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-500 text-white border-none text-[10px]">เธฃเธญเธ•เธฃเธงเธ QC (เธซเนเธฒเธกเน€เธเธดเธ)</Badge>}
+                       {item.qc_status === 'QUARANTINE' && <Badge className="absolute top-2 right-2 bg-amber-500 hover:bg-amber-500 text-white border-none text-[10px]">รอตรวจ QC (ห้ามเบิก)</Badge>}
                        <h4 className="font-bold text-slate-800">{item.products?.sku}</h4>
                        <div className="text-xs text-slate-500 line-clamp-1 mb-2">{item.products?.product_name}</div>
                        <div className="flex justify-between items-center text-sm mb-1">
@@ -661,7 +661,7 @@ export default function FgTasksPage() {
                        </div>
                        <div className="mt-4 pt-3 border-t flex justify-between items-center">
                          <span className="text-xs text-red-500 font-medium">EXP: {new Date(item.exp_date).toLocaleDateString('th-TH')}</span>
-                         <span className="font-bold text-indigo-600 text-lg">{item.available_qty_pcs} เธเธดเนเธ</span>
+                         <span className="font-bold text-indigo-600 text-lg">{item.available_qty_pcs} ชิ้น</span>
                        </div>
                     </CardContent>
                   </Card>
@@ -685,23 +685,23 @@ export default function FgTasksPage() {
                 </div>
                 
                 <div className="flex-1 text-center flex flex-col items-center">
-                  <h1 className="text-2xl font-bold mb-4 font-serif">เนเธเธชเนเธเธกเธญเธ - เธฃเธฑเธเธกเธญเธเธชเธดเธเธเนเธฒ</h1>
+                  <h1 className="text-2xl font-bold mb-4 font-serif">ใบส่งมอบ - รับมอบสินค้า</h1>
                   <div className="text-left space-y-1 ml-4 text-[13px]">
                     <div className="flex items-center gap-2">
-                       <div className="w-4 h-4 border border-black flex items-center justify-center font-bold text-lg leading-none">โ“</div>
-                       <span>เธชเธดเธเธเนเธฒเธชเธณเน€เธฃเนเธเธฃเธนเธ</span>
+                       <div className="w-4 h-4 border border-black flex items-center justify-center font-bold text-lg leading-none">✓</div>
+                       <span>สินค้าสำเร็จรูป</span>
                     </div>
                     <div className="flex items-center gap-2">
                        <div className="w-4 h-4 border border-black"></div>
-                       <span>เธชเธดเธเธเนเธฒเธญเธทเนเธเน .................................................</span>
+                       <span>สินค้าอื่นๆ .................................................</span>
                     </div>
                   </div>
                 </div>
                 
                 <div className="w-[150px] text-right text-[13px] space-y-2 pt-2">
-                  <div className="flex justify-between"><span>เน€เธฅเนเธกเธ—เธตเน</span> <span>{receiveDialog.docNoBook}</span></div>
+                  <div className="flex justify-between"><span>เล่มที่</span> <span>{receiveDialog.docNoBook}</span></div>
                   <div className="flex justify-between">
-                    <span>เน€เธฅเธเธ—เธตเน</span> 
+                    <span>เลขที่</span> 
                     <span className="font-mono">{receiveDialog.docNoNumber}</span>
                   </div>
                 </div>
@@ -711,20 +711,20 @@ export default function FgTasksPage() {
              <div className="flex justify-between items-end mb-2 text-[13px]">
                <div className="space-y-2">
                  <div className="flex items-center gap-2">
-                   <span className="font-semibold w-24">เนเธเธเธเธเธนเนเธชเนเธเธกเธญเธ</span>
-                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">โ“</div> เนเธเธเธเนเธเนเธเธเธดเนเธ</div>
-                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> เนเธเธเธเธเธฅเธฑเธเธชเธดเธเธเนเธฒ</div>
-                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> เนเธเธเธเธญเธทเนเธเน ...................................</div>
+                   <span className="font-semibold w-24">แผนกผู้ส่งมอบ</span>
+                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">✓</div> แผนกแพ็คกิ้ง</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกคลังสินค้า</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกอื่นๆ ...................................</div>
                  </div>
                  <div className="flex items-center gap-2">
-                   <span className="font-semibold w-24">เนเธเธเธเธเธนเนเธฃเธฑเธเธกเธญเธ</span>
-                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black"></div> เนเธเธเธเนเธเนเธเธเธดเนเธ</div>
-                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">โ“</div> เนเธเธเธเธเธฅเธฑเธเธชเธดเธเธเนเธฒ</div>
-                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> เนเธเธเธเธญเธทเนเธเน ...................................</div>
+                   <span className="font-semibold w-24">แผนกผู้รับมอบ</span>
+                   <div className="flex items-center gap-1"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกแพ็คกิ้ง</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black flex items-center justify-center text-[10px]">✓</div> แผนกคลังสินค้า</div>
+                   <div className="flex items-center gap-1 ml-2"><div className="w-3 h-3 rounded-full border border-black"></div> แผนกอื่นๆ ...................................</div>
                  </div>
                </div>
                <div>
-                 <span className="mr-2">เธงเธฑเธเธ—เธตเน</span>
+                 <span className="mr-2">วันที่</span>
                  <span className="border-b border-black border-dashed px-4 font-handwriting text-[#4A4238]">
                    {new Date().toLocaleDateString('en-GB').replace(/\//g, ' / ')}
                  </span>
@@ -736,13 +736,13 @@ export default function FgTasksPage() {
                <Table className="w-full !border-collapse">
                  <TableHeader>
                    <TableRow className="border-b-2 border-black">
-                     <TableHead className="border-r border-black font-semibold text-black text-center w-12 p-2">เธฅเธณเธ”เธฑเธ</TableHead>
-                     <TableHead className="border-r border-black font-semibold text-black text-center w-28 p-2">เธฃเธซเธฑเธชเธชเธดเธเธเนเธฒ</TableHead>
-                     <TableHead className="border-r border-black font-semibold text-black text-center p-2">เธเธทเนเธญเธชเธดเธเธเนเธฒ</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-12 p-2">ลำดับ</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-28 p-2">รหัสสินค้า</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center p-2">ชื่อสินค้า</TableHead>
                      <TableHead className="border-r border-black font-semibold text-black text-center w-20 p-2">LOT.</TableHead>
-                     <TableHead className="border-r border-black font-semibold text-black text-center w-32 p-2">เธเธณเธเธงเธ</TableHead>
-                     <TableHead className="border-r border-black font-semibold text-black text-center w-24 p-2">เน€เธฅเธเธ—เธตเนเธเธฅเนเธญเธ</TableHead>
-                     <TableHead className="font-semibold text-black text-center w-32 p-2">เน€เธฅเธเธ—เธตเนเนเธเธชเธฑเนเธเธเธทเนเธญ</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-32 p-2">จำนวน</TableHead>
+                     <TableHead className="border-r border-black font-semibold text-black text-center w-24 p-2">เลขที่กล่อง</TableHead>
+                     <TableHead className="font-semibold text-black text-center w-32 p-2">เลขที่ใบสั่งซื้อ</TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
@@ -814,7 +814,7 @@ export default function FgTasksPage() {
 
                    {/* Total Row */}
                    <TableRow className="h-8">
-                     <TableCell colSpan={4} className="border-r border-black text-center font-bold">เธฃเธงเธก</TableCell>
+                     <TableCell colSpan={4} className="border-r border-black text-center font-bold">รวม</TableCell>
                      <TableCell className="border-r border-black text-center font-bold font-handwriting text-[#4A4238]">{receiveDialog.qtyPcs}</TableCell>
                      <TableCell className="border-r border-black"></TableCell>
                      <TableCell></TableCell>
@@ -825,7 +825,7 @@ export default function FgTasksPage() {
 
              {/* Remark */}
              <div className="mb-2 text-[13px] text-[#4A4238] font-handwriting font-medium">
-               เธซเธกเธฒเธขเน€เธซเธ•เธธ: เธเธฅเนเธญเธเธฅเนเธญเธ• {receiveDialog.boxLot || '-'}
+               หมายเหตุ: กล่องล็อต {receiveDialog.boxLot || '-'}
              </div>
 
              {/* Signatures */}
@@ -833,21 +833,21 @@ export default function FgTasksPage() {
                {/* Col 1 */}
                <div className="flex-1 border-r border-black p-3 space-y-4 relative">
                   <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธเธนเนเธชเนเธเธกเธญเธ</span>
+                     <span className="whitespace-nowrap">ผู้ส่งมอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender?.split('@')[0] || ''}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
                      </div>
-                     <span className="whitespace-nowrap">เธงเธฑเธเธ—เธตเน</span>
+                     <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
                         {new Date().toLocaleDateString('en-GB')}
                      </span>
                   </div>
                    <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธเธนเนเธญเธเธธเธกเธฑเธ•เธดเธชเนเธ</span>
+                     <span className="whitespace-nowrap">ผู้อนุมัติส่ง</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender?.split('@')[0] || ''}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
                      </div>
-                     <span className="whitespace-nowrap">เธงเธฑเธเธ—เธตเน</span>
+                     <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
                         {new Date().toLocaleDateString('en-GB')}
                      </span>
@@ -856,21 +856,21 @@ export default function FgTasksPage() {
                {/* Col 2 */}
                <div className="flex-1 border-r border-black p-3 space-y-4">
                   <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธเธนเนเธฃเธฑเธเธกเธญเธ</span>
+                     <span className="whitespace-nowrap">ผู้รับมอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{receiveDialog.task?.tank_details?.fg_receive_info?.user?.split('@')[0] || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{receiveDialog.task?.tank_details?.fg_receive_info?.user || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
                      </div>
-                     <span className="whitespace-nowrap">เธงเธฑเธเธ—เธตเน</span>
+                     <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
                         {new Date().toLocaleDateString('en-GB')}
                      </span>
                   </div>
                   <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธเธนเนเธ•เธฃเธงเธเธชเธญเธ</span>
+                     <span className="whitespace-nowrap">ผู้ตรวจสอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
                        {/* QC Check goes here later */}
                      </div>
-                     <span className="whitespace-nowrap">เธงเธฑเธเธ—เธตเน</span>
+                     <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
                         {new Date().toLocaleDateString('en-GB')}
                      </span>
@@ -879,11 +879,11 @@ export default function FgTasksPage() {
                {/* Col 3 */}
                <div className="w-[180px] p-3 space-y-4 relative">
                   <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธเธนเนเธญเธเธธเธกเธฑเธ•เธด</span>
+                     <span className="whitespace-nowrap">ผู้อนุมัติ</span>
                      <span className="flex-1 border-b border-black border-dashed inline-block"></span>
                   </div>
                   <div className="flex items-end gap-1">
-                     <span className="whitespace-nowrap">เธงเธฑเธเธ—เธตเน</span>
+                     <span className="whitespace-nowrap">วันที่</span>
                      <span className="flex-1 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
                         {new Date().toLocaleDateString('en-GB')}
                      </span>
@@ -896,7 +896,7 @@ export default function FgTasksPage() {
           
           {/* Actions / Inputs for Receiving */}
           <div className="w-full max-w-[840px] bg-white rounded-lg shadow p-6 mt-6 border-t-4 border-indigo-500 shrink-0">
-            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><Archive className="w-5 h-5 text-indigo-500" /> เธ•เธฃเธงเธเธชเธญเธเธขเธญเธ”เนเธฅเธฐเธขเธทเธเธขเธฑเธเธฃเธฑเธเน€เธเนเธฒ (เนเธ”เธข FG)</h4>
+            <h4 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-lg"><Archive className="w-5 h-5 text-indigo-500" /> ตรวจสอบยอดและยืนยันรับเข้า (โดย FG)</h4>
             
             {/* Summary Panel */}
             {(() => {
@@ -934,16 +934,16 @@ export default function FgTasksPage() {
 
               return (
                 <div className="bg-slate-100 border border-slate-300 rounded-md p-4 mb-5 text-[13px] text-slate-800 space-y-1 font-mono shadow-sm">
-                  <div>เธงเธฑเธเธ—เธตเน : {fmtFullDate(new Date())}</div>
-                  <div>เธเธฒเธ : {t.production_lots?.products?.sku || '-'}</div>
-                  <div>SO/เนเธเธชเธฑเนเธเธเธฅเธดเธ• : {t.production_lots?.po_no || t.production_lots?.order_no || '-'}</div>
+                  <div>วันที่ : {fmtFullDate(new Date())}</div>
+                  <div>งาน : {t.production_lots?.products?.sku || '-'}</div>
+                  <div>SO/ใบสั่งผลิต : {t.production_lots?.po_no || t.production_lots?.order_no || '-'}</div>
                   <div>LOT: {t.production_lots?.lot_no || '-'}</div>
                   <div>MFD: {fmtDate(mfg)}</div>
                   <div>EXP: {fmtDate(exp)}</div>
-                  <div>เธเธณเธเธงเธ : {receiveDialog.cartons} เธฅเธฑเธ x {pcsPerCarton} เธเธดเนเธ = {receiveDialog.qtyPcs.toLocaleString()} เธเธดเนเธ</div>
-                  <div>เน€เธฅเธเธ—เธตเนเธเธฅเนเธญเธ : {boxString}</div>
-                  <div>[เธขเธญเธ”เธชเธฐเธชเธก ({endBox} เธฅเธฑเธ/ {totalCartons.toFixed(2).replace(/\.00$/,'')} เธฅเธฑเธ) x {pcsPerCarton} เธเธดเนเธ   = {accumulatedPcs.toLocaleString()} เธเธดเนเธ/  {plannedQty.toLocaleString()} เธเธดเนเธ  ]</div>
-                  <div>เนเธเธชเนเธเธกเธญเธ : {receiveDialog.docNoBook}/{receiveDialog.docNoNumber}</div>
+                  <div>จำนวน : {receiveDialog.cartons} ลัง x {pcsPerCarton} ชิ้น = {receiveDialog.qtyPcs.toLocaleString()} ชิ้น</div>
+                  <div>เลขที่กล่อง : {boxString}</div>
+                  <div>[ยอดสะสม ({endBox} ลัง/ {totalCartons.toFixed(2).replace(/\.00$/,'')} ลัง) x {pcsPerCarton} ชิ้น   = {accumulatedPcs.toLocaleString()} ชิ้น/  {plannedQty.toLocaleString()} ชิ้น  ]</div>
+                  <div>ใบส่งมอบ : {receiveDialog.docNoBook}/{receiveDialog.docNoNumber}</div>
                 </div>
               )
             })()}
@@ -952,25 +952,25 @@ export default function FgTasksPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 bg-[#F8F6F0]/ p-5 rounded-lg border border-slate-200">
                <div className="space-y-2">
-                 <label className="text-sm font-semibold text-slate-700">เธขเธญเธ”เธฃเธฑเธเธเธฃเธดเธ (เธฅเธฑเธ) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
+                 <label className="text-sm font-semibold text-slate-700">ยอดรับจริง (ลัง) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
                  <Input type="number" min={0} className="bg-white text-lg font-bold text-indigo-700 h-12" value={receiveDialog.cartons} disabled={receiveDialog.isReadOnly} onChange={(e) => setReceiveDialog(prev => ({...prev, cartons: parseInt(e.target.value) || 0}))} />
                </div>
                <div className="space-y-2">
-                 <label className="text-sm font-semibold text-slate-700">เธขเธญเธ”เธฃเธฑเธเธเธฃเธดเธ (เธเธดเนเธ) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
+                 <label className="text-sm font-semibold text-slate-700">ยอดรับจริง (ชิ้น) {!receiveDialog.isReadOnly && <span className="text-red-500">*</span>}</label>
                  <Input type="number" min={0} className="bg-white text-lg font-bold text-indigo-700 h-12" value={receiveDialog.qtyPcs} disabled={receiveDialog.isReadOnly} onChange={(e) => setReceiveDialog(prev => ({...prev, qtyPcs: parseInt(e.target.value) || 0}))} />
                </div>
                {!receiveDialog.isReadOnly && (
                  <div className="space-y-2">
-                   <label className="text-sm font-semibold text-slate-700">เธ•เธณเนเธซเธเนเธเธเธฑเธ”เน€เธเนเธ (Location) <span className="text-red-500">*</span></label>
+                   <label className="text-sm font-semibold text-slate-700">ตำแหน่งจัดเก็บ (Location) <span className="text-red-500">*</span></label>
                    <Select value={receiveDialog.locationId} onValueChange={(val) => setReceiveDialog(prev => ({...prev, locationId: val || ''}))}>
                      <SelectTrigger className="bg-white h-12">
-                       <SelectValue placeholder="-- เน€เธฅเธทเธญเธเนเธเธ/เธเธฑเนเธเธงเธฒเธ --" />
+                       <SelectValue placeholder="-- เลือกโซน/ชั้นวาง --" />
                      </SelectTrigger>
                      <SelectContent>
-                       <SelectItem value="UNSPECIFIED" className="font-medium text-slate-600">-- เธขเธฑเธเนเธกเนเธฃเธฐเธเธธ --</SelectItem>
+                       <SelectItem value="UNSPECIFIED" className="font-medium text-slate-600">-- ยังไม่ระบุ --</SelectItem>
                        {locations.map(loc => (
                          <SelectItem key={loc.id} value={loc.id}>
-                           {loc.zone} - {loc.rack} (เธเธฑเนเธ {loc.level})
+                           {loc.zone} - {loc.rack} (ชั้น {loc.level})
                          </SelectItem>
                        ))}
                      </SelectContent>
@@ -981,13 +981,13 @@ export default function FgTasksPage() {
             
             <div className="flex justify-end gap-3 mt-4 shrink-0">
               <Button variant="outline" size="lg" className="border-slate-300" onClick={handlePrint}>
-                <span className="mr-2">๐–จ๏ธ</span> เธเธดเธกเธเน / เธ”เธฒเธงเธเนเนเธซเธฅเธ” PDF
+                <span className="mr-2">🖨️</span> พิมพ์ / ดาวน์โหลด PDF
               </Button>
-              <Button variant="outline" size="lg" onClick={() => setReceiveDialog(prev => ({...prev, open: false}))}>เธเธดเธ”เธซเธเนเธฒเธ•เนเธฒเธ</Button>
+              <Button variant="outline" size="lg" onClick={() => setReceiveDialog(prev => ({...prev, open: false}))}>ปิดหน้าต่าง</Button>
               {!receiveDialog.isReadOnly && (
                 <Button size="lg" className="bg-[#D4AF37] hover:bg-[#B8962A] text-white shadow-md text-base px-8" onClick={confirmReceive}>
-                  <span className="text-xl mr-2">โ๏ธ</span>
-                  เธฅเธเธเธฒเธกเธฃเธฑเธเธกเธญเธ ({currentUser}) เนเธฅเธฐเธฃเธฑเธเน€เธเนเธฒเธเธฅเธฑเธ
+                  <span className="text-xl mr-2">✍️</span>
+                  ลงนามรับมอบ ({currentUser}) และรับเข้าคลัง
                 </Button>
               )}
             </div>
@@ -1000,28 +1000,28 @@ export default function FgTasksPage() {
       <Dialog open={dispatchDialog.open} onOpenChange={(open) => !open && setDispatchDialog(prev => ({...prev, open: false}))}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>เธ—เธณเธฃเธฒเธขเธเธฒเธฃเน€เธเธดเธเธเนเธฒเธข</DialogTitle>
+            <DialogTitle>ทำรายการเบิกจ่าย</DialogTitle>
           </DialogHeader>
           {dispatchDialog.invItem && (
             <div className="py-4 space-y-4">
               <div className="bg-[#F8F6F0] p-3 rounded">
                 <div className="font-medium text-slate-800">{dispatchDialog.invItem.products?.sku}</div>
                 <div className="text-sm text-slate-500">Lot: {dispatchDialog.invItem.lot_no} | Box Lot: {dispatchDialog.invItem.box_lot_no}</div>
-                <div className="text-sm font-bold text-indigo-600 mt-2">เธขเธญเธ”เธเธเน€เธซเธฅเธทเธญ: {dispatchDialog.invItem.available_qty_pcs} เธเธดเนเธ</div>
+                <div className="text-sm font-bold text-indigo-600 mt-2">ยอดคงเหลือ: {dispatchDialog.invItem.available_qty_pcs} ชิ้น</div>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">เธขเธญเธ”เธ—เธตเนเธ•เนเธญเธเธเธฒเธฃเน€เธเธดเธ (เธเธดเนเธ)</label>
+                <label className="text-sm font-medium">ยอดที่ต้องการเบิก (ชิ้น)</label>
                 <Input type="number" min={1} max={dispatchDialog.invItem.available_qty_pcs} value={dispatchDialog.qtyPcs} onChange={(e) => setDispatchDialog(prev => ({...prev, qtyPcs: parseInt(e.target.value) || 0}))} />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">เน€เธญเธเธชเธฒเธฃเธญเนเธฒเธเธญเธดเธ (PO, เนเธเน€เธเธดเธ)</label>
-                <Input placeholder="เน€เธเนเธ PO-2026-001" value={dispatchDialog.refDoc} onChange={(e) => setDispatchDialog(prev => ({...prev, refDoc: e.target.value}))} />
+                <label className="text-sm font-medium">เอกสารอ้างอิง (PO, ใบเบิก)</label>
+                <Input placeholder="เช่น PO-2026-001" value={dispatchDialog.refDoc} onChange={(e) => setDispatchDialog(prev => ({...prev, refDoc: e.target.value}))} />
               </div>
             </div>
           )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDispatchDialog(prev => ({...prev, open: false}))}>เธขเธเน€เธฅเธดเธ</Button>
-            <Button className="bg-[#D4AF37] hover:bg-[#B8962A]" onClick={handleDispatch}>เธขเธทเธเธขเธฑเธเธเนเธฒเธขเธญเธญเธ</Button>
+            <Button variant="outline" onClick={() => setDispatchDialog(prev => ({...prev, open: false}))}>ยกเลิก</Button>
+            <Button className="bg-[#D4AF37] hover:bg-[#B8962A]" onClick={handleDispatch}>ยืนยันจ่ายออก</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

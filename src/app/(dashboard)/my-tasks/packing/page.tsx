@@ -15,13 +15,13 @@ import { differenceInDays, startOfDay } from 'date-fns'
 
 const getPackagingIcon = (unit: string, className: string) => {
   switch (unit) {
-    case 'เธเธงเธ”เธ”เธฃเนเธญเธ': return <Pipette className={className} />
-    case 'เธเธงเธ”เธเธฑเนเธก': return <SprayCan className={className} />
-    case 'เธเธงเธ”เธเนเธณเธ•เธ': return <PillBottle className={className} />
-    case 'เธเธฃเธฐเธเธธเธ': return <Cylinder className={className} />
-    case 'เธซเธฅเธญเธ”': return <TestTube className={className} />
-    case 'เธเธญเธ': return <Mail className={className} />
-    case 'เธเธฅเนเธญเธ': return <BoxIcon className={className} />
+    case 'ขวดดร้อป': return <Pipette className={className} />
+    case 'ขวดปั๊ม': return <SprayCan className={className} />
+    case 'ขวดน้ำตบ': return <PillBottle className={className} />
+    case 'กระปุก': return <Cylinder className={className} />
+    case 'หลอด': return <TestTube className={className} />
+    case 'ซอง': return <Mail className={className} />
+    case 'กล่อง': return <BoxIcon className={className} />
     default: return <BoxIcon className={className} />
   }
 }
@@ -68,7 +68,7 @@ export default function PackingTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email?.split('@')[0] || 'Unknown User')
+      setCurrentUser(user.email || 'Unknown User')
     }
   }
 
@@ -116,10 +116,10 @@ export default function PackingTasksPage() {
       .order('created_at', { ascending: false })
 
     if (error) {
-      toast.error('เนเธซเธฅเธ”เธเนเธญเธกเธนเธฅเธฅเนเธกเน€เธซเธฅเธง')
+      toast.error('โหลดข้อมูลล้มเหลว')
     } else if (data) {
       const packingTasks = data.filter(t => 
-        (t.processes as any)?.process_name?.toLowerCase().includes('เธเธฃเธฃเธเธธ') || 
+        (t.processes as any)?.process_name?.toLowerCase().includes('บรรจุ') || 
         (t.processes as any)?.process_name?.toLowerCase().includes('packing')
       )
       setTasks(packingTasks)
@@ -145,7 +145,7 @@ export default function PackingTasksPage() {
       const historyItems: any[] = []
       data.forEach(task => {
         const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (!pName || (!pName.toLowerCase().includes('เธเธฃเธฃเธเธธ') && !pName.toLowerCase().includes('packing'))) return
+        if (!pName || (!pName.toLowerCase().includes('บรรจุ') && !pName.toLowerCase().includes('packing'))) return
         
         const details = task.tank_details || {}
         Object.keys(details).forEach(key => {
@@ -204,7 +204,7 @@ export default function PackingTasksPage() {
 
   
   const handleDefectSubmit = async () => {
-    if (!defectLotId || !defectQuantity) return toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเนเธญเธกเธนเธฅเนเธซเนเธเธฃเธเธ–เนเธงเธ')
+    if (!defectLotId || !defectQuantity) return toast.error('กรุณาระบุข้อมูลให้ครบถ้วน')
     await supabase.from('production_logs').insert({
       status: 'DEFECT',
       process_id: '0d1355cc-f3e2-40c0-b54f-ac0b550e544d',
@@ -213,7 +213,7 @@ export default function PackingTasksPage() {
       note: defectNote,
       activity_date: new Date().toISOString().split('T')[0]
     })
-    toast.success('เธเธฑเธเธ—เธถเธเธเธญเธเน€เธชเธตเธขเธเธฃเธฐเธเธณเธงเธฑเธเธชเธณเน€เธฃเนเธ')
+    toast.success('บันทึกของเสียประจำวันสำเร็จ')
     setIsDefectModalOpen(false)
     setDefectQuantity('')
     setDefectNote('')
@@ -238,9 +238,9 @@ export default function PackingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('อัปเดตสถานะเรียบร้อย')
       fetchPackingTasks()
     }
   }
@@ -252,9 +252,9 @@ export default function PackingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธซเนเธญเธเธเธฃเธฃเธเธธเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตห้องบรรจุไม่สำเร็จ')
     } else {
-      toast.success('เธญเธฑเธเน€เธ”เธ•เธซเนเธญเธเธเธฃเธฃเธเธธเน€เธฃเธตเธขเธเธฃเนเธญเธข')
+      toast.success('อัปเดตห้องบรรจุเรียบร้อย')
       fetchPackingTasks()
     }
   }
@@ -267,7 +267,7 @@ export default function PackingTasksPage() {
     if (currentStatus === 'IN_PROGRESS') nextStatus = 'DONE'
     else if (currentStatus === 'DONE') nextStatus = 'SENT_TO_POF'
     else if (currentStatus === 'SENT_TO_POF') {
-      toast.error('เนเธกเนเธชเธฒเธกเธฒเธฃเธ–เนเธเนเนเธเธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธชเนเธเธ•เนเธญเนเธเนเธฅเนเธงเนเธ”เน')
+      toast.error('ไม่สามารถแก้ไขรายการที่ส่งต่อไปแล้วได้')
       return
     }
 
@@ -281,11 +281,11 @@ export default function PackingTasksPage() {
 
   const handleQtyConfirm = async () => {
     if (!qtyDialog.qty || isNaN(Number(qtyDialog.qty))) {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเธณเธเธงเธเธเธดเนเธเธ—เธตเนเธ–เธนเธเธ•เนเธญเธ')
+      toast.error('กรุณาระบุจำนวนชิ้นที่ถูกต้อง')
       return
     }
     if (!qtyDialog.boxLot || qtyDialog.boxLot.trim() === '') {
-      toast.error('เธเธฃเธธเธ“เธฒเธฃเธฐเธเธธเธเนเธญเธกเธนเธฅเธเธฅเนเธญเธเธเธดเธกเธเนเธฅเนเธญเธ• (เน€เธเนเธ Lot.009/26)')
+      toast.error('กรุณาระบุข้อมูลกล่องพิมพ์ล็อต (เช่น Lot.009/26)')
       return
     }
     await executeTankUpdate(qtyDialog.taskId, qtyDialog.tankNum, qtyDialog.task, qtyDialog.nextStatus, Number(qtyDialog.qty), qtyDialog.boxLot)
@@ -340,9 +340,9 @@ export default function PackingTasksPage() {
       .eq('id', taskId)
 
     if (error) {
-      toast.error('เธญเธฑเธเน€เธ”เธ•เธชเธ–เธฒเธเธฐเธ–เธฑเธเนเธกเนเธชเธณเน€เธฃเนเธ')
+      toast.error('อัปเดตสถานะถังไม่สำเร็จ')
     } else {
-      toast.success(`เธญเธฑเธเน€เธ”เธ•เธเธฃเธฃเธเธธเธ–เธฑเธเธ—เธตเน ${currentTank} เน€เธเนเธเธชเธ–เธฒเธเธฐ ${nextStatus}`)
+      toast.success(`อัปเดตบรรจุถังที่ ${currentTank} เป็นสถานะ ${nextStatus}`)
       
       // --- AUTO HAND-OFF TO POF ---
       if (nextStatus === 'SENT_TO_POF') {
@@ -409,35 +409,35 @@ export default function PackingTasksPage() {
           <div>
             <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-2">
               {getPackagingIcon(task.production_lots?.unit || '', "w-5 h-5 text-emerald-500")}
-              เธชเธ–เธฒเธเธฐเธเธฒเธฃเธเธฃเธฃเธเธธเธเธดเธงเธเธตเน (เธ–เธฑเธเธ—เธตเน {start} เธ–เธถเธ {end}) เธเธฒเธเธ—เธฑเนเธเธซเธกเธ” {total} เธ–เธฑเธ
+              สถานะการบรรจุคิวนี้ (ถังที่ {start} ถึง {end}) จากทั้งหมด {total} ถัง
             </h3>
             <div className="flex flex-col sm:flex-row sm:items-center gap-4 mt-2">
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง:</span>
+                <span className="text-sm font-medium text-slate-600">วันที่จัดคิว:</span>
                 <span className="text-sm text-slate-800 font-medium">
                   {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-medium text-slate-600">เธซเนเธญเธเธเธฃเธฃเธเธธ:</span>
+                <span className="text-sm font-medium text-slate-600">ห้องบรรจุ:</span>
                 <Select value={task.room_id || ''} onValueChange={(val) => updateTaskRoom(task.id, val)}>
                   <SelectTrigger className="w-40 h-8 text-xs bg-white">
-                    <SelectValue placeholder="เธฃเธฐเธเธธเธซเนเธญเธ">
-                      {task.room_id === '0e02e3bb-d671-44af-a98d-80eef07f0404' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ 1 (206)' :
-                       task.room_id === 'dc0452d0-622f-4bbe-8252-605092e82fb5' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ 2 (207)' :
-                       task.room_id === 'bb6ac4e7-3afc-4f7a-ac5f-43d173622c4b' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ 3 (208)' :
-                       task.room_id === 'c9de40cd-8197-427c-9bd8-c22f3b583f1f' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ 4 (222)' :
-                       task.room_id === 'c6bb08f8-a7ef-42ab-b470-6d44cf6b1331' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ 5 (210)' :
-                       task.room_id === 'f88cd766-090b-40a8-8eab-b02c35e72bd3' ? 'เธซเนเธญเธเธเธฃเธฃเธเธธ เธญเธทเนเธเน' : ''}
+                    <SelectValue placeholder="ระบุห้อง">
+                      {task.room_id === '0e02e3bb-d671-44af-a98d-80eef07f0404' ? 'ห้องบรรจุ 1 (206)' :
+                       task.room_id === 'dc0452d0-622f-4bbe-8252-605092e82fb5' ? 'ห้องบรรจุ 2 (207)' :
+                       task.room_id === 'bb6ac4e7-3afc-4f7a-ac5f-43d173622c4b' ? 'ห้องบรรจุ 3 (208)' :
+                       task.room_id === 'c9de40cd-8197-427c-9bd8-c22f3b583f1f' ? 'ห้องบรรจุ 4 (222)' :
+                       task.room_id === 'c6bb08f8-a7ef-42ab-b470-6d44cf6b1331' ? 'ห้องบรรจุ 5 (210)' :
+                       task.room_id === 'f88cd766-090b-40a8-8eab-b02c35e72bd3' ? 'ห้องบรรจุ อื่นๆ' : ''}
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="0e02e3bb-d671-44af-a98d-80eef07f0404">เธซเนเธญเธเธเธฃเธฃเธเธธ 1 (206)</SelectItem>
-                    <SelectItem value="dc0452d0-622f-4bbe-8252-605092e82fb5">เธซเนเธญเธเธเธฃเธฃเธเธธ 2 (207)</SelectItem>
-                    <SelectItem value="bb6ac4e7-3afc-4f7a-ac5f-43d173622c4b">เธซเนเธญเธเธเธฃเธฃเธเธธ 3 (208)</SelectItem>
-                    <SelectItem value="c9de40cd-8197-427c-9bd8-c22f3b583f1f">เธซเนเธญเธเธเธฃเธฃเธเธธ 4 (222)</SelectItem>
-                    <SelectItem value="c6bb08f8-a7ef-42ab-b470-6d44cf6b1331">เธซเนเธญเธเธเธฃเธฃเธเธธ 5 (210)</SelectItem>
-                    <SelectItem value="f88cd766-090b-40a8-8eab-b02c35e72bd3">เธซเนเธญเธเธเธฃเธฃเธเธธ เธญเธทเนเธเน</SelectItem>
+                    <SelectItem value="0e02e3bb-d671-44af-a98d-80eef07f0404">ห้องบรรจุ 1 (206)</SelectItem>
+                    <SelectItem value="dc0452d0-622f-4bbe-8252-605092e82fb5">ห้องบรรจุ 2 (207)</SelectItem>
+                    <SelectItem value="bb6ac4e7-3afc-4f7a-ac5f-43d173622c4b">ห้องบรรจุ 3 (208)</SelectItem>
+                    <SelectItem value="c9de40cd-8197-427c-9bd8-c22f3b583f1f">ห้องบรรจุ 4 (222)</SelectItem>
+                    <SelectItem value="c6bb08f8-a7ef-42ab-b470-6d44cf6b1331">ห้องบรรจุ 5 (210)</SelectItem>
+                    <SelectItem value="f88cd766-090b-40a8-8eab-b02c35e72bd3">ห้องบรรจุ อื่นๆ</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -448,7 +448,7 @@ export default function PackingTasksPage() {
           <div className="flex gap-2">
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
               <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-emerald-600 hover:bg-emerald-700">
-                <Play className="w-4 h-4 mr-2" /> เน€เธฃเธดเนเธกเธเธฃเธฃเธเธธ
+                <Play className="w-4 h-4 mr-2" /> เริ่มบรรจุ
               </Button>
             )}
 
@@ -486,18 +486,18 @@ export default function PackingTasksPage() {
             const tooltipContent = history.length > 0 ? (
               <div className="space-y-1 min-w-[160px]">
                 <div className="border-b border-slate-700 pb-1.5 mb-2">
-                  <p className="font-semibold text-[#4A4238]/">เธเธฃเธฐเธงเธฑเธ•เธดเธ–เธฑเธ {t}</p>
+                  <p className="font-semibold text-[#4A4238]/">ประวัติถัง {t}</p>
                   <div className="text-[10px] text-slate-300 mt-1 flex flex-col gap-0.5">
-                    <div className="flex justify-between"><span>STD Yield:</span> <span>{stdYield > 0 ? stdYield.toLocaleString() : '-'} เธเธดเนเธ</span></div>
-                    <div className="flex justify-between"><span>Actual Yield:</span> <span className={actualYield > 0 ? "text-emerald-400 font-medium" : ""}>{actualYield > 0 ? actualYield.toLocaleString() : '-'} เธเธดเนเธ</span></div>
+                    <div className="flex justify-between"><span>STD Yield:</span> <span>{stdYield > 0 ? stdYield.toLocaleString() : '-'} ชิ้น</span></div>
+                    <div className="flex justify-between"><span>Actual Yield:</span> <span className={actualYield > 0 ? "text-emerald-400 font-medium" : ""}>{actualYield > 0 ? actualYield.toLocaleString() : '-'} ชิ้น</span></div>
                   </div>
                 </div>
                 {history.map((h: any, i: number) => {
                   let statusText = h.status
                   let badgeColor = 'bg-slate-700 text-slate-100'
-                  if (h.status === 'IN_PROGRESS') { statusText = 'เธเธณเธฅเธฑเธเธเธฃเธฃเธเธธ'; badgeColor = 'bg-[#D4AF37] text-white' }
-                  if (h.status === 'DONE') { statusText = 'เธเธฃเธฃเธเธธเน€เธชเธฃเนเธ'; badgeColor = 'bg-purple-500 text-white' }
-                  if (h.status === 'SENT_TO_POF') { statusText = 'เธชเนเธ POF'; badgeColor = 'bg-teal-500 text-white' }
+                  if (h.status === 'IN_PROGRESS') { statusText = 'กำลังบรรจุ'; badgeColor = 'bg-[#D4AF37] text-white' }
+                  if (h.status === 'DONE') { statusText = 'บรรจุเสร็จ'; badgeColor = 'bg-purple-500 text-white' }
+                  if (h.status === 'SENT_TO_POF') { statusText = 'ส่ง POF'; badgeColor = 'bg-teal-500 text-white' }
                   return (
                     <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
                       <div className="flex items-center justify-between gap-2">
@@ -506,7 +506,7 @@ export default function PackingTasksPage() {
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-slate-400">
                         <User className="w-3 h-3 shrink-0" />
-                        <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
+                        <span className="text-[10px] truncate max-w-[120px]">{h.user?.split('@')[0]}</span>
                       </div>
                       {h.note && (
                         <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
@@ -515,7 +515,7 @@ export default function PackingTasksPage() {
                       )}
                       {h.box_lot && (
                         <div className="text-[10px] text-amber-300 mt-1 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded w-fit border border-amber-500/20">
-                          ๐“ฆ {h.box_lot}
+                          📦 {h.box_lot}
                         </div>
                       )}
                     
@@ -542,7 +542,7 @@ export default function PackingTasksPage() {
                       className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
                     >
                       {getPackagingIcon(task.production_lots?.unit || '', `w-8 h-8 mb-2 ${animate}`)}
-                      <span className="text-xs font-bold">เธ–เธฑเธ {t}</span>
+                      <span className="text-xs font-bold">ถัง {t}</span>
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
@@ -573,7 +573,7 @@ export default function PackingTasksPage() {
         {task.start_time && (
           <div className="mt-4 flex items-center gap-2 text-sm text-slate-500">
             <Clock className="w-4 h-4" /> 
-            เน€เธฃเธดเนเธกเน€เธกเธทเนเธญ: {new Date(task.start_time).toLocaleString('th-TH')}
+            เริ่มเมื่อ: {new Date(task.start_time).toLocaleString('th-TH')}
           </div>
         )}
       </div>
@@ -588,10 +588,10 @@ export default function PackingTasksPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Box className="w-8 h-8 text-yellow-400" />
-            เธเธฒเธเธเธฃเธฃเธเธธ (Packing)
+            งานบรรจุ (Packing)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>เธฃเธฒเธขเธเธฒเธฃเธเธฒเธเธเธฃเธฃเธเธธเธชเธดเธเธเนเธฒเธเธฃเธฐเธเธณเธงเธฑเธ</div>
+             <div>รายการงานบรรจุสินค้าประจำวัน</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
@@ -601,7 +601,7 @@ export default function PackingTasksPage() {
         <div className="flex flex-wrap items-center gap-4">
           <div className="w-64">
             <Input 
-              placeholder="เธเนเธเธซเธฒ SKU เธซเธฃเธทเธญ LOT..." 
+              placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
@@ -612,14 +612,14 @@ export default function PackingTasksPage() {
               size="sm"
               onClick={() => setViewMode('list')}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> เนเธเธเธ•เธฒเธฃเธฒเธ
+              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> เธเธเธดเธ—เธดเธ
+              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
             </Button>
           </div>
         </div>
@@ -629,11 +629,11 @@ export default function PackingTasksPage() {
         <TabsList className="mb-4">
           <TabsTrigger value="queue" className="flex items-center gap-2">
             <ClipboardCheck className="w-4 h-4" />
-            เธเธดเธงเธเธฒเธเธเธฃเธฃเธเธธ
+            คิวงานบรรจุ
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            เธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธงเธฑเธเธเธตเน
+            ประวัติการทำงานวันนี้
           </TabsTrigger>
         </TabsList>
 
@@ -648,7 +648,7 @@ export default function PackingTasksPage() {
         <Card className="shadow-md overflow-hidden border-0 ring-1 ring-slate-200">
           <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <span className="text-sm font-medium text-slate-700">เธ•เธฑเธงเธเธฃเธญเธเธงเธฑเธเธ—เธตเนเธ•เธฒเธกเนเธเธ:</span>
+              <span className="text-sm font-medium text-slate-700">ตัวกรองวันที่ตามแผน:</span>
               <Input 
                 type="date" 
                 className="w-40 h-8 text-xs bg-white"
@@ -657,7 +657,7 @@ export default function PackingTasksPage() {
               />
               {filterDate && (
                 <Button variant="ghost" size="sm" onClick={() => setFilterDate('')} className="h-8 text-xs text-slate-500">
-                  เนเธชเธ”เธเธ—เธฑเนเธเธซเธกเธ”
+                  แสดงทั้งหมด
                 </Button>
               )}
             </div>
@@ -668,17 +668,17 @@ export default function PackingTasksPage() {
                 <TableHeader className="bg-[#F8F6F0]">
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
-                    <TableHead>เธชเธดเธเธเนเธฒ / SKU</TableHead>
+                    <TableHead>สินค้า / SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
-                    <TableHead>เธ–เธฑเธเธ—เธตเน (เธ•เธฒเธกเนเธเธ)</TableHead>
-                    <TableHead>เธเธณเธเธงเธเธ–เธฑเธ (เธฃเธงเธก)</TableHead>
-                    <TableHead>Bulk size (kg/เธ–เธฑเธ)</TableHead>
-                    <TableHead>STD Yield (เธเธดเนเธ/เธ–เธฑเธ)</TableHead>
-                    <TableHead>Actual Yield (เธเธดเนเธ)</TableHead>
-                    <TableHead>เธขเธญเธ”เธชเธฐเธชเธก (เธเธดเนเธ)</TableHead>
-                    <TableHead>เธขเธญเธ”เธชเธฐเธชเธก (เธฅเธฑเธ)</TableHead>
-                    <TableHead>เธงเธฑเธเธ—เธตเนเธเธฑเธ”เธเธดเธง (เนเธเธ)</TableHead>
-                    <TableHead>เธชเธ–เธฒเธเธฐ</TableHead>
+                    <TableHead>ถังที่ (ตามแผน)</TableHead>
+                    <TableHead>จำนวนถัง (รวม)</TableHead>
+                    <TableHead>Bulk size (kg/ถัง)</TableHead>
+                    <TableHead>STD Yield (ชิ้น/ถัง)</TableHead>
+                    <TableHead>Actual Yield (ชิ้น)</TableHead>
+                    <TableHead>ยอดสะสม (ชิ้น)</TableHead>
+                    <TableHead>ยอดสะสม (ลัง)</TableHead>
+                    <TableHead>วันที่จัดคิว (แผน)</TableHead>
+                    <TableHead>สถานะ</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -686,7 +686,7 @@ export default function PackingTasksPage() {
                     <TableRow>
                       <TableCell colSpan={12} className="text-center h-32 text-slate-500">
                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-emerald-500" />
-                        เธเธณเธฅเธฑเธเนเธซเธฅเธ”เธเนเธญเธกเธนเธฅ...
+                        กำลังโหลดข้อมูล...
                       </TableCell>
                     </TableRow>
                   ) : tasks.filter(t => {
@@ -699,7 +699,7 @@ export default function PackingTasksPage() {
                   }).length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={12} className="text-center h-32 text-slate-500">
-                        เนเธกเนเธกเธตเธเธดเธงเธเธฒเธเธเธฃเธฃเธเธธ{filterDate ? 'เนเธเธงเธฑเธเธ—เธตเนเน€เธฅเธทเธญเธ' : ''}
+                        ไม่มีคิวงานบรรจุ{filterDate ? 'ในวันที่เลือก' : ''}
                       </TableCell>
                     </TableRow>
                   ) : (
@@ -725,12 +725,12 @@ export default function PackingTasksPage() {
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start || '-'} - {task.tank_end || '-'}</TableCell>
-                          <TableCell>{task.production_lots?.total_tanks || 0} เธ–เธฑเธ</TableCell>
+                          <TableCell>{task.production_lots?.total_tanks || 0} ถัง</TableCell>
                           <TableCell>{task.production_lots?.kg_per_tank || 0} kg</TableCell>
                           <TableCell>
                             {task.production_lots?.kg_per_tank && task.production_lots?.g_per_piece 
                               ? Math.round((task.production_lots.kg_per_tank * 1000) / task.production_lots.g_per_piece).toLocaleString() 
-                              : 0} เธเธดเนเธ
+                              : 0} ชิ้น
                           </TableCell>
                           <TableCell className="text-emerald-600 font-medium">
                             {(() => {
@@ -740,7 +740,7 @@ export default function PackingTasksPage() {
                                 if (key.endsWith('_history')) continue;
                                 if (details[key]?.pieces) total += Number(details[key].pieces);
                               }
-                              return total > 0 ? total.toLocaleString() + ' เธเธดเนเธ' : '-';
+                              return total > 0 ? total.toLocaleString() + ' ชิ้น' : '-';
                             })()}
                           </TableCell>
                           <TableCell className="text-[#D4AF37] font-bold bg-[#D4AF37]/">
@@ -769,7 +769,7 @@ export default function PackingTasksPage() {
                                   cumulativePieces += Number(d[i].pieces);
                                 }
                               }
-                              return cumulativePieces > 0 ? cumulativePieces.toLocaleString() + ' เธเธดเนเธ' : '-';
+                              return cumulativePieces > 0 ? cumulativePieces.toLocaleString() + ' ชิ้น' : '-';
                             })()}
                           </TableCell>
                           <TableCell className="text-indigo-600 font-bold bg-indigo-50/50">
@@ -800,7 +800,7 @@ export default function PackingTasksPage() {
                               }
                               const pcsPerCarton = task.production_lots?.pcs_per_carton || 1;
                               const cartons = Math.floor(cumulativePieces / pcsPerCarton);
-                              return cumulativePieces > 0 ? cartons.toLocaleString() + ' เธฅเธฑเธ' : '-';
+                              return cumulativePieces > 0 ? cartons.toLocaleString() + ' ลัง' : '-';
                             })()}
                           </TableCell>
                           <TableCell>
@@ -808,13 +808,13 @@ export default function PackingTasksPage() {
                         </TableCell>
                         <TableCell>
                           {task.status === 'DONE' ? (
-                            <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">เธเธฃเธฃเธเธธเน€เธชเธฃเนเธเธชเธดเนเธ</Badge>
+                            <Badge className="bg-green-100 text-green-700 border-green-200 hover:bg-green-100">บรรจุเสร็จสิ้น</Badge>
                           ) : task.status === 'IN_PROGRESS' ? (
-                            <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">เธเธณเธฅเธฑเธเธเธฃเธฃเธเธธ</Badge>
+                            <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-200">กำลังบรรจุ</Badge>
                           ) : (
                             <>
-                              {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">เธฃเธญเธเธฃเธฃเธเธธ (เนเธเธ)</Badge>}
-                              {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">เธฃเธญเธเธฃเธฃเธเธธ</Badge>}
+                              {(task.status === 'PLANNED' || !task.status) && <Badge variant="outline" className="bg-[#F8F6F0] text-slate-500 border-slate-200">รอบรรจุ (แผน)</Badge>}
+                              {task.status === 'WAITING' && <Badge variant="outline" className="bg-slate-100 text-slate-600">รอบรรจุ</Badge>}
                             </>
                           )}
                           </TableCell>
@@ -840,24 +840,24 @@ export default function PackingTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>เธฃเธฒเธขเธเธฒเธฃเธ—เธตเนเธ”เธณเน€เธเธดเธเธเธฒเธฃเนเธฅเนเธงเธงเธฑเธเธเธตเน</CardTitle>
+              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
             </CardHeader>
             <CardContent>
               {todayHistory.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  เนเธกเนเธกเธตเธเธฃเธฐเธงเธฑเธ•เธดเธเธฒเธฃเธ—เธณเธเธฒเธเธเธญเธเธงเธฑเธเธเธตเน
+                  ไม่มีประวัติการทำงานของวันนี้
                 </div>
               ) : (
                 <div className="rounded-md border">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">เน€เธงเธฅเธฒ</th>
-                        <th className="px-4 py-3 font-medium">เธเธนเนเธ”เธณเน€เธเธดเธเธเธฒเธฃ</th>
+                        <th className="px-4 py-3 font-medium">เวลา</th>
+                        <th className="px-4 py-3 font-medium">ผู้ดำเนินการ</th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
-                        <th className="px-4 py-3 font-medium">เธ–เธฑเธเธ—เธตเน</th>
-                        <th className="px-4 py-3 font-medium">เธชเธ–เธฒเธเธฐ</th>
-                        <th className="px-4 py-3 font-medium text-right">เธขเธญเธ”เธ—เธตเนเนเธ”เน (เธเธดเนเธ)</th>
+                        <th className="px-4 py-3 font-medium">ถังที่</th>
+                        <th className="px-4 py-3 font-medium">สถานะ</th>
+                        <th className="px-4 py-3 font-medium text-right">ยอดที่ได้ (ชิ้น)</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -868,21 +868,21 @@ export default function PackingTasksPage() {
                         if (item.action === 'SENT_TO_POF' || item.action === 'SENT_TO_BOX') statusColor = "bg-sky-100 text-sky-700"
                         
                         let statusText = item.action
-                        if (item.action === 'DONE') statusText = 'เธเธฃเธฃเธเธธเน€เธชเธฃเนเธ'
-                        if (item.action === 'IN_PROGRESS') statusText = 'เธเธณเธฅเธฑเธเธเธฃเธฃเธเธธ'
-                        if (item.action === 'SENT_TO_POF') statusText = 'เนเธเธซเนเธญเธ POF'
-                        if (item.action === 'SENT_TO_BOX') statusText = 'เนเธเธฅเธเธฅเธฑเธ'
+                        if (item.action === 'DONE') statusText = 'บรรจุเสร็จ'
+                        if (item.action === 'IN_PROGRESS') statusText = 'กำลังบรรจุ'
+                        if (item.action === 'SENT_TO_POF') statusText = 'ไปห้อง POF'
+                        if (item.action === 'SENT_TO_BOX') statusText = 'ไปลงลัง'
 
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                             <td className="px-4 py-3 whitespace-nowrap">
                               {new Date(item.timestamp).toLocaleTimeString('th-TH')}
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap">{item.user}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                               {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                             </td>
-                            <td className="px-4 py-3 whitespace-nowrap font-semibold">เธ–เธฑเธเธ—เธตเน {item.tankNum}</td>
+                            <td className="px-4 py-3 whitespace-nowrap font-semibold">ถังที่ {item.tankNum}</td>
                             <td className="px-4 py-3 whitespace-nowrap">
                               <Badge variant="secondary" className={statusColor}>
                                 {statusText}
@@ -909,7 +909,7 @@ export default function PackingTasksPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl mb-4">
               {getPackagingIcon(selectedTask?.production_lots?.unit || '', "w-6 h-6 text-green-500")}
-              เธฃเธฒเธขเธฅเธฐเน€เธญเธตเธขเธ”เธเธฒเธเธเธฃเธฃเธเธธ
+              รายละเอียดงานบรรจุ
             </DialogTitle>
           </DialogHeader>
           <div className="mt-2 border-t pt-4">
@@ -921,30 +921,30 @@ export default function PackingTasksPage() {
       <Dialog open={qtyDialog.open} onOpenChange={(open) => !open && setQtyDialog(prev => ({...prev, open: false}))}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>เธฃเธฐเธเธธเธขเธญเธ”เธเธฃเธฃเธเธธเธ—เธตเนเนเธ”เนเธเธฒเธเธ–เธฑเธ {qtyDialog.tankNum}</DialogTitle>
+            <DialogTitle>ระบุยอดบรรจุที่ได้จากถัง {qtyDialog.tankNum}</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <Label>Actual Yield (เธเธดเนเธ/เธ–เธฑเธ)</Label>
+              <Label>Actual Yield (ชิ้น/ถัง)</Label>
                 <Input 
                   type="number" 
                   value={qtyDialog.qty} 
                   onChange={e => setQtyDialog(prev => ({...prev, qty: e.target.value}))} 
-                  placeholder="เน€เธเนเธ 1500" 
+                  placeholder="เช่น 1500" 
                   autoFocus
                 />
             </div>
             <div className="space-y-2">
-              <Label>เธเธฅเนเธญเธเธเธดเธกเธเนเธฅเนเธญเธ•เธญเธฐเนเธฃ (Box Lot No.) <span className="text-red-500">*</span></Label>
+              <Label>กล่องพิมพ์ล็อตอะไร (Box Lot No.) <span className="text-red-500">*</span></Label>
                 <Input 
                   value={qtyDialog.boxLot} 
                   onChange={e => setQtyDialog(prev => ({...prev, boxLot: e.target.value}))} 
-                  placeholder="เน€เธเนเธ Lot.009/26" 
+                  placeholder="เช่น Lot.009/26" 
                 />
             </div>
             <div className="flex justify-end gap-2 mt-4">
-              <Button variant="outline" onClick={() => setQtyDialog(prev => ({...prev, open: false}))}>เธขเธเน€เธฅเธดเธ</Button>
-              <Button onClick={handleQtyConfirm} className="bg-emerald-600 hover:bg-emerald-700">เธเธฑเธเธ—เธถเธเธขเธญเธ”</Button>
+              <Button variant="outline" onClick={() => setQtyDialog(prev => ({...prev, open: false}))}>ยกเลิก</Button>
+              <Button onClick={handleQtyConfirm} className="bg-emerald-600 hover:bg-emerald-700">บันทึกยอด</Button>
             </div>
           </div>
         </DialogContent>
