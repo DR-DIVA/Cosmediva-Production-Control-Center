@@ -177,17 +177,16 @@ export default function PlannerPage() {
         order_quantity: parseFloat(newLot.order_quantity),
         po_no: newLot.po_no,
         order_type: newLot.order_type,
-        fg_due_date: newLot.fg_due_date || null,
-        mfg_date: newLot.mfg_date || null,
-        exp_date: newLot.exp_date || null,
-        status: "PLANNED"
+        fg_due_date: newLot.fg_due_date || null
       }
 
       if (newLot.id) {
-        await supabase.from("production_lots").update(lotData).eq("id", newLot.id)
+        const { error: updateErr } = await supabase.from("production_lots").update(lotData).eq("id", newLot.id)
+        if (updateErr) throw updateErr
         toast.success("แก้ไขงานเรียบร้อย")
       } else {
-        await supabase.from("production_lots").insert([lotData])
+        const { error: insertErr } = await supabase.from("production_lots").insert([lotData])
+        if (insertErr) throw insertErr
         toast.success("เพิ่มงานใหม่เรียบร้อย")
       }
 
