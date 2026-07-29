@@ -717,12 +717,12 @@ export default function PlannerPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>Cap. ขั้นต่ำ (ชิ้น/วัน)</Label>
+              <Label>Cap. ขั้นต่ำ (ชิ้น/ชม.)</Label>
               <Input type="number" placeholder="เช่น 2000" value={newLot.capacity_min} onChange={e => setNewLot({...newLot, capacity_min: e.target.value})} />
             </div>
 
             <div className="space-y-2">
-              <Label>Cap. สูงสุด (ชิ้น/วัน)</Label>
+              <Label>Cap. สูงสุด (ชิ้น/ชม.)</Label>
               <Input type="number" placeholder="เช่น 5000" value={newLot.capacity_max} onChange={e => setNewLot({...newLot, capacity_max: e.target.value})} />
             </div>
 
