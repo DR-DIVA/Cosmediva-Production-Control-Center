@@ -712,7 +712,7 @@ export default function PlannerPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>ยอดจัดคิว (pc)</Label>
+              <Label>ยอดตามใบสั่งผลิต (pc)</Label>
               <Input type="number" placeholder="เช่น 30000" value={newLot.target_quantity} onChange={e => setNewLot({...newLot, target_quantity: e.target.value})} />
             </div>
 
