@@ -643,7 +643,11 @@ export default function PlannerPage() {
               <Label>สินค้า (SKU) *</Label>
               <Select value={newLot.product_id} onValueChange={handleProductChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="เลือกสินค้า หรือ สร้างใหม่" />
+                    <SelectValue placeholder="เลือกสินค้า หรือ สร้างใหม่">
+                      {newLot.product_id && newLot.product_id !== "NEW" && products.find(p => p.id === newLot.product_id)
+                        ? `${products.find(p => p.id === newLot.product_id)?.sku} - ${products.find(p => p.id === newLot.product_id)?.product_name}`
+                        : newLot.product_id === "NEW" ? "+ สร้างสินค้าใหม่" : undefined}
+                    </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="NEW" className="text-[#D4AF37] font-semibold">+ สร้างสินค้าใหม่</SelectItem>
