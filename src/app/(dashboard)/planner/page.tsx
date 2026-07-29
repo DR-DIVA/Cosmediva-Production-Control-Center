@@ -148,7 +148,6 @@ export default function PlannerPage() {
         const { data: newProd, error: prodErr } = await supabase.from("products").insert([{
           sku: newLot.new_sku_name,
           product_name: newLot.product_name || newLot.new_sku_name,
-          unit: newLot.unit,
           kg_per_tank: newLot.kg_per_tank ? parseFloat(newLot.kg_per_tank) : null,
           g_per_piece: newLot.g_per_piece ? parseFloat(newLot.g_per_piece) : null,
           capacity_min: newLot.capacity_min ? parseFloat(newLot.capacity_min) : null,
@@ -181,7 +180,6 @@ export default function PlannerPage() {
         fg_due_date: newLot.fg_due_date || null,
         mfg_date: newLot.mfg_date || null,
         exp_date: newLot.exp_date || null,
-        unit: newLot.unit,
         status: "PLANNED"
       }
 
