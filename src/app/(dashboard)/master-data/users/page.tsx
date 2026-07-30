@@ -229,6 +229,7 @@ export default function UsersPage() {
                       <SelectItem value="production_pk">แผนกบรรจุและลงลัง (PK/POF)</SelectItem>
                       <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
                       <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
+                      <SelectItem value="purchase">ฝ่ายจัดซื้อ (PU)</SelectItem>
                       <SelectItem value="warehouse_mmrm_bu">คลังวัตถุดิบ (MMRM/BU)</SelectItem>
                       <SelectItem value="warehouse_mmpm_fg">คลังบรรจุภัณฑ์และ FG (MMPM/FG)</SelectItem>
                       <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
@@ -290,6 +291,7 @@ export default function UsersPage() {
                   <SelectItem value="production_pk">แผนกบรรจุและลงลัง (PK/POF)</SelectItem>
                   <SelectItem value="qc">ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
                   <SelectItem value="qa">ฝ่ายประกันคุณภาพ (QA)</SelectItem>
+                  <SelectItem value="purchase">ฝ่ายจัดซื้อ (PU)</SelectItem>
                   <SelectItem value="warehouse_mmrm_bu">คลังวัตถุดิบ (MMRM/BU)</SelectItem>
                   <SelectItem value="warehouse_mmpm_fg">คลังบรรจุภัณฑ์และ FG (MMPM/FG)</SelectItem>
                   <SelectItem value="planner">ฝ่ายวางแผนผลิต (Planning)</SelectItem>
@@ -371,6 +373,7 @@ export default function UsersPage() {
                         <Badge variant="outline" className={
                           user.role === 'admin' ? 'bg-purple-100 text-purple-700 border-purple-200' :
                           user.role === 'qc' || user.role === 'qa' ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30' :
+                          user.role === 'purchase' ? 'bg-blue-100 text-blue-700 border-blue-200' :
                           'bg-slate-100 text-slate-700'
                         }>
                           {user.role}
