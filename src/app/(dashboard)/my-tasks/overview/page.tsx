@@ -61,6 +61,8 @@ export default function MyTasksPage() {
   const [defectLotId, setDefectLotId] = useState('')
   const [defectQuantity, setDefectQuantity] = useState('')
   const [defectNote, setDefectNote] = useState('')
+  const [defectProcessId, setDefectProcessId] = useState('')
+  const [processes, setProcesses] = useState<any[]>([])
   const [isQcPassDialogOpen, setIsQcPassDialogOpen] = useState(false)
   const [qcPassTankEnd, setQcPassTankEnd] = useState('')
   const [isQcFgPassDialogOpen, setIsQcFgPassDialogOpen] = useState(false)
@@ -80,11 +82,43 @@ export default function MyTasksPage() {
   useEffect(() => {
     fetchTasks()
     fetchRooms()
+    fetchProcesses()
   }, [])
 
   const fetchRooms = async () => {
     const { data } = await supabase.from('rooms').select('*').order('room_name')
     if (data) setRooms(data)
+  }
+
+  const fetchProcesses = async () => {
+    const { data } = await supabase.from('processes').select('*').order('process_name')
+    if (data) setProcesses(data.filter((p: any) => !p.process_name.includes('QC')))
+  }
+
+  const handleDefectSubmit = async () => {
+    if (!defectLotId || !defectQuantity || !defectProcessId) {
+      toast.error('กรุณาระบุข้อมูลให้ครบถ้วน (LOT, แผนก และจำนวน)')
+      return
+    }
+    const { error } = await supabase.from('production_logs').insert({
+      production_lot_id: defectLotId,
+      status: 'DEFECT',
+      process_id: defectProcessId,
+      piece_quantity: parseInt(defectQuantity),
+      note: defectNote || null,
+      activity_date: new Date().toISOString().split('T')[0]
+    })
+    if (error) {
+      toast.error('บันทึกของเสียไม่สำเร็จ')
+    } else {
+      toast.success('บันทึกของเสียประจำวันสำเร็จ')
+      setIsDefectModalOpen(false)
+      setDefectLotId('')
+      setDefectQuantity('')
+      setDefectNote('')
+      setDefectProcessId('')
+      fetchTasks()
+    }
   }
 
   const fetchTasks = async () => {
@@ -1339,6 +1373,61 @@ export default function MyTasksPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsQcFgPassDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={handleQcFgPassConfirm} className="bg-green-600 hover:bg-green-700 text-white">ยืนยัน QC Pass</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDefectModalOpen} onOpenChange={setIsDefectModalOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>บันทึกของเสียประจำวัน (Daily Defect Report)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">เลือกแผนก / กระบวนการ</label>
+              <Select value={defectProcessId} onValueChange={setDefectProcessId}>
+                <SelectTrigger><SelectValue placeholder="เลือกแผนก" /></SelectTrigger>
+                <SelectContent>
+                  {processes.map(p => (
+                    <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">เลือก LOT งาน</label>
+              <Select value={defectLotId} onValueChange={setDefectLotId}>
+                <SelectTrigger><SelectValue placeholder="เลือก LOT" /></SelectTrigger>
+                <SelectContent>
+                  {tasks.map(task => (
+                    <SelectItem key={task.production_lots?.id} value={task.production_lots?.id || ''}>
+                      LOT {task.production_lots?.lot_no} ({task.production_lots?.products?.sku})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">จำนวนชิ้นที่เสีย</label>
+              <Input 
+                type="number" 
+                placeholder="ระบุจำนวนชิ้น" 
+                value={defectQuantity} 
+                onChange={e => setDefectQuantity(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">สาเหตุ / หมายเหตุ</label>
+              <Input 
+                placeholder="เช่น ซีลแตก, ฟิล์มย่น" 
+                value={defectNote} 
+                onChange={e => setDefectNote(e.target.value)} 
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDefectModalOpen(false)}>ยกเลิก</Button>
+            <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleDefectSubmit}>บันทึกข้อมูล</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
