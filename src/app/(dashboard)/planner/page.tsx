@@ -23,10 +23,11 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Calendar as CalendarIcon, CheckCircle2, Clock, AlertTriangle, Activity } from "lucide-react"
+import { Calendar as CalendarIcon, CheckCircle2, Clock, AlertTriangle, Activity, History } from "lucide-react"
 import { format, differenceInDays, startOfDay, addDays } from "date-fns"
 import { createClient } from "@supabase/supabase-js"
 import { toast } from "sonner"
+import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
 
 const supabase = createClient(
@@ -55,6 +56,7 @@ export default function PlannerPage() {
   const [filterDept, setFilterDept] = useState("ALL")
   const [expandedLots, setExpandedLots] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState("table")
+  const [historySearchQuery, setHistorySearchQuery] = useState("")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -280,6 +282,58 @@ export default function PlannerPage() {
     });
   }
 
+  
+  const getHistoryData = () => {
+    const orderHistory = lots.map(lot => ({
+      id: `lot-${lot.id}`,
+      type: 'เพิ่มออเดอร์',
+      project: `${lot.po_no || '-'} / ${lot.products?.sku || 'Unknown SKU'}`,
+      timestamp: lot.created_at,
+      user: 'Planner',
+      details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
+    }));
+
+    const taskHistory = logs.map(log => {
+      const lot = lots.find(l => l.id === log.production_lot_id);
+      const process = processes.find(p => p.id === log.process_id);
+      return {
+        id: `log-${log.id}`,
+        type: 'ลงคิวงาน',
+        project: `${lot?.po_no || '-'} / ${lot?.products?.sku || 'Unknown SKU'}`,
+        timestamp: log.updated_at || log.created_at,
+        user: 'Planner',
+        details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}`
+      }
+    });
+
+    const combined = [...orderHistory, ...taskHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+    return combined.filter(item => 
+      item.project.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+      item.details.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
+      item.type.toLowerCase().includes(historySearchQuery.toLowerCase())
+    );
+  };
+
+  const handleExportHistory = () => {
+    const data = getHistoryData();
+    if (data.length === 0) {
+      toast.error('ไม่มีข้อมูลสำหรับ Export');
+      return;
+    }
+    const exportData = data.map(item => ({
+      'วันเวลา': format(new Date(item.timestamp), 'dd/MM/yyyy HH:mm'),
+      'ผู้ดำเนินการ': item.user,
+      'ประเภท': item.type,
+      'Project (PO/SKU)': item.project,
+      'รายละเอียด': item.details
+    }));
+    
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "History");
+    XLSX.writeFile(wb, `PD_Master_Plan_History_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
+  };
+
   const filteredLots = lots.filter(lot => 
     (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
     (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
@@ -354,6 +408,10 @@ export default function PlannerPage() {
               <TabsList className="bg-slate-100">
                 <TabsTrigger value="table">Main Table</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2">
+                  <History className="w-4 h-4" />
+                  ประวัติการทำงานแบบต่อเนื่อง
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="hidden md:block h-6 w-px bg-slate-200 mx-2"></div>
