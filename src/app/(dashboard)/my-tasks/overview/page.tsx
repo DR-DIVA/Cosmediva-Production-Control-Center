@@ -1385,7 +1385,7 @@ export default function MyTasksPage() {
           <div className="space-y-4 py-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">เลือกแผนก / กระบวนการ</label>
-              <Select value={defectProcessId} onValueChange={setDefectProcessId}>
+              <Select value={defectProcessId} onValueChange={(val) => setDefectProcessId(val || "")}>
                 <SelectTrigger><SelectValue placeholder="เลือกแผนก" /></SelectTrigger>
                 <SelectContent>
                   {processes.map(p => (
@@ -1396,7 +1396,7 @@ export default function MyTasksPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">เลือก LOT งาน</label>
-              <Select value={defectLotId} onValueChange={setDefectLotId}>
+              <Select value={defectLotId} onValueChange={(val) => setDefectLotId(val || "")}>
                 <SelectTrigger><SelectValue placeholder="เลือก LOT" /></SelectTrigger>
                 <SelectContent>
                   {tasks.map(task => (
