@@ -24,7 +24,6 @@ export default function StandardCostSetupPage() {
       const { data: processData, error: processError } = await supabase
         .from('processes')
         .select('*')
-        .order('seq_no', { ascending: true })
 
       if (processError) throw processError
       setProcesses(processData || [])
