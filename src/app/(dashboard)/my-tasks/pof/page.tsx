@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Loader2, PackageOpen, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Package, Wind, AlertTriangle, ArrowDownToLine, Boxes } from 'lucide-react'
 import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { differenceInDays, startOfDay } from 'date-fns'
 import { TaskCalendar } from '@/components/ui/TaskCalendar'
@@ -28,7 +29,7 @@ export default function PofTasksPage() {
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [filterDate, setFilterDate] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
-  const [todayHistory, setTodayHistory] = useState<any[]>([])
+  const [historyList, setHistoryList] = useState<any[]>([])
   const [qtyDialog, setQtyDialog] = useState<{open: boolean, taskId: string, tankNum: number, task: any, qty: string, boxLot: string, nextStatus: string, maxCartons?: number}>({open: false, taskId: '', tankNum: 0, task: null, qty: '', boxLot: '', nextStatus: ''})
   
     const [isDefectModalOpen, setIsDefectModalOpen] = useState(false)
@@ -42,10 +43,10 @@ export default function PofTasksPage() {
     fetchPofTasks()
     fetchRooms()
     fetchUser()
-    fetchTodayHistory()
+    fetchHistory()
     const interval = setInterval(() => {
       fetchPofTasks()
-      fetchTodayHistory()
+      fetchHistory()
     }, 30000)
     return () => clearInterval(interval)
   }, [])
@@ -124,24 +125,30 @@ export default function PofTasksPage() {
     setLoading(false)
   }
 
-  const fetchTodayHistory = async () => {
-    const today = new Date()
-    const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-    
+  const fetchHistory = async () => {
     const { data } = await supabase.from('production_logs')
       .select(`
         id, tank_details, updated_at,
-        production_lots ( id, lot_no, kg_per_tank, g_per_piece, pcs_per_carton, products:sku_id (sku, product_name) ),
+        production_lots ( id, lot_no, products:sku_id (sku, product_name) ),
         processes ( id, process_name )
       `)
-      .gte('updated_at', `${todayStr}T00:00:00.000Z`)
       .order('updated_at', { ascending: false })
+      .limit(1000)
 
     if (data) {
       const historyItems: any[] = []
-      data.forEach(task => {
-        const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (!pName || (!pName.toLowerCase().includes('pof') && !pName.toLowerCase().includes('อุโมงค์'))) return
+      data.forEach((task: any) => {
+        const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : task.processes?.process_name
+        
+        let shouldInclude = false;
+        const lowerPName = pName ? pName.toLowerCase() : '';
+        if ('pof'.includes('weighing') && (lowerPName.includes('ชั่ง') || lowerPName.includes('weigh'))) shouldInclude = true;
+        else if ('pof'.includes('mixing') && (lowerPName.includes('ผสม') || lowerPName.includes('mix'))) shouldInclude = true;
+        else if ('pof'.includes('packing') && (lowerPName.includes('บรรจุ') || lowerPName.includes('pack'))) shouldInclude = true;
+        else if ('pof'.includes('pof') && (lowerPName.includes('pof') || lowerPName.includes('แพค'))) shouldInclude = true;
+        
+        if (!pName) shouldInclude = false;
+        if (!shouldInclude) return;
         
         const details = task.tank_details || {}
         Object.keys(details).forEach(key => {
@@ -150,19 +157,15 @@ export default function PofTasksPage() {
             const histories = details[key] as any[]
             if (Array.isArray(histories)) {
               histories.forEach(h => {
-                const hDate = new Date(h.timestamp)
-                const hDateStr = new Date(hDate.getTime() - (hDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-                if (hDateStr === todayStr) {
-                  historyItems.push({
-                    taskId: task.id,
-                    lotNo: (task.production_lots as any)?.lot_no,
-                    sku: (task.production_lots as any)?.products?.sku,
-                    tankNum,
-                    action: h.status,
-                    user: h.user,
-                    timestamp: h.timestamp
-                  })
-                }
+                historyItems.push({
+                  taskId: task.id,
+                  lotNo: task.production_lots?.lot_no,
+                  sku: task.production_lots?.products?.sku,
+                  tankNum,
+                  action: h.status,
+                  user: h.user,
+                  timestamp: h.timestamp
+                })
               })
             }
           }
@@ -170,8 +173,34 @@ export default function PofTasksPage() {
       })
       
       historyItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      setTodayHistory(historyItems)
+      setHistoryList(historyItems.slice(0, 500))
     }
+  }
+
+  const exportToExcel = () => {
+    if (historyList.length === 0) {
+      toast.error('ไม่มีข้อมูลให้ Export')
+      return
+    }
+    const worksheet = XLSX.utils.json_to_sheet(historyList.map((item: any) => {
+      let statusText = item.action
+      if (item.action === 'DONE') statusText = 'ทำงานเสร็จสิ้น'
+      if (item.action === 'IN_PROGRESS') statusText = 'กำลังดำเนินการ'
+      if (item.action === 'MOVED') statusText = 'ส่งมอบแล้ว'
+      if (item.action === 'WAITING') statusText = 'รอคิว'
+
+      return {
+        'วันที่-เวลา': new Date(item.timestamp).toLocaleString('th-TH'),
+        'ผู้ดำเนินการ': item.user?.split('@')[0] || '-',
+        'LOT No.': item.lotNo || '-',
+        'SKU': item.sku || '-',
+        'ชุดที่/พาเลท': item.tankNum,
+        'สถานะ': statusText
+      }
+    }))
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "History")
+    XLSX.writeFile(workbook, "Work_History.xlsx")
   }
 
   const toggleRow = (id: string) => {
@@ -641,7 +670,7 @@ export default function PofTasksPage() {
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            ประวัติการทำงานวันนี้
+            ประวัติการทำงานแบบต่อเนื่อง
           </TabsTrigger>
         </TabsList>
 
@@ -812,12 +841,17 @@ export default function PofTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
+              <CardTitle className="flex justify-between items-center w-full">
+                 <span>ประวัติการทำงานแบบต่อเนื่อง</span>
+                 <Button onClick={exportToExcel} variant="outline" size="sm" className="text-emerald-700 border-emerald-500 hover:bg-emerald-50">
+                    Export Excel
+                 </Button>
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              {todayHistory.length === 0 ? (
+              {historyList.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  ไม่มีประวัติการทำงานของวันนี้
+                  ไม่มีประวัติการทำงาน
                 </div>
               ) : (
                 <div className="rounded-md border">
@@ -832,7 +866,7 @@ export default function PofTasksPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {todayHistory.map((item, idx) => {
+                      {historyList.filter(item => { const term = searchQuery.toLowerCase(); return (item.sku || '').toLowerCase().includes(term) || (item.lotNo || '').toLowerCase().includes(term); }).map((item, idx) => {
                         let statusColor = "bg-slate-100 text-slate-700"
                         if (item.action === 'DONE') statusColor = "bg-green-100 text-green-700"
                         if (item.action === 'IN_PROGRESS') statusColor = "bg-yellow-100 text-yellow-700"
@@ -846,7 +880,7 @@ export default function PofTasksPage() {
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                             <td className="px-4 py-3 whitespace-nowrap">
-                              {new Date(item.timestamp).toLocaleTimeString('th-TH')}
+                              {new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">

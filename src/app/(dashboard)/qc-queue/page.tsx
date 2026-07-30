@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import * as XLSX from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -145,19 +146,13 @@ export default function QCQueuePage() {
   }
 
   const fetchRmTodayHistory = async () => {
-    const today = new Date()
-    const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-    
-    // Fallback to checking created_at if updated_at is missing, but typically we want today's updates.
-    // For RM, we might just fetch items with qc_status != null, sorted by id or date descending.
-    const { data, error } = await supabase.from('production_lot_rms')
+    const { data } = await supabase.from('production_lot_rms')
       .select('*, production_lots(lot_no, sku_id)')
       .not('qc_status', 'is', null)
       .order('id', { ascending: false })
-      .limit(50) // Just fetch latest 50 for today's context as fallback
+      .limit(1000)
       
     if (data) {
-      // client-side filter for today if updated_at is tricky
       setRmTodayHistory(data)
     }
   }
@@ -188,9 +183,6 @@ export default function QCQueuePage() {
   }
 
   const fetchTodayHistory = async () => {
-    const today = new Date()
-    const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-    
     const { data } = await supabase.from('production_logs')
       .select(`
         id, status, tank_start, tank_end, total_tanks, tank_details, updated_at,
@@ -198,8 +190,8 @@ export default function QCQueuePage() {
         production_lots ( id, lot_no, products:sku_id (sku, product_name) ),
         processes ( id, process_name )
       `)
-      .gte('updated_at', `${todayStr}T00:00:00.000Z`)
       .order('updated_at', { ascending: false })
+      .limit(1000)
 
     if (data) {
       const historyItems: any[] = []
@@ -214,20 +206,16 @@ export default function QCQueuePage() {
             const histories = details[key] as any[]
             if (Array.isArray(histories)) {
               histories.forEach(h => {
-                const hDate = new Date(h.timestamp)
-                const hDateStr = new Date(hDate.getTime() - (hDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-                if (hDateStr === todayStr) {
-                  historyItems.push({
-                    taskId: task.id,
-                    lotNo: (task.production_lots as any)?.lot_no,
-                    sku: (task.production_lots as any)?.products?.sku,
-                    tankNum,
-                    action: h.status,
-                    note: h.note,
-                    user: h.user,
-                    timestamp: h.timestamp
-                  })
-                }
+                historyItems.push({
+                  taskId: task.id,
+                  lotNo: (task.production_lots as any)?.lot_no,
+                  sku: (task.production_lots as any)?.products?.sku,
+                  tankNum,
+                  action: h.status,
+                  note: h.note,
+                  user: h.user,
+                  timestamp: h.timestamp
+                })
               })
             }
           }
@@ -427,9 +415,6 @@ export default function QCQueuePage() {
   }
 
   const fetchFgTodayHistory = async () => {
-    const today = new Date()
-    const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-    
     const { data } = await supabase.from('fg_inventory')
       .select(`
         id, 
@@ -443,8 +428,8 @@ export default function QCQueuePage() {
         products:sku_id(sku, product_name)
       `)
       .neq('qc_status', 'QUARANTINE')
-      .gte('updated_at', `${todayStr}T00:00:00.000Z`)
       .order('updated_at', { ascending: false })
+      .limit(1000)
 
     if (data) {
       setFgTodayHistory(data)
@@ -548,7 +533,7 @@ export default function QCQueuePage() {
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="w-4 h-4" />
-                ประวัติการทำงานวันนี้
+                ประวัติการทำงานแบบต่อเนื่อง
               </TabsTrigger>
             </TabsList>
 
@@ -628,36 +613,37 @@ export default function QCQueuePage() {
             <TabsContent value="history">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>ประวัติการตรวจสอบวันนี้ (RM)</CardTitle>
+                  <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (RM)</CardTitle>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      const csvData = [
-                        ["LOT No.", "วันที่รับเข้า", "รหัส", "ชื่อวัตถุดิบ", "จำนวน", "หน่วย", "PO No.", "สถานะ QC", "อัปเดตล่าสุด"],
-                        ...rmTodayHistory.map(h => [
-                          h.production_lots?.lot_no || '-',
-                          h.receive_date ? new Date(h.receive_date).toLocaleDateString('th-TH') : '-',
-                          h.rm_code,
-                          h.rm_name,
-                          h.quantity,
-                          h.unit,
-                          h.po_no,
-                          h.qc_status,
-                          h.updated_at ? new Date(h.updated_at).toLocaleString('th-TH') : '-'
-                        ])
-                      ]
-                      downloadCSV(csvData, `rm_qc_history_${new Date().toISOString().split('T')[0]}.csv`)
+                      const worksheet = XLSX.utils.json_to_sheet(rmTodayHistory.map((h: any) => {
+                          return {
+                            'อัปเดตล่าสุด': h.updated_at ? new Date(h.updated_at).toLocaleString('th-TH') : '-',
+                            'LOT No.': h.production_lots?.lot_no || '-',
+                            'วันที่รับเข้า': h.receive_date ? new Date(h.receive_date).toLocaleDateString('th-TH') : '-',
+                            'รหัส': h.rm_code,
+                            'ชื่อวัตถุดิบ': h.rm_name,
+                            'จำนวน': h.quantity,
+                            'หน่วย': h.unit,
+                            'PO No.': h.po_no,
+                            'สถานะ QC': h.qc_status
+                          }
+                        }))
+                        const workbook = XLSX.utils.book_new()
+                        XLSX.utils.book_append_sheet(workbook, worksheet, "QC RM History")
+                        XLSX.writeFile(workbook, "QC_RM_History.xlsx")
                     }}
                     disabled={rmTodayHistory.length === 0}
                   >
-                    ดาวน์โหลดประวัติ (CSV)
+                    Export Excel
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {rmTodayHistory.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                      ไม่มีประวัติการตรวจสอบของวันนี้
+                      ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
                     <div className="rounded-md border">
@@ -671,7 +657,7 @@ export default function QCQueuePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {rmTodayHistory.map((item, idx) => (
+                          {rmTodayHistory.filter(item => { const term = searchQuery.toLowerCase(); return (item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term); }).map((item, idx) => (
                             <tr key={idx} className="hover:bg-[#F8F6F0]">
                               <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
                               <td className="px-4 py-3">
@@ -711,7 +697,7 @@ export default function QCQueuePage() {
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="w-4 h-4" />
-                ประวัติการทำงานวันนี้
+                ประวัติการทำงานแบบต่อเนื่อง
               </TabsTrigger>
             </TabsList>
 
@@ -728,22 +714,22 @@ export default function QCQueuePage() {
             <TabsContent value="history">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>ประวัติการตรวจสอบวันนี้ (PM)</CardTitle>
+                  <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (PM)</CardTitle>
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
                       // no data for PM yet
-                      downloadCSV([["ไม่มีข้อมูลในขณะนี้"]], `pm_qc_history_${new Date().toISOString().split('T')[0]}.csv`)
+                      toast.error('ไม่มีข้อมูลให้ Export')
                     }}
                     disabled={pmTodayHistory.length === 0}
                   >
-                    ดาวน์โหลดประวัติ (CSV)
+                    Export Excel
                   </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                    ไม่มีประวัติการตรวจสอบของวันนี้
+                    ไม่มีประวัติการตรวจสอบ
                   </div>
                 </CardContent>
               </Card>
@@ -761,7 +747,7 @@ export default function QCQueuePage() {
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="w-4 h-4" />
-                ประวัติการทำงานวันนี้
+                ประวัติการทำงานแบบต่อเนื่อง
               </TabsTrigger>
             </TabsList>
 
@@ -920,13 +906,13 @@ export default function QCQueuePage() {
                     }}
                     disabled={todayHistory.length === 0}
                   >
-                    ดาวน์โหลดประวัติ (CSV)
+                    Export Excel
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {todayHistory.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                      ไม่มีประวัติการตรวจสอบของวันนี้
+                      ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
                     <div className="rounded-md border">
@@ -942,7 +928,7 @@ export default function QCQueuePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {todayHistory.map((item, idx) => {
+                          {todayHistory.filter(item => { const term = searchQuery.toLowerCase(); return (item.sku || "").toLowerCase().includes(term) || (item.lotNo || "").toLowerCase().includes(term); }).map((item, idx) => {
                             let statusColor = "bg-slate-100 text-slate-700"
                             if (item.action === 'QC_PASS') statusColor = "bg-green-100 text-green-700"
                             if (item.action === 'PAUSED') statusColor = "bg-orange-100 text-orange-700"
@@ -951,7 +937,7 @@ export default function QCQueuePage() {
 
                             return (
                               <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
-                                <td className="px-4 py-3 whitespace-nowrap">{new Date(item.timestamp).toLocaleTimeString('th-TH')}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">{new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
                                 <td className="px-4 py-3 whitespace-nowrap">{item.user}</td>
                                 <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                                   {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
@@ -984,7 +970,7 @@ export default function QCQueuePage() {
               </TabsTrigger>
               <TabsTrigger value="history" className="flex items-center gap-2">
                 <History className="w-4 h-4" />
-                ประวัติการทำงานวันนี้
+                ประวัติการทำงานแบบต่อเนื่อง
               </TabsTrigger>
             </TabsList>
 
@@ -1059,7 +1045,7 @@ export default function QCQueuePage() {
             <TabsContent value="history">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>ประวัติการตรวจสอบวันนี้ (FG)</CardTitle>
+                  <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (FG)</CardTitle>
                   <Button 
                     variant="outline" 
                     size="sm" 
@@ -1080,13 +1066,13 @@ export default function QCQueuePage() {
                     }}
                     disabled={fgTodayHistory.length === 0}
                   >
-                    ดาวน์โหลดประวัติ (CSV)
+                    Export Excel
                   </Button>
                 </CardHeader>
                 <CardContent>
                   {fgTodayHistory.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                      ไม่มีประวัติการตรวจสอบของวันนี้
+                      ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
                     <div className="rounded-md border">
@@ -1101,7 +1087,7 @@ export default function QCQueuePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {fgTodayHistory.map((item, idx) => (
+                          {fgTodayHistory.filter(item => { const term = searchQuery.toLowerCase(); return (item.products?.sku || "").toLowerCase().includes(term) || (item.lot_no || "").toLowerCase().includes(term); }).map((item, idx) => (
                             <tr key={idx} className="hover:bg-[#F8F6F0]">
                               <td className="px-4 py-3 font-medium text-[#D4AF37]">
                                 {item.products?.sku}

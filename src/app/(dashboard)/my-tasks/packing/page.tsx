@@ -40,7 +40,7 @@ export default function PackingTasksPage() {
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [filterDate, setFilterDate] = useState<string>('')
-  const [todayHistory, setTodayHistory] = useState<any[]>([])
+  const [historyList, setHistoryList] = useState<any[]>([])
 
   const [allDefects, setAllDefects] = useState<any[]>([])
   const [isDefectModalOpen, setIsDefectModalOpen] = useState(false)
@@ -57,10 +57,10 @@ export default function PackingTasksPage() {
     fetchPackingTasks()
     fetchRooms()
     fetchUser()
-    fetchTodayHistory()
+    fetchHistory()
     const interval = setInterval(() => {
       fetchPackingTasks()
-      fetchTodayHistory()
+      fetchHistory()
     }, 30000)
     return () => clearInterval(interval)
   }, [])
@@ -128,18 +128,15 @@ export default function PackingTasksPage() {
     setLoading(false)
   }
 
-  const fetchTodayHistory = async () => {
-    const today = new Date()
-    const todayStr = new Date(today.getTime() - (today.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-    
+  const fetchHistory = async () => {
     const { data } = await supabase.from('production_logs')
       .select(`
         id, tank_details, updated_at,
         production_lots ( id, lot_no, products:sku_id (sku, product_name) ),
         processes ( id, process_name )
       `)
-      .gte('updated_at', `${todayStr}T00:00:00.000Z`)
       .order('updated_at', { ascending: false })
+      .limit(1000)
 
     if (data) {
       const historyItems: any[] = []
@@ -154,20 +151,16 @@ export default function PackingTasksPage() {
             const histories = details[key] as any[]
             if (Array.isArray(histories)) {
               histories.forEach(h => {
-                const hDate = new Date(h.timestamp)
-                const hDateStr = new Date(hDate.getTime() - (hDate.getTimezoneOffset() * 60000)).toISOString().split('T')[0]
-                if (hDateStr === todayStr) {
-                  historyItems.push({
-                    taskId: task.id,
-                    lotNo: (task.production_lots as any)?.lot_no,
-                    sku: (task.production_lots as any)?.products?.sku,
-                    tankNum,
-                    action: h.status,
-                    user: h.user,
-                    timestamp: h.timestamp,
-                    qty: h.qty
-                  })
-                }
+                historyItems.push({
+                  taskId: task.id,
+                  lotNo: (task.production_lots as any)?.lot_no,
+                  sku: (task.production_lots as any)?.products?.sku,
+                  tankNum,
+                  action: h.status,
+                  user: h.user,
+                  timestamp: h.timestamp,
+                  qty: h.qty
+                })
               })
             }
           }
@@ -175,7 +168,7 @@ export default function PackingTasksPage() {
       })
       
       historyItems.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-      setTodayHistory(historyItems)
+      setHistoryList(historyItems)
 
       // Fetch Defects for alert
       const { data: defects } = await supabase
@@ -848,7 +841,7 @@ export default function PackingTasksPage() {
               <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
             </CardHeader>
             <CardContent>
-              {todayHistory.length === 0 ? (
+              {historyList.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                   ไม่มีประวัติการทำงานของวันนี้
                 </div>
@@ -866,7 +859,7 @@ export default function PackingTasksPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {todayHistory.map((item, idx) => {
+                      {historyList.map((item, idx) => {
                         let statusColor = "bg-slate-100 text-slate-700"
                         if (item.action === 'DONE') statusColor = "bg-green-100 text-green-700"
                         if (item.action === 'IN_PROGRESS') statusColor = "bg-yellow-100 text-yellow-700"
