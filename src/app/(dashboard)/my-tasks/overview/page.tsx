@@ -43,6 +43,7 @@ const parseRanges = (str: string) => {
 
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
   const [isPauseDialogOpen, setIsPauseDialogOpen] = useState(false)
   const [pauseReason, setPauseReason] = useState('')
   const [isFinishDialogOpen, setIsFinishDialogOpen] = useState(false)
@@ -761,12 +762,27 @@ export default function MyTasksPage() {
              Track Every Step. Improve Every Batch.
           </div>
         </div>
+        <div className="w-full md:w-64">
+          <Input 
+            placeholder="ค้นหา SKU..." 
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]"
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden flex gap-4 pb-4 snap-x snap-mandatory">
         {COLUMNS.map(col => {
           let colTasks = tasks.filter(t => getTaskColumn(t) === col.id)
           
+          if (searchQuery) {
+            colTasks = colTasks.filter(t => {
+              const sku = t.production_lots?.products?.sku || '';
+              return sku.toLowerCase().includes(searchQuery.toLowerCase());
+            })
+          }
+
           if (col.id === 'FG' || col.id === 'POF') {
             const grouped = new Map()
             colTasks.sort((a, b) => (a.tank_start || 0) - (b.tank_start || 0))
