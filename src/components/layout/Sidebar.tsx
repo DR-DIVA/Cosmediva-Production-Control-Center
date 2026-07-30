@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
+  Calculator,
   Menu, 
   ShoppingCart, 
   Users
@@ -110,6 +111,19 @@ const routes = [
     href: '/people',
     color: 'text-[#D4AF37]',
     allowedRoles: ['admin']
+  },
+  {
+    label: 'CosmeFlow Costing',
+    subtitle: 'Track Your Manufacturing Cost.',
+    icon: Calculator,
+    href: '/costing',
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner'],
+    subRoutes: [
+      { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'planner'] },
+      { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'planner'] },
+      { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'planner'] },
+    ]
   },
   {
     label: 'ข้อมูลหลัก (Master Data)',
