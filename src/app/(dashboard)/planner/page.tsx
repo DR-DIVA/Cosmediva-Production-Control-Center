@@ -688,6 +688,71 @@ export default function PlannerPage() {
             </div>
           </div>
         )}
+        {activeTab === "history" && (
+          <div className="p-4 bg-white min-h-[500px]">
+            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
+               <div className="relative">
+                  <Input 
+                    placeholder="ค้นหา Project, ประเภท, รายละเอียด..." 
+                    value={historySearchQuery} 
+                    onChange={e => setHistorySearchQuery(e.target.value)} 
+                    className="w-full md:w-80"
+                  />
+               </div>
+               <Button variant="outline" onClick={handleExportHistory} className="text-[#0f766e] border-[#0f766e] hover:bg-[#0f766e] hover:text-white">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export Excel (ประวัติ)
+               </Button>
+            </div>
+            
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
+               <Table>
+                 <TableHeader className="bg-[#F8F6F0]">
+                   <TableRow>
+                     <TableHead className="w-[180px]">วันเวลา</TableHead>
+                     <TableHead className="w-[150px]">ผู้ดำเนินการ</TableHead>
+                     <TableHead className="w-[150px]">ประเภท</TableHead>
+                     <TableHead className="w-[250px]">Project (PO/SKU)</TableHead>
+                     <TableHead>รายละเอียด</TableHead>
+                   </TableRow>
+                 </TableHeader>
+                 <TableBody>
+                    {getHistoryData().length === 0 ? (
+                       <TableRow>
+                          <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                             ไม่พบประวัติการทำงาน
+                          </TableCell>
+                       </TableRow>
+                    ) : (
+                       getHistoryData().map((item) => (
+                         <TableRow key={item.id} className="hover:bg-slate-50">
+                           <TableCell className="text-slate-600">
+                             {format(new Date(item.timestamp), 'dd MMM yyyy')}
+                             <span className="text-xs text-slate-400 block">{format(new Date(item.timestamp), 'HH:mm:ss')}</span>
+                           </TableCell>
+                           <TableCell>
+                             <div className="flex items-center gap-2">
+                               <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-600 font-bold">
+                                 {item.user.charAt(0)}
+                               </div>
+                               <span className="text-sm font-medium">{item.user}</span>
+                             </div>
+                           </TableCell>
+                           <TableCell>
+                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.type === 'เพิ่มออเดอร์' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                               {item.type}
+                             </span>
+                           </TableCell>
+                           <TableCell className="font-medium text-[#4A4238]">{item.project}</TableCell>
+                           <TableCell className="text-slate-600">{item.details}</TableCell>
+                         </TableRow>
+                       ))
+                    )}
+                 </TableBody>
+               </Table>
+            </div>
+          </div>
+        )}
       </Card>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
