@@ -49,19 +49,27 @@ export default function DashboardPage() {
     const monthEnd = endOfMonth(today).toISOString()
 
     // 1. Fetch Active Logs & Lots (For Production Overview)
-    const { data: logs } = await supabase.from('production_logs')
-      .select(`
-        id, status, tank_start, tank_end, production_lot_id, piece_quantity, start_time, end_time, process_id,
+    const logSelect = `
+        id, status, tank_start, tank_end, production_lot_id, piece_quantity, start_time, end_time, process_id, updated_at, activity_date,
         processes (process_name), rooms (room_name), tank_details,
         production_lots (
-          id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity,
+          id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity,
           processes (process_name),
           products:sku_id (sku, product_name)
         )
-      `)
-      .in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED'])
+      `
     
-    if (logs) {
+    const [ { data: activeLogsInitial }, { data: todayLogsInitial } ] = await Promise.all([
+      supabase.from('production_logs').select(logSelect).in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED']),
+      supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd)
+    ])
+
+    const logsMap = new Map()
+    if (activeLogsInitial) activeLogsInitial.forEach(l => logsMap.set(l.id, l))
+    if (todayLogsInitial) todayLogsInitial.forEach(l => logsMap.set(l.id, l))
+    const logs = Array.from(logsMap.values())
+    
+    if (logs.length > 0) {
       setActiveLogs(logs)
       const uniqueLotsMap = new Map()
       logs.forEach(log => {
@@ -121,7 +129,8 @@ export default function DashboardPage() {
     if (!lot) return;
     
     const totalTanks = lot.total_tanks || 0
-    const targetQty = lot.planned_quantity || 0
+    const calculatedQty = (lot.total_tanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(lot.total_tanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
+    const targetQty = lot.planned_quantity || lot.order_quantity || calculatedQty || 0
 
     // Count actual progress from tank_details if available, else fallback
     let completedTanks = 0
@@ -136,11 +145,13 @@ export default function DashboardPage() {
       })
     }
     
+    const outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
+
     if (pName.includes('ชั่ง')) { prodTarget.weighing += totalTanks; prodOutput.weighing += completedTanks }
     if (pName.includes('ผสม')) { prodTarget.mixing += totalTanks; prodOutput.mixing += completedTanks }
-    if (pName.includes('บรรจุ')) { prodTarget.packing += targetQty; prodOutput.packing += completedPieces || (completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) }
-    if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) { prodTarget.pof += targetQty; prodOutput.pof += completedPieces || (completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) }
-    if (pName.includes('QC')) { prodTarget.qc += targetQty; prodOutput.qc += completedPieces || targetQty }
+    if (pName.includes('บรรจุ')) { prodTarget.packing += targetQty; prodOutput.packing += outputPieces }
+    if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) { prodTarget.pof += targetQty; prodOutput.pof += outputPieces }
+    if (pName.includes('QC')) { prodTarget.qc += targetQty; prodOutput.qc += outputPieces || targetQty }
   })
 
   // 2. %Yield (ผสม, บรรจุ)
