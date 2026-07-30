@@ -838,7 +838,7 @@ export default function PackingTasksPage() {
         <TabsContent value="history">
           <Card>
             <CardHeader>
-              <CardTitle>รายการที่ดำเนินการแล้ววันนี้</CardTitle>
+              <CardTitle>ประวัติการทำงานแบบต่อเนื่อง</CardTitle>
             </CardHeader>
             <CardContent>
               {historyList.length === 0 ? (

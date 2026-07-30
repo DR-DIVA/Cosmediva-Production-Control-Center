@@ -459,7 +459,7 @@ export default function WeighingTasksPage() {
             งานชั่งสาร (Weighing)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>รายการงานชั่งสารประจำวัน</div>
+             <div>รายการงานชั่งสารทั้งหมด</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
