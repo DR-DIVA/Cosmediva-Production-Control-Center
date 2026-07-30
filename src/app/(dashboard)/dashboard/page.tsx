@@ -59,6 +59,19 @@ export default function DashboardPage() {
         )
       `
     
+    // Fetch all Active Lots
+    const { data: activeLotsData } = await supabase.from('production_lots')
+      .select(`
+        id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity,
+        processes (process_name),
+        products:sku_id (sku, product_name)
+      `)
+      .neq('current_status', 'DONE')
+
+    if (activeLotsData) {
+      setActiveLots(activeLotsData)
+    }
+
     const [ { data: activeLogsInitial }, { data: todayLogsInitial } ] = await Promise.all([
       supabase.from('production_logs').select(logSelect).in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED']),
       supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd)
@@ -71,14 +84,6 @@ export default function DashboardPage() {
     
     if (logs.length > 0) {
       setActiveLogs(logs)
-      const uniqueLotsMap = new Map()
-      logs.forEach(log => {
-        const lot = log.production_lots as any
-        if (lot && !uniqueLotsMap.has(lot.id)) {
-          uniqueLotsMap.set(lot.id, lot)
-        }
-      })
-      setActiveLots(Array.from(uniqueLotsMap.values()))
     }
 
     // 2. Fetch Defects (Today)
