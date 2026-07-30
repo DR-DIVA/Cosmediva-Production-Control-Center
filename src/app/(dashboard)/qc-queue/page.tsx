@@ -882,7 +882,7 @@ export default function QCQueuePage() {
             <TabsContent value="history">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>รายการตรวจสอบวันนี้ (Bulk)</CardTitle>
+                  <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (Bulk)</CardTitle>
                   <Button 
                     variant="outline" 
                     size="sm" 

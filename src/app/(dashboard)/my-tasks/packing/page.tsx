@@ -631,7 +631,7 @@ export default function PackingTasksPage() {
           </TabsTrigger>
           <TabsTrigger value="history" className="flex items-center gap-2">
             <History className="w-4 h-4" />
-            ประวัติการทำงานวันนี้
+            ประวัติการทำงานแบบต่อเนื่อง
           </TabsTrigger>
         </TabsList>
 
@@ -843,7 +843,7 @@ export default function PackingTasksPage() {
             <CardContent>
               {historyList.length === 0 ? (
                 <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                  ไม่มีประวัติการทำงานของวันนี้
+                  ไม่มีประวัติการทำงาน
                 </div>
               ) : (
                 <div className="rounded-md border">
