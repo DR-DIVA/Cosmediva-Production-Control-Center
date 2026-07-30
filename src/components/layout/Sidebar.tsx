@@ -26,7 +26,7 @@ import { createClient } from '@/utils/supabase/client'
 
 const routes = [
   {
-    label: 'CosmeFlow Executive',
+    label: 'CosmeFlow Dashboard',
     subtitle: 'Turn Factory Data into Business Decisions.',
     icon: LayoutDashboard,
     href: '/dashboard',
