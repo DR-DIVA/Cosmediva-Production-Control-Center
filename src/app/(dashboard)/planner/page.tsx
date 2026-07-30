@@ -70,11 +70,13 @@ export default function PlannerPage() {
   })
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
+        setCurrentUserId(user.id)
         const email = user.email || 'Unknown User';
         if (email.includes('@')) {
           setCurrentUser(email.split('@')[0]);
@@ -230,7 +232,7 @@ export default function PlannerPage() {
       status: "PLANNED",
       activity_date: format(new Date(), "yyyy-MM-dd"),
       end_date: format(new Date(), "yyyy-MM-dd"),
-      created_by: currentUser || "Planner"
+      ...(currentUserId ? { created_by: currentUserId } : {})
     }
 
     try {
