@@ -69,7 +69,21 @@ export default function PlannerPage() {
     mfg_date: "", exp_date: "", product_name: ""
   })
 
+  const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+
   useEffect(() => {
+    const fetchUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const email = user.email || 'Unknown User';
+        if (email.includes('@')) {
+          setCurrentUser(email.split('@')[0]);
+        } else {
+          setCurrentUser(email);
+        }
+      }
+    }
+    fetchUser()
     fetchData()
   }, [])
 
@@ -216,6 +230,7 @@ export default function PlannerPage() {
       status: "PLANNED",
       activity_date: format(new Date(), "yyyy-MM-dd"),
       end_date: format(new Date(), "yyyy-MM-dd"),
+      created_by: currentUser || "Planner"
     }
 
     try {
@@ -289,7 +304,7 @@ export default function PlannerPage() {
       type: 'เพิ่มออเดอร์',
       project: `${lot.po_no || '-'} / ${lot.products?.sku || 'Unknown SKU'}`,
       timestamp: lot.created_at,
-      user: 'Planner',
+      user: lot.created_by || 'Planner',
       details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
     }));
 
@@ -301,7 +316,7 @@ export default function PlannerPage() {
         type: 'ลงคิวงาน',
         project: `${lot?.po_no || '-'} / ${lot?.products?.sku || 'Unknown SKU'}`,
         timestamp: log.updated_at || log.created_at,
-        user: 'Planner',
+        user: log.created_by || log.operator_id || 'Planner',
         details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}`
       }
     });
