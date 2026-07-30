@@ -108,9 +108,15 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
                 
                 {/* Lot Info */}
                 <div className="col-span-2 pl-2">
-                  <div className="font-bold text-slate-800 text-base flex items-center gap-2">
-                    {lot.lot_no}
-                    {lot.products?.sku && <span className="text-xs font-normal text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">{lot.products.sku}</span>}
+                  <div className="font-bold text-slate-800 flex flex-wrap items-center gap-2 leading-tight">
+                    {lot.products?.sku ? (
+                      <>
+                        <span className="text-base text-emerald-700">{lot.products.sku}</span>
+                        <span className="text-[11px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">LOT: {lot.lot_no}</span>
+                      </>
+                    ) : (
+                      <span className="text-base">{lot.lot_no}</span>
+                    )}
                   </div>
                   <div className="text-xs text-slate-500 truncate max-w-[200px]" title={lot.products?.product_name}>
                     {lot.products?.product_name}
