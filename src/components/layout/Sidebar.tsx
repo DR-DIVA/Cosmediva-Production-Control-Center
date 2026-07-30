@@ -30,8 +30,7 @@ const routes = [
     subtitle: 'Turn Factory Data into Business Decisions.',
     icon: LayoutDashboard,
     href: '/dashboard',
-    color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'planner']
+    color: 'text-[#D4AF37]'
   },
   {
     label: 'CosmeFlow Planning',
