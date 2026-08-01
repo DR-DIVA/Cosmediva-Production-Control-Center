@@ -32,7 +32,7 @@ type RMItem = {
   receive_date: string;
   qc_status: string;
   file_link: string;
-  production_lots?: { lot_no: string; sku_id: string };
+  production_lots?: { lot_no: string; sku_id: string; products?: { sku: string } };
 };
 
 export default function RMControlCenterPage() {
@@ -51,7 +51,7 @@ export default function RMControlCenterPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('production_lot_rms')
-      .select('*, production_lots(lot_no, sku_id)')
+      .select('*, production_lots(lot_no, sku_id, products(sku))')
       .order('eta_date', { ascending: true });
 
     if (error) {
@@ -335,12 +335,12 @@ export default function RMControlCenterPage() {
       </div>
 
       <Tabs defaultValue="purchasing" className="w-full">
-        <TabsList className="bg-slate-100/50 p-1 rounded-lg border w-full justify-start h-auto">
-          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white py-2"><LayoutDashboard className="w-4 h-4 mr-2"/> Dashboard</TabsTrigger>
-          <TabsTrigger value="purchasing" className="data-[state=active]:bg-white py-2"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
-          <TabsTrigger value="warehouse" className="data-[state=active]:bg-white py-2"><Box className="w-4 h-4 mr-2"/> Warehouse View</TabsTrigger>
-          <TabsTrigger value="qc" className="data-[state=active]:bg-white py-2"><Activity className="w-4 h-4 mr-2"/> QC View</TabsTrigger>
-          <TabsTrigger value="planning" className="data-[state=active]:bg-white py-2"><Calendar className="w-4 h-4 mr-2"/> Planning View</TabsTrigger>
+        <TabsList className="bg-slate-100/80 p-1.5 rounded-xl border w-full justify-start h-auto gap-1">
+          <TabsTrigger value="dashboard" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><LayoutDashboard className="w-4 h-4 mr-2"/> Dashboard</TabsTrigger>
+          <TabsTrigger value="purchasing" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
+          <TabsTrigger value="warehouse" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Box className="w-4 h-4 mr-2"/> Warehouse View</TabsTrigger>
+          <TabsTrigger value="qc" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Activity className="w-4 h-4 mr-2"/> QC View</TabsTrigger>
+          <TabsTrigger value="planning" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Calendar className="w-4 h-4 mr-2"/> Planning View</TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
@@ -564,7 +564,7 @@ export default function RMControlCenterPage() {
                   <Table className="whitespace-nowrap text-sm">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Product / LOT</TableHead>
+                        <TableHead>SKU / LOT</TableHead>
                         <TableHead>Job/Ref</TableHead>
                         <TableHead>RM Code</TableHead>
                         <TableHead>RM Name</TableHead>
@@ -576,7 +576,10 @@ export default function RMControlCenterPage() {
                     <TableBody>
                       {filteredItems.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-semibold text-[#D4AF37]">{item.production_lots?.lot_no || '-'}</TableCell>
+                          <TableCell className="font-semibold text-[#D4AF37]">
+                            <div className="text-xs text-slate-500 font-normal">{item.production_lots?.products?.sku || '-'}</div>
+                            <div>{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
                           <TableCell>{item.lot_product}</TableCell>
                           <TableCell>{item.rm_code}</TableCell>
                           <TableCell>{item.rm_name}</TableCell>
@@ -595,7 +598,7 @@ export default function RMControlCenterPage() {
       </Tabs>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#4A4238]">ยืนยันข้อมูลใบสั่งซื้อ (Purchase Order)</DialogTitle>
           </DialogHeader>
@@ -614,7 +617,16 @@ export default function RMControlCenterPage() {
               <div className="space-y-3 bg-[#F8F6F0] p-4 rounded-lg border">
                 <Label className="font-semibold flex items-center gap-2"><Box className="w-4 h-4"/> จับคู่กับรหัสงาน (LOT) ในระบบ <span className="text-red-500">*</span></Label>
                 <Select value={selectedLotId} onValueChange={(val) => setSelectedLotId(val as string)}>
-                  <SelectTrigger className="w-full bg-white"><SelectValue placeholder="-- ค้นหาและเลือก LOT การผลิต --" /></SelectTrigger>
+                  <SelectTrigger className="w-full bg-white">
+                    <SelectValue placeholder="-- ค้นหาและเลือก LOT การผลิต --">
+                      {selectedLotId && lotOptions.find(l => l.id === selectedLotId)
+                        ? (() => {
+                            const lot = lotOptions.find(l => l.id === selectedLotId);
+                            return `${(lot.products as any)?.sku} - ${(lot.products as any)?.product_name} (LOT: ${lot.lot_no})`;
+                          })()
+                        : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>
                     {lotOptions.map((lot) => (
                       <SelectItem key={lot.id} value={lot.id}>{(lot.products as any)?.sku} - {(lot.products as any)?.product_name} (LOT: {lot.lot_no})</SelectItem>
