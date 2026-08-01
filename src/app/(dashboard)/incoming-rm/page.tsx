@@ -576,9 +576,9 @@ export default function RMControlCenterPage() {
                     <TableBody>
                       {filteredItems.map((item) => (
                         <TableRow key={item.id}>
-                          <TableCell className="font-semibold text-[#D4AF37]">
-                            <div className="text-xs text-slate-500 font-normal">{item.production_lots?.products?.sku || '-'}</div>
-                            <div>{item.production_lots?.lot_no || '-'}</div>
+                          <TableCell>
+                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                           </TableCell>
                           <TableCell>{item.lot_product}</TableCell>
                           <TableCell>{item.rm_code}</TableCell>
