@@ -448,6 +448,7 @@ export default function RMControlCenterPage() {
                         <TableHead>ETA</TableHead>
                         <TableHead>PO No.</TableHead>
                         <TableHead>Supplier</TableHead>
+                        <TableHead>SKU / LOT</TableHead>
                         <TableHead>Item</TableHead>
                         <TableHead>Qty</TableHead>
                         <TableHead>Warehouse</TableHead>
@@ -468,6 +469,10 @@ export default function RMControlCenterPage() {
                           </TableCell>
                           <TableCell>{item.po_no}</TableCell>
                           <TableCell className="max-w-[150px] truncate">{item.supplier}</TableCell>
+                          <TableCell>
+                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
                           <TableCell>{item.rm_code} - {item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{item.warehouse}</TableCell>
