@@ -32,7 +32,7 @@ type RMItem = {
   receive_date: string;
   qc_status: string;
   file_link: string;
-  production_lots?: { lot_no: string; sku_id: string; products?: { sku: string } };
+  production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
 };
 
 export default function RMControlCenterPage() {
@@ -51,7 +51,7 @@ export default function RMControlCenterPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from('production_lot_rms')
-      .select('*, production_lots(lot_no, sku_id, products(sku))')
+      .select('*, production_lots(lot_no, sku_id, products(sku), production_logs(activity_date, processes(process_name)))')
       .order('eta_date', { ascending: true });
 
     if (error) {
@@ -575,7 +575,7 @@ export default function RMControlCenterPage() {
                     <TableHeader>
                       <TableRow>
                         <TableHead>SKU / LOT</TableHead>
-                        <TableHead>Job/Ref</TableHead>
+                        <TableHead>คิวชั่งสาร (วันที่)</TableHead>
                         <TableHead>RM Code</TableHead>
                         <TableHead>RM Name</TableHead>
                         <TableHead>Required Qty</TableHead>
@@ -590,7 +590,15 @@ export default function RMControlCenterPage() {
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                           </TableCell>
-                          <TableCell>{item.lot_product}</TableCell>
+                          <TableCell className="text-slate-600 font-medium">
+                            {(() => {
+                              if (!item.production_lots?.production_logs) return '-';
+                              const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
+                              if (weighLogs.length === 0) return '-';
+                              weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                              return new Date(weighLogs[0].activity_date).toLocaleDateString('th-TH');
+                            })()}
+                          </TableCell>
                           <TableCell>{item.rm_code}</TableCell>
                           <TableCell>{item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
