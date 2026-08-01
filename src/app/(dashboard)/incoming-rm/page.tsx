@@ -335,12 +335,12 @@ export default function RMControlCenterPage() {
       </div>
 
       <Tabs defaultValue="purchasing" className="w-full">
-        <TabsList className="bg-slate-100/80 p-1.5 rounded-xl border w-full justify-start h-auto gap-1">
-          <TabsTrigger value="dashboard" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><LayoutDashboard className="w-4 h-4 mr-2"/> Dashboard</TabsTrigger>
-          <TabsTrigger value="purchasing" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
-          <TabsTrigger value="warehouse" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Box className="w-4 h-4 mr-2"/> Warehouse View</TabsTrigger>
-          <TabsTrigger value="qc" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Activity className="w-4 h-4 mr-2"/> QC View</TabsTrigger>
-          <TabsTrigger value="planning" className="data-[state=active]:bg-[#D4AF37] data-[state=active]:text-white data-[state=active]:shadow-md py-2 px-4 text-slate-600 font-medium transition-all rounded-lg"><Calendar className="w-4 h-4 mr-2"/> Planning View</TabsTrigger>
+        <TabsList className="bg-[#D4AF37] p-1.5 rounded-xl border-none shadow-md w-full justify-start h-auto gap-1">
+          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><LayoutDashboard className="w-4 h-4 mr-2"/> Dashboard</TabsTrigger>
+          <TabsTrigger value="purchasing" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
+          <TabsTrigger value="warehouse" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Box className="w-4 h-4 mr-2"/> Warehouse View</TabsTrigger>
+          <TabsTrigger value="qc" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Activity className="w-4 h-4 mr-2"/> QC View</TabsTrigger>
+          <TabsTrigger value="planning" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Calendar className="w-4 h-4 mr-2"/> Planning View</TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
