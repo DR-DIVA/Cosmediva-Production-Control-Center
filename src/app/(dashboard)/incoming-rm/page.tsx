@@ -411,6 +411,11 @@ export default function RMControlCenterPage() {
                               <TableCell>
                                 <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                                 <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                    {item.bottom_remark.split('/')[0].trim()}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell>
                                 <div className="font-medium text-slate-700">{item.rm_code}</div>
@@ -545,6 +550,11 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                              <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                {item.bottom_remark.split('/')[0].trim()}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>{item.rm_code} - {item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
@@ -609,6 +619,11 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                              <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                {item.bottom_remark.split('/')[0].trim()}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell>
                              <div className="font-medium text-purple-700">{item.rm_code}</div>
@@ -675,6 +690,11 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                              <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                {item.bottom_remark.split('/')[0].trim()}
+                              </div>
+                            )}
                           </TableCell>
                           <TableCell className="text-slate-600 font-medium">
                             {weighDate ? weighDate.toLocaleDateString('th-TH') : '-'}
