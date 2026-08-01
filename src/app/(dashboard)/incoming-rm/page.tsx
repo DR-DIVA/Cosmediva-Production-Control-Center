@@ -65,7 +65,11 @@ export default function RMControlCenterPage() {
 
   const fetchLots = async () => {
     const { data } = await supabase.from('production_lots').select('id, lot_no, sku_id, products(sku, product_name)').order('created_at', { ascending: false });
-    if (data) setLotOptions(data);
+    if (data) {
+      setLotOptions(data);
+      return data;
+    }
+    return [];
   };
 
   useEffect(() => {
@@ -102,10 +106,11 @@ export default function RMControlCenterPage() {
         
         if (result.data.items && result.data.items.length > 0) {
           setExtractedData(result.data);
+          const freshLots = await fetchLots();
           let matchedLotId = '';
           if (result.data.jobNo) {
              const cleanedJobNo = result.data.jobNo.replace('L.', '');
-             const matched = lotOptions.find(l => l.lot_no.includes(cleanedJobNo) || cleanedJobNo.includes(l.lot_no));
+             const matched = freshLots.find((l: any) => l.lot_no.includes(cleanedJobNo) || cleanedJobNo.includes(l.lot_no));
              if (matched) matchedLotId = matched.id;
           }
           setSelectedLotId(matchedLotId);
