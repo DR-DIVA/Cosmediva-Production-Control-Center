@@ -514,6 +514,7 @@ export default function RMControlCenterPage() {
                       <TableRow className="border-b border-slate-200">
                         <TableHead className="font-semibold text-slate-700 px-6 py-4">Receive Date</TableHead>
                         <TableHead className="font-semibold text-slate-700">PO No.</TableHead>
+                        <TableHead className="font-semibold text-slate-700">SKU / LOT</TableHead>
                         <TableHead className="font-semibold text-slate-700">Item</TableHead>
                         <TableHead className="font-semibold text-slate-700 w-44">QC Status</TableHead>
                       </TableRow>
@@ -532,6 +533,10 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell className="font-medium text-slate-700">{item.po_no}</TableCell>
+                          <TableCell>
+                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
                           <TableCell>
                              <div className="font-medium text-purple-700">{item.rm_code}</div>
                              <div className="text-sm text-slate-500 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
@@ -552,7 +557,7 @@ export default function RMControlCenterPage() {
                         </TableRow>
                       ))}
                       {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY').length === 0 && (
-                        <TableRow><TableCell colSpan={4} className="text-center py-12 text-slate-500 bg-white">ไม่มีรายการรอตรวจ QC</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={5} className="text-center py-12 text-slate-500 bg-white">ไม่มีรายการรอตรวจ QC</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
