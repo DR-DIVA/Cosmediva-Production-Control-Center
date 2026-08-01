@@ -377,7 +377,7 @@ export default function RMControlCenterPage() {
                 </Card>
              </div>
              
-             {delayedItems.length > 0 && (
+             {delayedItems.length > 0 ? (
                <Card className="border-red-200 shadow-sm mt-4">
                  <CardHeader className="bg-red-50 border-b border-red-100 pb-3">
                    <CardTitle className="text-red-800 text-sm flex items-center gap-2">
@@ -427,6 +427,12 @@ export default function RMControlCenterPage() {
                         })}
                       </TableBody>
                     </Table>
+                 </CardContent>
+               </Card>
+             ) : (
+               <Card className="border-green-200 shadow-sm mt-4">
+                 <CardContent className="p-6 flex items-center justify-center text-green-700 bg-green-50/50 rounded-lg">
+                   <CheckCircle2 className="w-5 h-5 mr-2" /> ไม่มีรายการวัตถุดิบที่เข้าไม่ทันคิวชั่งสาร (RM ทุกรายการเข้าทันกำหนด)
                  </CardContent>
                </Card>
              )}
