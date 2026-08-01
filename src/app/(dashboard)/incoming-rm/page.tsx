@@ -584,28 +584,43 @@ export default function RMControlCenterPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => (
+                      {filteredItems.map((item) => {
+                        let weighDate: Date | null = null;
+                        if (item.production_lots?.production_logs) {
+                          const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
+                          if (weighLogs.length > 0) {
+                            weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                            weighDate = new Date(weighLogs[0].activity_date);
+                          }
+                        }
+                        
+                        const etaDate = item.eta_date ? new Date(item.eta_date) : null;
+                        const isDelayed = weighDate && etaDate && new Date(etaDate.toDateString()) > new Date(weighDate.toDateString());
+
+                        return (
                         <TableRow key={item.id}>
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                           </TableCell>
                           <TableCell className="text-slate-600 font-medium">
-                            {(() => {
-                              if (!item.production_lots?.production_logs) return '-';
-                              const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
-                              if (weighLogs.length === 0) return '-';
-                              weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-                              return new Date(weighLogs[0].activity_date).toLocaleDateString('th-TH');
-                            })()}
+                            {weighDate ? weighDate.toLocaleDateString('th-TH') : '-'}
                           </TableCell>
                           <TableCell>{item.rm_code}</TableCell>
                           <TableCell>{item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{getStatusBadge(item.status)}</TableCell>
-                          <TableCell>{item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-'}</TableCell>
+                          <TableCell>
+                            {etaDate ? (
+                              <div className={`font-medium flex items-center ${isDelayed ? 'text-red-600' : 'text-slate-700'}`}>
+                                {etaDate.toLocaleDateString('th-TH')}
+                                {isDelayed && <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full ml-2 border border-red-200">เข้าไม่ทันชั่ง</span>}
+                              </div>
+                            ) : '-'}
+                          </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
