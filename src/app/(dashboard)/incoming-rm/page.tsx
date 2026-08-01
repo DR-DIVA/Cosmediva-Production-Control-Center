@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Truck, Package } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Truck, Package, AlertTriangle } from 'lucide-react';
 
 type RMItem = {
   id: string;
@@ -302,6 +302,19 @@ export default function RMControlCenterPage() {
     link.remove();
   };
 
+  const delayedItems = items.filter(item => {
+    let weighDate: Date | null = null;
+    if (item.production_lots?.production_logs) {
+      const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
+      if (weighLogs.length > 0) {
+        weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+        weighDate = new Date(weighLogs[0].activity_date);
+      }
+    }
+    const etaDate = item.eta_date ? new Date(item.eta_date) : null;
+    return weighDate && etaDate && new Date(etaDate.toDateString()) > new Date(weighDate.toDateString());
+  });
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
@@ -363,6 +376,60 @@ export default function RMControlCenterPage() {
                   <CardContent><div className="text-3xl font-bold text-green-600">{items.filter(i => i.status === 'READY' || i.status === 'QC_PASS').length}</div></CardContent>
                 </Card>
              </div>
+             
+             {delayedItems.length > 0 && (
+               <Card className="border-red-200 shadow-sm mt-4">
+                 <CardHeader className="bg-red-50 border-b border-red-100 pb-3">
+                   <CardTitle className="text-red-800 text-sm flex items-center gap-2">
+                     <AlertTriangle className="w-4 h-4" /> รายการวัตถุดิบที่เข้าไม่ทันคิวชั่งสาร ({delayedItems.length})
+                   </CardTitle>
+                 </CardHeader>
+                 <CardContent className="p-0">
+                    <Table className="whitespace-nowrap text-sm">
+                      <TableHeader className="bg-red-50/50">
+                        <TableRow>
+                          <TableHead className="text-red-800">SKU / LOT</TableHead>
+                          <TableHead className="text-red-800">Item</TableHead>
+                          <TableHead className="text-red-800">คิวชั่งสาร</TableHead>
+                          <TableHead className="text-red-800">ETA ของเข้า</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {delayedItems.map((item) => {
+                          let weighDate: Date | null = null;
+                          if (item.production_lots?.production_logs) {
+                            const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
+                            if (weighLogs.length > 0) {
+                              weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                              weighDate = new Date(weighLogs[0].activity_date);
+                            }
+                          }
+                          const etaDate = item.eta_date ? new Date(item.eta_date) : null;
+                          
+                          return (
+                            <TableRow key={item.id} className="bg-white">
+                              <TableCell>
+                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="font-medium text-slate-700">{item.rm_code}</div>
+                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                              </TableCell>
+                              <TableCell className="font-medium text-slate-700">
+                                {weighDate ? weighDate.toLocaleDateString('th-TH') : '-'}
+                              </TableCell>
+                              <TableCell className="font-bold text-red-600">
+                                {etaDate ? etaDate.toLocaleDateString('th-TH') : '-'}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                      </TableBody>
+                    </Table>
+                 </CardContent>
+               </Card>
+             )}
           </TabsContent>
 
           <TabsContent value="purchasing" className="space-y-6">
