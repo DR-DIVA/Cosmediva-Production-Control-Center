@@ -299,7 +299,7 @@ export default function QCQueuePage() {
       }).eq('id', task.id)
 
       if (statusAction === 'QC_PASS') {
-        const { data: packProc } = await supabase.from('processes').select('id').ilike('process_name', '%บรรจุ%').limit(1).single()
+        const { data: packProc } = await supabase.from('processes').select('id').eq('process_name', 'บรรจุ').single()
         if (packProc) {
           const { data: existingPack } = await supabase.from('production_logs')
             .select('id, tank_details, status')
@@ -343,7 +343,7 @@ export default function QCQueuePage() {
         }
       }
 
-      const { data: mixProc } = await supabase.from('processes').select('id').ilike('process_name', '%ผสม%').limit(1).single()
+      const { data: mixProc } = await supabase.from('processes').select('id').eq('process_name', 'ผสม').single()
       if (mixProc) {
         const { data: existingMix } = await supabase.from('production_logs')
           .select('id, tank_details')

@@ -314,7 +314,7 @@ export default function MixingTasksPage() {
           }
         }
       } else if (nextStatus === 'SENT_TO_PACKING') {
-        const { data: packingProcess } = await supabase.from('processes').select('id').ilike('process_name', '%บรรจุ%').limit(1).single()
+        const { data: packingProcess } = await supabase.from('processes').select('id').eq('process_name', 'บรรจุ').single()
         if (packingProcess) {
           const { data: existingPackingLog } = await supabase.from('production_logs')
             .select('id, tank_details')
