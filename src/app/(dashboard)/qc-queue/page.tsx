@@ -283,12 +283,27 @@ export default function QCQueuePage() {
     try {
       let newStatus = allProcessed ? 'COMPLETED' : 'IN_PROGRESS'
       let newNote = task.note || ''
+      const cleanReason = reasonText.replace(/\n/g, ' ')
       
       if (statusAction === 'PAUSED' || statusAction === 'FAILED' || statusAction === 'REPROCESS') {
         newStatus = 'PAUSED'
         const issueType = statusAction === 'PAUSED' ? '[QC HOLD]' : statusAction === 'FAILED' ? '[QC REJECT]' : '[QC REPROCESS]'
-        const cleanReason = reasonText.replace(/\n/g, ' ')
         newNote = newNote ? `${newNote}\n${issueType} ถัง ${tankNum}: ${cleanReason}` : `${issueType} ถัง ${tankNum}: ${cleanReason}`
+      } else if (statusAction === 'QC_PASS' && isReturningToPass) {
+        // Find the active issue line for this tank and append [Resolved: ...]
+        const lines = newNote.split('\n')
+        for (let i = 0; i < lines.length; i++) {
+           if (lines[i].includes(`ถัง ${tankNum}:`) && !lines[i].includes('[Resolved')) {
+               lines[i] = `${lines[i]} [Resolved: ${cleanReason} - ${new Date().toLocaleString('th-TH')}]`
+           }
+        }
+        newNote = lines.join('\n')
+        
+        // If there are still active issues for OTHER tanks, keep status PAUSED, otherwise IN_PROGRESS
+        const hasUnresolved = lines.some(l => l.trim() && !l.includes('[Resolved'))
+        if (hasUnresolved && task.status === 'PAUSED') {
+            newStatus = 'PAUSED'
+        }
       }
 
       await supabase.from('production_logs').update({
