@@ -123,7 +123,7 @@ export default function RMControlCenterPage() {
           setSelectedLotId(matchedLotId);
           setIsModalOpen(true);
         } else {
-          toast.warning('ไม่พบรายการวัตถุดิบใน PDF นี้');
+          toast.warning('ไม่พบรายการวัตถุดิบ/บรรจุภัณฑ์ใน PDF นี้');
         }
 
       } else {
