@@ -52,7 +52,7 @@ export default function RMControlCenterPage() {
 
   // Customer Supplied PM State
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
-  const [cmd2Form, setCmd2Form] = useState({ pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
+  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
 
   const fetchItems = async () => {
     setLoading(true);
@@ -269,8 +269,8 @@ export default function RMControlCenterPage() {
     // Generate pseudo PO/PR number
     const fakePo = `PM-CMD2-${Date.now().toString().slice(-6)}`;
     
-    // Prefix rm_code with CMD2
-    const fakeCode = `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+    // If no code is provided, generate a pseudo one
+    const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
     
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
@@ -612,7 +612,8 @@ export default function RMControlCenterPage() {
                         <TableHead>PO No.</TableHead>
                         <TableHead>Supplier</TableHead>
                         <TableHead>SKU / LOT</TableHead>
-                        <TableHead>Item</TableHead>
+                        <TableHead>Code</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead>Qty</TableHead>
                         <TableHead>Warehouse</TableHead>
                         <TableHead>Receive Date (Actual)</TableHead>
@@ -641,7 +642,8 @@ export default function RMControlCenterPage() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>{item.rm_code} - {item.rm_name}</TableCell>
+                          <TableCell className="font-medium text-slate-700">{item.rm_code}</TableCell>
+                          <TableCell className="text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{item.warehouse}</TableCell>
                           <TableCell>
@@ -916,9 +918,15 @@ export default function RMControlCenterPage() {
               <Label>ชื่อลูกค้า (Customer Name)</Label>
               <Input required value={cmd2Form.customerName} onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
             </div>
-            <div className="space-y-2">
-              <Label>ชื่อบรรจุภัณฑ์ (PM Name)</Label>
-              <Input required value={cmd2Form.pmName} onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} placeholder="เช่น กล่องใส่ครีม 50g" />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>รหัสบรรจุภัณฑ์ (PM Code)</Label>
+                <Input value={cmd2Form.pmCode} onChange={e => setCmd2Form({...cmd2Form, pmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้" />
+              </div>
+              <div className="space-y-2">
+                <Label>ชื่อบรรจุภัณฑ์ (PM Name)</Label>
+                <Input required value={cmd2Form.pmName} onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} placeholder="เช่น กล่องใส่ครีม 50g" />
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
