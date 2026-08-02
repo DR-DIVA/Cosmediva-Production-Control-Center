@@ -102,7 +102,7 @@ export default function QCQueuePage() {
   // ---- RM LOGIC ----
   const fetchRmTasks = async () => {
     const { data } = await supabase.from('production_lot_rms')
-      .select('*, production_lots(lot_no, sku_id)')
+      .select('*, production_lots(lot_no, products:sku_id(sku))')
       .eq('status', 'RECEIVED')
       .order('receive_date', { ascending: false })
       
@@ -148,7 +148,7 @@ export default function QCQueuePage() {
 
   const fetchRmTodayHistory = async () => {
     const { data } = await supabase.from('production_lot_rms')
-      .select('*, production_lots(lot_no, sku_id)')
+      .select('*, production_lots(lot_no, products:sku_id(sku))')
       .not('qc_status', 'is', null)
       .order('id', { ascending: false })
       .limit(1000)
@@ -592,7 +592,7 @@ export default function QCQueuePage() {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-slate-100 text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">LOT No.</th>
+                        <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                         <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
                         <th className="px-4 py-3 font-medium">รหัส / ชื่อวัตถุดิบ</th>
                         <th className="px-4 py-3 font-medium">จำนวน</th>
@@ -608,11 +608,19 @@ export default function QCQueuePage() {
                         return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && !isPM
                       }).map((item) => (
                         <tr key={item.id} className="hover:bg-[#F8F6F0]">
-                          <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                          <td className="px-4 py-3">
+                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </td>
                           <td className="px-4 py-3">{item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-'}</td>
                           <td className="px-4 py-3">
                             <span className="text-indigo-600 font-semibold">{item.rm_code}</span>
-                            <div className="text-xs text-slate-500">{item.rm_name}</div>
+                            <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                            {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                              <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                {item.bottom_remark.split('/')[0].trim()}
+                              </div>
+                            )}
                           </td>
                           <td className="px-4 py-3">{item.quantity} {item.unit}</td>
                           <td className="px-4 py-3">{item.po_no}</td>
@@ -688,7 +696,7 @@ export default function QCQueuePage() {
                       <table className="w-full text-sm text-left">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                             <th className="px-4 py-3 font-medium">รหัส / ชื่อวัตถุดิบ</th>
                             <th className="px-4 py-3 font-medium">สถานะ QC</th>
                             <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
@@ -701,10 +709,18 @@ export default function QCQueuePage() {
                             return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && !isPM; 
                           }).map((item, idx) => (
                             <tr key={idx} className="hover:bg-[#F8F6F0]">
-                              <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                              </td>
                               <td className="px-4 py-3">
                                 <span className="text-indigo-600 font-semibold">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                    {item.bottom_remark.split('/')[0].trim()}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <Badge variant="outline" className={
@@ -762,7 +778,7 @@ export default function QCQueuePage() {
                         <thead className="bg-slate-100 text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">ประเภท</th>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                             <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
                             <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
                             <th className="px-4 py-3 font-medium">จำนวน</th>
@@ -784,11 +800,19 @@ export default function QCQueuePage() {
                                   <Badge className="bg-blue-100 text-blue-700 border-blue-200" variant="outline">[CMD1]</Badge>
                                 )}
                               </td>
-                              <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                              </td>
                               <td className="px-4 py-3">{item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-'}</td>
                               <td className="px-4 py-3">
                                 <span className="text-purple-600 font-semibold">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                    {item.bottom_remark.split('/')[0].trim()}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3">{item.quantity} {item.unit}</td>
                               <td className="px-4 py-3">
@@ -838,7 +862,7 @@ export default function QCQueuePage() {
                       <table className="w-full text-sm text-left">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                             <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
                             <th className="px-4 py-3 font-medium">สถานะ QC</th>
                             <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
@@ -851,7 +875,10 @@ export default function QCQueuePage() {
                             return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && isPM; 
                           }).map((item, idx) => (
                             <tr key={idx} className="hover:bg-[#F8F6F0]">
-                              <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                              <td className="px-4 py-3">
+                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                              </td>
                               <td className="px-4 py-3">
                                 {item.rm_code?.startsWith('CMD2') ? (
                                   <Badge className="bg-pink-100 text-pink-700 border-pink-200 mb-1" variant="outline">[CMD2]</Badge>
@@ -859,7 +886,12 @@ export default function QCQueuePage() {
                                   <Badge className="bg-blue-100 text-blue-700 border-blue-200 mb-1" variant="outline">[CMD1]</Badge>
                                 )}
                                 <span className="text-purple-600 font-semibold ml-2">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                    {item.bottom_remark.split('/')[0].trim()}
+                                  </div>
+                                )}
                               </td>
                               <td className="px-4 py-3">
                                 <Badge variant="outline" className={
