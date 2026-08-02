@@ -302,7 +302,7 @@ export default function QCQueuePage() {
         const { data: packProc } = await supabase.from('processes').select('id').ilike('process_name', '%บรรจุ%').limit(1).single()
         if (packProc) {
           const { data: existingPack } = await supabase.from('production_logs')
-            .select('id, tank_details')
+            .select('id, tank_details, status')
             .eq('production_lot_id', task.production_lot_id)
             .eq('process_id', packProc.id)
             .eq('tank_start', task.tank_start)
