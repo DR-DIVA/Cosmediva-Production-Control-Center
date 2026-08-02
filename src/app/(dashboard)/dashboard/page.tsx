@@ -126,12 +126,20 @@ export default function DashboardPage() {
   const prodOutput = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
   const prodTarget = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
 
+  const todayStr = format(new Date(), 'yyyy-MM-dd')
+
   activeLogs.forEach(log => {
     if (selectedFilter !== 'all' && log.production_lot_id !== selectedFilter) return;
     
     const pName = (log.processes as any)?.process_name || ''
     const lot = log.production_lots as any
     if (!lot) return;
+    
+    const isPlannedForToday = log.activity_date === todayStr;
+    const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date().setHours(0,0,0,0)).getTime();
+
+    // If it's not planned for today and nobody worked on it today, ignore it completely for this dashboard.
+    if (!isPlannedForToday && !isUpdatedToday) return;
     
     const totalTanks = lot.total_tanks || 0
     const calculatedQty = (lot.total_tanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(lot.total_tanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
@@ -152,11 +160,23 @@ export default function DashboardPage() {
     
     const outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
 
-    if (pName.includes('ชั่ง')) { prodTarget.weighing += totalTanks; prodOutput.weighing += completedTanks }
-    if (pName.includes('ผสม')) { prodTarget.mixing += totalTanks; prodOutput.mixing += completedTanks }
-    if (pName.includes('บรรจุ')) { prodTarget.packing += targetQty; prodOutput.packing += outputPieces }
-    if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) { prodTarget.pof += targetQty; prodOutput.pof += outputPieces }
-    if (pName.includes('QC')) { prodTarget.qc += targetQty; prodOutput.qc += outputPieces || targetQty }
+    // Targets: Only count if it's explicitly planned for TODAY
+    if (isPlannedForToday) {
+      if (pName.includes('ชั่ง')) prodTarget.weighing += totalTanks;
+      if (pName.includes('ผสม')) prodTarget.mixing += totalTanks;
+      if (pName.includes('บรรจุ')) prodTarget.packing += targetQty;
+      if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodTarget.pof += targetQty;
+      if (pName.includes('QC')) prodTarget.qc += targetQty;
+    }
+
+    // Outputs: Only count if it was updated TODAY (meaning someone worked on it today) or if it's planned for today and they already did it.
+    if (isUpdatedToday || isPlannedForToday) {
+      if (pName.includes('ชั่ง')) prodOutput.weighing += completedTanks;
+      if (pName.includes('ผสม')) prodOutput.mixing += completedTanks;
+      if (pName.includes('บรรจุ')) prodOutput.packing += outputPieces;
+      if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodOutput.pof += outputPieces;
+      if (pName.includes('QC')) prodOutput.qc += (outputPieces || targetQty);
+    }
   })
 
   // 2. %Yield (ผสม, บรรจุ)
