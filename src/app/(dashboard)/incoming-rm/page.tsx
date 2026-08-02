@@ -887,7 +887,7 @@ export default function RMControlCenterPage() {
             </Button>
           </DialogFooter>
         </DialogContent>
-        </Tabs>
+      </Dialog>
 
       {/* Customer Supplied PM Modal */}
       <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
