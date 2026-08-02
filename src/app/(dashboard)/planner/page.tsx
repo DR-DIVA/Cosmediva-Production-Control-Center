@@ -152,6 +152,31 @@ export default function PlannerPage() {
     }
   }
 
+  const handleEditLot = (lot: any) => {
+    setNewLot({
+      id: lot.id,
+      product_id: lot.sku_id,
+      lot_number: lot.lot_no,
+      target_quantity: lot.planned_quantity?.toString() || "",
+      total_tanks: lot.total_tanks?.toString() || "",
+      kg_per_tank: lot.kg_per_tank?.toString() || "",
+      g_per_piece: lot.g_per_piece?.toString() || "",
+      capacity_min: lot.capacity_min?.toString() || "",
+      capacity_max: lot.capacity_max?.toString() || "",
+      pcs_per_carton: lot.pcs_per_carton?.toString() || "",
+      order_quantity: lot.order_quantity?.toString() || "",
+      po_no: lot.po_no || "",
+      order_type: lot.order_type || "MTS",
+      fg_due_date: lot.fg_due_date || "",
+      new_sku_name: "",
+      unit: "pc",
+      mfg_date: "",
+      exp_date: "",
+      product_name: lot.products?.product_name || ""
+    })
+    setIsDialogOpen(true)
+  }
+
   const handleSaveLot = async () => {
     if (isSaving) return
     if (!newLot.product_id || !newLot.lot_number || !newLot.order_quantity || !newLot.total_tanks) {
@@ -459,6 +484,7 @@ export default function PlannerPage() {
                   <TableHead>ลงลัง (ชิ้น)</TableHead>
                   <TableHead>ประเภท</TableHead>
                   <TableHead>Due Date</TableHead>
+                  <TableHead className="w-[40px] text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -506,6 +532,11 @@ export default function PlannerPage() {
                           <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
                             Due: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
+                            <Pencil className="w-3.5 h-3.5" />
+                          </Button>
                         </TableCell>
                       </TableRow>
 
@@ -775,7 +806,7 @@ export default function PlannerPage() {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>เพิ่มออเดอร์ใหม่ (Project)</DialogTitle>
+            <DialogTitle>{newLot.id ? "แก้ไขออเดอร์ (Project)" : "เพิ่มออเดอร์ใหม่ (Project)"}</DialogTitle>
           </DialogHeader>
           
           <div className="grid grid-cols-2 gap-4 py-4">
