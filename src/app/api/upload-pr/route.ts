@@ -159,7 +159,7 @@ export async function POST(request: Request) {
 
     // Match item lines even if they wrap to a new line!
     // Uses [\s\S] to tolerate newlines within the item name before hitting the warehouse/quantity.
-    const itemRegex = /^[๓\s]*(\d+)[๓\s]+([A-Z0-9-]+)[๓\s]+([\s\S]{1,150}?)[๓\s]+([A-Z0-9]{2,6}|คลัง)?[๓\s]*([\d,.]+)[๓\s]*(KG|PCS|G|ML|L|KGS|EA|SET|BTL|BOX|TUBE|JAR|CAP|ROLL|PACK|BAG|PUMP|M|CM|MM)/gim;
+    const itemRegex = /^[๓\s]*(\d+)[๓\s]+([A-Z0-9-]+)[๓\s]+([\s\S]{1,150}?)[๓\s]+([A-Z0-9]{2,6}|คลัง)?[๓\s]*([\d,.]+)[๓\s]*(KG|PCS|G|ML|L|KGS|EA|SET|BTL|BOX|TUBE|JAR|CAP|ROLL|PACK|BAG|PUMP|M|CM|MM|ชิ้น|ใบ|แผ่น|เส้น|ตลับ|พาเลท|ลัง)/gim;
     
     let match;
     while ((match = itemRegex.exec(itemsSection)) !== null) {
@@ -176,7 +176,7 @@ export async function POST(request: Request) {
 
     if (items.length === 0) {
       // Legacy ERP format where table borders are extracted as Thai characters (e.g., ๓, ๔, ๕)
-      const legacyTableRegex = /\s*๓\s*\d+\s*๓\s*([A-Z0-9-]+)\s+(.+?)\s*๓([A-Za-z0-9_-]+)๓\s*([\d,.]+)\s*(KG|kg|G|g|L|l|ML|ml|PCS|pcs|KGS|kgs|EA|ea|SET|set|BTL|btl|BOX|box|TUBE|tube|JAR|jar|CAP|cap|ROLL|roll|PACK|pack|BAG|bag|PUMP|pump|M|m|CM|cm|MM|mm)/gi;
+      const legacyTableRegex = /\s*๓\s*\d+\s*๓\s*([A-Z0-9-]+)\s+(.+?)\s*๓([A-Za-z0-9_-]+)๓\s*([\d,.]+)\s*(KG|kg|G|g|L|l|ML|ml|PCS|pcs|KGS|kgs|EA|ea|SET|set|BTL|btl|BOX|box|TUBE|tube|JAR|jar|CAP|cap|ROLL|roll|PACK|pack|BAG|bag|PUMP|pump|M|m|CM|cm|MM|mm|ชิ้น|ใบ|แผ่น|เส้น|ตลับ|พาเลท|ลัง)/gi;
       let legacyMatch;
       while ((legacyMatch = legacyTableRegex.exec(text)) !== null) {
         items.push({
@@ -192,7 +192,7 @@ export async function POST(request: Request) {
     }
 
     if (items.length === 0) {
-      const altItemRegex = /([A-Z0-9-]+)\s+([A-Za-z0-9\s/.-]+?)\s+([\d,.]+)\s*(KG|G|L|ML|PCS|EA|SET|BTL|BOX|TUBE|JAR|CAP|ROLL|PACK|BAG|PUMP|M|CM|MM)/gi;
+      const altItemRegex = /([A-Z0-9-]+)\s+([A-Za-z0-9\s/.-]+?)\s+([\d,.]+)\s*(KG|G|L|ML|PCS|EA|SET|BTL|BOX|TUBE|JAR|CAP|ROLL|PACK|BAG|PUMP|M|CM|MM|ชิ้น|ใบ|แผ่น|เส้น|ตลับ|พาเลท|ลัง)/gi;
       let altMatch;
       while ((altMatch = altItemRegex.exec(text)) !== null) {
         if (altMatch[1].length > 2) {
