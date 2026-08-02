@@ -17,6 +17,7 @@ import { Calendar as CalendarIcon, List as ListIcon, User, History, ClipboardChe
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { differenceInDays, startOfDay } from 'date-fns'
+import { DefectPopup } from '@/components/production/DefectPopup'
 
 export default function WeighingTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
@@ -344,7 +345,12 @@ export default function WeighingTasksPage() {
             </h3>
 
           </div>
-          <div className="space-x-2">
+          <div className="space-x-2 flex items-center">
+            <DefectPopup 
+              lotId={task.production_lot_id}
+              processId={Array.isArray(task.processes) ? task.processes[0]?.id : task.processes?.id}
+              processName={Array.isArray(task.processes) ? task.processes[0]?.process_name : task.processes?.process_name || 'ชั่งสาร'}
+            />
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
               <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-emerald-600 hover:bg-emerald-700">
                 <Play className="w-4 h-4 mr-2" /> เริ่มชั่งสาร

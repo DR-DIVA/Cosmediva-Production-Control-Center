@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { differenceInDays, startOfDay } from 'date-fns'
+import { DefectPopup } from '@/components/production/DefectPopup'
 
 const getPackagingIcon = (unit: string, className: string) => {
   switch (unit) {
