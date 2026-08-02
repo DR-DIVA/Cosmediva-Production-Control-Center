@@ -923,7 +923,17 @@ export default function RMControlCenterPage() {
                             <div>{item.rm_name}</div>
                             {item.bottom_remark && <div className="text-xs text-slate-500 mt-1">Remark: {item.bottom_remark}</div>}
                           </TableCell>
-                          <TableCell>{item.warehouse}</TableCell>
+                          <TableCell>
+                            <Input 
+                              className="w-24 h-8 inline-block"
+                              value={item.warehouse || ''} 
+                              onChange={(e) => {
+                                const newItems = [...extractedData.items];
+                                newItems[idx] = { ...newItems[idx], warehouse: e.target.value };
+                                setExtractedData({ ...extractedData, items: newItems });
+                              }}
+                            />
+                          </TableCell>
                           <TableCell className="text-right">
                             <Input 
                               className="w-20 text-right h-8 font-bold inline-block"
