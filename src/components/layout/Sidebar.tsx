@@ -19,10 +19,16 @@ import {
   Calculator,
   Menu, 
   ShoppingCart, 
-  Users
+  Users,
+  KeyRound
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 
 
 const routes = [
@@ -123,6 +129,7 @@ const routes = [
       { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'planner'] },
       { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'planner'] },
       { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'planner'] },
+      { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'planner'] },
     ]
   },
   {
@@ -147,6 +154,10 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
   const supabase = createClient()
   
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   useEffect(() => {
     const fetchRole = async () => {
@@ -163,6 +174,29 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
 
   const toggleExpand = (href: string) => {
     setExpanded(prev => ({ ...prev, [href]: !prev[href] }))
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newPassword || newPassword.length < 6) {
+      toast.error('รหัสผ่านต้องมีความยาวอย่างน้อย 6 ตัวอักษร')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('รหัสผ่านและการยืนยันรหัสผ่านไม่ตรงกัน')
+      return
+    }
+    setIsChangingPassword(true)
+    const { error } = await supabase.auth.updateUser({ password: newPassword })
+    setIsChangingPassword(false)
+    if (error) {
+      toast.error('เปลี่ยนรหัสผ่านไม่สำเร็จ: ' + error.message)
+    } else {
+      toast.success('เปลี่ยนรหัสผ่านเรียบร้อยแล้ว')
+      setIsPasswordModalOpen(false)
+      setNewPassword('')
+      setConfirmPassword('')
+    }
   }
 
   const handleLogout = async () => {
@@ -290,11 +324,66 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
           ))}
         </div>
       </div>
-      <div className="px-3 py-2">
+      <div className="px-3 py-2 flex flex-col gap-1 border-t border-slate-700/50 mt-auto">
+        <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
+          <DialogTrigger asChild>
+            <button
+              className={cn(
+                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer text-zinc-400 hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
+                isCollapsed ? "justify-center px-0" : ""
+              )}
+              title={isCollapsed ? "เปลี่ยนรหัสผ่าน" : undefined}
+            >
+              <div className={cn("flex items-center", isCollapsed ? "justify-center flex-1" : "flex-1 overflow-hidden")}>
+                <KeyRound className={cn("h-5 w-5 text-zinc-400 shrink-0", isCollapsed ? "" : "mr-3")} />
+                {!isCollapsed && <span className="truncate">เปลี่ยนรหัสผ่าน</span>}
+              </div>
+            </button>
+          </DialogTrigger>
+          <DialogContent className="sm:max-w-[425px]">
+            <form onSubmit={handleChangePassword}>
+              <DialogHeader>
+                <DialogTitle>เปลี่ยนรหัสผ่าน (Change Password)</DialogTitle>
+                <DialogDescription>
+                  รหัสผ่านใหม่ต้องมีความยาวอย่างน้อย 6 ตัวอักษร
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">รหัสผ่านใหม่</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">ยืนยันรหัสผ่านใหม่</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    placeholder="••••••••"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-3">
+                <Button type="button" variant="outline" onClick={() => setIsPasswordModalOpen(false)}>ยกเลิก</Button>
+                <Button type="submit" disabled={isChangingPassword} className="bg-[#D4AF37] hover:bg-[#D4AF37]/90 text-white">
+                  {isChangingPassword ? 'กำลังบันทึก...' : 'บันทึกรหัสผ่านใหม่'}
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+
         <button
           onClick={handleLogout}
           className={cn(
-            "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer text-zinc-400 hover:text-white hover:bg-[#D4AF37]/ hover:text-[#D4AF37] rounded-lg transition",
+            "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer text-zinc-400 hover:text-white hover:bg-red-500/10 hover:text-red-400 rounded-lg transition",
             isCollapsed ? "justify-center px-0" : ""
           )}
           title={isCollapsed ? "ออกจากระบบ" : undefined}
