@@ -804,7 +804,7 @@ export default function RMControlCenterPage() {
       </Tabs>
 
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[95vw] md:max-w-[90vw] lg:max-w-5xl xl:max-w-6xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#4A4238]">ยืนยันข้อมูลใบสั่งซื้อ (Purchase Order)</DialogTitle>
           </DialogHeader>
@@ -892,7 +892,7 @@ export default function RMControlCenterPage() {
 
       {/* Customer Supplied PM Modal */}
       <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="sm:max-w-md md:max-w-lg w-full">
           <DialogHeader>
             <DialogTitle>รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)</DialogTitle>
           </DialogHeader>
