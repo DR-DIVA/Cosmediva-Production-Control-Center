@@ -293,7 +293,7 @@ export default function RMControlCenterPage() {
     } else {
       toast.success('รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ!');
       setIsCmd2ModalOpen(false);
-      setCmd2Form({ pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
+      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
       fetchItems();
     }
   };
