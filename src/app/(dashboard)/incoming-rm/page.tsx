@@ -394,7 +394,7 @@ export default function RMControlCenterPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Package className="w-8 h-8 text-yellow-400" />
-            {mainTab === 'rm' ? 'Raw Material Control Center' : 'Packaging Material Control'}
+            Material Control Center
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
              <div>ศูนย์กลางจัดการใบสั่งซื้อ การรับเข้า และสถานะวัตถุดิบสำหรับการผลิต</div>

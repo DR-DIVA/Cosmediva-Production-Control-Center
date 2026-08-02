@@ -48,7 +48,7 @@ const routes = [
     allowedRoles: ['admin', 'planner']
   },
   {
-    label: 'CosmeFlow RM Control',
+    label: 'CosmeFlow Material Control',
     subtitle: 'ระบบควบคุมวัตถุดิบและความพร้อมในการผลิต',
     icon: FileText,
     href: '/incoming-rm',
