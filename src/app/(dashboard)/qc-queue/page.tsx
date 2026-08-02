@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
 export default function QCQueuePage() {
   const [activeTab, setActiveTab] = useState('bulk')
