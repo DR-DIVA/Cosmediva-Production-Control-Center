@@ -326,19 +326,17 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
       </div>
       <div className="px-3 py-2 flex flex-col gap-1 border-t border-slate-700/50 mt-auto">
         <Dialog open={isPasswordModalOpen} onOpenChange={setIsPasswordModalOpen}>
-          <DialogTrigger asChild>
-            <button
-              className={cn(
-                "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer text-zinc-400 hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
-                isCollapsed ? "justify-center px-0" : ""
-              )}
-              title={isCollapsed ? "เปลี่ยนรหัสผ่าน" : undefined}
-            >
-              <div className={cn("flex items-center", isCollapsed ? "justify-center flex-1" : "flex-1 overflow-hidden")}>
-                <KeyRound className={cn("h-5 w-5 text-zinc-400 shrink-0", isCollapsed ? "" : "mr-3")} />
-                {!isCollapsed && <span className="truncate">เปลี่ยนรหัสผ่าน</span>}
-              </div>
-            </button>
+          <DialogTrigger
+            className={cn(
+              "text-sm group flex p-3 w-full justify-start font-medium cursor-pointer text-zinc-400 hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
+              isCollapsed ? "justify-center px-0" : ""
+            )}
+            title={isCollapsed ? "เปลี่ยนรหัสผ่าน" : undefined}
+          >
+            <div className={cn("flex items-center", isCollapsed ? "justify-center flex-1" : "flex-1 overflow-hidden")}>
+              <KeyRound className={cn("h-5 w-5 text-zinc-400 shrink-0", isCollapsed ? "" : "mr-3")} />
+              {!isCollapsed && <span className="truncate">เปลี่ยนรหัสผ่าน</span>}
+            </div>
           </DialogTrigger>
           <DialogContent className="sm:max-w-[425px]">
             <form onSubmit={handleChangePassword}>
