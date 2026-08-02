@@ -17,12 +17,12 @@ export default function DashboardLayout({
   return (
     <div className="h-full relative transition-all duration-300">
       {/* Desktop Sidebar */}
-      <div className={`hidden h-full md:flex md:flex-col md:fixed md:inset-y-0 z-[80] bg-slate-900 transition-all duration-300 ${isCollapsed ? 'md:w-20' : 'md:w-72'}`}>
+      <div className={`hidden h-full md:flex md:flex-col md:fixed md:inset-y-0 z-[80] bg-slate-900 transition-all duration-300 ${isCollapsed ? 'md:w-20' : 'md:w-80'}`}>
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       </div>
 
       {/* Main Content Area */}
-      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? 'md:pl-20' : 'md:pl-72'}`}>
+      <div className={`flex flex-col min-h-screen transition-all duration-300 ${isCollapsed ? 'md:pl-20' : 'md:pl-80'}`}>
         {/* Top Header */}
         <header className="h-14 bg-white border-b border-[#D4AF37]/30 flex items-center justify-between px-6 sticky top-0 z-[70] shadow-sm">
           
