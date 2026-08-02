@@ -143,19 +143,24 @@ export default function DashboardPage() {
     // If it's not planned for today and nobody worked on it today, ignore it completely for this dashboard.
     if (!isPlannedForToday && !isUpdatedToday) return;
     
-    const totalTanks = lot.total_tanks || 0
-    const calculatedQty = (lot.total_tanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(lot.total_tanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
-    const targetQty = lot.planned_quantity || lot.order_quantity || calculatedQty || 0
+    const taskTanks = (log.tank_start && log.tank_end) ? (log.tank_end - log.tank_start + 1) : (lot.total_tanks || 0)
+    const calculatedQty = (taskTanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(taskTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
+    const targetQty = calculatedQty || lot.planned_quantity || lot.order_quantity || 0
 
     // Count actual progress from tank_details if available, else fallback
     let completedTanks = 0
     let completedPieces = 0
     if (log.tank_details) {
       Object.values(log.tank_details).forEach((val: any) => {
-        if (val && val.status === 'DONE') {
+        const s = typeof val === 'string' ? val : (val?.status || '')
+        const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
+        
+        if (isDone) {
            completedTanks++
-           if (val.cartons) completedPieces += val.cartons * (lot.pcs_per_carton || 1)
-           if (val.pieces) completedPieces += val.pieces
+           if (typeof val === 'object' && val !== null) {
+             if (val.cartons) completedPieces += val.cartons * (lot.pcs_per_carton || 1)
+             if (val.pieces) completedPieces += val.pieces
+           }
         }
       })
     }
@@ -164,8 +169,8 @@ export default function DashboardPage() {
 
     // Targets: Only count if it's explicitly planned for TODAY
     if (isPlannedForToday) {
-      if (pName.includes('ชั่ง')) prodTarget.weighing += totalTanks;
-      if (pName.includes('ผสม')) prodTarget.mixing += totalTanks;
+      if (pName.includes('ชั่ง')) prodTarget.weighing += taskTanks;
+      if (pName.includes('ผสม')) prodTarget.mixing += taskTanks;
       if (pName.includes('บรรจุ')) prodTarget.packing += targetQty;
       if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodTarget.pof += targetQty;
       if (pName.includes('QC')) prodTarget.qc += targetQty;
