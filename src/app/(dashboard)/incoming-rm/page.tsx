@@ -48,6 +48,11 @@ export default function RMControlCenterPage() {
   const [lotOptions, setLotOptions] = useState<any[]>([]);
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [mainTab, setMainTab] = useState<'rm'|'pm'>('rm');
+
+  // Customer Supplied PM State
+  const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
+  const [cmd2Form, setCmd2Form] = useState({ pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
 
   const fetchItems = async () => {
     setLoading(true);
@@ -257,6 +262,42 @@ export default function RMControlCenterPage() {
     }
   };
 
+  const handleCmd2Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setUploading(true);
+    
+    // Generate pseudo PO/PR number
+    const fakePo = `PM-CMD2-${Date.now().toString().slice(-6)}`;
+    
+    // Prefix rm_code with CMD2
+    const fakeCode = `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
+    
+    const { error } = await supabase.from('production_lot_rms').insert({
+      po_no: fakePo,
+      pr_no: fakePo,
+      supplier: cmd2Form.customerName,
+      rm_code: fakeCode,
+      rm_name: cmd2Form.pmName,
+      quantity: parseFloat(cmd2Form.quantity) || 0,
+      unit: 'pcs',
+      warehouse: cmd2Form.warehouse,
+      lot_product: cmd2Form.lotProduct,
+      status: 'RECEIVED',
+      receive_date: new Date().toISOString()
+    });
+
+    setUploading(false);
+
+    if (error) {
+      toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ');
+    } else {
+      toast.success('รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ!');
+      setIsCmd2ModalOpen(false);
+      setCmd2Form({ pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
+      fetchItems();
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING_DELIVERY': return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">Ordered</Badge>;
@@ -287,7 +328,11 @@ export default function RMControlCenterPage() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const filteredItems = items.filter(item => 
+  const isPM = (code: string) => code?.startsWith('CMD1') || code?.startsWith('CMD2');
+  
+  const typeFilteredItems = items.filter(item => mainTab === 'pm' ? isPM(item.rm_code) : !isPM(item.rm_code));
+
+  const filteredItems = typeFilteredItems.filter(item => 
     (item.po_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.rm_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.rm_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -322,13 +367,33 @@ export default function RMControlCenterPage() {
     return weighDate && etaDate && new Date(etaDate.toDateString()) > new Date(weighDate.toDateString());
   });
 
+  const activeItemsCount = typeFilteredItems.length;
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+        {/* Top Toggle for RM/PM */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
+            <button 
+              onClick={() => setMainTab('rm')}
+              className={`px-8 py-2.5 rounded-lg font-semibold text-sm transition-all ${mainTab === 'rm' ? 'bg-white text-[#D4AF37] shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              วัตถุดิบ (RM)
+            </button>
+            <button 
+              onClick={() => setMainTab('pm')}
+              className={`px-8 py-2.5 rounded-lg font-semibold text-sm transition-all ${mainTab === 'pm' ? 'bg-white text-[#D4AF37] shadow-md' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              บรรจุภัณฑ์ (PM)
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Package className="w-8 h-8 text-yellow-400" />
-            Raw Material Control Center
+            {mainTab === 'rm' ? 'Raw Material Control Center' : 'Packaging Material Control'}
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
              <div>ศูนย์กลางจัดการใบสั่งซื้อ การรับเข้า และสถานะวัตถุดิบสำหรับการผลิต</div>
@@ -351,10 +416,15 @@ export default function RMControlCenterPage() {
           <Button variant="outline" onClick={exportToCSV} className="bg-white">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
+          {mainTab === 'pm' && (
+            <Button onClick={() => setIsCmd2ModalOpen(true)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+              + รับเข้าวัสดุลูกค้า (CMD2)
+            </Button>
+          )}
         </div>
       </div>
 
-      <Tabs defaultValue="purchasing" className="w-full">
+        <Tabs defaultValue="purchasing" className="w-full">
         <TabsList className="bg-[#D4AF37] p-1.5 rounded-xl border-none shadow-md w-full justify-start h-auto gap-1">
           <TabsTrigger value="dashboard" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><LayoutDashboard className="w-4 h-4 mr-2"/> Dashboard</TabsTrigger>
           <TabsTrigger value="purchasing" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
@@ -367,16 +437,18 @@ export default function RMControlCenterPage() {
           <TabsContent value="dashboard" className="space-y-4">
              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="bg-[#D4AF37]/ border-[#D4AF37]/30">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-[#4A4238]">PO ทั้งหมด</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-[#D4AF37]">{items.length}</div></CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-[#4A4238]">รายการทั้งหมด</CardTitle></CardHeader>
+                  <CardContent><div className="text-3xl font-bold text-[#D4AF37]">{activeItemsCount}</div></CardContent>
                 </Card>
                 <Card className="bg-orange-50 border-orange-100">
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-orange-800">รอของเข้า (Pending)</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-orange-600">{items.filter(i => i.status === 'PENDING_DELIVERY').length}</div></CardContent>
+                  <CardContent><div className="text-3xl font-bold text-orange-600">{typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY').length}</div></CardContent>
                 </Card>
                 <Card className="bg-yellow-50 border-yellow-100">
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-800">รอตรวจ QC</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-yellow-600">{items.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED').length}</div></CardContent>
+                  <CardContent><div className="text-3xl font-bold text-yellow-600">{typeFilteredItems.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED').length}</div></CardContent>
+                </Card>
+                <Card className="bg-green-50 border-green-100">
                 </Card>
                 <Card className="bg-green-50 border-green-100">
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-800">พร้อมใช้ผลิต (Released)</CardTitle></CardHeader>
@@ -454,7 +526,7 @@ export default function RMControlCenterPage() {
             <Card className="bg-[#D4AF37]/ border-[#D4AF37]/30/50 shadow-sm">
               <CardHeader className="pb-3">
                 <CardTitle className="text-[#4A4238] flex items-center gap-2 text-base">
-                  <Upload className="w-4 h-4" /> อัปโหลดใบสั่งซื้อ (PO PDF)
+                  <Upload className="w-4 h-4" /> อัปโหลดใบสั่งซื้อ (PO PDF) {mainTab === 'pm' ? 'สำหรับบรรจุภัณฑ์' : 'สำหรับวัตถุดิบ'}
                 </CardTitle>
               </CardHeader>
               <CardContent>
@@ -814,6 +886,45 @@ export default function RMControlCenterPage() {
               บันทึกลง Data Center
             </Button>
           </DialogFooter>
+        </DialogContent>
+        </Tabs>
+
+      {/* Customer Supplied PM Modal */}
+      <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleCmd2Submit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>ชื่อลูกค้า (Customer Name)</Label>
+              <Input required value={cmd2Form.customerName} onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
+            </div>
+            <div className="space-y-2">
+              <Label>ชื่อบรรจุภัณฑ์ (PM Name)</Label>
+              <Input required value={cmd2Form.pmName} onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} placeholder="เช่น กล่องใส่ครีม 50g" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>จำนวน (ชิ้น)</Label>
+                <Input required type="number" min="1" value={cmd2Form.quantity} onChange={e => setCmd2Form({...cmd2Form, quantity: e.target.value})} />
+              </div>
+              <div className="space-y-2">
+                <Label>LOT งานผลิตอ้างอิง</Label>
+                <Input value={cmd2Form.lotProduct} onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>คลังสินค้า (Warehouse)</Label>
+              <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} />
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsCmd2ModalOpen(false)}>ยกเลิก</Button>
+              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} รับเข้า PM ทันที
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

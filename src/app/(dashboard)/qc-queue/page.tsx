@@ -81,7 +81,7 @@ export default function QCQueuePage() {
     } else if (activeTab === 'fg') {
       fetchFgInventory()
       fetchFgTodayHistory()
-    } else if (activeTab === 'rm') {
+    } else if (activeTab === 'rm' || activeTab === 'pm') {
       fetchRmTasks()
       fetchRmTodayHistory()
     }
@@ -132,7 +132,7 @@ export default function QCQueuePage() {
       await supabase.from('production_issues').insert({
         production_lot_id: activeRm.production_lot_id,
         issue_type: 'QC_REJECT',
-        description: `RM QC [${activeRm.rm_code} - ${activeRm.rm_name}]: ${rmStatusAction}\nหมายเหตุ: ${reasonText}`,
+        description: `RM/PM QC [${activeRm.rm_code} - ${activeRm.rm_name}]: ${rmStatusAction}\nหมายเหตุ: ${reasonText}`,
         reported_by: currentUser,
         status: 'OPEN',
         priority: 'HIGH'
@@ -567,7 +567,8 @@ export default function QCQueuePage() {
                     <tbody className="divide-y divide-slate-100">
                       {rmItems.filter(item => {
                         const term = searchQuery.toLowerCase()
-                        return (item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)
+                        const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
+                        return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && !isPM
                       }).map((item) => (
                         <tr key={item.id} className="hover:bg-[#F8F6F0]">
                           <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
@@ -657,7 +658,11 @@ export default function QCQueuePage() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {rmTodayHistory.filter(item => { const term = searchQuery.toLowerCase(); return (item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term); }).map((item, idx) => (
+                          {rmTodayHistory.filter(item => { 
+                            const term = searchQuery.toLowerCase(); 
+                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && !isPM; 
+                          }).map((item, idx) => (
                             <tr key={idx} className="hover:bg-[#F8F6F0]">
                               <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
                               <td className="px-4 py-3">
@@ -702,11 +707,81 @@ export default function QCQueuePage() {
             </TabsList>
 
             <TabsContent value="queue">
-              <Card className="border-dashed border-2">
-                <CardContent className="flex flex-col items-center justify-center h-[400px] text-slate-400">
-                  <PackageOpen className="w-16 h-16 mb-4 text-slate-300" />
-                  <h3 className="text-xl font-bold mb-2">ระบบตรวจบรรจุภัณฑ์ (PM)</h3>
-                  <p>รองรับการเชื่อมต่อกับระบบตรวจสอบคุณภาพบรรจุภัณฑ์ในอนาคต</p>
+              <Card>
+                <CardHeader className="border-b bg-[#F8F6F0]">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <PackageOpen className="w-5 h-5 text-purple-600" />
+                    รายการบรรจุภัณฑ์รอตรวจ (PM)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {rmItems.filter(i => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2')).length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                      ไม่มีรายการบรรจุภัณฑ์รอตรวจ
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-slate-100 text-slate-700">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">ประเภท</th>
+                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
+                            <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
+                            <th className="px-4 py-3 font-medium">จำนวน</th>
+                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                            <th className="px-4 py-3 font-medium text-right">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {rmItems.filter(item => {
+                            const term = searchQuery.toLowerCase()
+                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
+                            return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && isPM
+                          }).map((item) => (
+                            <tr key={item.id} className="hover:bg-[#F8F6F0]">
+                              <td className="px-4 py-3">
+                                {item.rm_code?.startsWith('CMD2') ? (
+                                  <Badge className="bg-pink-100 text-pink-700 border-pink-200" variant="outline">[CMD2]</Badge>
+                                ) : (
+                                  <Badge className="bg-blue-100 text-blue-700 border-blue-200" variant="outline">[CMD1]</Badge>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                              <td className="px-4 py-3">{item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-'}</td>
+                              <td className="px-4 py-3">
+                                <span className="text-purple-600 font-semibold">{item.rm_code}</span>
+                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                              </td>
+                              <td className="px-4 py-3">{item.quantity} {item.unit}</td>
+                              <td className="px-4 py-3">
+                                <Badge variant="outline" className={
+                                  item.qc_status === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' :
+                                  item.qc_status === 'QUARANTINED' || item.qc_status === 'PENDING' ? 'bg-yellow-100 text-yellow-700 border-yellow-200' :
+                                  item.qc_status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
+                                  'bg-slate-100 text-slate-700'
+                                }>
+                                  {item.qc_status || 'PENDING'}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                                    อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => openRmDialog(item, 'PASSED')} className="text-green-600 font-medium"><CheckCircle2 className="w-4 h-4 mr-2" /> ผ่าน (PASSED)</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openRmDialog(item, 'HOLD')} className="text-orange-600 font-medium"><AlertTriangle className="w-4 h-4 mr-2" /> กักกัน (HOLD)</DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => openRmDialog(item, 'REJECTED')} className="text-red-600 font-medium"><XCircle className="w-4 h-4 mr-2" /> ไม่ผ่าน (REJECTED)</DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -715,22 +790,58 @@ export default function QCQueuePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (PM)</CardTitle>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    onClick={() => {
-                      // no data for PM yet
-                      toast.error('ไม่มีข้อมูลให้ Export')
-                    }}
-                    disabled={pmTodayHistory.length === 0}
-                  >
-                    Export Excel
-                  </Button>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                    ไม่มีประวัติการตรวจสอบ
-                  </div>
+                  {rmTodayHistory.filter(i => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2')).length === 0 ? (
+                    <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
+                      ไม่มีประวัติการตรวจสอบ
+                    </div>
+                  ) : (
+                    <div className="rounded-md border">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-[#F8F6F0] text-slate-700">
+                          <tr>
+                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
+                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                            <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {rmTodayHistory.filter(item => { 
+                            const term = searchQuery.toLowerCase(); 
+                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && isPM; 
+                          }).map((item, idx) => (
+                            <tr key={idx} className="hover:bg-[#F8F6F0]">
+                              <td className="px-4 py-3 font-medium">{item.production_lots?.lot_no || '-'}</td>
+                              <td className="px-4 py-3">
+                                {item.rm_code?.startsWith('CMD2') ? (
+                                  <Badge className="bg-pink-100 text-pink-700 border-pink-200 mb-1" variant="outline">[CMD2]</Badge>
+                                ) : (
+                                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 mb-1" variant="outline">[CMD1]</Badge>
+                                )}
+                                <span className="text-purple-600 font-semibold ml-2">{item.rm_code}</span>
+                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge variant="outline" className={
+                                  item.qc_status === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' :
+                                  item.qc_status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
+                                  'bg-yellow-100 text-yellow-700 border-yellow-200'
+                                }>
+                                  {item.qc_status}
+                                </Badge>
+                              </td>
+                              <td className="px-4 py-3 text-slate-500">
+                                {item.updated_at ? new Date(item.updated_at).toLocaleTimeString('th-TH') : '-'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>

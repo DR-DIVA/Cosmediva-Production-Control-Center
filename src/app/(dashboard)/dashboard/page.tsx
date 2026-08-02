@@ -34,6 +34,8 @@ export default function DashboardPage() {
   const [qaQcLogs, setQaQcLogs] = useState<any[]>([])
   const [fgLogs, setFgLogs] = useState<any[]>([])
   const [plannerLots, setPlannerLots] = useState<any[]>([])
+  const [rmQcLogs, setRmQcLogs] = useState<any[]>([])
+  const [fgQcLogs, setFgQcLogs] = useState<any[]>([])
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [dashboardDate, setDashboardDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
 
@@ -120,6 +122,16 @@ export default function DashboardPage() {
       .select('id, planned_quantity')
       .neq('current_status', 'DONE')
     if (plannedLots) setPlannerLots(plannedLots)
+
+    // 6. Fetch RM QC Queues (Today)
+    const { data: rmQc } = await supabase.from('production_lot_rms')
+      .select('status, qc_status, receive_date, updated_at')
+    if (rmQc) setRmQcLogs(rmQc)
+
+    // 7. Fetch FG QC Queues (Today)
+    const { data: fgQc } = await supabase.from('fg_inventory')
+      .select('qc_status, created_at, updated_at')
+    if (fgQc) setFgQcLogs(fgQc)
   }
 
   // --- Calculations ---
@@ -152,22 +164,34 @@ export default function DashboardPage() {
     // Count actual progress from tank_details if available, else fallback
     let completedTanks = 0
     let completedPieces = 0
-    if (log.tank_details) {
-      Object.values(log.tank_details).forEach((val: any) => {
+    const isLogDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(log.status)
+
+    if (log.tank_details && Object.keys(log.tank_details).length > 0) {
+      Object.keys(log.tank_details).forEach(key => {
+        if (key.endsWith('_history')) return;
+        const val = log.tank_details[key]
         const s = typeof val === 'string' ? val : (val?.status || '')
         const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
         
         if (isDone) {
            completedTanks++
            if (typeof val === 'object' && val !== null) {
-             if (val.cartons) completedPieces += val.cartons * (lot.pcs_per_carton || 1)
+             if (val.cartons) completedPieces += (val.cartons * (lot.pcs_per_carton || 1))
              if (val.pieces) completedPieces += val.pieces
            }
         }
       })
+    } else if (isLogDone) {
+      completedTanks = taskTanks
+      completedPieces = log.piece_quantity || targetQty
     }
     
-    const outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
+    let outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
+    
+    // Fallback if outputPieces is still 0 but log is done (e.g. packing without tank calculations)
+    if (isLogDone && outputPieces === 0) {
+       outputPieces = log.piece_quantity || targetQty;
+    }
 
     // Targets: Only count if it's explicitly planned for TODAY
     if (isPlannedForToday) {
@@ -175,7 +199,11 @@ export default function DashboardPage() {
       if (pName.includes('ผสม')) prodTarget.mixing += taskTanks;
       if (pName.includes('บรรจุ')) prodTarget.packing += targetQty;
       if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodTarget.pof += targetQty;
-      if (pName.includes('QC')) prodTarget.qc += targetQty;
+      if (pName.includes('รอ QC')) {
+         const start = parseInt(log.tank_start) || 1;
+         const end = parseInt(log.tank_end) || start;
+         prodTarget.qc += (end - start + 1);
+      }
     }
 
     // Outputs: Only count if it was updated TODAY (meaning someone worked on it today) or if it's planned for today and they already did it.
@@ -184,8 +212,58 @@ export default function DashboardPage() {
       if (pName.includes('ผสม')) prodOutput.mixing += completedTanks;
       if (pName.includes('บรรจุ')) prodOutput.packing += outputPieces;
       if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodOutput.pof += outputPieces;
-      if (pName.includes('QC')) prodOutput.qc += (outputPieces || targetQty);
     }
+
+    // Bulk QC Output: Check history for QC_PASS on dashboardDate
+    if (pName === 'รอ QC' && log.tank_details) {
+      Object.keys(log.tank_details).forEach(key => {
+        if (key.endsWith('_history')) {
+          const histories = log.tank_details[key] as any[]
+          if (Array.isArray(histories)) {
+             const hasPassToday = histories.some(h => 
+               h.status === 'QC_PASS' && 
+               new Date(h.timestamp).getTime() >= new Date(dashboardStart).getTime() && 
+               new Date(h.timestamp).getTime() <= new Date(dashboardEnd).getTime()
+             )
+             if (hasPassToday) prodOutput.qc += 1;
+          }
+        }
+      })
+    }
+  })
+
+  // Add RM and FG Queues to QC Metric
+  rmQcLogs.forEach(rm => {
+     if (rm.status === 'RECEIVED' && rm.receive_date === dashboardDate) {
+        prodTarget.qc += 1;
+     }
+     if (rm.qc_status && rm.updated_at) {
+        const updateTime = new Date(rm.updated_at).getTime();
+        const start = new Date(dashboardDate).setHours(0,0,0,0);
+        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        if (updateTime >= start && updateTime <= end) {
+           prodOutput.qc += 1;
+        }
+     }
+  })
+
+  fgQcLogs.forEach(fg => {
+     if (fg.qc_status === 'QUARANTINE' && fg.created_at) {
+        const createTime = new Date(fg.created_at).getTime();
+        const start = new Date(dashboardDate).setHours(0,0,0,0);
+        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        if (createTime >= start && createTime <= end) {
+           prodTarget.qc += 1;
+        }
+     }
+     if (fg.qc_status !== 'QUARANTINE' && fg.updated_at) {
+        const updateTime = new Date(fg.updated_at).getTime();
+        const start = new Date(dashboardDate).setHours(0,0,0,0);
+        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        if (updateTime >= start && updateTime <= end) {
+           prodOutput.qc += 1;
+        }
+     }
   })
 
   // 2. %Yield (ผสม, บรรจุ)
@@ -337,7 +415,7 @@ export default function DashboardPage() {
         <MetricCard title="ผสม" value={prodOutput.mixing} target={prodTarget.mixing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
         <MetricCard title="บรรจุ" value={prodOutput.packing} target={prodTarget.packing} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
         <MetricCard title="ลงลัง (POF)" value={prodOutput.pof} target={prodTarget.pof} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
-        <MetricCard title="QC" value={prodOutput.qc} target={prodTarget.qc} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard title="QC" value={prodOutput.qc} target={prodTarget.qc} unit="รายการ" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 mt-8">
