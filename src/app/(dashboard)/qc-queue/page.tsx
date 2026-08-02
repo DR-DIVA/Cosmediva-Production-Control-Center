@@ -1000,18 +1000,21 @@ export default function QCQueuePage() {
                                         ) : null
 
                                         return (
-                                          <div key={t} className="relative group flex flex-col items-center justify-center">
-                                            <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 ${color} ${animate}`}>
-                                              <FlaskConical className="w-8 h-8 mb-1" />
-                                              <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
-                                            </div>
-                                            {tooltipContent && (
-                                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-[#2D2721] text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-xl pointer-events-none">
-                                                {tooltipContent}
-                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
-                                              </div>
-                                            )}
-                                          </div>
+                                          <TooltipProvider key={t}>
+                                            <Tooltip delayDuration={100}>
+                                              <TooltipTrigger asChild>
+                                                <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${color} ${animate}`}>
+                                                  <FlaskConical className="w-8 h-8 mb-1" />
+                                                  <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
+                                                </div>
+                                              </TooltipTrigger>
+                                              {tooltipContent && (
+                                                <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100] max-h-64 overflow-y-auto">
+                                                  {tooltipContent}
+                                                </TooltipContent>
+                                              )}
+                                            </Tooltip>
+                                          </TooltipProvider>
                                         )
                                       })}
                                     </div>

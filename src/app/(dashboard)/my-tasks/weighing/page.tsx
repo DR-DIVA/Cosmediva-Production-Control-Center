@@ -430,8 +430,8 @@ export default function WeighingTasksPage() {
 
             return (
               <TooltipProvider key={b}>
-                <Tooltip>
-                  <TooltipTrigger>
+                <Tooltip delayDuration={100}>
+                  <TooltipTrigger asChild>
                     <div 
                       onClick={handleBasketClick}
                       className={`flex flex-col items-center justify-center p-2 rounded-lg border ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
@@ -441,7 +441,7 @@ export default function WeighingTasksPage() {
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
-                    <TooltipContent>
+                    <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100] max-h-64 overflow-y-auto">
                       {tooltipContent}
                     </TooltipContent>
                   )}

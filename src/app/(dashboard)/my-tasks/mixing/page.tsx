@@ -509,8 +509,8 @@ export default function MixingTasksPage() {
 
             return (
               <TooltipProvider key={t}>
-                <Tooltip>
-                  <TooltipTrigger>
+                <Tooltip delayDuration={100}>
+                  <TooltipTrigger asChild>
                     <div 
                       onClick={handleTankClick}
                       className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
@@ -520,7 +520,7 @@ export default function MixingTasksPage() {
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
-                    <TooltipContent>
+                    <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100] max-h-64 overflow-y-auto">
                       {tooltipContent}
                     </TooltipContent>
                   )}
