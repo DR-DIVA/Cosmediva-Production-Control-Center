@@ -1082,7 +1082,7 @@ export default function QCQueuePage() {
                             tankNum,
                             h.status,
                             new Date(h.timestamp).toLocaleString('th-TH'),
-                            h.user,
+                            h.user?.split('@')[0] || h.user,
                             h.note || ''
                           ]]
                         })
@@ -1124,7 +1124,7 @@ export default function QCQueuePage() {
                             return (
                               <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                                 <td className="px-4 py-3 whitespace-nowrap">{new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">{item.user}</td>
+                                <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0] || item.user}</td>
                                 <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
                                   {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                                 </td>
