@@ -354,17 +354,18 @@ export default function RMControlCenterPage() {
     link.remove();
   };
 
-  const delayedItems = items.filter(item => {
-    let weighDate: Date | null = null;
+  const delayedItems = typeFilteredItems.filter(item => {
+    let targetDate: Date | null = null;
     if (item.production_lots?.production_logs) {
-      const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
-      if (weighLogs.length > 0) {
-        weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-        weighDate = new Date(weighLogs[0].activity_date);
+      const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
+      const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
+      if (targetLogs.length > 0) {
+        targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+        targetDate = new Date(targetLogs[0].activity_date);
       }
     }
     const etaDate = item.eta_date ? new Date(item.eta_date) : null;
-    return weighDate && etaDate && new Date(etaDate.toDateString()) > new Date(weighDate.toDateString());
+    return targetDate && etaDate && new Date(etaDate.toDateString()) > new Date(targetDate.toDateString());
   });
 
   const activeItemsCount = typeFilteredItems.length;
@@ -449,10 +450,8 @@ export default function RMControlCenterPage() {
                   <CardContent><div className="text-3xl font-bold text-yellow-600">{typeFilteredItems.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED').length}</div></CardContent>
                 </Card>
                 <Card className="bg-green-50 border-green-100">
-                </Card>
-                <Card className="bg-green-50 border-green-100">
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-800">พร้อมใช้ผลิต (Released)</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-green-600">{items.filter(i => i.status === 'READY' || i.status === 'QC_PASS').length}</div></CardContent>
+                  <CardContent><div className="text-3xl font-bold text-green-600">{typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS').length}</div></CardContent>
                 </Card>
              </div>
              
@@ -460,7 +459,7 @@ export default function RMControlCenterPage() {
                <Card className="border-red-200 shadow-sm mt-4">
                  <CardHeader className="bg-red-50 border-b border-red-100 pb-3">
                    <CardTitle className="text-red-800 text-sm flex items-center gap-2">
-                     <AlertTriangle className="w-4 h-4" /> รายการวัตถุดิบที่เข้าไม่ทันคิวชั่งสาร ({delayedItems.length})
+                     <AlertTriangle className="w-4 h-4" /> รายการ{mainTab === 'rm' ? 'วัตถุดิบ' : 'บรรจุภัณฑ์'}ที่เข้าไม่ทันคิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} ({delayedItems.length})
                    </CardTitle>
                  </CardHeader>
                  <CardContent className="p-0">
@@ -469,18 +468,19 @@ export default function RMControlCenterPage() {
                         <TableRow>
                           <TableHead className="text-red-800">SKU / LOT</TableHead>
                           <TableHead className="text-red-800">Item</TableHead>
-                          <TableHead className="text-red-800">คิวชั่งสาร</TableHead>
+                          <TableHead className="text-red-800">คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'}</TableHead>
                           <TableHead className="text-red-800">ETA ของเข้า</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {delayedItems.map((item) => {
-                          let weighDate: Date | null = null;
+                          let targetDate: Date | null = null;
                           if (item.production_lots?.production_logs) {
-                            const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
-                            if (weighLogs.length > 0) {
-                              weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-                              weighDate = new Date(weighLogs[0].activity_date);
+                            const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
+                            const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
+                            if (targetLogs.length > 0) {
+                              targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                              targetDate = new Date(targetLogs[0].activity_date);
                             }
                           }
                           const etaDate = item.eta_date ? new Date(item.eta_date) : null;
@@ -501,7 +501,7 @@ export default function RMControlCenterPage() {
                                 <div className="text-xs text-slate-500">{item.rm_name}</div>
                               </TableCell>
                               <TableCell className="font-medium text-slate-700">
-                                {weighDate ? weighDate.toLocaleDateString('th-TH') : '-'}
+                                {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
                               </TableCell>
                               <TableCell className="font-bold text-red-600">
                                 {etaDate ? etaDate.toLocaleDateString('th-TH') : '-'}
@@ -516,7 +516,7 @@ export default function RMControlCenterPage() {
              ) : (
                <Card className="border-green-200 shadow-sm mt-4">
                  <CardContent className="p-6 flex items-center justify-center text-green-700 bg-green-50/50 rounded-lg">
-                   <CheckCircle2 className="w-5 h-5 mr-2" /> ไม่มีรายการวัตถุดิบที่เข้าไม่ทันคิวชั่งสาร (RM ทุกรายการเข้าทันกำหนด)
+                   <CheckCircle2 className="w-5 h-5 mr-2" /> ไม่มีรายการ{mainTab === 'rm' ? 'วัตถุดิบ' : 'บรรจุภัณฑ์'}ที่เข้าไม่ทันคิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} ({mainTab === 'rm' ? 'RM' : 'PM'} ทุกรายการเข้าทันกำหนด)
                  </CardContent>
                </Card>
              )}
@@ -735,16 +735,16 @@ export default function RMControlCenterPage() {
 
           <TabsContent value="planning" className="space-y-6">
              <Card className="shadow-sm">
-              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">RM Readiness (เรียงตาม LOT การผลิต)</CardTitle></CardHeader>
+              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
                   <Table className="whitespace-nowrap text-sm">
                     <TableHeader>
                       <TableRow>
                         <TableHead>SKU / LOT</TableHead>
-                        <TableHead>คิวชั่งสาร (วันที่)</TableHead>
-                        <TableHead>RM Code</TableHead>
-                        <TableHead>RM Name</TableHead>
+                        <TableHead>คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)</TableHead>
+                        <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
+                        <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
                         <TableHead>Required Qty</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>ETA</TableHead>
@@ -752,17 +752,18 @@ export default function RMControlCenterPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredItems.map((item) => {
-                        let weighDate: Date | null = null;
+                        let targetDate: Date | null = null;
                         if (item.production_lots?.production_logs) {
-                          const weighLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === 'ชั่งสาร');
-                          if (weighLogs.length > 0) {
-                            weighLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-                            weighDate = new Date(weighLogs[0].activity_date);
+                          const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
+                          const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
+                          if (targetLogs.length > 0) {
+                            targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                            targetDate = new Date(targetLogs[0].activity_date);
                           }
                         }
                         
                         const etaDate = item.eta_date ? new Date(item.eta_date) : null;
-                        const isDelayed = weighDate && etaDate && new Date(etaDate.toDateString()) > new Date(weighDate.toDateString());
+                        const isDelayed = targetDate && etaDate && new Date(etaDate.toDateString()) > new Date(targetDate.toDateString());
 
                         return (
                         <TableRow key={item.id}>
@@ -776,7 +777,7 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell className="text-slate-600 font-medium">
-                            {weighDate ? weighDate.toLocaleDateString('th-TH') : '-'}
+                            {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
                           </TableCell>
                           <TableCell>{item.rm_code}</TableCell>
                           <TableCell>{item.rm_name}</TableCell>
@@ -786,7 +787,7 @@ export default function RMControlCenterPage() {
                             {etaDate ? (
                               <div className={`font-medium flex items-center ${isDelayed ? 'text-red-600' : 'text-slate-700'}`}>
                                 {etaDate.toLocaleDateString('th-TH')}
-                                {isDelayed && <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full ml-2 border border-red-200">เข้าไม่ทันชั่ง</span>}
+                                {isDelayed && <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full ml-2 border border-red-200">เข้าไม่ทัน{mainTab === 'rm' ? 'ชั่ง' : 'บรรจุ'}</span>}
                               </div>
                             ) : '-'}
                           </TableCell>
