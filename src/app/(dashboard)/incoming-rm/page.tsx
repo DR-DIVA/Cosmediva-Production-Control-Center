@@ -491,17 +491,17 @@ export default function RMControlCenterPage() {
                               <TableCell>
                                 <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                                 <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
-                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
-                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
-                                    {item.bottom_remark.split('/')[0].trim()}
-                                  </div>
-                                )}
                               </TableCell>
                               <TableCell>
                                 <div className="font-medium text-slate-700">{item.rm_code}</div>
                               </TableCell>
                               <TableCell>
                                 <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                    {item.bottom_remark.split('/')[0].trim()}
+                                  </div>
+                                )}
                               </TableCell>
                               <TableCell className="font-medium text-slate-700">
                                 {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
@@ -639,14 +639,16 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
+                          <TableCell className="font-medium text-slate-700">{item.rm_code}</TableCell>
+                          <TableCell>
+                            <div className="text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium text-slate-700">{item.rm_code}</TableCell>
-                          <TableCell className="text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{item.warehouse}</TableCell>
                           <TableCell>
@@ -716,17 +718,17 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
+                          <TableCell className="font-medium text-purple-700">
+                             {item.rm_code}
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
                               </div>
                             )}
-                          </TableCell>
-                          <TableCell className="font-medium text-purple-700">
-                             {item.rm_code}
-                          </TableCell>
-                          <TableCell className="text-sm text-slate-600 max-w-[250px] truncate" title={item.rm_name}>
-                             {item.rm_name}
                           </TableCell>
                           <TableCell>
                              <Select value={item.qc_status || 'QUARANTINED'} onValueChange={(val) => handleQcStatusChange(item, val as string)}>
@@ -790,17 +792,19 @@ export default function RMControlCenterPage() {
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          </TableCell>
+                          <TableCell className="text-slate-600 font-medium">
+                            {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
+                          </TableCell>
+                          <TableCell>{item.rm_code}</TableCell>
+                          <TableCell>
+                            <div>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
                               </div>
                             )}
                           </TableCell>
-                          <TableCell className="text-slate-600 font-medium">
-                            {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
-                          </TableCell>
-                          <TableCell>{item.rm_code}</TableCell>
-                          <TableCell>{item.rm_name}</TableCell>
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{getStatusBadge(item.status)}</TableCell>
                           <TableCell>
