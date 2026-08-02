@@ -34,15 +34,16 @@ export default function DashboardPage() {
   const [fgLogs, setFgLogs] = useState<any[]>([])
   const [plannerLots, setPlannerLots] = useState<any[]>([])
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
+  const [dashboardDate, setDashboardDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
 
   const supabase = createClient()
 
   useEffect(() => {
     fetchDashboardData()
-  }, [])
+  }, [dashboardDate])
 
   const fetchDashboardData = async () => {
-    const today = new Date()
+    const today = new Date(dashboardDate)
     const todayStart = startOfDay(today).toISOString()
     const todayEnd = endOfDay(today).toISOString()
     const monthStart = startOfMonth(today).toISOString()
@@ -126,7 +127,7 @@ export default function DashboardPage() {
   const prodOutput = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
   const prodTarget = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
 
-  const todayStr = format(new Date(), 'yyyy-MM-dd')
+  const todayStr = dashboardDate;
 
   activeLogs.forEach(log => {
     if (selectedFilter !== 'all' && log.production_lot_id !== selectedFilter) return;
@@ -136,7 +137,7 @@ export default function DashboardPage() {
     if (!lot) return;
     
     const isPlannedForToday = log.activity_date === todayStr;
-    const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date().setHours(0,0,0,0)).getTime();
+    const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date(dashboardDate).setHours(0,0,0,0)).getTime() && new Date(log.updated_at).getTime() <= new Date(new Date(dashboardDate).setHours(23,59,59,999)).getTime();
 
     // If it's not planned for today and nobody worked on it today, ignore it completely for this dashboard.
     if (!isPlannedForToday && !isUpdatedToday) return;
@@ -277,8 +278,17 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="w-full mt-4">
+        <div className="flex flex-wrap items-center gap-4 mt-4 md:mt-0">
+          <div className="flex items-center gap-2 bg-white border border-[#D4AF37]/30 rounded-md p-1">
+             <Calendar className="w-5 h-5 text-yellow-500 ml-2" />
+             <input 
+               type="date" 
+               className="bg-transparent border-none outline-none text-sm font-semibold text-[#4A4238] p-1 cursor-pointer"
+               value={dashboardDate}
+               onChange={(e) => setDashboardDate(e.target.value)}
+             />
+          </div>
+          <div className="w-48">
             <Select value={selectedFilter} onValueChange={(val) => setSelectedFilter(val || '')}>
               <SelectTrigger className="bg-white border-[#D4AF37]/30 text-[#4A4238] font-semibold h-11 focus:ring-yellow-400">
                 <SelectValue placeholder="เลือกการแสดงผล" />
