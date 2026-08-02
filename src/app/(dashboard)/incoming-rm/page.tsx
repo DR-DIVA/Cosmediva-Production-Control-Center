@@ -371,7 +371,7 @@ export default function RMControlCenterPage() {
   const activeItemsCount = typeFilteredItems.length;
 
   return (
-    <div className="p-6 max-w-[1400px] mx-auto space-y-6">
+    <div className="p-6 w-full mx-auto space-y-6">
         {/* Top Toggle for RM/PM */}
         <div className="flex justify-center mb-6">
           <div className="bg-slate-100 p-1 rounded-xl flex shadow-inner">
