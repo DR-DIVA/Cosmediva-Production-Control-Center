@@ -785,7 +785,21 @@ export default function RMControlCenterPage() {
                         }
                         
                         const etaDate = item.eta_date ? new Date(item.eta_date) : null;
-                        const isDelayed = targetDate && etaDate && new Date(etaDate.toDateString()) > new Date(targetDate.toDateString());
+                        
+                        let etaStatus: 'on-time' | 'at-risk' | 'delayed' | null = null;
+                        if (targetDate && etaDate) {
+                          const tDate = new Date(targetDate.toDateString()).getTime();
+                          const eDate = new Date(etaDate.toDateString()).getTime();
+                          const diffDays = (tDate - eDate) / (1000 * 60 * 60 * 24);
+                          
+                          if (diffDays < 0) {
+                            etaStatus = 'delayed';
+                          } else if (diffDays <= 3) {
+                            etaStatus = 'at-risk';
+                          } else {
+                            etaStatus = 'on-time';
+                          }
+                        }
 
                         return (
                         <TableRow key={item.id}>
@@ -809,9 +823,23 @@ export default function RMControlCenterPage() {
                           <TableCell>{getStatusBadge(item.status)}</TableCell>
                           <TableCell>
                             {etaDate ? (
-                              <div className={`font-medium flex items-center ${isDelayed ? 'text-red-600' : 'text-slate-700'}`}>
-                                {etaDate.toLocaleDateString('th-TH')}
-                                {isDelayed && <span className="text-[10px] text-red-600 bg-red-100 px-1.5 py-0.5 rounded-full ml-2 border border-red-200">เข้าไม่ทัน{mainTab === 'rm' ? 'ชั่ง' : 'บรรจุ'}</span>}
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-slate-700">{etaDate.toLocaleDateString('th-TH')}</span>
+                                {etaStatus === 'delayed' && (
+                                  <div className="flex items-center gap-1 text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                                    <AlertTriangle className="w-3 h-3" /> ไม่ทัน{mainTab === 'rm' ? 'ชั่ง' : 'บรรจุ'}
+                                  </div>
+                                )}
+                                {etaStatus === 'at-risk' && (
+                                  <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                                    <AlertTriangle className="w-3 h-3" /> เสี่ยงล่าช้า
+                                  </div>
+                                )}
+                                {etaStatus === 'on-time' && (
+                                  <div className="flex items-center gap-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
+                                    <CheckCircle2 className="w-3 h-3" /> ทันเวลา
+                                  </div>
+                                )}
                               </div>
                             ) : '-'}
                           </TableCell>
