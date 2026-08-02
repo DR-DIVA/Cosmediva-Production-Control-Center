@@ -26,6 +26,7 @@ export default function WeighingTasksPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [filterDate, setFilterDate] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
   const [historyList, setHistoryList] = useState<any[]>([])
@@ -47,6 +48,7 @@ export default function WeighingTasksPage() {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       setCurrentUser(user.email || 'Unknown User')
+      setUserRole(user?.user_metadata?.role || 'user')
     }
   }
 
@@ -226,10 +228,15 @@ export default function WeighingTasksPage() {
     const confirmForward = window.confirm(`ยืนยันการเปลี่ยนสถานะชุดที่ ${currentBasket} เป็น "${actionText}" ใช่หรือไม่?\n\n* หากต้องการย้อนกลับ/เคลียร์สถานะเดิม ให้กด "Cancel" (ยกเลิก)`)
     if (!confirmForward) {
       if (currentStatus !== 'WAITING') {
-        const confirmClear = window.confirm(`⚠️ คุณแน่ใจหรือไม่ที่จะ "เคลียร์สถานะ" ของชุดที่ ${currentBasket} ให้กลับไปเริ่มต้นใหม่?`)
-        if (confirmClear) {
-          nextStatus = 'WAITING'
+        if (userRole === 'admin') {
+          const confirmClear = window.confirm(`⚠️ คุณแน่ใจหรือไม่ที่จะ "เคลียร์สถานะ" ของชุดที่ ${currentBasket} ให้กลับไปเริ่มต้นใหม่?`)
+          if (confirmClear) {
+            nextStatus = 'WAITING'
+          } else {
+            return
+          }
         } else {
+          toast.error('ฟังก์ชันนี้สงวนไว้สำหรับ Admin เท่านั้น กรุณาติดต่อ Admin เพื่อเคลียร์สถานะ')
           return
         }
       } else {
