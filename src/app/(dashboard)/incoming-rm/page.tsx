@@ -120,7 +120,7 @@ export default function RMControlCenterPage() {
              const matched = freshLots.find((l: any) => l.lot_no.includes(cleanedJobNo) || cleanedJobNo.includes(l.lot_no));
              if (matched) matchedLotId = matched.id;
           }
-          setSelectedLotId(matchedLotId);
+          setSelectedLotId(matchedLotId || 'N/A');
           setIsModalOpen(true);
         } else {
           toast.warning('ไม่พบรายการวัตถุดิบ/บรรจุภัณฑ์ใน PDF นี้');
@@ -159,7 +159,7 @@ export default function RMControlCenterPage() {
     }
 
     const itemsToInsert = extractedData.items.map((item: any) => ({
-      production_lot_id: selectedLotId,
+      production_lot_id: selectedLotId === 'N/A' ? null : selectedLotId,
       po_no: extractedData.poNo,
       supplier: extractedData.supplier,
       po_date: extractedData.poDate || null,
@@ -822,10 +822,12 @@ export default function RMControlCenterPage() {
 
               <div className="space-y-3 bg-[#F8F6F0] p-4 rounded-lg border">
                 <Label className="font-semibold flex items-center gap-2"><Box className="w-4 h-4"/> จับคู่กับรหัสงาน (LOT) ในระบบ <span className="text-red-500">*</span></Label>
-                <Select value={selectedLotId} onValueChange={(val) => setSelectedLotId(val as string)}>
+                <Select value={selectedLotId || ''} onValueChange={(val) => setSelectedLotId(val as string)}>
                   <SelectTrigger className="w-full bg-white">
                     <SelectValue placeholder="-- ค้นหาและเลือก LOT การผลิต --">
-                      {selectedLotId && lotOptions.find(l => l.id === selectedLotId)
+                      {selectedLotId === 'N/A' 
+                        ? 'N/A - ไม่ระบุงาน' 
+                        : selectedLotId && lotOptions.find(l => l.id === selectedLotId)
                         ? (() => {
                             const lot = lotOptions.find(l => l.id === selectedLotId);
                             return `${(lot.products as any)?.sku} - ${(lot.products as any)?.product_name} (LOT: ${lot.lot_no})`;
@@ -834,6 +836,7 @@ export default function RMControlCenterPage() {
                     </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="N/A">N/A - ไม่ระบุงาน</SelectItem>
                     {lotOptions.map((lot) => (
                       <SelectItem key={lot.id} value={lot.id}>{(lot.products as any)?.sku} - {(lot.products as any)?.product_name} (LOT: {lot.lot_no})</SelectItem>
                     ))}
