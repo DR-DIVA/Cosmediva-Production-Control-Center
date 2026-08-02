@@ -315,7 +315,7 @@ export default function QCQueuePage() {
         newNote = lines.join('\n')
         
         // If there are still active issues for OTHER tanks, keep status PAUSED, otherwise IN_PROGRESS
-        const hasUnresolved = lines.some(l => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]'))
+        const hasUnresolved = lines.some((l: string) => l.trim() && !l.includes('[Resolved') && !l.includes('> [QA') && !l.includes('> [QC'))
         if (hasUnresolved && task.status === 'PAUSED') {
             newStatus = 'PAUSED'
         }
@@ -1032,7 +1032,7 @@ export default function QCQueuePage() {
                                         return (
                                           <TooltipProvider key={t} delay={100}>
                                             <Tooltip>
-                                              <TooltipTrigger asChild>
+                                              <TooltipTrigger>
                                                 <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${color} ${animate}`}>
                                                   <FlaskConical className="w-8 h-8 mb-1" />
                                                   <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
