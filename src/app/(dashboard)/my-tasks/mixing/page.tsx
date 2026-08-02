@@ -225,7 +225,19 @@ export default function MixingTasksPage() {
       return
     }
 
-    if (!window.confirm(`ยืนยันการเปลี่ยนสถานะถังที่ ${currentTank} เป็น "${actionText}" ใช่หรือไม่?`)) return;
+    const confirmForward = window.confirm(`ยืนยันการเปลี่ยนสถานะถังที่ ${currentTank} เป็น "${actionText}" ใช่หรือไม่?\n\n* หากต้องการย้อนกลับ/เคลียร์สถานะเดิม ให้กด "Cancel" (ยกเลิก)`)
+    if (!confirmForward) {
+      if (currentStatus !== 'WAITING') {
+        const confirmClear = window.confirm(`⚠️ คุณแน่ใจหรือไม่ที่จะ "เคลียร์สถานะ" ของถังที่ ${currentTank} ให้กลับไปเริ่มต้นใหม่?`)
+        if (confirmClear) {
+          nextStatus = 'WAITING'
+        } else {
+          return
+        }
+      } else {
+        return
+      }
+    }
 
     if (nextStatus === 'WAITING') {
       delete details[currentTank]
