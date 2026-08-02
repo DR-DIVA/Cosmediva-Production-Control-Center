@@ -578,7 +578,13 @@ export default function RMControlCenterPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell>
-                            <Button variant="ghost" size="icon" onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-600 hover:bg-red-50 h-8 w-8">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => handleDelete(item.id)} 
+                              disabled={item.status !== 'PENDING_DELIVERY'}
+                              className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                            >
                                <Trash2 className="w-4 h-4" />
                             </Button>
                           </TableCell>
