@@ -467,7 +467,8 @@ export default function RMControlCenterPage() {
                       <TableHeader className="bg-red-50/50">
                         <TableRow>
                           <TableHead className="text-red-800">SKU / LOT</TableHead>
-                          <TableHead className="text-red-800">Item</TableHead>
+                          <TableHead className="text-red-800">Code</TableHead>
+                          <TableHead className="text-red-800">Name</TableHead>
                           <TableHead className="text-red-800">คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'}</TableHead>
                           <TableHead className="text-red-800">ETA ของเข้า</TableHead>
                         </TableRow>
@@ -498,7 +499,9 @@ export default function RMControlCenterPage() {
                               </TableCell>
                               <TableCell>
                                 <div className="font-medium text-slate-700">{item.rm_code}</div>
-                                <div className="text-xs text-slate-500">{item.rm_name}</div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
                               </TableCell>
                               <TableCell className="font-medium text-slate-700">
                                 {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
@@ -688,7 +691,8 @@ export default function RMControlCenterPage() {
                         <TableHead className="font-semibold text-slate-700 px-6 py-4">Receive Date</TableHead>
                         <TableHead className="font-semibold text-slate-700">PO No.</TableHead>
                         <TableHead className="font-semibold text-slate-700">SKU / LOT</TableHead>
-                        <TableHead className="font-semibold text-slate-700">Item</TableHead>
+                        <TableHead className="font-semibold text-slate-700">Code</TableHead>
+                        <TableHead className="font-semibold text-slate-700">Name</TableHead>
                         <TableHead className="font-semibold text-slate-700 w-44">QC Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -718,9 +722,11 @@ export default function RMControlCenterPage() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>
-                             <div className="font-medium text-purple-700">{item.rm_code}</div>
-                             <div className="text-sm text-slate-500 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                          <TableCell className="font-medium text-purple-700">
+                             {item.rm_code}
+                          </TableCell>
+                          <TableCell className="text-sm text-slate-600 max-w-[250px] truncate" title={item.rm_name}>
+                             {item.rm_name}
                           </TableCell>
                           <TableCell>
                              <Select value={item.qc_status || 'QUARANTINED'} onValueChange={(val) => handleQcStatusChange(item, val as string)}>
