@@ -74,14 +74,16 @@ export default function DashboardPage() {
       setActiveLots(activeLotsData)
     }
 
-    const [ { data: activeLogsInitial }, { data: todayLogsInitial } ] = await Promise.all([
+    const [ { data: activeLogsInitial }, { data: todayLogsInitial }, { data: activityLogsInitial } ] = await Promise.all([
       supabase.from('production_logs').select(logSelect).in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED']),
-      supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd)
+      supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd),
+      supabase.from('production_logs').select(logSelect).eq('activity_date', dashboardDate)
     ])
 
     const logsMap = new Map()
     if (activeLogsInitial) activeLogsInitial.forEach(l => logsMap.set(l.id, l))
     if (todayLogsInitial) todayLogsInitial.forEach(l => logsMap.set(l.id, l))
+    if (activityLogsInitial) activityLogsInitial.forEach(l => logsMap.set(l.id, l))
     const logs = Array.from(logsMap.values())
     
     if (logs.length > 0) {
