@@ -429,7 +429,7 @@ export default function WeighingTasksPage() {
             }
 
             return (
-              <TooltipProvider key={b} delayDuration={100}>
+              <TooltipProvider key={b} delay={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div 

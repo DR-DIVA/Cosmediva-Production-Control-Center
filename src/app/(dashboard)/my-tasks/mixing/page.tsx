@@ -508,7 +508,7 @@ export default function MixingTasksPage() {
             }
 
             return (
-              <TooltipProvider key={t} delayDuration={100}>
+              <TooltipProvider key={t} delay={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <div 
