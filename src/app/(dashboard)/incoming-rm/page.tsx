@@ -32,6 +32,8 @@ type RMItem = {
   receive_date: string;
   qc_status: string;
   file_link: string;
+  bottom_remark?: string | null;
+  top_remark?: string | null;
   production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
 };
 
