@@ -28,6 +28,7 @@ export default function IssuesPage() {
   const [resolvingIssue, setResolvingIssue] = useState<any>(null)
   const [resolveNote, setResolveNote] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [currentUser, setCurrentUser] = useState<string>('System')
   
   const fetchIssues = async () => {
     const { data, error } = await supabase.from('production_logs')
@@ -58,7 +59,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (!line.includes('[Resolved') && !line.includes('> [QC PASSED]')) {
+          if (!line.includes('[Resolved') && !line.includes('> [QC PASSED]') && !line.includes('> [QA Approved]')) {
             parsedActive.push({
               ...task,
               parsedNote: line,
@@ -78,7 +79,7 @@ export default function IssuesPage() {
         production_lots (lot_no, products:sku_id (product_name, sku)),
         processes (process_name), rooms (room_name)
       `)
-      .or('note.ilike.%[Resolved%,note.ilike.%> [QC PASSED]%')
+      .or('note.ilike.%[Resolved%,note.ilike.%> [QC PASSED]%,note.ilike.%> [QA Approved]%')
       .order('updated_at', { ascending: false })
       .limit(50)
       
@@ -87,7 +88,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (line.includes('[Resolved') || line.includes('> [QC PASSED]')) {
+          if (line.includes('[Resolved') || line.includes('> [QC PASSED]') || line.includes('> [QA Approved]')) {
             parsedResolved.push({
               ...task,
               parsedNote: line,
@@ -121,6 +122,11 @@ export default function IssuesPage() {
   }
 
   useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) {
+        setCurrentUser(user.email || 'System')
+      }
+    })
     fetchIssues()
     fetchActiveTasks()
   }, [])
@@ -135,14 +141,17 @@ export default function IssuesPage() {
     if (!resolvingIssue) return
     
     const timestamp = new Date().toLocaleString('th-TH')
-    const resolutionText = resolveNote.trim() ? `[Resolved: ${resolveNote.replace(/\n/g, ' ')} - ${timestamp}]` : `[Resolved: ${timestamp}]`
+    const username = currentUser.split('@')[0]
+    const resolutionText = resolveNote.trim() 
+      ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${username} - ${timestamp})` 
+      : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${username} - ${timestamp})`
     
     const lines = resolvingIssue.originalNote.split('\n')
-    lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]} ${resolutionText}`
+    lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]}${resolutionText}`
     const newNote = lines.join('\n')
     
-    // Check if there are any lines left without [Resolved or > [QC PASSED]
-    const allResolved = lines.filter((l: string) => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]')).length === 0
+    // Check if there are any lines left without [Resolved or > [QC PASSED] or > [QA Approved]
+    const allResolved = lines.filter((l: string) => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]') && !l.includes('> [QA Approved]')).length === 0
     
     const { error } = await supabase.from('production_logs').update({
       status: allResolved ? 'WAITING' : 'PAUSED', // กลับไปรอทำงานต่อเมื่อแก้ปัญหาครบทุกข้อความ
