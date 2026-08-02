@@ -639,12 +639,15 @@ export default function RMControlCenterPage() {
                           <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{item.warehouse}</TableCell>
                           <TableCell>
-                            {item.receive_date ? (
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-700 text-sm">{new Date(item.receive_date).toLocaleDateString('th-TH')}</span>
-                                <span className="text-xs text-slate-500">{new Date(item.receive_date).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
-                              </div>
-                            ) : (
+                            {item.receive_date ? (() => {
+                              const d = new Date(item.receive_date.endsWith('Z') || item.receive_date.includes('+') ? item.receive_date : item.receive_date + 'Z');
+                              return (
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-slate-700 text-sm">{d.toLocaleDateString('th-TH')}</span>
+                                  <span className="text-xs text-slate-500">{d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
+                                </div>
+                              );
+                            })() : (
                               <span className="text-slate-400 text-sm">-</span>
                             )}
                           </TableCell>
@@ -685,12 +688,15 @@ export default function RMControlCenterPage() {
                       {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY').map((item, index) => (
                         <TableRow key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#F8F6F0]/'} hover:bg-purple-50/50 transition-colors border-b border-slate-100`}>
                           <TableCell className="px-6">
-                            {item.receive_date ? (
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-700 text-sm">{new Date(item.receive_date).toLocaleDateString('th-TH')}</span>
-                                <span className="text-xs text-slate-500">{new Date(item.receive_date).toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
-                              </div>
-                            ) : (
+                            {item.receive_date ? (() => {
+                              const d = new Date(item.receive_date.endsWith('Z') || item.receive_date.includes('+') ? item.receive_date : item.receive_date + 'Z');
+                              return (
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-slate-700 text-sm">{d.toLocaleDateString('th-TH')}</span>
+                                  <span className="text-xs text-slate-500">{d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
+                                </div>
+                              );
+                            })() : (
                               <span className="text-slate-400 text-sm">-</span>
                             )}
                           </TableCell>
