@@ -977,6 +977,7 @@ export default function QCQueuePage() {
                                               if (h.status === 'FAILED') { statusText = 'REJECT (ไม่ผ่าน)'; badgeColor = 'bg-red-500 text-white' }
                                               if (h.status === 'REPROCESS') { statusText = 'REPROCESS (ตีกลับ)'; badgeColor = 'bg-purple-500 text-white' }
                                               if (h.status === 'SENT_TO_QC') { statusText = 'ส่ง QC'; badgeColor = 'bg-teal-500 text-white' }
+                                              if (h.status === 'MX ส่ง QC') { statusText = 'MX ส่ง QC'; badgeColor = 'bg-indigo-500 text-white' }
                                               return (
                                                 <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
                                                   <div className="flex items-center justify-between gap-2">
@@ -1084,6 +1085,7 @@ export default function QCQueuePage() {
                             if (item.action === 'PAUSED') statusColor = "bg-orange-100 text-orange-700"
                             if (item.action === 'FAILED') statusColor = "bg-red-100 text-red-700"
                             if (item.action === 'REPROCESS') statusColor = "bg-purple-100 text-purple-700"
+                            if (item.action === 'MX ส่ง QC') statusColor = "bg-indigo-100 text-indigo-700"
 
                             return (
                               <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">

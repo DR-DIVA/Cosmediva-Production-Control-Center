@@ -311,6 +311,11 @@ export default function MixingTasksPage() {
             const currentQCState = qcDetails[currentTank]?.status || qcDetails[currentTank]
             if (!currentQCState || currentQCState === 'LOCKED') {
                qcDetails[currentTank] = 'WAITING'
+               const qcHistory = qcDetails[`${currentTank}_history`] || []
+               qcDetails[`${currentTank}_history`] = [
+                 ...qcHistory,
+                 { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
+               ]
                await supabase.from('production_logs').update({ tank_details: qcDetails }).eq('id', existingQCLog.id)
             }
           } else {
@@ -319,6 +324,11 @@ export default function MixingTasksPage() {
             const initialQCDetails: any = {}
             for(let i=start; i<=end; i++) {
                initialQCDetails[i] = (i === currentTank) ? 'WAITING' : 'LOCKED'
+               if (i === currentTank) {
+                 initialQCDetails[`${i}_history`] = [
+                   { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
+                 ]
+               }
             }
             await supabase.from('production_logs').insert({
               production_lot_id: task.production_lot_id,
