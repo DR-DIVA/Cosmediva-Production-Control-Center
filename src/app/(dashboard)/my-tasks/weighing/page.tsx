@@ -429,8 +429,8 @@ export default function WeighingTasksPage() {
             }
 
             return (
-              <TooltipProvider key={b}>
-                <Tooltip delayDuration={100}>
+              <TooltipProvider key={b} delayDuration={100}>
+                <Tooltip>
                   <TooltipTrigger asChild>
                     <div 
                       onClick={handleBasketClick}

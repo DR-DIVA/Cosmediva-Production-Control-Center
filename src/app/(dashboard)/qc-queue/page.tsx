@@ -1030,8 +1030,8 @@ export default function QCQueuePage() {
                                         ) : null
 
                                         return (
-                                          <TooltipProvider key={t}>
-                                            <Tooltip delayDuration={100}>
+                                          <TooltipProvider key={t} delayDuration={100}>
+                                            <Tooltip>
                                               <TooltipTrigger asChild>
                                                 <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${color} ${animate}`}>
                                                   <FlaskConical className="w-8 h-8 mb-1" />
