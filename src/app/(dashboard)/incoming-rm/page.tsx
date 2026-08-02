@@ -390,11 +390,11 @@ export default function RMControlCenterPage() {
           </div>
         </div>
 
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
-        <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+        <div className="flex-shrink-0">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Package className="w-8 h-8 text-yellow-400" />
-            Material Control Center
+            <span className="whitespace-nowrap">Material Control Center</span>
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
              <div>ศูนย์กลางจัดการใบสั่งซื้อ การรับเข้า และสถานะวัตถุดิบสำหรับการผลิต</div>
@@ -404,21 +404,21 @@ export default function RMControlCenterPage() {
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-start lg:justify-end">
+          <div className="relative flex-shrink-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
             <Input 
               placeholder="ค้นหา PO, Code, Name..." 
-              className="pl-9 w-[250px] bg-white"
+              className="pl-9 w-full sm:w-[250px] bg-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <Button variant="outline" onClick={exportToCSV} className="bg-white">
+          <Button variant="outline" onClick={exportToCSV} className="bg-white flex-shrink-0">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
           {mainTab === 'pm' && (
-            <Button onClick={() => setIsCmd2ModalOpen(true)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+            <Button onClick={() => setIsCmd2ModalOpen(true)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white flex-shrink-0">
               + รับเข้าวัสดุลูกค้า (CMD2)
             </Button>
           )}
