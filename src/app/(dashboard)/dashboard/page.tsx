@@ -222,8 +222,8 @@ export default function DashboardPage() {
           if (Array.isArray(histories)) {
              const hasPassToday = histories.some(h => 
                h.status === 'QC_PASS' && 
-               new Date(h.timestamp).getTime() >= new Date(dashboardStart).getTime() && 
-               new Date(h.timestamp).getTime() <= new Date(dashboardEnd).getTime()
+               new Date(h.timestamp).getTime() >= new Date(dashboardDate).setHours(0,0,0,0) && 
+               new Date(h.timestamp).getTime() <= new Date(dashboardDate).setHours(23,59,59,999)
              )
              if (hasPassToday) prodOutput.qc += 1;
           }
