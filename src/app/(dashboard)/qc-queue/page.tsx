@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, ChevronDown, ChevronUp, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export default function QCQueuePage() {
@@ -875,123 +875,156 @@ export default function QCQueuePage() {
                 ไม่มีรายการรอตรวจ
               </div>
             ) : (
-              tasks.filter(task => {
-                const term = searchQuery.toLowerCase()
-                const sku = (task.production_lots?.products?.sku || '').toLowerCase()
-                const lotNo = (task.production_lots?.lot_no || '').toLowerCase()
-                return sku.includes(term) || lotNo.includes(term)
-              }).map(task => {
-                const isExpanded = expandedTasks.includes(task.id)
-                const lotNo = task.production_lots?.lot_no || '-'
-                const sku = task.production_lots?.products?.sku || '-'
-                const start = parseInt(task.tank_start) || 1
-                const end = parseInt(task.tank_end) || start
-                const total = parseInt(task.total_tanks) || end
-                const details = task.tank_details || {}
-                
-                let qcDoneCount = 0
-                for(let i = start; i <= end; i++) {
-                  const st = details[i]
-                  if (st === 'QC_PASS' || st === 'FAILED' || st === 'PAUSED' || st === 'REPROCESS') {
-                    qcDoneCount++
-                  }
-                }
-                const totalInBatch = end - start + 1
-
-                return (
-                  <Card key={task.id} className="overflow-visible">
-                    <CardHeader 
-                      className="flex flex-row items-center justify-between py-4 cursor-pointer hover:bg-[#F8F6F0] transition-colors"
-                      onClick={() => toggleExpand(task.id)}
-                    >
-                      <div className="flex items-center gap-6">
-                        {isExpanded ? <ChevronUp className="w-5 h-5 text-slate-400" /> : <ChevronDown className="w-5 h-5 text-slate-400" />}
-                        <div>
-                          <CardTitle className="text-lg text-slate-700 flex items-center gap-3">
-                            <span className="text-violet-600">{sku}</span>
-                            <Badge variant="outline" className="text-sm bg-slate-100">{lotNo}</Badge>
-                          </CardTitle>
-                          <p className="text-sm text-slate-500 mt-1">
-                            คิวตรวจถังที่ {start} - {end} (จากทั้งหมด {total} ถัง)
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <Badge variant="secondary" className="bg-[#D4AF37]/ text-[#D4AF37]">
-                          ตรวจแล้ว {qcDoneCount}/{totalInBatch}
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    
-                    {isExpanded && (
-                      <CardContent className="pt-0 pb-6 border-t border-slate-100 mt-4">
-                        <div className="grid grid-cols-5 md:grid-cols-10 gap-4 mt-6">
-                          {Array.from({ length: totalInBatch }).map((_, idx) => {
-                            const t = start + idx
-                            const tankStatus = details[t] || 'LOCKED'
-                            let color = "text-slate-300 bg-[#F8F6F0] border-slate-200 opacity-60 cursor-not-allowed"
-                            let animate = ""
-                            if (tankStatus === 'WAITING' || tankStatus === 'IN_PROGRESS') { color = "text-yellow-600 bg-yellow-50 border-yellow-300 shadow-sm cursor-pointer hover:bg-yellow-100 hover:scale-105"; animate = "animate-pulse" }
-                            else if (tankStatus === 'QC_PASS') { color = "text-green-500 bg-green-50 border-green-300 shadow-sm cursor-pointer hover:bg-green-100 hover:scale-105" }
-                            else if (tankStatus === 'PAUSED') { color = "text-orange-500 bg-orange-50 border-orange-300 shadow-sm cursor-pointer hover:bg-orange-100 hover:scale-105" }
-                            else if (tankStatus === 'FAILED') { color = "text-red-500 bg-red-50 border-red-300 shadow-sm cursor-pointer hover:bg-red-100 hover:scale-105" }
-                            else if (tankStatus === 'REPROCESS') { color = "text-purple-500 bg-purple-50 border-purple-300 shadow-sm cursor-pointer hover:bg-purple-100 hover:scale-105" }
-
-                            const history = details[`${t}_history`] || []
-                            const tooltipContent = history.length > 0 ? (
-                              <div className="space-y-1">
-                                <p className="font-semibold text-[#4A4238]/ border-b border-slate-700 pb-1 mb-2">ประวัติถัง {t}</p>
-                                {history.map((h: any, i: number) => {
-                                  let statusText = h.status
-                                  let badgeColor = 'bg-slate-700 text-slate-100'
-                                  if (h.status === 'WAITING' || h.status === 'IN_PROGRESS') { statusText = 'รอตรวจ'; badgeColor = 'bg-yellow-600 text-white' }
-                                  if (h.status === 'QC_PASS') { statusText = 'PASS (ผ่าน)'; badgeColor = 'bg-green-500 text-white' }
-                                  if (h.status === 'PAUSED') { statusText = 'HOLD (กัก)'; badgeColor = 'bg-orange-500 text-white' }
-                                  if (h.status === 'FAILED') { statusText = 'REJECT (ไม่ผ่าน)'; badgeColor = 'bg-red-500 text-white' }
-                                  if (h.status === 'REPROCESS') { statusText = 'REPROCESS (ตีกลับ)'; badgeColor = 'bg-purple-500 text-white' }
-                                  if (h.status === 'SENT_TO_QC') { statusText = 'ส่ง QC'; badgeColor = 'bg-green-500 text-white' }
-                                  return (
-                                    <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <Badge variant="outline" className={`text-[10px] border-none px-1 py-0 ${badgeColor}`}>{statusText}</Badge>
-                                        <span className="text-[10px] text-slate-300 shrink-0">{new Date(h.timestamp).toLocaleTimeString('th-TH')}</span>
-                                      </div>
-                                      <div className="flex items-center gap-1 mt-1 text-slate-400">
-                                        <User className="w-3 h-3 shrink-0" />
-                                        <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
-                                      </div>
-                                      {h.note && (
-                                        <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
-                                          {h.note}
-                                        </div>
-                                      )}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ) : null
-
-                            return (
-                              <div key={t} className="relative group flex flex-col items-center justify-center">
-                                <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 ${color} ${animate}`}>
-                                  <FlaskConical className="w-8 h-8 mb-1" />
-                                  <span className="text-sm font-bold">{t}</span>
-                                </div>
-                                {tooltipContent && (
-                                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-[#2D2721] text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-xl pointer-events-none">
-                                    {tooltipContent}
-                                    <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-[#F8F6F0] text-[#8B7355] border-b border-[#D4AF37]/20">
+                      <tr>
+                        <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
+                        <th className="px-4 py-3 font-medium">LOT No.</th>
+                        <th className="px-4 py-3 font-medium">ถังที่ (ตามแผน)</th>
+                        <th className="px-4 py-3 font-medium">จำนวนถัง (รวม)</th>
+                        <th className="px-4 py-3 font-medium">Bulk size (kg/ถัง)</th>
+                        <th className="px-4 py-3 font-medium">วันที่จัดทำ (แผน)</th>
+                        <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {tasks.filter(task => {
+                        const term = searchQuery.toLowerCase()
+                        const sku = (task.production_lots?.products?.sku || '').toLowerCase()
+                        const lotNo = (task.production_lots?.lot_no || '').toLowerCase()
+                        return sku.includes(term) || lotNo.includes(term)
+                      }).map(task => {
+                        const isExpanded = expandedTasks.includes(task.id)
+                        const lotNo = task.production_lots?.lot_no || '-'
+                        const sku = task.production_lots?.products?.sku || '-'
+                        const productName = task.production_lots?.products?.name || ''
+                        const start = parseInt(task.tank_start) || 1
+                        const end = parseInt(task.tank_end) || start
+                        const total = parseInt(task.total_tanks) || end
+                        const details = task.tank_details || {}
+                        const kgPerTank = task.production_lots?.kg_per_tank || '-'
+                        
+                        let qcDoneCount = 0
+                        for(let i = start; i <= end; i++) {
+                          const st = details[i]
+                          if (st === 'QC_PASS' || st === 'FAILED' || st === 'PAUSED' || st === 'REPROCESS') {
+                            qcDoneCount++
+                          }
+                        }
+                        const totalInBatch = end - start + 1
+                        
+                        return (
+                          <React.Fragment key={task.id}>
+                            <tr 
+                              className={`hover:bg-[#F8F6F0] cursor-pointer transition-colors ${isExpanded ? 'bg-[#F8F6F0]' : ''}`}
+                              onClick={() => toggleExpand(task.id)}
+                            >
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
+                                  <div>
+                                    <div className="font-semibold text-violet-600">{sku}</div>
+                                    <div className="text-xs text-slate-500 truncate max-w-[200px]">{productName}</div>
                                   </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </CardContent>
-                    )}
-                  </Card>
-                )
-              })
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 font-medium">{lotNo}</td>
+                              <td className="px-4 py-3 text-slate-600">{start} - {end}</td>
+                              <td className="px-4 py-3 text-slate-600">{totalInBatch} ถัง</td>
+                              <td className="px-4 py-3 text-slate-600">{kgPerTank} kg</td>
+                              <td className="px-4 py-3 text-slate-600">
+                                {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge variant="secondary" className="bg-[#D4AF37]/10 text-[#D4AF37] whitespace-nowrap">
+                                  ตรวจแล้ว {qcDoneCount}/{totalInBatch}
+                                </Badge>
+                              </td>
+                            </tr>
+                            
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan={7} className="p-0 border-b-2 border-[#D4AF37]/30">
+                                  <div className="p-6 bg-[#F8F6F0] shadow-inner">
+                                    <h4 className="font-semibold text-slate-700 flex items-center gap-2 mb-4">
+                                      <FlaskConical className="w-5 h-5 text-[#D4AF37]" />
+                                      สถานะ QC ถังที่ {start} ถึง {end} (จากทั้งหมด {total} ถัง)
+                                    </h4>
+                                    <div className="grid grid-cols-5 md:grid-cols-10 gap-4">
+                                      {Array.from({ length: totalInBatch }).map((_, idx) => {
+                                        const t = start + idx
+                                        const tankStatus = details[t] || 'LOCKED'
+                                        let color = "text-slate-300 bg-white border-slate-200 opacity-60 cursor-not-allowed"
+                                        let animate = ""
+                                        if (tankStatus === 'WAITING' || tankStatus === 'IN_PROGRESS') { color = "text-yellow-600 bg-yellow-50 border-yellow-300 shadow-sm cursor-pointer hover:bg-yellow-100 hover:scale-105"; animate = "animate-pulse" }
+                                        else if (tankStatus === 'QC_PASS') { color = "text-green-600 bg-green-50 border-green-300 shadow-sm cursor-pointer hover:bg-green-100 hover:scale-105" }
+                                        else if (tankStatus === 'PAUSED') { color = "text-orange-600 bg-orange-50 border-orange-300 shadow-sm cursor-pointer hover:bg-orange-100 hover:scale-105" }
+                                        else if (tankStatus === 'FAILED') { color = "text-red-600 bg-red-50 border-red-300 shadow-sm cursor-pointer hover:bg-red-100 hover:scale-105" }
+                                        else if (tankStatus === 'REPROCESS') { color = "text-purple-600 bg-purple-50 border-purple-300 shadow-sm cursor-pointer hover:bg-purple-100 hover:scale-105" }
+
+                                        const history = details[`${t}_history`] || []
+                                        const tooltipContent = history.length > 0 ? (
+                                          <div className="space-y-1">
+                                            <p className="font-semibold text-[#4A4238]/ border-b border-slate-700 pb-1 mb-2">ประวัติถัง {t}</p>
+                                            {history.map((h: any, i: number) => {
+                                              let statusText = h.status
+                                              let badgeColor = 'bg-slate-700 text-slate-100'
+                                              if (h.status === 'WAITING' || h.status === 'IN_PROGRESS') { statusText = 'รอตรวจ'; badgeColor = 'bg-yellow-600 text-white' }
+                                              if (h.status === 'QC_PASS') { statusText = 'PASS (ผ่าน)'; badgeColor = 'bg-green-500 text-white' }
+                                              if (h.status === 'PAUSED') { statusText = 'HOLD (กัก)'; badgeColor = 'bg-orange-500 text-white' }
+                                              if (h.status === 'FAILED') { statusText = 'REJECT (ไม่ผ่าน)'; badgeColor = 'bg-red-500 text-white' }
+                                              if (h.status === 'REPROCESS') { statusText = 'REPROCESS (ตีกลับ)'; badgeColor = 'bg-purple-500 text-white' }
+                                              if (h.status === 'SENT_TO_QC') { statusText = 'ส่ง QC'; badgeColor = 'bg-teal-500 text-white' }
+                                              return (
+                                                <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
+                                                  <div className="flex items-center justify-between gap-2">
+                                                    <Badge variant="outline" className={`text-[10px] border-none px-1 py-0 ${badgeColor}`}>{statusText}</Badge>
+                                                    <span className="text-[10px] text-slate-300 shrink-0">{new Date(h.timestamp).toLocaleTimeString('th-TH')}</span>
+                                                  </div>
+                                                  <div className="flex items-center gap-1 mt-1 text-slate-400">
+                                                    <User className="w-3 h-3 shrink-0" />
+                                                    <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
+                                                  </div>
+                                                  {h.note && (
+                                                    <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
+                                                      {h.note}
+                                                    </div>
+                                                  )}
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        ) : null
+
+                                        return (
+                                          <div key={t} className="relative group flex flex-col items-center justify-center">
+                                            <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 ${color} ${animate}`}>
+                                              <FlaskConical className="w-8 h-8 mb-1" />
+                                              <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
+                                            </div>
+                                            {tooltipContent && (
+                                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 p-2 bg-[#2D2721] text-white text-xs rounded-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50 shadow-xl pointer-events-none">
+                                                {tooltipContent}
+                                                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-900" />
+                                              </div>
+                                            )}
+                                          </div>
+                                        )
+                                      })}
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             )}
               </div>
             </TabsContent>
