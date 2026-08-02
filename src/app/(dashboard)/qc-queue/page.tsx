@@ -161,9 +161,9 @@ export default function QCQueuePage() {
   const fetchTasks = async () => {
     const { data } = await supabase.from('production_logs')
       .select(`
-        id, status, tank_start, tank_end, note, total_tanks, tank_details,
+        id, status, tank_start, tank_end, note, total_tanks, tank_details, activity_date,
         production_lot_id,
-        production_lots ( id, lot_no, products:sku_id (sku) ),
+        production_lots ( id, lot_no, kg_per_tank, products:sku_id (sku, product_name) ),
         processes ( id, process_name ),
         rooms ( id, room_name )
       `)
@@ -899,7 +899,7 @@ export default function QCQueuePage() {
                         const isExpanded = expandedTasks.includes(task.id)
                         const lotNo = task.production_lots?.lot_no || '-'
                         const sku = task.production_lots?.products?.sku || '-'
-                        const productName = task.production_lots?.products?.name || ''
+                        const productName = task.production_lots?.products?.product_name || ''
                         const start = parseInt(task.tank_start) || 1
                         const end = parseInt(task.tank_end) || start
                         const total = parseInt(task.total_tanks) || end
