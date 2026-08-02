@@ -407,6 +407,7 @@ export default function IssuesPage() {
                     <TableHead>LOT No.</TableHead>
                     <TableHead>ขั้นตอน</TableHead>
                     <TableHead>รายละเอียด / บันทึกการแก้ไข</TableHead>
+                    <TableHead>ผู้ตรวจสอบ (QA)</TableHead>
                     <TableHead>เวลาที่แก้ไขล่าสุด</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -418,7 +419,7 @@ export default function IssuesPage() {
                     return sku.includes(term) || lotNo.includes(term);
                   }).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                         ยังไม่มีประวัติการแก้ไขปัญหา
                       </TableCell>
                     </TableRow>
@@ -449,6 +450,17 @@ export default function IssuesPage() {
                                 <span>{issue.parsedNote}</span>}
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-xs text-slate-600 font-medium">
+                          {(() => {
+                            const match = issue.parsedNote.match(/\(โดย (.*?) - /)
+                            return match ? (
+                              <div className="flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-1 rounded-md w-fit">
+                                <User className="w-3 h-3" />
+                                {match[1]}
+                              </div>
+                            ) : '-'
+                          })()}
                         </TableCell>
                         <TableCell className="text-xs text-slate-600">
                           {new Date(issue.updated_at).toLocaleString('th-TH')}
