@@ -1,7 +1,7 @@
 "use client";
 import { createClient } from '@supabase/supabase-js'
 import { toast } from 'sonner'
-import { AlertTriangle, Hammer, PackageSearch, ShieldAlert, CheckCircle2, PlusCircle, History } from 'lucide-react'
+import { AlertTriangle, Hammer, PackageSearch, ShieldAlert, CheckCircle2, PlusCircle, History, User } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
