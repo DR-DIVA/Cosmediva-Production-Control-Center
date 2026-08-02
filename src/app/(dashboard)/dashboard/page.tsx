@@ -123,10 +123,17 @@ export default function DashboardPage() {
       .neq('current_status', 'DONE')
     if (plannedLots) setPlannerLots(plannedLots)
 
-    // 6. Fetch RM QC Queues (Today)
+    // 6. Fetch RM/PM/CMD2 QC Queues (Today)
     const { data: rmQc } = await supabase.from('production_lot_rms')
       .select('status, qc_status, receive_date, updated_at')
-    if (rmQc) setRmQcLogs(rmQc)
+    const { data: pmQc } = await supabase.from('production_lot_pms')
+      .select('status, qc_status, receive_date, updated_at')
+    const { data: cmd2Qc } = await supabase.from('production_lot_cmd2_pms')
+      .select('status, qc_status, receive_date, updated_at')
+      
+    if (rmQc || pmQc || cmd2Qc) {
+      setRmQcLogs([...(rmQc || []), ...(pmQc || []), ...(cmd2Qc || [])])
+    }
 
     // 7. Fetch FG QC Queues (Today)
     const { data: fgQc } = await supabase.from('fg_inventory')
