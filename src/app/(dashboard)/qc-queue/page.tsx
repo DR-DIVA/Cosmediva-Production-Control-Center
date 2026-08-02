@@ -288,19 +288,34 @@ export default function QCQueuePage() {
       if (statusAction === 'PAUSED' || statusAction === 'FAILED' || statusAction === 'REPROCESS') {
         newStatus = 'PAUSED'
         const issueType = statusAction === 'PAUSED' ? '[QC HOLD]' : statusAction === 'FAILED' ? '[QC REJECT]' : '[QC REPROCESS]'
-        newNote = newNote ? `${newNote}\n${issueType} ถัง ${tankNum}: ${cleanReason}` : `${issueType} ถัง ${tankNum}: ${cleanReason}`
+        
+        const lines = newNote.split('\n')
+        let foundActive = false
+        for (let i = 0; i < lines.length; i++) {
+            if (lines[i].includes(`ถัง ${tankNum}:`) && !lines[i].includes('[Resolved') && !lines[i].includes('> [QC PASSED]')) {
+                lines[i] = `${lines[i]} > ${issueType} ${cleanReason}`
+                foundActive = true
+                break
+            }
+        }
+        
+        if (!foundActive) {
+            newNote = newNote ? `${newNote}\n${issueType} ถัง ${tankNum}: ${cleanReason}` : `${issueType} ถัง ${tankNum}: ${cleanReason}`
+        } else {
+            newNote = lines.join('\n')
+        }
       } else if (statusAction === 'QC_PASS' && isReturningToPass) {
-        // Find the active issue line for this tank and append [Resolved: ...]
+        // Find the active issue line for this tank and append > [QC PASSED] ...
         const lines = newNote.split('\n')
         for (let i = 0; i < lines.length; i++) {
-           if (lines[i].includes(`ถัง ${tankNum}:`) && !lines[i].includes('[Resolved')) {
-               lines[i] = `${lines[i]} [Resolved: ${cleanReason} - ${new Date().toLocaleString('th-TH')}]`
+           if (lines[i].includes(`ถัง ${tankNum}:`) && !lines[i].includes('[Resolved') && !lines[i].includes('> [QC PASSED]')) {
+               lines[i] = `${lines[i]} > [QC PASSED] ${cleanReason}`
            }
         }
         newNote = lines.join('\n')
         
         // If there are still active issues for OTHER tanks, keep status PAUSED, otherwise IN_PROGRESS
-        const hasUnresolved = lines.some(l => l.trim() && !l.includes('[Resolved'))
+        const hasUnresolved = lines.some(l => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]'))
         if (hasUnresolved && task.status === 'PAUSED') {
             newStatus = 'PAUSED'
         }

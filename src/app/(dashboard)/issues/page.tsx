@@ -58,7 +58,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (!line.includes('[Resolved')) {
+          if (!line.includes('[Resolved') && !line.includes('> [QC PASSED]')) {
             parsedActive.push({
               ...task,
               parsedNote: line,
@@ -78,7 +78,7 @@ export default function IssuesPage() {
         production_lots (lot_no, products:sku_id (product_name, sku)),
         processes (process_name), rooms (room_name)
       `)
-      .ilike('note', '%[Resolved%')
+      .or('note.ilike.%[Resolved%,note.ilike.%> [QC PASSED]%')
       .order('updated_at', { ascending: false })
       .limit(50)
       
@@ -87,7 +87,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (line.includes('[Resolved')) {
+          if (line.includes('[Resolved') || line.includes('> [QC PASSED]')) {
             parsedResolved.push({
               ...task,
               parsedNote: line,
@@ -141,8 +141,8 @@ export default function IssuesPage() {
     lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]} ${resolutionText}`
     const newNote = lines.join('\n')
     
-    // Check if there are any lines left without [Resolved
-    const allResolved = lines.filter((l: string) => l.trim() && !l.includes('[Resolved')).length === 0
+    // Check if there are any lines left without [Resolved or > [QC PASSED]
+    const allResolved = lines.filter((l: string) => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]')).length === 0
     
     const { error } = await supabase.from('production_logs').update({
       status: allResolved ? 'WAITING' : 'PAUSED', // กลับไปรอทำงานต่อเมื่อแก้ปัญหาครบทุกข้อความ
@@ -338,8 +338,13 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`}>
-                        <TableCell className="font-medium">{issue.production_lots?.lot_no}</TableCell>
-                        <TableCell className="max-w-[200px] truncate" title={issue.production_lots?.products?.product_name}>
+                        <TableCell className="font-medium">
+                           <div className="flex flex-col gap-1">
+                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                             <span className="text-xs text-slate-500 font-semibold">{issue.production_lots?.products?.sku || '-'}</span>
+                           </div>
+                        </TableCell>
+                        <TableCell className="max-w-[200px] truncate text-xs" title={issue.production_lots?.products?.product_name}>
                           {issue.production_lots?.products?.product_name}
                         </TableCell>
                         <TableCell>
@@ -411,7 +416,12 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`} className="opacity-75">
-                        <TableCell className="font-medium">{issue.production_lots?.lot_no}</TableCell>
+                        <TableCell className="font-medium min-w-[120px]">
+                           <div className="flex flex-col gap-1">
+                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                             <span className="text-xs text-slate-500 font-semibold">{issue.production_lots?.products?.sku || '-'}</span>
+                           </div>
+                        </TableCell>
                         <TableCell>
                           <div className="text-sm font-semibold">{issue.processes?.process_name}</div>
                         </TableCell>
