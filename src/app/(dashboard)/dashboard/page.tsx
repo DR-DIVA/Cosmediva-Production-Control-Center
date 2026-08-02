@@ -26,7 +26,8 @@ const parseRanges = (str: string) => {
 }
 
 export default function DashboardPage() {
-  const [workingHours, setWorkingHours] = useState(8)
+  const [mixingHours, setMixingHours] = useState(8)
+  const [packingHours, setPackingHours] = useState(8)
   const [activeLots, setActiveLots] = useState<any[]>([])
   const [activeLogs, setActiveLogs] = useState<any[]>([])
   const [allDefects, setAllDefects] = useState<any[]>([])
@@ -214,8 +215,8 @@ export default function DashboardPage() {
   let maxMixingCap = 0; let maxPackingCap = 0;
   filteredLots.forEach(lot => {
     if (lot.capacity_max) {
-      maxMixingCap += lot.capacity_max * workingHours * 0.1 
-      maxPackingCap += lot.capacity_max * workingHours
+      maxMixingCap += lot.capacity_max * mixingHours * 0.1 
+      maxPackingCap += lot.capacity_max * packingHours
     }
   })
   if (maxMixingCap === 0) maxMixingCap = 100;
@@ -310,15 +311,6 @@ export default function DashboardPage() {
               </SelectContent>
             </Select>
           </div>
-
-          <div className="flex items-center space-x-3 bg-white p-2 px-4 rounded-xl border border-[#D4AF37]/30">
-            <Label htmlFor="workingHours" className="text-sm font-medium text-[#4A4238] whitespace-nowrap">ชั่วโมงทำงาน (ชม.):</Label>
-            <Input 
-              id="workingHours" type="number" value={workingHours}
-              onChange={(e) => setWorkingHours(Number(e.target.value) || 0)}
-              className="w-20 text-center font-bold bg-white border-[#D4AF37]/30 text-[#4A4238] h-9 focus-visible:ring-yellow-400" min={1} max={24}
-            />
-          </div>
         </div>
       </div>
       
@@ -352,8 +344,8 @@ export default function DashboardPage() {
              <span className="text-yellow-400 text-2xl font-black">4.</span> ประสิทธิภาพเครื่องจักร (OEE)
            </h3>
            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <OeeCard title="เครื่องผสม" value={Number(oeeMixing)} />
-              <OeeCard title="เครื่องบรรจุ" value={Number(oeePacking)} />
+              <OeeCard title="เครื่องผสม" value={Number(oeeMixing)} hours={mixingHours} onHoursChange={setMixingHours} />
+              <OeeCard title="เครื่องบรรจุ" value={Number(oeePacking)} hours={packingHours} onHoursChange={setPackingHours} />
            </div>
         </div>
       </div>
@@ -507,13 +499,25 @@ function DefectCard({ title, value, count }: { title: string, value: string, cou
   )
 }
 
-function OeeCard({ title, value }: { title: string, value: number }) {
+function OeeCard({ title, value, hours, onHoursChange }: { title: string, value: number, hours: number, onHoursChange: (v: number) => void }) {
   const colorClass = value > 80 ? 'text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]' : value > 60 ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]' : 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
   return (
     <Card className="bg-white border-[#D4AF37]/30 shadow-lg overflow-hidden relative group">
-      <CardContent className="p-6 flex items-center justify-between relative z-10">
-        <div className="font-semibold text-[#4A4238] text-lg">{title}</div>
-        <div className={`text-4xl font-black ${colorClass}`}>{value}%</div>
+      <CardContent className="p-4 md:p-6 flex flex-row items-center justify-between relative z-10 gap-2">
+        <div className="flex flex-col gap-2">
+          <div className="font-semibold text-[#4A4238] text-lg">{title}</div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-[#8B7355] whitespace-nowrap">ชม.ทำงาน:</span>
+            <Input 
+              type="number" 
+              value={hours}
+              onChange={(e) => onHoursChange(Number(e.target.value) || 0)}
+              className="w-16 h-7 text-xs text-center border-[#D4AF37]/30 p-1"
+              min={1} max={24}
+            />
+          </div>
+        </div>
+        <div className={`text-3xl md:text-4xl font-black ${colorClass}`}>{value}%</div>
       </CardContent>
     </Card>
   )
