@@ -294,7 +294,8 @@ export default function QCQueuePage() {
       await supabase.from('production_logs').update({
         tank_details: details,
         status: newStatus,
-        note: newNote
+        note: newNote,
+        updated_at: new Date().toISOString()
       }).eq('id', task.id)
 
       if (statusAction === 'QC_PASS') {
@@ -323,7 +324,9 @@ export default function QCQueuePage() {
 
           if (existingPack) {
             await supabase.from('production_logs').update({
-              tank_details: packDetails
+              tank_details: packDetails,
+              status: existingPack.status === 'DONE' ? 'DONE' : 'WAITING',
+              updated_at: new Date().toISOString()
             }).eq('id', existingPack.id)
           } else {
             await supabase.from('production_logs').insert({
@@ -374,7 +377,10 @@ export default function QCQueuePage() {
              }
           }
           
-          const mixUpdates: any = { tank_details: mixDetails };
+          const mixUpdates: any = { 
+            tank_details: mixDetails,
+            updated_at: new Date().toISOString()
+          };
           if (allMixDone) {
              mixUpdates.status = 'DONE';
              // Only set end_time if it's not already set, but we don't fetch it, so let's just set status.
