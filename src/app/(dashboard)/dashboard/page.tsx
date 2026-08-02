@@ -263,6 +263,13 @@ export default function DashboardPage() {
     groupedLots[sku].push(lot)
   })
 
+  const selectedLot = activeLots.find(l => l.id === selectedFilter)
+  const displayFilterText = selectedFilter === 'all' 
+    ? <span className="font-bold text-[#D4AF37]">ภาพรวมโรงงาน (Factory Overview)</span>
+    : selectedLot 
+      ? <span className="font-semibold text-[#4A4238]">LOT {selectedLot.lot_no}</span>
+      : <span className="text-gray-400">เลือกการแสดงผล</span>
+
   return (
     <div className="p-8 space-y-6 max-w-[1400px] mx-auto bg-transparent min-h-screen pb-12 font-sans text-[#4A4238]">
       
@@ -292,7 +299,7 @@ export default function DashboardPage() {
           <div className="w-48">
             <Select value={selectedFilter} onValueChange={(val) => setSelectedFilter(val || '')}>
               <SelectTrigger className="bg-white border-[#D4AF37]/30 text-[#4A4238] font-semibold h-11 focus:ring-yellow-400">
-                <SelectValue placeholder="เลือกการแสดงผล" />
+                <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">{displayFilterText}</span>
               </SelectTrigger>
               <SelectContent className="bg-white border-[#D4AF37]/30 text-[#4A4238]">
                 <SelectItem value="all" className="focus:bg-slate-700 focus:text-yellow-400">
