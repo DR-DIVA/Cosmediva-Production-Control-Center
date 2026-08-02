@@ -964,7 +964,13 @@ export default function FgTasksPage() {
                    <label className="text-sm font-semibold text-slate-700">ตำแหน่งจัดเก็บ (Location) <span className="text-red-500">*</span></label>
                    <Select value={receiveDialog.locationId} onValueChange={(val) => setReceiveDialog(prev => ({...prev, locationId: val || ''}))}>
                      <SelectTrigger className="bg-white h-12">
-                       <SelectValue placeholder="-- เลือกโซน/ชั้นวาง --" />
+                        <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">
+                          {receiveDialog.locationId === 'UNSPECIFIED' ? '-- ยังไม่ระบุ --' : 
+                           receiveDialog.locationId ? (() => {
+                             const loc = locations.find(l => l.id === receiveDialog.locationId);
+                             return loc ? `${loc.zone} - ${loc.rack} (ชั้น ${loc.level})` : '-- เลือกโซน/ชั้นวาง --';
+                           })() : '-- เลือกโซน/ชั้นวาง --'}
+                        </span>
                      </SelectTrigger>
                      <SelectContent>
                        <SelectItem value="UNSPECIFIED" className="font-medium text-slate-600">-- ยังไม่ระบุ --</SelectItem>

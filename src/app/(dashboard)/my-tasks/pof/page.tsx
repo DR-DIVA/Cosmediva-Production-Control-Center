@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { differenceInDays, startOfDay } from 'date-fns'
+import { DefectPopup } from '@/components/production/DefectPopup'
 import { TaskCalendar } from '@/components/ui/TaskCalendar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle , DialogFooter} from '@/components/ui/dialog'
 import { Calendar as CalendarIcon, List as ListIcon, User, History, ClipboardCheck } from 'lucide-react'
@@ -982,7 +983,14 @@ export default function PofTasksPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">เลือก LOT งาน</label>
               <Select value={defectLotId} onValueChange={(val) => setDefectLotId(val || '')}>
-                <SelectTrigger><SelectValue placeholder="เลือก LOT" /></SelectTrigger>
+                <SelectTrigger>
+                  <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">
+                    {defectLotId ? (() => {
+                      const t = tasks.find(task => task.production_lots?.id === defectLotId);
+                      return t ? `LOT ${t.production_lots?.lot_no} (${t.production_lots?.products?.sku})` : 'เลือก LOT';
+                    })() : 'เลือก LOT'}
+                  </span>
+                </SelectTrigger>
                 <SelectContent>
                   {tasks.map(task => (
                     <SelectItem key={task.production_lots?.id} value={task.production_lots?.id || ''}>
