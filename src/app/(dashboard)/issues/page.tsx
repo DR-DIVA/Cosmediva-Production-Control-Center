@@ -319,6 +319,7 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
                     <TableHead>สินค้า</TableHead>
                     <TableHead>ขั้นตอน / ห้อง</TableHead>
@@ -335,7 +336,7 @@ export default function IssuesPage() {
                     return sku.includes(term) || lotNo.includes(term);
                   }).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={7} className="text-center py-8 text-slate-500">
                         ไม่มีปัญหาที่เปิดอยู่ในขณะนี้ 🎉
                       </TableCell>
                     </TableRow>
@@ -347,17 +348,19 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`}>
+                        <TableCell className="font-medium text-purple-600">
+                          {issue.production_lots?.products?.sku || '-'}
+                        </TableCell>
                         <TableCell className="font-medium">
-                           <div className="flex flex-col gap-1">
-                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
-                             <span className="text-xs text-slate-500 font-semibold">{issue.production_lots?.products?.sku || '-'}</span>
-                           </div>
+                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
                         </TableCell>
                         <TableCell className="max-w-[200px] truncate text-xs" title={issue.production_lots?.products?.product_name}>
                           {issue.production_lots?.products?.product_name}
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm font-semibold">{issue.processes?.process_name}</div>
+                          <div className="text-sm font-semibold">
+                            {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                          </div>
                           {issue.rooms?.room_name && <div className="text-xs text-slate-500">{issue.rooms.room_name}</div>}
                         </TableCell>
                         <TableCell>
@@ -399,6 +402,7 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead>SKU</TableHead>
                     <TableHead>LOT No.</TableHead>
                     <TableHead>ขั้นตอน</TableHead>
                     <TableHead>รายละเอียด / บันทึกการแก้ไข</TableHead>
@@ -413,7 +417,7 @@ export default function IssuesPage() {
                     return sku.includes(term) || lotNo.includes(term);
                   }).length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center py-8 text-slate-500">
+                      <TableCell colSpan={5} className="text-center py-8 text-slate-500">
                         ยังไม่มีประวัติการแก้ไขปัญหา
                       </TableCell>
                     </TableRow>
@@ -425,14 +429,16 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`} className="opacity-75">
+                        <TableCell className="font-medium min-w-[120px] text-purple-600">
+                          {issue.production_lots?.products?.sku || '-'}
+                        </TableCell>
                         <TableCell className="font-medium min-w-[120px]">
-                           <div className="flex flex-col gap-1">
-                             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
-                             <span className="text-xs text-slate-500 font-semibold">{issue.production_lots?.products?.sku || '-'}</span>
-                           </div>
+                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="text-sm font-semibold">{issue.processes?.process_name}</div>
+                          <div className="text-sm font-semibold">
+                            {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className={`text-xs p-2 rounded border inline-block bg-[#F8F6F0] text-slate-700 border-slate-200`}>
