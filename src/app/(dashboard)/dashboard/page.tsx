@@ -160,9 +160,28 @@ export default function DashboardPage() {
     
     const isPlannedForToday = log.activity_date === todayStr;
     const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date(dashboardDate).setHours(0,0,0,0)).getTime() && new Date(log.updated_at).getTime() <= new Date(new Date(dashboardDate).setHours(23,59,59,999)).getTime();
+    
+    let hasActivityToday = false;
+    if (log.tank_details && Object.keys(log.tank_details).length > 0) {
+      Object.keys(log.tank_details).forEach(key => {
+        if (key.endsWith('_history')) {
+          const history = log.tank_details[key] || [];
+          if (Array.isArray(history)) {
+             const workedToday = history.some(h => {
+                if (!h.timestamp) return false;
+                const t = new Date(h.timestamp).getTime();
+                const start = new Date(dashboardDate).setHours(0,0,0,0);
+                const end = new Date(dashboardDate).setHours(23,59,59,999);
+                return t >= start && t <= end;
+             });
+             if (workedToday) hasActivityToday = true;
+          }
+        }
+      });
+    }
 
     // If it's not planned for today and nobody worked on it today, ignore it completely for this dashboard.
-    if (!isPlannedForToday && !isUpdatedToday) return;
+    if (!isPlannedForToday && !isUpdatedToday && !hasActivityToday) return;
     
     const taskTanks = (log.tank_start && log.tank_end) ? (log.tank_end - log.tank_start + 1) : (lot.total_tanks || 0)
     const calculatedQty = (taskTanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(taskTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
