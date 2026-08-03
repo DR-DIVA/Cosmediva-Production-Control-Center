@@ -550,7 +550,7 @@ export default function PofTasksPage() {
                     <div key={i} className="flex flex-col mb-2 bg-slate-800 p-1.5 rounded">
                       <div className="flex items-center justify-between gap-2">
                         <Badge variant="outline" className={`text-[10px] px-1 py-0 ${badgeClass}`}>{statusText}</Badge>
-                        <span className="text-[10px] text-slate-300 shrink-0">{new Date(h.timestamp).toLocaleTimeString('th-TH')}</span>
+                        <span className="text-[10px] text-slate-300 shrink-0">{new Date(h.timestamp).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                       <div className="flex items-center gap-1 mt-1 text-slate-400">
                         <User className="w-3 h-3 shrink-0" />
