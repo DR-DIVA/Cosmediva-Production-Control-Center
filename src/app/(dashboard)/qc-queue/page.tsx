@@ -1062,7 +1062,7 @@ export default function QCQueuePage() {
                                           </div>
                                         ) : null
 
-                                        const problemStatuses = Array.from(new Set(history.filter(h => ['PAUSED', 'FAILED', 'REPROCESS'].includes(h.status)).map(h => {
+                                        const problemStatuses = Array.from(new Set(history.filter((h: any) => ['PAUSED', 'FAILED', 'REPROCESS'].includes(h.status)).map((h: any) => {
                                           if (h.status === 'PAUSED') return 'HOLD'
                                           if (h.status === 'FAILED') return 'REJECT'
                                           if (h.status === 'REPROCESS') return 'REPROCESS'
@@ -1079,7 +1079,7 @@ export default function QCQueuePage() {
                                                   {problemStatuses.length > 0 && (
                                                     <div className="flex flex-col items-center mt-1 space-y-[2px]">
                                                       {problemStatuses.map(ps => (
-                                                        <span key={ps} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps}</span>
+                                                        <span key={ps as string} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps as string}</span>
                                                       ))}
                                                     </div>
                                                   )}

@@ -527,7 +527,7 @@ export default function MixingTasksPage() {
                       {problemStatuses.length > 0 && (
                         <div className="flex flex-col items-center mt-1 space-y-[2px]">
                           {problemStatuses.map(ps => (
-                            <span key={ps} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps}</span>
+                            <span key={ps as string} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps as string}</span>
                           ))}
                         </div>
                       )}
