@@ -668,8 +668,8 @@ export default function PackingTasksPage() {
                   <TableRow>
                     <TableHead className="w-[50px]"></TableHead>
                     <TableHead>สินค้า / SKU</TableHead>
-                    <TableHead>LOT No.</TableHead>
-                    <TableHead>ถังที่ (ตามแผน)</TableHead>
+                    <TableHead className="whitespace-nowrap">LOT No.</TableHead>
+                    <TableHead className="whitespace-nowrap">ถังที่ (ตามแผน)</TableHead>
                     <TableHead>จำนวนถัง (รวม)</TableHead>
                     <TableHead>Bulk size (kg/ถัง)</TableHead>
                     <TableHead>STD Yield (ชิ้น/ถัง)</TableHead>
@@ -722,8 +722,8 @@ export default function PackingTasksPage() {
                             <div className="break-words">{task.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-normal break-words">{task.production_lots?.products?.product_name || ''}</div>
                           </TableCell>
-                          <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
-                          <TableCell>{task.tank_start || '-'} - {task.tank_end || '-'}</TableCell>
+                          <TableCell className="font-semibold whitespace-nowrap">{task.production_lots?.lot_no || '-'}</TableCell>
+                          <TableCell className="whitespace-nowrap">{task.tank_start || '-'} - {task.tank_end || '-'}</TableCell>
                           <TableCell>{task.production_lots?.total_tanks || 0} ถัง</TableCell>
                           <TableCell>{task.production_lots?.kg_per_tank || 0} kg</TableCell>
                           <TableCell>
