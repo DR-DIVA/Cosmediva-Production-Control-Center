@@ -160,7 +160,7 @@ export default function PackingTasksPage() {
                   action: h.status,
                   user: h.user,
                   timestamp: h.timestamp,
-                  qty: h.qty
+                  qty: h.pieces
                 })
               })
             }
@@ -718,9 +718,9 @@ export default function PackingTasksPage() {
                           <TableCell>
                             {expandedRow === task.id ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           </TableCell>
-                          <TableCell className="font-medium text-emerald-700">
-                            {task.production_lots?.products?.sku || '-'}
-                            <div className="text-xs text-slate-500 font-normal">{task.production_lots?.products?.product_name || ''}</div>
+                          <TableCell className="font-medium text-emerald-700 whitespace-normal min-w-[250px] max-w-[350px] break-words">
+                            <div className="break-words">{task.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-normal break-words">{task.production_lots?.products?.product_name || ''}</div>
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start || '-'} - {task.tank_end || '-'}</TableCell>
@@ -733,7 +733,7 @@ export default function PackingTasksPage() {
                           </TableCell>
                           <TableCell className="text-emerald-600 font-medium">
                             {(() => {
-                              const details = typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details as any : {};
+                              const details = typeof task.tank_details === 'string' ? JSON.parse(task.tank_details) : (typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details : {});
                               let total = 0;
                               for (const key in details) {
                                 if (key.endsWith('_history')) continue;
@@ -744,7 +744,7 @@ export default function PackingTasksPage() {
                           </TableCell>
                           <TableCell className="text-[#D4AF37] font-bold bg-[#D4AF37]/">
                             {(() => {
-                              const dCurrent = typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details as any : {};
+                              const dCurrent = typeof task.tank_details === 'string' ? JSON.parse(task.tank_details) : (typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details : {});
                               let currentTotal = 0;
                               for (const key in dCurrent) {
                                 if (key.endsWith('_history')) continue;
@@ -758,13 +758,13 @@ export default function PackingTasksPage() {
                               for (let i = 1; i <= targetEnd; i++) {
                                 const taskForTank = sameLotTasks.find(t => {
                                   if (i >= parseInt(t.tank_start) && i <= parseInt(t.tank_end)) {
-                                    const d = typeof t.tank_details === 'object' && t.tank_details !== null ? (t.tank_details as any) : {};
+                                    const d = typeof t.tank_details === 'string' ? JSON.parse(t.tank_details) : (typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {});
                                     return d[i] && d[i].pieces !== undefined;
                                   }
                                   return false;
                                 });
                                 if (taskForTank) {
-                                  const d = taskForTank.tank_details as any;
+                                  const d = typeof taskForTank.tank_details === 'string' ? JSON.parse(taskForTank.tank_details) : (taskForTank.tank_details as any);
                                   cumulativePieces += Number(d[i].pieces);
                                 }
                               }
@@ -773,7 +773,7 @@ export default function PackingTasksPage() {
                           </TableCell>
                           <TableCell className="text-indigo-600 font-bold bg-indigo-50/50">
                             {(() => {
-                              const dCurrent = typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details as any : {};
+                              const dCurrent = typeof task.tank_details === 'string' ? JSON.parse(task.tank_details) : (typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details : {});
                               let currentTotal = 0;
                               for (const key in dCurrent) {
                                 if (key.endsWith('_history')) continue;
@@ -787,13 +787,13 @@ export default function PackingTasksPage() {
                               for (let i = 1; i <= targetEnd; i++) {
                                 const taskForTank = sameLotTasks.find(t => {
                                   if (i >= parseInt(t.tank_start) && i <= parseInt(t.tank_end)) {
-                                    const d = typeof t.tank_details === 'object' && t.tank_details !== null ? (t.tank_details as any) : {};
+                                    const d = typeof t.tank_details === 'string' ? JSON.parse(t.tank_details) : (typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {});
                                     return d[i] && d[i].pieces !== undefined;
                                   }
                                   return false;
                                 });
                                 if (taskForTank) {
-                                  const d = taskForTank.tank_details as any;
+                                  const d = typeof taskForTank.tank_details === 'string' ? JSON.parse(taskForTank.tank_details) : (taskForTank.tank_details as any);
                                   cumulativePieces += Number(d[i].pieces);
                                 }
                               }

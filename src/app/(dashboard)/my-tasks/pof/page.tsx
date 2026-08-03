@@ -771,9 +771,9 @@ export default function PofTasksPage() {
                           <TableCell>
                             {expandedRow === task.id ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           </TableCell>
-                          <TableCell className="font-medium text-orange-700">
-                            {task.production_lots?.products?.sku || '-'}
-                            <div className="text-xs text-slate-500 font-normal">{task.production_lots?.products?.product_name || ''}</div>
+                          <TableCell className="font-medium text-orange-700 whitespace-normal min-w-[250px] max-w-[350px] break-words">
+                            <div className="break-words">{task.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-normal break-words">{task.production_lots?.products?.product_name || ''}</div>
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>{task.tank_start} - {task.tank_end}</TableCell>

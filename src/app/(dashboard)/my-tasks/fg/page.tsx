@@ -513,9 +513,9 @@ export default function FgTasksPage() {
                       <React.Fragment key={task.id}>
                         <TableRow className={`cursor-pointer hover:bg-[#F8F6F0] ${expandedRow === task.id ? 'bg-slate-100' : ''}`} onClick={() => toggleRow(task.id)}>
                           <TableCell>{expandedRow === task.id ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}</TableCell>
-                          <TableCell className="font-medium text-indigo-700">
-                            {task.production_lots?.products?.sku || '-'}
-                            <div className="text-xs text-slate-500 font-normal">{task.production_lots?.products?.product_name || ''}</div>
+                          <TableCell className="font-medium text-indigo-700 whitespace-normal min-w-[250px] max-w-[350px] break-words">
+                            <div className="break-words">{task.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-normal break-words">{task.production_lots?.products?.product_name || ''}</div>
                           </TableCell>
                           <TableCell className="font-semibold">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell>
