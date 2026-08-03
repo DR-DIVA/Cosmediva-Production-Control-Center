@@ -507,16 +507,30 @@ export default function MixingTasksPage() {
               updateTankProgress(task.id, t, task)
             }
 
+            const problemStatuses = Array.from(new Set(history.filter((h: any) => ['PAUSED', 'FAILED', 'REPROCESS'].includes(h.status)).map((h: any) => {
+              if (h.status === 'PAUSED') return 'HOLD'
+              if (h.status === 'FAILED') return 'REJECT'
+              if (h.status === 'REPROCESS') return 'REPROCESS'
+              return ''
+            })))
+
             return (
               <TooltipProvider key={t} delay={100}>
                 <Tooltip>
                   <TooltipTrigger>
                     <div 
                       onClick={handleTankClick}
-                      className={`flex flex-col items-center justify-center p-3 rounded-xl border-2 ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
+                      className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 ${color} transition-all ${isClickable ? 'cursor-pointer hover:scale-105' : ''}`}
                     >
                       <Beaker className={`w-8 h-8 mb-2 ${animate}`} />
                       <span className="text-xs font-bold">ถัง {t}</span>
+                      {problemStatuses.length > 0 && (
+                        <div className="flex flex-col items-center mt-1 space-y-[2px]">
+                          {problemStatuses.map(ps => (
+                            <span key={ps} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps}</span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (

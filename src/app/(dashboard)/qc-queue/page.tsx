@@ -1062,6 +1062,13 @@ export default function QCQueuePage() {
                                           </div>
                                         ) : null
 
+                                        const problemStatuses = Array.from(new Set(history.filter(h => ['PAUSED', 'FAILED', 'REPROCESS'].includes(h.status)).map(h => {
+                                          if (h.status === 'PAUSED') return 'HOLD'
+                                          if (h.status === 'FAILED') return 'REJECT'
+                                          if (h.status === 'REPROCESS') return 'REPROCESS'
+                                          return ''
+                                        })))
+
                                         return (
                                           <TooltipProvider key={t} delay={100}>
                                             <Tooltip>
@@ -1069,6 +1076,13 @@ export default function QCQueuePage() {
                                                 <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${color} ${animate}`}>
                                                   <FlaskConical className="w-8 h-8 mb-1" />
                                                   <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
+                                                  {problemStatuses.length > 0 && (
+                                                    <div className="flex flex-col items-center mt-1 space-y-[2px]">
+                                                      {problemStatuses.map(ps => (
+                                                        <span key={ps} className="text-[9px] font-bold text-red-600 animate-pulse bg-red-100/50 px-1 rounded-sm">{ps}</span>
+                                                      ))}
+                                                    </div>
+                                                  )}
                                                 </div>
                                               </TooltipTrigger>
                                               {tooltipContent && (
