@@ -171,35 +171,80 @@ export default function DashboardPage() {
     // Count actual progress from tank_details if available, else fallback
     let completedTanks = 0
     let completedPieces = 0
+    let todayOutputTanks = 0
+    let todayOutputPieces = 0
     const isLogDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(log.status)
 
     if (log.tank_details && Object.keys(log.tank_details).length > 0) {
       Object.keys(log.tank_details).forEach(key => {
-        if (key.endsWith('_history')) return;
+        if (key.endsWith('_history') || key === 'history') return;
         const val = log.tank_details[key]
         const s = typeof val === 'string' ? val : (val?.status || '')
         const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
         
+        let completedToday = false;
+        const historyKey = `${key}_history`
+        const history = log.tank_details[historyKey] || []
+        
+        if (Array.isArray(history) && history.length > 0) {
+           const doneEvents = history.filter(h => ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(h.status));
+           if (doneEvents.length > 0) {
+              const doneToday = doneEvents.some(h => {
+                 const t = new Date(h.timestamp).getTime();
+                 const start = new Date(dashboardDate).setHours(0,0,0,0);
+                 const end = new Date(dashboardDate).setHours(23,59,59,999);
+                 return t >= start && t <= end;
+              });
+              if (doneToday) completedToday = true;
+           }
+        }
+        
         if (isDone) {
            completedTanks++
+           let thisTankPieces = 0
            if (typeof val === 'object' && val !== null) {
-             if (val.cartons) completedPieces += (val.cartons * (lot.pcs_per_carton || 1))
-             if (val.pieces) completedPieces += val.pieces
+             if (val.cartons) thisTankPieces = (val.cartons * (lot.pcs_per_carton || 1))
+             else if (val.pieces) thisTankPieces = val.pieces
+           }
+           
+           if (thisTankPieces === 0 && lot.kg_per_tank && lot.g_per_piece) {
+              thisTankPieces = Math.floor(1 * (lot.kg_per_tank * 1000 / lot.g_per_piece));
+           }
+
+           completedPieces += thisTankPieces
+           
+           if (completedToday || (isPlannedForToday && !Array.isArray(history))) {
+              todayOutputTanks++
+              todayOutputPieces += thisTankPieces
            }
         }
       })
+      
+      // Add to today's outputs from tank_details
+      if (todayOutputTanks > 0 || todayOutputPieces > 0) {
+        if (pName.includes('ชั่ง')) prodOutput.weighing += todayOutputTanks;
+        if (pName.includes('ผสม')) prodOutput.mixing += todayOutputTanks;
+        if (pName.includes('บรรจุ')) prodOutput.packing += todayOutputPieces;
+        if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodOutput.pof += todayOutputPieces;
+      }
+      
     } else if (isLogDone) {
       completedTanks = taskTanks
       completedPieces = log.piece_quantity || targetQty
+      
+      let outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
+      if (isLogDone && outputPieces === 0) {
+         outputPieces = log.piece_quantity || targetQty;
+      }
+      
+      if (isUpdatedToday || isPlannedForToday) {
+        if (pName.includes('ชั่ง')) prodOutput.weighing += completedTanks;
+        if (pName.includes('ผสม')) prodOutput.mixing += completedTanks;
+        if (pName.includes('บรรจุ')) prodOutput.packing += outputPieces;
+        if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodOutput.pof += outputPieces;
+      }
     }
     
-    let outputPieces = completedPieces || (completedTanks && lot.kg_per_tank && lot.g_per_piece ? Math.floor(completedTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0);
-    
-    // Fallback if outputPieces is still 0 but log is done (e.g. packing without tank calculations)
-    if (isLogDone && outputPieces === 0) {
-       outputPieces = log.piece_quantity || targetQty;
-    }
-
     // Targets: Only count if it's explicitly planned for TODAY
     if (isPlannedForToday) {
       if (pName.includes('ชั่ง')) prodTarget.weighing += taskTanks;
@@ -211,14 +256,6 @@ export default function DashboardPage() {
          const end = parseInt(log.tank_end) || start;
          prodTarget.qc += (end - start + 1);
       }
-    }
-
-    // Outputs: Only count if it was updated TODAY (meaning someone worked on it today) or if it's planned for today and they already did it.
-    if (isUpdatedToday || isPlannedForToday) {
-      if (pName.includes('ชั่ง')) prodOutput.weighing += completedTanks;
-      if (pName.includes('ผสม')) prodOutput.mixing += completedTanks;
-      if (pName.includes('บรรจุ')) prodOutput.packing += outputPieces;
-      if (pName.includes('POF') || pName.includes('อุโมงค์') || pName.includes('ลงลัง')) prodOutput.pof += outputPieces;
     }
 
     // Bulk QC Output: Check history for QC_PASS on dashboardDate
