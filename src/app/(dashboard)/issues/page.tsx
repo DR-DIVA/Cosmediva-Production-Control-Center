@@ -47,7 +47,7 @@ export default function IssuesPage() {
         processes (process_name),
         rooms (room_name)
       `)
-      .eq('status', 'PAUSED')
+      .or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%')
       .order('updated_at', { ascending: false })
 
     if (error) {
@@ -60,7 +60,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (!line.includes('[Resolved') && !line.includes('> [QC PASSED]') && !line.includes('> [QA Approved]')) {
+          if ((line.includes('[QC ') || line.includes('[แจ้งปัญหา]')) && !line.includes('[Resolved') && !line.includes('> [QA Approved]')) {
             parsedActive.push({
               ...task,
               parsedNote: line,
@@ -80,7 +80,7 @@ export default function IssuesPage() {
         production_lots (lot_no, products:sku_id (product_name, sku)),
         processes (process_name), rooms (room_name)
       `)
-      .or('note.ilike.%[Resolved%,note.ilike.%> [QC PASSED]%,note.ilike.%> [QA Approved]%')
+      .or('note.ilike.%[Resolved%,note.ilike.%> [QA Approved]%')
       .order('updated_at', { ascending: false })
       .limit(50)
       
@@ -89,7 +89,7 @@ export default function IssuesPage() {
       if (task.note) {
         const lines = task.note.split('\n').filter((l: string) => l.trim())
         lines.forEach((line: string, idx: number) => {
-          if (line.includes('[Resolved') || line.includes('> [QC PASSED]') || line.includes('> [QA Approved]')) {
+          if ((line.includes('[QC ') || line.includes('[แจ้งปัญหา]')) && (line.includes('[Resolved') || line.includes('> [QA Approved]'))) {
             parsedResolved.push({
               ...task,
               parsedNote: line,
@@ -151,13 +151,15 @@ export default function IssuesPage() {
     lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]}${resolutionText}`
     const newNote = lines.join('\n')
     
-    // Check if there are any lines left without [Resolved or > [QC PASSED] or > [QA Approved]
-    const allResolved = lines.filter((l: string) => l.trim() && !l.includes('[Resolved') && !l.includes('> [QC PASSED]') && !l.includes('> [QA Approved]')).length === 0
+    // Check if there are any lines left without [Resolved or > [QA Approved]
+    const allResolved = lines.filter((l: string) => l.trim() && (l.includes('[QC ') || l.includes('[แจ้งปัญหา]')) && !l.includes('[Resolved') && !l.includes('> [QA Approved]')).length === 0
     
-    const { error } = await supabase.from('production_logs').update({
-      status: allResolved ? 'WAITING' : 'PAUSED', // กลับไปรอทำงานต่อเมื่อแก้ปัญหาครบทุกข้อความ
-      note: newNote
-    }).eq('id', resolvingIssue.id)
+    const updateData: any = { note: newNote }
+    if (resolvingIssue.status === 'PAUSED') {
+      updateData.status = allResolved ? 'WAITING' : 'PAUSED'
+    }
+
+    const { error } = await supabase.from('production_logs').update(updateData).eq('id', resolvingIssue.id)
 
     if (error) {
       toast.error('บันทึกการแก้ไขปัญหาล้มเหลว')
