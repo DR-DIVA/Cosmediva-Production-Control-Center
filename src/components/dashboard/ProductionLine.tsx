@@ -35,17 +35,37 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
     })
 
     // 2. Aggregate tank count and statuses
+    let currentTank = 0
+    let maxCompletedTank = 0
+
     stageLogs.forEach(log => {
       const start = parseInt(log.tank_start) || 0
       const end = parseInt(log.tank_end) || start
       if (end >= start && start > 0) {
         count += (end - start + 1)
+        
+        const details = log.tank_details || {}
+        for (let t = start; t <= end; t++) {
+           const val = details[t] || details[t.toString()]
+           const s = typeof val === 'string' ? val : (val?.status || '')
+           const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
+           
+           if (!isDone) {
+              if (currentTank === 0 || t < currentTank) {
+                 currentTank = t
+              }
+           } else {
+              maxCompletedTank = Math.max(maxCompletedTank, t)
+           }
+        }
       }
       
       if (log.status === 'PAUSED') hasError = true
       else if (log.status === 'IN_PROGRESS') hasActive = true
       else if (log.status === 'WAITING') hasWaiting = true
     })
+
+    const displayTankNumber = currentTank > 0 ? currentTank : (maxCompletedTank > 0 ? maxCompletedTank : (count > 0 ? parseInt(stageLogs[0]?.tank_start) || 1 : 0))
 
     let status = 'pending'
     if (count > 0) {
@@ -69,7 +89,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
       }
     }
 
-    return { count, status }
+    return { count: displayTankNumber, status, totalAssigned: count }
   }
 
   return (
@@ -153,7 +173,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
                           {info.count > 0 ? (
                             <>
                               <span className="text-lg font-bold leading-none">{info.count}</span>
-                              <span className="text-[9px] font-medium leading-tight">ถัง</span>
+                              <span className="text-[9px] font-medium leading-tight">ถังที่</span>
                             </>
                           ) : (
                             <span className="text-xl font-bold opacity-30">-</span>
