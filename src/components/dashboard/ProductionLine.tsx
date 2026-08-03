@@ -93,7 +93,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
   }
 
   return (
-    <Card className="col-span-full overflow-x-auto shadow-sm border-slate-200">
+    <Card className="col-span-full shadow-sm border-slate-200">
       <CardHeader className="pb-3 border-b bg-[#F8F6F0]/">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg font-bold text-slate-800">Production Line (Digital Twin)</CardTitle>
@@ -105,11 +105,12 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="min-w-[950px]">
-          {/* Header Row */}
-          <div className="grid grid-cols-8 border-b bg-[#F8F6F0]/ p-4 text-sm font-semibold text-slate-600">
-            <div className="col-span-2 pl-2">LOT No. (สินค้า)</div>
-            <div className="col-span-6 grid grid-cols-6 gap-2 text-center">
+        <div className="max-h-[650px] overflow-auto relative scrollbar-thin scrollbar-thumb-slate-300">
+          <div className="min-w-[1000px]">
+            {/* Header Row */}
+            <div className="sticky top-0 z-20 grid grid-cols-8 border-b bg-[#F8F6F0] p-4 text-sm font-semibold text-slate-700 shadow-sm">
+              <div className="col-span-2 pl-2">LOT No. (สินค้า)</div>
+              <div className="col-span-6 grid grid-cols-6 gap-2 text-center">
               {PROCESS_STAGES.map(stage => (
                 <div key={stage.key} className="flex flex-col items-center justify-center space-y-1">
                   <stage.icon className="w-5 h-5 text-slate-400" />
