@@ -875,7 +875,7 @@ export default function PackingTasksPage() {
                         return (
                           <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
                             <td className="px-4 py-3 whitespace-nowrap">
-                              {new Date(item.timestamp).toLocaleTimeString('th-TH')}
+                              {new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
                             <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
