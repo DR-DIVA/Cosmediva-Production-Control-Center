@@ -59,7 +59,7 @@ export default function RMControlCenterPage() {
     const { data, error } = await supabase
       .from('production_lot_rms')
       .select('*, production_lots(lot_no, sku_id, products(sku), production_logs(activity_date, processes(process_name)))')
-      .order('eta_date', { ascending: true });
+      .order('created_at', { ascending: false });
 
     if (error) {
       console.error(error);
