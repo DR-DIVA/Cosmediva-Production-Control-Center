@@ -699,7 +699,9 @@ export default function RMControlCenterPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY').map((item, index) => (
+                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY')
+                        .sort((a, b) => new Date(b.receive_date || 0).getTime() - new Date(a.receive_date || 0).getTime())
+                        .map((item, index) => (
                         <TableRow key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#F8F6F0]/'} hover:bg-purple-50/50 transition-colors border-b border-slate-100`}>
                           <TableCell className="px-6">
                             {item.receive_date ? (() => {
