@@ -336,7 +336,10 @@ export default function RMControlCenterPage() {
     (item.po_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.rm_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
     (item.rm_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.lot_product || '').toLowerCase().includes(searchQuery.toLowerCase())
+    (item.lot_product || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.production_lots?.products?.sku || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.production_lots?.lot_no || '').toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const exportToCSV = () => {
