@@ -184,7 +184,9 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
                         
                         {/* The Station Node (ตัวรถ) */}
                         <div className={`w-14 h-14 rounded-xl border-2 flex flex-col items-center justify-center transition-all duration-300 ${bgColors[info.status as keyof typeof bgColors]}`}>
-                          {info.count > 0 ? (
+                          {info.count === '✔' ? (
+                            <span className="text-xl font-bold">✔</span>
+                          ) : Number(info.count) > 0 ? (
                             <>
                               <span className="text-lg font-bold leading-none">{info.count}</span>
                               <span className="text-[9px] font-medium leading-tight">ถังที่</span>
