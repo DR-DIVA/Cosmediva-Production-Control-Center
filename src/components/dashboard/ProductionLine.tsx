@@ -199,6 +199,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
             ))
           )}
         </div>
+        </div>
       </CardContent>
     </Card>
   )
