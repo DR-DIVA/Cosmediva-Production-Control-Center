@@ -180,6 +180,18 @@ export default function PlannerPage() {
     setIsDialogOpen(true)
   }
 
+  const handleMarkAsDone = async (lotId: string) => {
+    if (!confirm("ยืนยันการปิดงาน (Mark as Done)? งานนี้จะถูกย้ายไปที่ประวัติงานที่เสร็จสิ้น")) return
+    try {
+      const { error } = await supabase.from("production_lots").update({ current_status: 'DONE', updated_at: new Date().toISOString() }).eq("id", lotId)
+      if (error) throw error
+      toast.success("ปิดงานและย้ายไปประวัติเรียบร้อยแล้ว")
+      fetchData()
+    } catch (e: any) {
+      toast.error("บันทึกไม่สำเร็จ: " + e.message)
+    }
+  }
+
   const handleSaveLot = async () => {
     if (isSaving) return
     if (!newLot.product_id || !newLot.lot_number || !newLot.order_quantity || !newLot.total_tanks) {
@@ -380,11 +392,14 @@ export default function PlannerPage() {
     XLSX.writeFile(wb, `PD_Master_Plan_History_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
-  const filteredLots = lots.filter(lot => 
-    (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-    (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
-    (lot.products?.sku?.toLowerCase() || "").includes(searchQuery.toLowerCase())
-  )
+  const filteredLots = lots.filter(lot => {
+    if (activeTab === "completed" && lot.current_status !== "DONE") return false;
+    if (activeTab !== "completed" && lot.current_status === "DONE") return false;
+
+    return (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
+      (lot.products?.sku?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  })
 
   const today = new Date()
   const timelineDates = Array.from({ length: 14 }).map((_, i) => addDays(today, i))
@@ -476,6 +491,10 @@ export default function PlannerPage() {
                   <History className="w-4 h-4" />
                   ประวัติการทำงานแบบต่อเนื่อง
                 </TabsTrigger>
+                <TabsTrigger value="completed" className="flex items-center gap-2 text-emerald-600 data-[state=active]:text-emerald-700">
+                  <CheckCircle2 className="w-4 h-4" />
+                  งานที่เสร็จสิ้น (Completed)
+                </TabsTrigger>
               </TabsList>
             </Tabs>
             <div className="hidden md:block h-6 w-px bg-slate-200 mx-2"></div>
@@ -491,7 +510,7 @@ export default function PlannerPage() {
           </div>
         </div>
 
-        {activeTab === "table" && (
+        {(activeTab === "table" || activeTab === "completed") && (
           <div className="overflow-x-auto min-h-[500px]">
             <Table>
               <TableHeader className="bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
@@ -574,9 +593,16 @@ export default function PlannerPage() {
                           ) : "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
-                            <Pencil className="w-3.5 h-3.5" />
-                          </Button>
+                          <div className="flex justify-end gap-1">
+                            {activeTab !== "completed" && (
+                              <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50" onClick={(e) => { e.stopPropagation(); handleMarkAsDone(lot.id); }} title="ปิดงาน (Done)">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }} title="แก้ไขออเดอร์">
+                              <Pencil className="w-3.5 h-3.5" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
 

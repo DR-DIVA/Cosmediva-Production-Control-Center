@@ -63,14 +63,16 @@ export default function DashboardPage() {
         )
       `
     
-    // Fetch all Active Lots
+    const sevenDaysAgo = addDays(todayStart, -7).toISOString()
+
+    // Fetch all Active Lots or Recently Done Lots
     const { data: activeLotsData } = await supabase.from('production_lots')
       .select(`
-        id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity,
+        id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity, updated_at,
         processes (process_name),
         products:sku_id (sku, product_name)
       `)
-      .neq('current_status', 'DONE')
+      .or(`current_status.neq.DONE,and(current_status.eq.DONE,updated_at.gte.${sevenDaysAgo})`)
       .order('created_at', { ascending: true })
 
     const activeLotIds = activeLotsData && activeLotsData.length > 0 ? activeLotsData.map((l: any) => l.id) : ['none']

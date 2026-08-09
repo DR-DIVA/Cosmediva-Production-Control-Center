@@ -11,12 +11,22 @@ const PROCESS_STAGES = [
   { key: 'fill', label: 'บรรจุ', icon: Container, keywords: ['บรรจุ', 'packing', 'pk'] },
   { key: 'pof', label: 'POF / ลงลัง', icon: ScanBarcode, keywords: ['pof', 'อุโมงค์', 'แพค'] },
   { key: 'pack', label: 'คงคลัง FG', icon: Box, keywords: ['fg', 'คลัง', 'store', 'ลัง'] },
+  { key: 'delivered', label: 'ส่งมอบ FG เรียบร้อย', icon: CheckCircle2, keywords: [] },
 ]
 
 export default function ProductionLine({ activeLots, activeLogs = [] }: { activeLots: any[], activeLogs?: any[] }) {
   
   // Helper to determine status and tank count for a stage
   const getStageInfo = (lot: any, stageKey: string) => {
+    if (stageKey === 'delivered') {
+      const isDone = lot.current_status === 'DONE'
+      return {
+        count: isDone ? '✔' : '-',
+        status: isDone ? 'active' : 'pending',
+        totalAssigned: 0
+      }
+    }
+
     let count = 0
     let hasError = false
     let hasActive = false
@@ -109,11 +119,11 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
       </CardHeader>
       <CardContent className="p-0">
         <div className="relative overflow-x-auto">
-          <div className="min-w-[1000px]">
+          <div className="min-w-[1100px]">
             {/* Header Row */}
-            <div className="sticky top-0 z-20 grid grid-cols-8 border-b bg-[#F8F6F0] p-4 text-sm font-semibold text-slate-700 shadow-sm">
+            <div className="sticky top-0 z-20 grid grid-cols-9 border-b bg-[#F8F6F0] p-4 text-sm font-semibold text-slate-700 shadow-sm">
               <div className="col-span-2 pl-2">LOT No. (สินค้า)</div>
-              <div className="col-span-6 grid grid-cols-6 gap-2 text-center">
+              <div className="col-span-7 grid grid-cols-7 gap-2 text-center">
               {PROCESS_STAGES.map(stage => (
                 <div key={stage.key} className="flex flex-col items-center justify-center space-y-1">
                   <stage.icon className="w-5 h-5 text-slate-400" />
@@ -128,7 +138,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
             <div className="p-8 text-center text-slate-500">ไม่มีข้อมูลออเดอร์ที่กำลังผลิต</div>
           ) : (
             activeLots.map((lot, idx) => (
-              <div key={lot.id} className={`grid grid-cols-8 p-4 border-b items-center transition-colors hover:bg-[#F8F6F0]/ ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8F6F0]/'}`}>
+              <div key={lot.id} className={`grid grid-cols-9 p-4 border-b items-center transition-colors hover:bg-[#F8F6F0]/50 ${idx % 2 === 0 ? 'bg-white' : 'bg-[#F8F6F0]/30'}`}>
                 
                 {/* Lot Info */}
                 <div className="col-span-2 pl-2">
@@ -149,7 +159,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
                 </div>
 
                 {/* Pipeline Lanes */}
-                <div className="col-span-6 grid grid-cols-6 gap-2 relative">
+                <div className="col-span-7 grid grid-cols-7 gap-2 relative">
                   {/* The Background Line (ถนน) */}
                   <div className="absolute top-1/2 left-8 right-8 h-1 bg-slate-200 -translate-y-1/2 -z-10 rounded-full"></div>
                   
