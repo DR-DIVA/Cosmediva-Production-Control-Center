@@ -57,6 +57,7 @@ export default function PlannerPage() {
   
   const [searchQuery, setSearchQuery] = useState("")
   const [filterDept, setFilterDept] = useState("ALL")
+  const [filterOrderType, setFilterOrderType] = useState("ALL")
   const [expandedLots, setExpandedLots] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState("table")
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
@@ -446,6 +447,7 @@ export default function PlannerPage() {
   const filteredLots = lots.filter(lot => {
     if (activeTab === "completed" && lot.current_status !== "DONE") return false;
     if (activeTab !== "completed" && lot.current_status === "DONE") return false;
+    if (filterOrderType !== "ALL" && lot.order_type !== filterOrderType) return false;
 
     return (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
       (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
@@ -557,6 +559,11 @@ export default function PlannerPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <div className="hidden md:flex bg-slate-100 p-1 rounded-md mr-2">
+              <Button size="sm" variant={filterOrderType === "ALL" ? "default" : "ghost"} onClick={() => setFilterOrderType("ALL")} className="h-7 text-xs">ทั้งหมด</Button>
+              <Button size="sm" variant={filterOrderType === "MTS" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTS")} className="h-7 text-xs">MTS</Button>
+              <Button size="sm" variant={filterOrderType === "MTO" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTO")} className="h-7 text-xs">MTO</Button>
+            </div>
             <Input placeholder="ค้นหา PO หรือ SKU..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-64 h-9" />
           </div>
         </div>
