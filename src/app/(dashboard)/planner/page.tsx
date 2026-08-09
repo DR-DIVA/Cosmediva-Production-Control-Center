@@ -646,7 +646,7 @@ export default function PlannerPage() {
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-2">
                             {activeTab !== "completed" && (
-                              <Button variant="outline" size="sm" className="h-8 px-3 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleMarkAsDone(lot.id); }}>
+                              <Button variant="outline" size="sm" className="h-8 px-3 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleMarkAsDoneClick(lot.id); }}>
                                 <CheckCircle2 className="w-4 h-4 mr-1.5" /> ปิดงาน
                               </Button>
                             )}
