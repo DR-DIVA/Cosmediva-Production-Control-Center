@@ -865,13 +865,13 @@ export default function PlannerPage() {
       )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] md:max-w-6xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{newLot.id ? "แก้ไขออเดอร์ (Project)" : "เพิ่มออเดอร์ใหม่ (Project)"}</DialogTitle>
           </DialogHeader>
           
-          <div className="grid grid-cols-2 gap-4 py-4">
-            <div className="space-y-2 col-span-2">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-2">
+            <div className="space-y-2 col-span-2 md:col-span-4">
               <Label>สินค้า (SKU) *</Label>
               <Select value={newLot.product_id} onValueChange={handleProductChange}>
                 <SelectTrigger>
@@ -889,13 +889,13 @@ export default function PlannerPage() {
             </div>
 
             {newLot.product_id === 'NEW' && (
-              <div className="space-y-2 col-span-2">
+              <div className="space-y-2 col-span-2 md:col-span-4">
                 <Label>SKU ใหม่ *</Label>
                 <Input placeholder="เช่น JHD-999" value={newLot.new_sku_name} onChange={e => setNewLot({...newLot, new_sku_name: e.target.value})} />
               </div>
             )}
 
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2 col-span-2 md:col-span-4">
               <Label>ชื่อสินค้า</Label>
               <Input placeholder="เช่น โลชั่นบำรุงผิว" value={newLot.product_name} onChange={e => setNewLot({...newLot, product_name: e.target.value})} />
             </div>
