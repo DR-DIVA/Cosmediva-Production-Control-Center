@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box } from 'lucide-react'
+import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box, CheckCircle2 } from 'lucide-react'
 
 const PROCESS_STAGES = [
   { key: 'weigh', label: 'ชั่งสาร', icon: Scale, keywords: ['ชั่ง', 'mm-rm'] },
