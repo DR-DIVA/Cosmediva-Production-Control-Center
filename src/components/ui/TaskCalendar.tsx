@@ -52,7 +52,7 @@ export function TaskCalendar({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'WAITING': return 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
-      case 'IN_PROGRESS': return 'bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30 hover:bg-[#D4AF37]/'
+      case 'IN_PROGRESS': return 'bg-[#D4AF37]/10 text-[#D4AF37] border-[#D4AF37]/30 hover:bg-[#D4AF37]/20'
       case 'DONE': return 'bg-green-100 text-green-700 border-green-200 hover:bg-green-200'
       case 'QC_PASS': return 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200'
       case 'HOLD': return 'bg-amber-100 text-amber-700 border-amber-200 hover:bg-amber-200'
@@ -76,7 +76,7 @@ export function TaskCalendar({
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden flex flex-col h-[750px]">
       {/* Calendar Header */}
-      <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-[#F8F6F0]/">
+      <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-[#F8F6F0]">
         <div className="flex items-center gap-4">
           <h2 className="text-xl font-bold text-slate-800 capitalize flex items-center gap-2">
             <CalendarIcon className="w-5 h-5 text-slate-500" />
@@ -115,11 +115,11 @@ export function TaskCalendar({
           return (
             <div 
               key={day.toString()} 
-              className={`min-h-[120px] bg-white p-2 flex flex-col transition-colors ${!isCurrentMonth ? 'bg-[#F8F6F0]/ text-slate-400' : ''} ${isToday ? 'bg-[#D4AF37]//20' : ''} hover:bg-[#F8F6F0] cursor-pointer`}
+              className={`min-h-[120px] bg-white p-2 flex flex-col transition-colors ${!isCurrentMonth ? 'bg-[#F8F6F0] text-slate-400' : ''} ${isToday ? 'bg-[#D4AF37]/10' : ''} hover:bg-[#F8F6F0] cursor-pointer`}
               onClick={() => onDateClick && onDateClick(day)}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-[#D4AF37]/ text-white shadow-sm' : ''}`}>
+                <span className={`text-xs font-medium w-6 h-6 flex items-center justify-center rounded-full ${isToday ? 'bg-[#D4AF37] text-white shadow-sm' : ''}`}>
                   {format(day, dateFormat)}
                 </span>
                 {dayTasks.length > 0 && (
