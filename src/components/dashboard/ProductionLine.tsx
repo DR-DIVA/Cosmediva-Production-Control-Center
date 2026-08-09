@@ -9,8 +9,8 @@ const PROCESS_STAGES = [
   { key: 'mix', label: 'ผสม', icon: Beaker, keywords: ['ผสม', 'mix', 'mx'] },
   { key: 'qc', label: 'รอ QC', icon: ShieldCheck, keywords: ['qc', 'quarantine', 'passed', 'rejected'] },
   { key: 'fill', label: 'บรรจุ', icon: Container, keywords: ['บรรจุ', 'packing', 'pk'] },
-  { key: 'pof', label: 'เข้า POF', icon: ScanBarcode, keywords: ['pof', 'อุโมงค์'] },
-  { key: 'pack', label: 'ลงลัง', icon: Box, keywords: ['fg', 'คลัง', 'store', 'ลัง'] },
+  { key: 'pof', label: 'POF / ลงลัง', icon: ScanBarcode, keywords: ['pof', 'อุโมงค์', 'แพค'] },
+  { key: 'pack', label: 'คงคลัง FG', icon: Box, keywords: ['fg', 'คลัง', 'store', 'ลัง'] },
 ]
 
 export default function ProductionLine({ activeLots, activeLogs = [] }: { activeLots: any[], activeLogs?: any[] }) {
