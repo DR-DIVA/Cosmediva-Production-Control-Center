@@ -493,14 +493,14 @@ export default function PlannerPage() {
         <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex flex-wrap gap-4 items-center">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList className="bg-slate-100">
-                <TabsTrigger value="table">Main Table</TabsTrigger>
-                <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-2">
+              <TabsList className="bg-slate-100/80 p-1 rounded-xl">
+                <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-white transition-all">Main Table</TabsTrigger>
+                <TabsTrigger value="timeline" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">Timeline</TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
                   <History className="w-4 h-4" />
                   ประวัติการทำงานแบบต่อเนื่อง
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-2 text-emerald-600 data-[state=active]:text-emerald-700">
+                <TabsTrigger value="completed" className="flex items-center gap-2 rounded-lg text-emerald-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all">
                   <CheckCircle2 className="w-4 h-4" />
                   งานที่เสร็จสิ้น (Completed)
                 </TabsTrigger>
