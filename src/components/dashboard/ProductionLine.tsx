@@ -108,7 +108,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
         </div>
       </CardHeader>
       <CardContent className="p-0">
-        <div className="max-h-[650px] overflow-auto relative scrollbar-thin scrollbar-thumb-slate-300">
+        <div className="relative overflow-x-auto">
           <div className="min-w-[1000px]">
             {/* Header Row */}
             <div className="sticky top-0 z-20 grid grid-cols-8 border-b bg-[#F8F6F0] p-4 text-sm font-semibold text-slate-700 shadow-sm">
