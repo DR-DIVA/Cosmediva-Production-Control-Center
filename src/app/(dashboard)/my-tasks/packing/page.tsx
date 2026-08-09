@@ -459,7 +459,10 @@ export default function PackingTasksPage() {
             let color = "text-slate-300 bg-white border-slate-200"
             let animate = ""
             
-            const tankStatus = details[t]?.status || details[t] || (task.status === 'DONE' ? 'DONE' : 'LOCKED')
+            let tankStatus = details[t]?.status || details[t]
+            if (!tankStatus || tankStatus === 'LOCKED') {
+              tankStatus = (task.status === 'DONE' ? 'DONE' : (task.status === 'IN_PROGRESS' ? 'WAITING' : 'LOCKED'))
+            }
             
             if (tankStatus === 'LOCKED') {
               color = "text-slate-300 bg-slate-100 border-slate-200 opacity-60 cursor-not-allowed"

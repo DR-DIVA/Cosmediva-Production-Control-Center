@@ -6,9 +6,9 @@ import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box } from 'lucide-
 
 const PROCESS_STAGES = [
   { key: 'weigh', label: 'ชั่งสาร', icon: Scale, keywords: ['ชั่ง', 'mm-rm'] },
-  { key: 'mix', label: 'ผสม', icon: Beaker, keywords: ['ผสม', 'mix'] },
+  { key: 'mix', label: 'ผสม', icon: Beaker, keywords: ['ผสม', 'mix', 'mx'] },
   { key: 'qc', label: 'รอ QC', icon: ShieldCheck, keywords: ['qc', 'quarantine', 'passed', 'rejected'] },
-  { key: 'fill', label: 'บรรจุ', icon: Container, keywords: ['บรรจุ', 'packing'] },
+  { key: 'fill', label: 'บรรจุ', icon: Container, keywords: ['บรรจุ', 'packing', 'pk'] },
   { key: 'pof', label: 'เข้า POF', icon: ScanBarcode, keywords: ['pof', 'อุโมงค์'] },
   { key: 'pack', label: 'ลงลัง', icon: Box, keywords: ['fg', 'คลัง', 'store', 'ลัง'] },
 ]
@@ -35,8 +35,8 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
     })
 
     // 2. Aggregate tank count and statuses
-    let currentTank = 0
-    let maxCompletedTank = 0
+    let maxStartedTank = 0
+    let minWaitingTank = 0
 
     stageLogs.forEach(log => {
       const start = parseInt(log.tank_start) || 0
@@ -48,14 +48,17 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
         for (let t = start; t <= end; t++) {
            const val = details[t] || details[t.toString()]
            const s = typeof val === 'string' ? val : (val?.status || '')
-           const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
            
-           if (!isDone) {
-              if (currentTank === 0 || t < currentTank) {
-                 currentTank = t
-              }
+           const isStartedOrDone = (s && !['LOCKED', 'WAITING', 'PLANNED'].includes(s)) || ['DONE', 'COMPLETED'].includes(log.status) || !!(val && typeof val === 'object' && val.fg_receive_info)
+           const isQCStage = stage.key === 'qc'
+           const isValidForMax = isQCStage ? (s === 'QC_PASS') : isStartedOrDone
+           
+           if (isValidForMax) {
+              maxStartedTank = Math.max(maxStartedTank, t)
            } else {
-              maxCompletedTank = Math.max(maxCompletedTank, t)
+              if (minWaitingTank === 0 || t < minWaitingTank) {
+                 minWaitingTank = t
+              }
            }
         }
       }
@@ -65,7 +68,7 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
       else if (log.status === 'WAITING') hasWaiting = true
     })
 
-    const displayTankNumber = currentTank > 0 ? currentTank : (maxCompletedTank > 0 ? maxCompletedTank : (count > 0 ? parseInt(stageLogs[0]?.tank_start) || 1 : 0))
+    const displayTankNumber = maxStartedTank > 0 ? maxStartedTank : (minWaitingTank > 0 ? minWaitingTank : (count > 0 ? parseInt(stageLogs[0]?.tank_start) || 1 : 0))
 
     let status = 'pending'
     if (count > 0) {

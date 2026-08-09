@@ -76,8 +76,10 @@ export default function DashboardPage() {
       setActiveLots(activeLotsData)
     }
 
+    const activeLotIds = activeLotsData && activeLotsData.length > 0 ? activeLotsData.map((l: any) => l.id) : ['none']
+
     const [ { data: activeLogsInitial }, { data: todayLogsInitial }, { data: activityLogsInitial } ] = await Promise.all([
-      supabase.from('production_logs').select(logSelect).in('status', ['WAITING', 'IN_PROGRESS', 'PAUSED']),
+      supabase.from('production_logs').select(logSelect).in('production_lot_id', activeLotIds),
       supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd),
       supabase.from('production_logs').select(logSelect).eq('activity_date', dashboardDate)
     ])

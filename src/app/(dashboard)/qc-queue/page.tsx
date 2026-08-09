@@ -418,6 +418,48 @@ export default function QCQueuePage() {
           }
           
           await supabase.from('production_logs').update(mixUpdates).eq('id', existingMix.id)
+
+          if (statusAction === 'QC_PASS') {
+            const { data: packingProcess } = await supabase.from('processes').select('id').eq('process_name', 'บรรจุ').single()
+            if (packingProcess) {
+              const { data: existingPackingLog } = await supabase.from('production_logs')
+                .select('id, tank_details')
+                .eq('production_lot_id', task.production_lot_id)
+                .eq('process_id', packingProcess.id)
+                .eq('tank_start', task.tank_start)
+                .eq('tank_end', task.tank_end)
+                .maybeSingle()
+                
+              if (existingPackingLog) {
+                const packingDetails = typeof existingPackingLog.tank_details === 'object' && existingPackingLog.tank_details !== null 
+                  ? { ...existingPackingLog.tank_details } 
+                  : {}
+                
+                const currentPackingState = packingDetails[tankNum]?.status || packingDetails[tankNum]
+                if (!currentPackingState || currentPackingState === 'LOCKED') {
+                   packingDetails[tankNum] = 'WAITING'
+                   await supabase.from('production_logs').update({ tank_details: packingDetails }).eq('id', existingPackingLog.id)
+                }
+              } else {
+                const start = parseInt(task.tank_start) || 1
+                const end = parseInt(task.tank_end) || 1
+                const initialPackingDetails: any = {}
+                for(let i=start; i<=end; i++) {
+                   initialPackingDetails[i] = (i === parseInt(tankNum)) ? 'WAITING' : 'LOCKED'
+                }
+                await supabase.from('production_logs').insert({
+                  production_lot_id: task.production_lot_id,
+                  process_id: packingProcess.id,
+                  status: 'WAITING',
+                  activity_date: new Date().toISOString().split('T')[0],
+                  tank_start: task.tank_start,
+                  tank_end: task.tank_end,
+                  total_tanks: task.production_lots?.total_tanks || null,
+                  tank_details: initialPackingDetails
+                })
+              }
+            }
+          }
         }
       }
 
