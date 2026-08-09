@@ -73,10 +73,6 @@ export default function DashboardPage() {
       .neq('current_status', 'DONE')
       .order('created_at', { ascending: true })
 
-    if (activeLotsData) {
-      setActiveLots(activeLotsData)
-    }
-
     const activeLotIds = activeLotsData && activeLotsData.length > 0 ? activeLotsData.map((l: any) => l.id) : ['none']
 
     const [ { data: activeLogsInitial }, { data: todayLogsInitial }, { data: activityLogsInitial } ] = await Promise.all([
@@ -93,6 +89,23 @@ export default function DashboardPage() {
     
     if (logs.length > 0) {
       setActiveLogs(logs)
+    }
+
+    if (activeLotsData) {
+      const sortedLots = [...activeLotsData]
+      
+      const getWeighDate = (lotId: string) => {
+        const weighLog = logs.find(l => 
+          l.production_lot_id === lotId && 
+          ((l.processes?.process_name || '').toLowerCase().includes('ชั่ง') || 
+           (l.processes?.process_name || '').toLowerCase().includes('mm-rm')) &&
+          (parseInt(l.tank_start) <= 1 && (parseInt(l.tank_end) || parseInt(l.tank_start)) >= 1 || parseInt(l.tank_start) === 1)
+        );
+        return weighLog?.activity_date ? new Date(weighLog.activity_date).getTime() : Infinity;
+      };
+      
+      sortedLots.sort((a, b) => getWeighDate(a.id) - getWeighDate(b.id));
+      setActiveLots(sortedLots)
     }
 
     // 2. Fetch Defects (Today)
