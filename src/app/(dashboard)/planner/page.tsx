@@ -29,6 +29,7 @@ import { createClient } from "@supabase/supabase-js"
 import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
+import { TaskCalendar } from "@/components/ui/TaskCalendar"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -450,6 +451,10 @@ export default function PlannerPage() {
               <TabsList className="bg-slate-100">
                 <TabsTrigger value="table">Main Table</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
+                <TabsTrigger value="calendar" className="flex items-center gap-2">
+                  <CalendarIcon className="w-4 h-4" />
+                  ปฏิทิน
+                </TabsTrigger>
                 <TabsTrigger value="history" className="flex items-center gap-2">
                   <History className="w-4 h-4" />
                   ประวัติการทำงานแบบต่อเนื่อง
@@ -736,6 +741,27 @@ export default function PlannerPage() {
             </div>
           </div>
         )}
+
+        {activeTab === "calendar" && (
+          <div className="p-4 bg-white min-h-[500px]">
+            <TaskCalendar 
+              tasks={filteredLots.map(lot => ({
+                id: lot.id,
+                activity_date: lot.fg_due_date,
+                status: 'IN_PROGRESS',
+                production_lots: {
+                  lot_no: lot.lot_no,
+                  products: lot.products,
+                  sku_id: lot.sku_id
+                },
+                originalLot: lot
+              }))}
+              dateField="activity_date"
+              onTaskClick={(task) => handleEditLot(task.originalLot)}
+            />
+          </div>
+        )}
+
         {activeTab === "history" && (
           <div className="p-4 bg-white min-h-[500px]">
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
