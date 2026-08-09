@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box, CheckCircle2 } from 'lucide-react'
+import { format } from 'date-fns'
 
 const PROCESS_STAGES = [
   { key: 'weigh', label: 'ชั่งสาร', icon: Scale, keywords: ['ชั่ง', 'mm-rm'] },
@@ -197,12 +198,26 @@ export default function ProductionLine({ activeLots, activeLogs = [] }: { active
                         </div>
 
                         {/* Status Label */}
-                        <div className="mt-2 text-[10px] font-medium h-4 flex items-center justify-center">
-                          {info.status === 'active' && <span className="text-emerald-600 font-bold animate-pulse">● กำลังทำ</span>}
-                          {info.status === 'warning' && <span className="text-yellow-600 font-bold">● รอคิว</span>}
-                          {info.status === 'error' && <span className="text-red-600 font-bold animate-bounce">▲ ติดปัญหา</span>}
-                          {info.status === 'completed' && <span className="text-emerald-500 font-bold">✓ เสร็จสิ้น</span>}
-                        </div>
+                        <div className="mt-2 text-[10px] text-center w-max min-w-[5rem] whitespace-nowrap">
+                            {info.status === 'active' && <span className="text-emerald-600 font-bold animate-pulse">● กำลังทำ</span>}
+                            {info.status === 'warning' && <span className="text-yellow-600 font-bold">● รอคิว</span>}
+                            {info.status === 'error' && <span className="text-red-600 font-bold animate-bounce">▲ ติดปัญหา</span>}
+                            {info.status === 'completed' && <span className="text-emerald-500 font-bold">✓ เสร็จสิ้น</span>}
+                            {stage.key === 'delivered' && (
+                              <div className="mt-1 text-[9px] text-slate-500 font-medium leading-tight">
+                                {(!lot.order_type || lot.order_type === 'MTS') ? (
+                                  <div className="flex flex-col gap-0.5">
+                                    <span>S: {lot.planned_start_date ? format(new Date(lot.planned_start_date), "dd MMM") : '-'}</span>
+                                    <span>E: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM") : '-'}</span>
+                                  </div>
+                                ) : (
+                                  <div className="mt-1 text-xs text-blue-600">
+                                    <span>Due: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM") : '-'}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                       </div>
                     )
                   })}
