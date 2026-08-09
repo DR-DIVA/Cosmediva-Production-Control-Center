@@ -67,7 +67,7 @@ export default function PlannerPage() {
     total_tanks: "", kg_per_tank: "", g_per_piece: "",
     capacity_min: "", capacity_max: "", pcs_per_carton: "",
     order_quantity: "", po_no: "", order_type: "MTS",
-    fg_due_date: "", new_sku_name: "", unit: "pc",
+    fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
     mfg_date: "", exp_date: "", product_name: ""
   })
 
@@ -170,6 +170,7 @@ export default function PlannerPage() {
       po_no: lot.po_no || "",
       order_type: lot.order_type || "MTS",
       fg_due_date: lot.fg_due_date || "",
+      fg_due_date_start: lot.fg_due_date_start || "",
       new_sku_name: "",
       unit: "pc",
       mfg_date: "",
@@ -222,7 +223,8 @@ export default function PlannerPage() {
         order_quantity: parseFloat(newLot.order_quantity),
         po_no: newLot.po_no,
         order_type: newLot.order_type,
-        fg_due_date: newLot.fg_due_date || null
+        fg_due_date: newLot.fg_due_date || null,
+        fg_due_date_start: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null
       }
 
       if (newLot.id) {
@@ -424,7 +426,7 @@ export default function PlannerPage() {
               total_tanks: "", kg_per_tank: "", g_per_piece: "",
               capacity_min: "", capacity_max: "", pcs_per_carton: "",
               order_quantity: "", po_no: "", order_type: "MTS",
-              fg_due_date: "", new_sku_name: "", unit: "pc",
+              fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
               mfg_date: "", exp_date: "", product_name: ""
             })
             setIsDialogOpen(true)
@@ -503,7 +505,9 @@ export default function PlannerPage() {
                   <TableHead>บรรจุ (g)</TableHead>
                   <TableHead>ลงลัง (ชิ้น)</TableHead>
                   <TableHead>ประเภท</TableHead>
-                  <TableHead>Due Date</TableHead>
+                  <TableHead>วันที่เริ่มส่งมอบ FG (MTS)</TableHead>
+                  <TableHead>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</TableHead>
+                  <TableHead>กำหนดส่งมอบ FG (MTO)</TableHead>
                   <TableHead className="w-[40px] text-right"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -549,9 +553,25 @@ export default function PlannerPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
-                            Due: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
-                          </div>
+                          {(!lot.order_type || lot.order_type === 'MTS') ? (
+                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
+                              Start: {lot.fg_due_date_start ? format(new Date(lot.fg_due_date_start), "dd MMM yyyy") : "-"}
+                            </div>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {(!lot.order_type || lot.order_type === 'MTS') ? (
+                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
+                              End: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
+                            </div>
+                          ) : "-"}
+                        </TableCell>
+                        <TableCell>
+                          {lot.order_type === 'MTO' ? (
+                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
+                              Due: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
+                            </div>
+                          ) : "-"}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
@@ -901,21 +921,6 @@ export default function PlannerPage() {
             </div>
 
             <div className="space-y-2">
-              <Label>กำหนดส่ง FG (Due Date)</Label>
-              <Input type="date" value={newLot.fg_due_date} onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>MFG Date</Label>
-              <Input type="date" value={newLot.mfg_date} onChange={e => setNewLot({...newLot, mfg_date: e.target.value})} />
-            </div>
-
-            <div className="space-y-2">
-              <Label>EXP Date</Label>
-              <Input type="date" value={newLot.exp_date} onChange={e => setNewLot({...newLot, exp_date: e.target.value})} />
-            </div>
-
-            <div className="space-y-2">
               <Label>ประเภทออเดอร์</Label>
               <Select value={newLot.order_type} onValueChange={val => setNewLot({...newLot, order_type: val || ''})}>
                 <SelectTrigger><SelectValue placeholder="เลือกประเภท" /></SelectTrigger>
@@ -925,6 +930,24 @@ export default function PlannerPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {(!newLot.order_type || newLot.order_type === 'MTS') ? (
+              <>
+                <div className="space-y-2">
+                  <Label>วันที่เริ่มส่งมอบ FG (MTS)</Label>
+                  <Input type="date" value={newLot.fg_due_date_start} onChange={e => setNewLot({...newLot, fg_due_date_start: e.target.value})} />
+                </div>
+                <div className="space-y-2">
+                  <Label>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</Label>
+                  <Input type="date" value={newLot.fg_due_date} onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} />
+                </div>
+              </>
+            ) : (
+              <div className="space-y-2">
+                <Label>กำหนดส่งมอบ FG (MTO)</Label>
+                <Input type="date" value={newLot.fg_due_date} onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} />
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>ยอดตามใบสั่งผลิต (pc)</Label>
