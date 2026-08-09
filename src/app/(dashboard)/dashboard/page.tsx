@@ -71,6 +71,7 @@ export default function DashboardPage() {
         products:sku_id (sku, product_name)
       `)
       .neq('current_status', 'DONE')
+      .order('created_at', { ascending: true })
 
     if (activeLotsData) {
       setActiveLots(activeLotsData)
