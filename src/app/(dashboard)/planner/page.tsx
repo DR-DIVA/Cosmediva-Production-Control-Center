@@ -538,13 +538,13 @@ export default function PlannerPage() {
           <div className="flex flex-wrap gap-4 items-center">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
               <TabsList className="bg-slate-100/80 p-1 rounded-xl">
-                <TabsTrigger value="table" className="rounded-lg data-[state=active]:bg-slate-800 data-[state=active]:text-white transition-all">Main Table</TabsTrigger>
-                <TabsTrigger value="timeline" className="rounded-lg data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">Timeline</TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-blue-600 data-[state=active]:text-white transition-all">
+                <TabsTrigger value="table" className="rounded-lg data-active:bg-slate-800 data-[active]:bg-slate-800 data-[active]:text-white data-active:text-white transition-all">Main Table</TabsTrigger>
+                <TabsTrigger value="timeline" className="rounded-lg data-active:bg-indigo-600 data-[active]:bg-indigo-600 data-[active]:text-white data-active:text-white transition-all">Timeline</TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-2 rounded-lg data-active:bg-blue-600 data-[active]:bg-blue-600 data-[active]:text-white data-active:text-white transition-all">
                   <History className="w-4 h-4" />
                   ประวัติการทำงานแบบต่อเนื่อง
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-2 rounded-lg text-emerald-600 data-[state=active]:bg-emerald-500 data-[state=active]:text-white transition-all">
+                <TabsTrigger value="completed" className="flex items-center gap-2 rounded-lg text-emerald-600 data-active:bg-emerald-500 data-[active]:bg-emerald-500 data-[active]:text-white data-active:text-white transition-all">
                   <CheckCircle2 className="w-4 h-4" />
                   งานที่เสร็จสิ้น (Completed)
                 </TabsTrigger>
