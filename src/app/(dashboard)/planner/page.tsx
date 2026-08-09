@@ -57,6 +57,7 @@ export default function PlannerPage() {
   const [filterDept, setFilterDept] = useState("ALL")
   const [expandedLots, setExpandedLots] = useState<Record<string, boolean>>({})
   const [activeTab, setActiveTab] = useState("table")
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [historySearchQuery, setHistorySearchQuery] = useState("")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
@@ -400,6 +401,22 @@ export default function PlannerPage() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <div className="flex gap-2 mr-4">
+            <Button
+              variant={viewMode === 'list' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('list')}
+            >
+              <ListTodo className="w-4 h-4 mr-2" /> แบบตาราง
+            </Button>
+            <Button
+              variant={viewMode === 'calendar' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('calendar')}
+            >
+              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน กำหนดส่งมอบ FG
+            </Button>
+          </div>
           <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Export</Button>
           <Button onClick={() => {
             setNewLot({
@@ -417,7 +434,9 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      {viewMode === 'list' ? (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="bg-white shadow-sm border-slate-200">
           <CardContent className="p-6 flex items-center justify-between">
             <div className="space-y-1"><p className="text-sm font-medium text-slate-500">ออเดอร์ทั้งหมด</p><p className="text-3xl font-bold text-slate-900">{lots.length}</p></div>
@@ -451,10 +470,6 @@ export default function PlannerPage() {
               <TabsList className="bg-slate-100">
                 <TabsTrigger value="table">Main Table</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                <TabsTrigger value="calendar" className="flex items-center gap-2">
-                  <CalendarIcon className="w-4 h-4" />
-                  ปฏิทิน
-                </TabsTrigger>
                 <TabsTrigger value="history" className="flex items-center gap-2">
                   <History className="w-4 h-4" />
                   ประวัติการทำงานแบบต่อเนื่อง
@@ -742,26 +757,6 @@ export default function PlannerPage() {
           </div>
         )}
 
-        {activeTab === "calendar" && (
-          <div className="p-4 bg-white min-h-[500px]">
-            <TaskCalendar 
-              tasks={filteredLots.map(lot => ({
-                id: lot.id,
-                activity_date: lot.fg_due_date,
-                status: 'IN_PROGRESS',
-                production_lots: {
-                  lot_no: lot.lot_no,
-                  products: lot.products,
-                  sku_id: lot.sku_id
-                },
-                originalLot: lot
-              }))}
-              dateField="activity_date"
-              onTaskClick={(task) => handleEditLot(task.originalLot)}
-            />
-          </div>
-        )}
-
         {activeTab === "history" && (
           <div className="p-4 bg-white min-h-[500px]">
             <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
@@ -828,6 +823,26 @@ export default function PlannerPage() {
           </div>
         )}
       </Card>
+      </>
+      ) : (
+        <Card className="border-slate-200 shadow-sm overflow-hidden p-0 bg-white">
+          <TaskCalendar 
+            tasks={filteredLots.map(lot => ({
+              id: lot.id,
+              activity_date: lot.fg_due_date,
+              status: 'IN_PROGRESS',
+              production_lots: {
+                lot_no: lot.lot_no,
+                products: lot.products,
+                sku_id: lot.sku_id
+              },
+              originalLot: lot
+            }))}
+            dateField="activity_date"
+            onTaskClick={(task) => handleEditLot(task.originalLot)}
+          />
+        </Card>
+      )}
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
