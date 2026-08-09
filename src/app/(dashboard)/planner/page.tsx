@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Calendar as CalendarIcon, CheckCircle2, Clock, AlertTriangle, Activity, History } from "lucide-react"
 import { format, differenceInDays, startOfDay, addDays } from "date-fns"
 import { createClient } from "@supabase/supabase-js"
@@ -74,6 +75,12 @@ export default function PlannerPage() {
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  const [isDoneDialogOpen, setIsDoneDialogOpen] = useState(false)
+  const [doneLotId, setDoneLotId] = useState<string | null>(null)
+  const [doneFgAmount, setDoneFgAmount] = useState("")
+  const [doneCanClosePo, setDoneCanClosePo] = useState("yes")
+  const [doneReason, setDoneReason] = useState("")
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -183,12 +190,47 @@ export default function PlannerPage() {
     setIsDialogOpen(true)
   }
 
-  const handleMarkAsDone = async (lotId: string) => {
-    if (!confirm("ยืนยันการปิดงาน (Mark as Done)? งานนี้จะถูกย้ายไปที่ประวัติงานที่เสร็จสิ้น")) return
+  const handleMarkAsDoneClick = (lotId: string) => {
+    setDoneLotId(lotId)
+    setDoneFgAmount("")
+    setDoneCanClosePo("yes")
+    setDoneReason("")
+    setIsDoneDialogOpen(true)
+  }
+
+  const submitMarkAsDone = async () => {
+    if (!doneLotId || !doneFgAmount) {
+      toast.error("กรุณากรอกจำนวน FG ที่ส่งมอบ")
+      return
+    }
+    if (doneCanClosePo === "no" && !doneReason.trim()) {
+      toast.error("กรุณาระบุสาเหตุที่ไม่สามารถปิด PO ได้")
+      return
+    }
+
     try {
-      const { error } = await supabase.from("production_lots").update({ current_status: 'DONE', updated_at: new Date().toISOString() }).eq("id", lotId)
-      if (error) throw error
+      const { error: updateErr } = await supabase.from("production_lots").update({ 
+        current_status: 'DONE', 
+        updated_at: new Date().toISOString() 
+      }).eq("id", doneLotId)
+      
+      if (updateErr) throw updateErr
+
+      const logNote = `ส่งยอด FG: ${doneFgAmount} ชิ้น | ปิด PO: ${doneCanClosePo === 'yes' ? 'ได้เลย' : 'ไม่ได้'}${doneCanClosePo === 'no' ? ` | สาเหตุ: ${doneReason}` : ''}`
+      const newLog = {
+        production_lot_id: doneLotId,
+        status: "COMPLETED",
+        activity_date: format(new Date(), "yyyy-MM-dd"),
+        process_id: null,
+        note: logNote,
+        ...(currentUserId ? { created_by: currentUserId } : {})
+      }
+
+      const { error: logErr } = await supabase.from("production_logs").insert([newLog])
+      if (logErr) console.error("Error inserting completion log:", logErr)
+
       toast.success("ปิดงานและย้ายไปประวัติเรียบร้อยแล้ว")
+      setIsDoneDialogOpen(false)
       fetchData()
     } catch (e: any) {
       toast.error("บันทึกไม่สำเร็จ: " + e.message)
@@ -1020,6 +1062,61 @@ export default function PlannerPage() {
             <Button onClick={handleSaveLot} disabled={isSaving}>
               {isSaving ? "กำลังบันทึก..." : "บันทึกออเดอร์"}
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Mark As Done Dialog */}
+      <Dialog open={isDoneDialogOpen} onOpenChange={setIsDoneDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>ปิดงานและส่งมอบ FG</DialogTitle>
+            <DialogDescription>
+              กรุณากรอกข้อมูลการส่งมอบ FG ให้ทางบัญชีเปิดบิล/ใบส่งของให้ลูกค้า
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="fg-amount" className="text-right">จำนวน FG (ชิ้น)</Label>
+              <Input
+                id="fg-amount"
+                type="number"
+                className="col-span-3"
+                placeholder="ระบุจำนวน..."
+                value={doneFgAmount}
+                onChange={(e) => setDoneFgAmount(e.target.value)}
+              />
+            </div>
+            
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">ปิด PO</Label>
+              <Select value={doneCanClosePo} onValueChange={setDoneCanClosePo}>
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="เลือก..." />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">ปิด PO ได้เลย</SelectItem>
+                  <SelectItem value="no">ยังปิดไม่ได้</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {doneCanClosePo === "no" && (
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="reason" className="text-right pt-2">สาเหตุ</Label>
+                <Textarea
+                  id="reason"
+                  className="col-span-3"
+                  placeholder="ระบุสาเหตุที่ยังปิด PO ไม่ได้..."
+                  value={doneReason}
+                  onChange={(e) => setDoneReason(e.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDoneDialogOpen(false)}>ยกเลิก</Button>
+            <Button onClick={submitMarkAsDone} className="bg-emerald-600 hover:bg-emerald-700 text-white">ยืนยันปิดงาน</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
