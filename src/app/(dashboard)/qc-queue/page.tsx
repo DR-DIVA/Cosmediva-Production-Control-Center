@@ -445,7 +445,7 @@ export default function QCQueuePage() {
                 const end = parseInt(task.tank_end) || 1
                 const initialPackingDetails: any = {}
                 for(let i=start; i<=end; i++) {
-                   initialPackingDetails[i] = (i === parseInt(tankNum)) ? 'WAITING' : 'LOCKED'
+                   initialPackingDetails[i] = (i === Number(tankNum)) ? 'WAITING' : 'LOCKED'
                 }
                 await supabase.from('production_logs').insert({
                   production_lot_id: task.production_lot_id,
