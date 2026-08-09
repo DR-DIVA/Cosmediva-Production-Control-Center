@@ -1098,7 +1098,7 @@ export default function PlannerPage() {
             
             <div className="grid grid-cols-4 items-center gap-4">
               <Label className="text-right">ปิด PO</Label>
-              <Select value={doneCanClosePo} onValueChange={setDoneCanClosePo}>
+              <Select value={doneCanClosePo} onValueChange={(val) => setDoneCanClosePo(val || '')}>
                 <SelectTrigger className="col-span-3">
                   <SelectValue placeholder="เลือก..." />
                 </SelectTrigger>
