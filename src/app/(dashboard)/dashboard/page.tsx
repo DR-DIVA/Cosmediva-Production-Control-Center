@@ -69,6 +69,7 @@ export default function DashboardPage() {
     const { data: activeLotsData } = await supabase.from('production_lots')
       .select(`
         id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity, updated_at,
+        order_type, planned_start_date, fg_due_date,
         processes (process_name),
         products:sku_id (sku, product_name)
       `)
