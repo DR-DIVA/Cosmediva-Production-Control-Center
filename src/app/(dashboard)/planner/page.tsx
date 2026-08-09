@@ -536,7 +536,7 @@ export default function PlannerPage() {
                   <TableHead>วันที่เริ่มส่งมอบ FG (MTS)</TableHead>
                   <TableHead>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</TableHead>
                   <TableHead>กำหนดส่งมอบ FG (MTO)</TableHead>
-                  <TableHead className="w-[40px] text-right"></TableHead>
+                  <TableHead className="min-w-[150px] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -602,14 +602,14 @@ export default function PlannerPage() {
                           ) : "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
+                          <div className="flex justify-end gap-2">
                             {activeTab !== "completed" && (
-                              <Button variant="ghost" size="icon" className="h-6 w-6 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50" onClick={(e) => { e.stopPropagation(); handleMarkAsDone(lot.id); }} title="ปิดงาน (Done)">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
+                              <Button variant="outline" size="sm" className="h-8 px-3 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleMarkAsDone(lot.id); }}>
+                                <CheckCircle2 className="w-4 h-4 mr-1.5" /> ปิดงาน
                               </Button>
                             )}
-                            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-slate-600" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }} title="แก้ไขออเดอร์">
-                              <Pencil className="w-3.5 h-3.5" />
+                            <Button variant="outline" size="sm" className="h-8 px-3 text-slate-600 hover:text-slate-800 bg-white" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
+                              <Pencil className="w-4 h-4 mr-1.5" /> แก้ไข
                             </Button>
                           </div>
                         </TableCell>
