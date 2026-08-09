@@ -170,7 +170,7 @@ export default function PlannerPage() {
       po_no: lot.po_no || "",
       order_type: lot.order_type || "MTS",
       fg_due_date: lot.fg_due_date || "",
-      fg_due_date_start: lot.fg_due_date_start || "",
+      fg_due_date_start: lot.planned_start_date || "",
       new_sku_name: "",
       unit: "pc",
       mfg_date: "",
@@ -224,7 +224,7 @@ export default function PlannerPage() {
         po_no: newLot.po_no,
         order_type: newLot.order_type,
         fg_due_date: newLot.fg_due_date || null,
-        fg_due_date_start: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null
+        planned_start_date: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null
       }
 
       if (newLot.id) {
@@ -555,7 +555,7 @@ export default function PlannerPage() {
                         <TableCell>
                           {(!lot.order_type || lot.order_type === 'MTS') ? (
                             <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
-                              Start: {lot.fg_due_date_start ? format(new Date(lot.fg_due_date_start), "dd MMM yyyy") : "-"}
+                              Start: {lot.planned_start_date ? format(new Date(lot.planned_start_date), "dd MMM yyyy") : "-"}
                             </div>
                           ) : "-"}
                         </TableCell>
