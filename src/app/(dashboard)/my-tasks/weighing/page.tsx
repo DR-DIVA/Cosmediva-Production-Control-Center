@@ -81,6 +81,7 @@ export default function WeighingTasksPage() {
           process_name
         )
       `)
+      .neq('status', 'COMPLETED')
       .order('created_at', { ascending: false })
 
     if (error) {

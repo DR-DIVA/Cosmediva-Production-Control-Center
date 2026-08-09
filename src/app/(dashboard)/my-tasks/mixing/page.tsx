@@ -80,6 +80,7 @@ export default function MixingTasksPage() {
           process_name
         )
       `)
+      .neq('status', 'COMPLETED')
       .order('created_at', { ascending: false })
 
     if (error) {

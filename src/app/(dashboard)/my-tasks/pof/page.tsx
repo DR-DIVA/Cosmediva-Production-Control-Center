@@ -109,6 +109,7 @@ export default function PofTasksPage() {
           room_name
         )
       `)
+      .neq('status', 'COMPLETED')
       .order('created_at', { ascending: false })
 
     if (error) {
