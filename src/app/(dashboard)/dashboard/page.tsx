@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Activity, AlertTriangle, TrendingUp, Package, Box, ShieldAlert, CheckCircle2, Factory, Calendar } from 'lucide-react'
 import ProductionLine from '@/components/dashboard/ProductionLine'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { format, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'date-fns'
+import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 
 const parseRanges = (str: string) => {
   if (!str) return 0;
