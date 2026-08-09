@@ -51,6 +51,7 @@ export default function PlannerPage() {
   const [products, setProducts] = useState<any[]>([])
   const [rooms, setRooms] = useState<any[]>([])
   const [processes, setProcesses] = useState<any[]>([])
+  const [usersList, setUsersList] = useState<any[]>([])
   const [stats, setStats] = useState({ onTime: 0, delayed: 0, early: 0, total: 0 })
   
   const [searchQuery, setSearchQuery] = useState("")
@@ -93,12 +94,13 @@ export default function PlannerPage() {
 
   const fetchData = async () => {
     try {
-      const [lotsRes, productsRes, roomsRes, processesRes, logsRes] = await Promise.all([
+      const [lotsRes, productsRes, roomsRes, processesRes, logsRes, usersRes] = await Promise.all([
         supabase.from("production_lots").select("*, products(sku)").order("created_at", { ascending: false }),
         supabase.from("products").select("*").order("sku"),
         supabase.from("rooms").select("*").order("room_name"),
         supabase.from("processes").select("*").order("process_name"),
-        supabase.from("production_logs").select("*").order("created_at", { ascending: true })
+        supabase.from("production_logs").select("*").order("created_at", { ascending: true }),
+        supabase.from("users").select("id, full_name")
       ])
 
       if (lotsRes.data) setLots(lotsRes.data)
@@ -106,6 +108,7 @@ export default function PlannerPage() {
       if (roomsRes.data) setRooms(roomsRes.data)
       if (processesRes.data) setProcesses(processesRes.data)
       if (logsRes.data) setLogs(logsRes.data)
+      if (usersRes.data) setUsersList(usersRes.data)
 
       if (logsRes.data) {
         let onTime = 0, delayed = 0, early = 0
@@ -342,12 +345,18 @@ export default function PlannerPage() {
 
   
   const getHistoryData = () => {
+    const getUserName = (id: string | null) => {
+      if (!id) return 'Planner';
+      const u = usersList.find(u => u.id === id);
+      return u ? u.full_name : 'Planner';
+    };
+
     const orderHistory = lots.map(lot => ({
       id: `lot-${lot.id}`,
       type: 'เพิ่มออเดอร์',
       project: `${lot.po_no || '-'} / ${lot.products?.sku || 'Unknown SKU'}`,
       timestamp: lot.created_at,
-      user: lot.created_by || 'Planner',
+      user: getUserName(lot.created_by),
       details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
     }));
 
@@ -359,7 +368,7 @@ export default function PlannerPage() {
         type: 'ลงคิวงาน',
         project: `${lot?.po_no || '-'} / ${lot?.products?.sku || 'Unknown SKU'}`,
         timestamp: log.updated_at || log.created_at,
-        user: log.created_by || log.operator_id || 'Planner',
+        user: getUserName(log.created_by || log.operator_id),
         details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}`
       }
     });
