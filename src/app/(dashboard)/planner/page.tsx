@@ -29,6 +29,7 @@ import { Calendar as CalendarIcon, CheckCircle2, Clock, AlertTriangle, Activity,
 import { format, differenceInDays, startOfDay, addDays } from "date-fns"
 import { createClient } from "@supabase/supabase-js"
 import { toast } from "sonner"
+import { getUsers } from '@/app/actions/users'
 import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
 import { TaskCalendar } from "@/components/ui/TaskCalendar"
@@ -104,7 +105,7 @@ export default function PlannerPage() {
         supabase.from("rooms").select("*").order("room_name"),
         supabase.from("processes").select("*").order("process_name"),
         supabase.from("production_logs").select("*").order("created_at", { ascending: true }),
-        supabase.from("profiles").select("id, full_name, employee_id")
+        getUsers()
       ])
 
       if (lotsRes.data) setLots(lotsRes.data)
@@ -112,7 +113,7 @@ export default function PlannerPage() {
       if (roomsRes.data) setRooms(roomsRes.data)
       if (processesRes.data) setProcesses(processesRes.data)
       if (logsRes.data) setLogs(logsRes.data)
-      if (usersRes.data) setUsersList(usersRes.data)
+      if (usersRes.success && usersRes.data) setUsersList(usersRes.data)
 
       if (logsRes.data) {
         let onTime = 0, delayed = 0, early = 0
