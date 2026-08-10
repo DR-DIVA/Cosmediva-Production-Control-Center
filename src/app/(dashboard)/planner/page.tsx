@@ -388,18 +388,18 @@ export default function PlannerPage() {
     const getUserName = (id: string | null) => {
       if (id) {
         const u = usersList.find(u => u.id === id);
-        if (u) return u.full_name;
+        if (u) return u.employee_id ? u.employee_id.toUpperCase() : u.full_name;
         if (id === currentUserId && currentUser && currentUser !== 'Unknown User') {
           const empId = currentUser.split('@')[0].toLowerCase();
           const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
-          return cu ? cu.full_name : currentUser.split('@')[0];
+          return cu?.employee_id ? cu.employee_id.toUpperCase() : currentUser.split('@')[0].toUpperCase();
         }
         return 'Planner';
       } else {
         if (currentUser && currentUser !== 'Unknown User') {
           const empId = currentUser.split('@')[0].toLowerCase();
           const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
-          return cu ? cu.full_name : currentUser.split('@')[0];
+          return cu?.employee_id ? cu.employee_id.toUpperCase() : currentUser.split('@')[0].toUpperCase();
         }
         return 'Planner';
       }
