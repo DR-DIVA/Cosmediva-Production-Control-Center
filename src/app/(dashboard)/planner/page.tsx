@@ -89,12 +89,7 @@ export default function PlannerPage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (user) {
         setCurrentUserId(user.id)
-        const email = user.email || 'Unknown User';
-        if (email.includes('@')) {
-          setCurrentUser(email.split('@')[0]);
-        } else {
-          setCurrentUser(email);
-        }
+        setCurrentUser(user.email || 'Unknown User')
       }
     }
     fetchUser()
@@ -390,9 +385,21 @@ export default function PlannerPage() {
   
   const getHistoryData = () => {
     const getUserName = (id: string | null) => {
-      if (!id) return 'Planner';
-      const u = usersList.find(u => u.id === id);
-      return u ? u.full_name : 'Planner';
+      if (id) {
+        const u = usersList.find(u => u.id === id);
+        if (u) return u.full_name;
+        if (id === currentUserId && currentUser && currentUser !== 'Unknown User') {
+          const cu = usersList.find(u => u.email === currentUser);
+          return cu ? cu.full_name : currentUser.split('@')[0];
+        }
+        return 'Planner';
+      } else {
+        if (currentUser && currentUser !== 'Unknown User') {
+          const cu = usersList.find(u => u.email === currentUser);
+          return cu ? cu.full_name : currentUser.split('@')[0];
+        }
+        return 'Planner';
+      }
     };
 
     const orderHistory = lots.map(lot => ({
@@ -1109,18 +1116,16 @@ export default function PlannerPage() {
               </Select>
             </div>
 
-            {doneCanClosePo === "no" && (
-              <div className="grid grid-cols-4 items-start gap-4">
-                <Label htmlFor="reason" className="text-right pt-2">สาเหตุ</Label>
-                <Textarea
-                  id="reason"
-                  className="col-span-3"
-                  placeholder="ระบุสาเหตุที่ยังปิด PO ไม่ได้..."
-                  value={doneReason}
-                  onChange={(e) => setDoneReason(e.target.value)}
-                />
-              </div>
-            )}
+            <div className="grid grid-cols-4 items-start gap-4">
+              <Label htmlFor="reason" className="text-right pt-2">สาเหตุ</Label>
+              <Textarea
+                id="reason"
+                className="col-span-3"
+                placeholder={doneCanClosePo === "no" ? "ระบุสาเหตุที่ยังปิด PO ไม่ได้..." : "ระบุสาเหตุหรือหมายเหตุเพิ่มเติม (ถ้ามี)"}
+                value={doneReason}
+                onChange={(e) => setDoneReason(e.target.value)}
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDoneDialogOpen(false)}>ยกเลิก</Button>
