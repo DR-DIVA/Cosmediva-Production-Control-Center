@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+ï»¿import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: Request) {
@@ -35,8 +35,9 @@ export async function GET(request: Request) {
 
     // 3. Find processes
     const { data: processes } = await supabase.from('processes').select('id, process_name');
-    const packingProc = processes?.find(p => p.process_name === 'ºÃÃ¨Ø');
-    const mixingProc = processes?.find(p => p.process_name === '¼ÊÁ');
+    // Using hex codes to avoid encoding issues just in case
+    const packingProc = processes?.find(p => p.process_name === '\u0E1A\u0E23\u0E23\u0E08\u0E38');
+    const mixingProc = processes?.find(p => p.process_name === '\u0E1C\u0E2A\u0E21');
 
     // 4. Delete packing tasks on 25/7/2569 (2026-07-25)
     if (packingProc) {
