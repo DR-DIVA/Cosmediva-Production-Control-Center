@@ -104,7 +104,7 @@ export default function PlannerPage() {
         supabase.from("rooms").select("*").order("room_name"),
         supabase.from("processes").select("*").order("process_name"),
         supabase.from("production_logs").select("*").order("created_at", { ascending: true }),
-        supabase.from("profiles").select("id, full_name, email")
+        supabase.from("profiles").select("id, full_name, employee_id")
       ])
 
       if (lotsRes.data) setLots(lotsRes.data)
@@ -389,13 +389,15 @@ export default function PlannerPage() {
         const u = usersList.find(u => u.id === id);
         if (u) return u.full_name;
         if (id === currentUserId && currentUser && currentUser !== 'Unknown User') {
-          const cu = usersList.find(u => u.email === currentUser);
+          const empId = currentUser.split('@')[0].toLowerCase();
+          const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
           return cu ? cu.full_name : currentUser.split('@')[0];
         }
         return 'Planner';
       } else {
         if (currentUser && currentUser !== 'Unknown User') {
-          const cu = usersList.find(u => u.email === currentUser);
+          const empId = currentUser.split('@')[0].toLowerCase();
+          const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
           return cu ? cu.full_name : currentUser.split('@')[0];
         }
         return 'Planner';
