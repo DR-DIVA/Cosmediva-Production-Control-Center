@@ -104,7 +104,7 @@ export default function PlannerPage() {
         supabase.from("rooms").select("*").order("room_name"),
         supabase.from("processes").select("*").order("process_name"),
         supabase.from("production_logs").select("*").order("created_at", { ascending: true }),
-        supabase.from("users").select("id, full_name")
+        supabase.from("profiles").select("id, full_name, email")
       ])
 
       if (lotsRes.data) setLots(lotsRes.data)

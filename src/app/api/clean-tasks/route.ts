@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function GET(request: Request) {
@@ -11,9 +11,9 @@ export async function GET(request: Request) {
 
   try {
     // 1. Update created_by for old records to PLPTB1234
-    const { data: users, error: userErr } = await supabase.from('users').select('id, full_name').eq('employee_code', 'PLPTB1234');
+    const { data: users, error: userErr } = await supabase.from('profiles').select('id, full_name').eq('employee_id', 'PLPTB1234');
     if (userErr || !users || users.length === 0) {
-      results.push('Error finding user PLPTB1234');
+      results.push('Error finding user PLPTB1234 in profiles: ' + (userErr?.message || 'Not found'));
     } else {
       const plannerId = users[0].id;
       // Update logs where created_by is null
