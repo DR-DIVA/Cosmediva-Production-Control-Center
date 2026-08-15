@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle, Filter } from 'lucide-react';
 
 type RMItem = {
   id: string;
@@ -626,19 +626,6 @@ export default function RMControlCenterPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="w-[160px] flex-shrink-0">
-            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-              <SelectTrigger className="bg-white">
-                <SelectValue placeholder="ทุกสถานะ (All)" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="ALL">ทุกสถานะ (All)</SelectItem>
-                <SelectItem value="PENDING_DELIVERY">รอรับของ (Pending)</SelectItem>
-                <SelectItem value="RECEIVED">รับของแล้ว (Received)</SelectItem>
-                <SelectItem value="READY">พร้อมจ่าย (Ready)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
           <Button variant="outline" onClick={exportToCSV} className="bg-white flex-shrink-0">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
@@ -782,7 +769,26 @@ export default function RMControlCenterPage() {
                         <TableHead className="w-[10%]">Code</TableHead>
                         <TableHead className="w-[15%]">Name</TableHead>
                         <TableHead className="w-[8%]">Qty</TableHead>
-                        <TableHead className="w-[10%]">Status</TableHead>
+                        <TableHead className="w-[10%] p-0">
+                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
+                              <div className="flex items-center gap-2">
+                                <span>Status</span>
+                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ALL">All Status</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
+                              <SelectItem value="RECEIVED">Received</SelectItem>
+                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                              <SelectItem value="READY">Released</SelectItem>
+                              <SelectItem value="DELAYED">Delayed</SelectItem>
+                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableHead>
                         <TableHead>File</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -856,7 +862,26 @@ export default function RMControlCenterPage() {
                         <TableHead className="w-[8%]">Qty</TableHead>
                         <TableHead className="w-[8%]">Warehouse</TableHead>
                         <TableHead className="w-[9%]">Receive Date</TableHead>
-                        <TableHead className="w-[10%]">Status</TableHead>
+                        <TableHead className="w-[10%] p-0">
+                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
+                              <div className="flex items-center gap-2">
+                                <span>Status</span>
+                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ALL">All Status</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
+                              <SelectItem value="RECEIVED">Received</SelectItem>
+                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                              <SelectItem value="READY">Released</SelectItem>
+                              <SelectItem value="DELAYED">Delayed</SelectItem>
+                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1008,7 +1033,26 @@ export default function RMControlCenterPage() {
                         <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
                         <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
                         <TableHead>Required Qty</TableHead>
-                        <TableHead className="w-[10%]">Status</TableHead>
+                        <TableHead className="w-[10%] p-0">
+                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
+                              <div className="flex items-center gap-2">
+                                <span>Status</span>
+                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ALL">All Status</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
+                              <SelectItem value="RECEIVED">Received</SelectItem>
+                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                              <SelectItem value="READY">Released</SelectItem>
+                              <SelectItem value="DELAYED">Delayed</SelectItem>
+                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableHead>
                         <TableHead className="w-[8%]">ETA</TableHead>
                       </TableRow>
                     </TableHeader>
