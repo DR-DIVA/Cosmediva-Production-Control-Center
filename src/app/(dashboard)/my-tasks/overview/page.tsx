@@ -856,11 +856,15 @@ export default function MyTasksPage() {
                     <CardHeader className="pb-2 p-3">
                       <div className="flex justify-between items-start">
                         <div>
-                          <p className="text-xs font-medium text-[#D4AF37] line-clamp-1">
+                          <p className="text-xs font-medium text-[#D4AF37] truncate" title={`${task.processes?.process_name} ${task.rooms ? `(${task.rooms.room_name})` : ''}`}>
                             {task.processes?.process_name} {task.rooms ? `(${task.rooms.room_name})` : ''}
                           </p>
-                          <CardTitle className="text-base mt-0.5">{task.production_lots?.products?.sku}</CardTitle>
-                          <p className="text-xs text-gray-500 line-clamp-1">{task.production_lots?.products?.product_name}</p>
+                          <CardTitle className="text-base mt-0.5 truncate" title={task.production_lots?.products?.sku || ''}>
+                            {task.production_lots?.products?.sku}
+                          </CardTitle>
+                          <p className="text-xs text-gray-500 line-clamp-2 leading-snug" title={task.production_lots?.products?.product_name || ''}>
+                            {task.production_lots?.products?.product_name}
+                          </p>
                         </div>
                       </div>
                     </CardHeader>

@@ -303,8 +303,8 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                   href={route.href}
                   onClick={handleLinkClick}
                   className={cn(
-                    "group flex p-3 w-full justify-start cursor-pointer hover:text-white hover:bg-[#D4AF37]/ hover:text-[#D4AF37] rounded-lg transition",
-                    pathname === route.href ? "text-[#D4AF37] bg-[#D4AF37]/ border border-[#D4AF37]/30 shadow-sm shadow-cosme-gold/10" : "text-zinc-400",
+                    "group flex p-3 w-full justify-start cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
+                    pathname === route.href ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-[#D4AF37]/10" : "text-zinc-400",
                     isCollapsed ? "justify-center px-0" : ""
                   )}
                   title={isCollapsed ? route.label : undefined}

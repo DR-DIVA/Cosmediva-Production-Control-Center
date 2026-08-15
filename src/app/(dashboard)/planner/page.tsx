@@ -588,6 +588,7 @@ export default function PlannerPage() {
                   <TableHead className="min-w-[200px]">Project (PO/SKU)</TableHead>
                   <TableHead>LOT</TableHead>
                   <TableHead>ยอดออเดอร์</TableHead>
+                  <TableHead>FG Delivery</TableHead>
                   <TableHead>จำนวนถัง</TableHead>
                   <TableHead>Bulk (kg)</TableHead>
                   <TableHead>บรรจุ (g)</TableHead>
@@ -629,6 +630,7 @@ export default function PlannerPage() {
                         </TableCell>
                         <TableCell>{lot.lot_no}</TableCell>
                         <TableCell>{lot.order_quantity?.toLocaleString()} pc</TableCell>
+                        <TableCell className="font-semibold text-emerald-600">{lot.planned_quantity ? `${lot.planned_quantity.toLocaleString()} pc` : "-"}</TableCell>
                         <TableCell>{lot.total_tanks} ถัง</TableCell>
                         <TableCell>{lot.kg_per_tank || "-"}</TableCell>
                         <TableCell>{lot.g_per_piece || "-"}</TableCell>
@@ -695,7 +697,7 @@ export default function PlannerPage() {
                                 
                                 <Select value={log.process_id} onValueChange={(val) => handleUpdateLogDirect(log.id, "process_id", val)}>
                                    <SelectTrigger className="h-7 text-xs w-[100px] border-none bg-transparent font-medium p-0 shadow-none focus:ring-0">
-                                      <span className="truncate">{process?.process_name || "เลือกงาน"}</span>
+                                      <span className="line-clamp-2 break-words text-wrap">{process?.process_name || "เลือกงาน"}</span>
                                       <ChevronDown className="h-4 w-4 opacity-50" />
                                    </SelectTrigger>
                                    <SelectContent>
@@ -806,7 +808,7 @@ export default function PlannerPage() {
                     <div key={lot.id} className="group relative z-10">
                       <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
                         <div className="w-[250px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
-                          <div className="font-medium text-sm truncate">{lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span></div>
+                          <div className="font-medium text-sm line-clamp-2 break-words text-wrap">{lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span></div>
                         </div>
                         <div className="flex flex-1"></div>
                       </div>
@@ -857,7 +859,7 @@ export default function PlannerPage() {
                                   style={{ left: `calc(${leftPercent}% + 4px)`, width: `calc(${widthPercent}% - 8px)` }}
                                   title={`รหัสงาน/SKU: ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nLOT: ${lot.lot_no || '-'}\nถังที่: ${log.tank_start}-${log.tank_end}\nวันที่: ${log.activity_date ? format(new Date(log.activity_date), 'dd MMM yyyy') : '-'}${log.end_date && log.end_date !== log.activity_date ? ` ถึง ${format(new Date(log.end_date), 'dd MMM yyyy')}` : ''}`}
                                 >
-                                  <span className="truncate">{lot.products?.sku} - {process?.process_name}</span>
+                                  <span className="line-clamp-2 break-words text-wrap">{lot.products?.sku} - {process?.process_name}</span>
                                 </div>
                               )}
                             </div>

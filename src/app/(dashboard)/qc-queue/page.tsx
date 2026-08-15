@@ -631,11 +631,12 @@ export default function QCQueuePage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-sm text-left table-fixed">
                     <thead className="bg-slate-100 text-slate-700">
                       <tr>
                         <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                         <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
+                        <th className="px-4 py-3 font-medium text-purple-700">Control No.</th>
                         <th className="px-4 py-3 font-medium">รหัส / ชื่อวัตถุดิบ</th>
                         <th className="px-4 py-3 font-medium">จำนวน</th>
                         <th className="px-4 py-3 font-medium">PO No.</th>
@@ -655,9 +656,10 @@ export default function QCQueuePage() {
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                           </td>
                           <td className="px-4 py-3">{item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-'}</td>
+                          <td className="px-4 py-3 font-bold text-purple-700">{item.control_no || '-'}</td>
                           <td className="px-4 py-3">
                             <span className="text-indigo-600 font-semibold">{item.rm_code}</span>
-                            <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                            <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
@@ -678,7 +680,7 @@ export default function QCQueuePage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <DropdownMenu>
-                              <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                              <DropdownMenuTrigger className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
                                 อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -735,7 +737,7 @@ export default function QCQueuePage() {
                     </div>
                   ) : (
                     <div className="rounded-md border">
-                      <table className="w-full text-sm text-left">
+                      <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
@@ -757,7 +759,7 @@ export default function QCQueuePage() {
                               </td>
                               <td className="px-4 py-3">
                                 <span className="text-indigo-600 font-semibold">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                                 {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                                   <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                     {item.bottom_remark.split('/')[0].trim()}
@@ -816,12 +818,13 @@ export default function QCQueuePage() {
                     </div>
                   ) : (
                     <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
+                      <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-slate-100 text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">ประเภท</th>
                             <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                             <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
+                            <th className="px-4 py-3 font-medium text-purple-700">Control No.</th>
                             <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
                             <th className="px-4 py-3 font-medium">จำนวน</th>
                             <th className="px-4 py-3 font-medium">สถานะ QC</th>
@@ -847,9 +850,10 @@ export default function QCQueuePage() {
                                 <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                               </td>
                               <td className="px-4 py-3">{item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-'}</td>
+                              <td className="px-4 py-3 font-bold text-purple-700">{item.control_no || '-'}</td>
                               <td className="px-4 py-3">
                                 <span className="text-purple-600 font-semibold">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                                 {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                                   <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                     {item.bottom_remark.split('/')[0].trim()}
@@ -869,7 +873,7 @@ export default function QCQueuePage() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <DropdownMenu>
-                                  <DropdownMenuTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                                  <DropdownMenuTrigger className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
                                     อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
@@ -901,7 +905,7 @@ export default function QCQueuePage() {
                     </div>
                   ) : (
                     <div className="rounded-md border">
-                      <table className="w-full text-sm text-left">
+                      <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
@@ -928,7 +932,7 @@ export default function QCQueuePage() {
                                   <Badge className="bg-blue-100 text-blue-700 border-blue-200 mb-1" variant="outline">[CMD1]</Badge>
                                 )}
                                 <span className="text-purple-600 font-semibold ml-2">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                                 {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                                   <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                     {item.bottom_remark.split('/')[0].trim()}
@@ -982,7 +986,7 @@ export default function QCQueuePage() {
             ) : (
               <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-sm text-left table-fixed">
                     <thead className="bg-[#F8F6F0] text-[#8B7355] border-b border-[#D4AF37]/20">
                       <tr>
                         <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
@@ -1031,7 +1035,7 @@ export default function QCQueuePage() {
                                   <ChevronRight className={`w-4 h-4 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
                                   <div>
                                     <div className="font-semibold text-violet-600">{sku}</div>
-                                    <div className="text-xs text-slate-500 truncate max-w-[200px]">{productName}</div>
+                                    <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap max-w-[200px]">{productName}</div>
                                   </div>
                                 </div>
                               </td>
@@ -1043,7 +1047,7 @@ export default function QCQueuePage() {
                                 {task.activity_date ? new Date(task.activity_date).toLocaleDateString('th-TH') : '-'}
                               </td>
                               <td className="px-4 py-3">
-                                <Badge variant="secondary" className="bg-[#D4AF37]/10 text-[#D4AF37] whitespace-nowrap">
+                                <Badge variant="secondary" className="bg-[#D4AF37]/10 text-[#D4AF37] ">
                                   ตรวจแล้ว {qcDoneCount}/{totalInBatch}
                                 </Badge>
                               </td>
@@ -1091,7 +1095,7 @@ export default function QCQueuePage() {
                                                   </div>
                                                   <div className="flex items-center gap-1 mt-1 text-slate-400">
                                                     <User className="w-3 h-3 shrink-0" />
-                                                    <span className="text-[10px] truncate max-w-[120px]">{h.user}</span>
+                                                    <span className="text-[10px] line-clamp-2 break-words text-wrap max-w-[120px]">{h.user}</span>
                                                   </div>
                                                   {h.note && (
                                                     <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
@@ -1189,7 +1193,7 @@ export default function QCQueuePage() {
                     </div>
                   ) : (
                     <div className="rounded-md border">
-                      <table className="w-full text-sm text-left">
+                      <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">เวลา</th>
@@ -1211,16 +1215,16 @@ export default function QCQueuePage() {
 
                             return (
                               <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
-                                <td className="px-4 py-3 whitespace-nowrap">{new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0] || item.user}</td>
-                                <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
+                                <td className="px-4 py-3 ">{new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                                <td className="px-4 py-3 ">{item.user?.split('@')[0] || item.user}</td>
+                                <td className="px-4 py-3  font-medium text-[#D4AF37]">
                                   {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
                                 </td>
-                                <td className="px-4 py-3 whitespace-nowrap font-semibold">ถังที่ {item.tankNum}</td>
-                                <td className="px-4 py-3 whitespace-nowrap">
+                                <td className="px-4 py-3  font-semibold">ถังที่ {item.tankNum}</td>
+                                <td className="px-4 py-3 ">
                                   <Badge variant="secondary" className={statusColor}>{item.action}</Badge>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600 truncate max-w-xs">{item.note || '-'}</td>
+                                <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">{item.note || '-'}</td>
                               </tr>
                             )
                           })}
@@ -1260,7 +1264,7 @@ export default function QCQueuePage() {
                 </div>
               ) : (
                 <div className="rounded-md border">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-sm text-left table-fixed">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
                         <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
@@ -1350,7 +1354,7 @@ export default function QCQueuePage() {
                     </div>
                   ) : (
                     <div className="rounded-md border">
-                      <table className="w-full text-sm text-left">
+                      <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">สินค้า / SKU</th>

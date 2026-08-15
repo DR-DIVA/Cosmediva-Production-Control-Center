@@ -538,7 +538,7 @@ export default function MixingTasksPage() {
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
-                    <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100]">
+                    <TooltipContent side="top" className="max-w-sm p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[9999]">
                       {tooltipContent}
                     </TooltipContent>
                   )}
@@ -724,9 +724,9 @@ export default function MixingTasksPage() {
                           <TableCell>
                             {expandedRow === task.id ? <ChevronDown className="w-4 h-4 text-slate-500" /> : <ChevronRight className="w-4 h-4 text-slate-400" />}
                           </TableCell>
-                          <TableCell className="font-medium text-[#D4AF37] whitespace-normal min-w-[250px] max-w-[350px] break-words">
-                            <div className="break-words">{task.production_lots?.products?.sku || '-'}</div>
-                            <div className="text-xs text-slate-500 font-normal break-words">{task.production_lots?.products?.product_name || ''}</div>
+                          <TableCell className="font-medium text-[#D4AF37] max-w-[300px]">
+                            <div className="truncate" title={task.production_lots?.products?.sku || ''}>{task.production_lots?.products?.sku || '-'}</div>
+                            <div className="text-xs text-slate-500 font-normal line-clamp-2 leading-snug" title={task.production_lots?.products?.product_name || ''}>{task.production_lots?.products?.product_name || ''}</div>
                           </TableCell>
                           <TableCell className="font-semibold whitespace-nowrap">{task.production_lots?.lot_no || '-'}</TableCell>
                           <TableCell className="whitespace-nowrap">{task.tank_start} - {task.tank_end}</TableCell>

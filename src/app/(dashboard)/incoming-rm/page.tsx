@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Truck, Package, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle } from 'lucide-react';
 
 type RMItem = {
   id: string;
@@ -32,6 +32,7 @@ type RMItem = {
   receive_date: string;
   qc_status: string;
   file_link: string;
+  control_no?: string | null;
   bottom_remark?: string | null;
   top_remark?: string | null;
   production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
@@ -48,11 +49,24 @@ export default function RMControlCenterPage() {
   const [lotOptions, setLotOptions] = useState<any[]>([]);
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  const [currentUser, setCurrentUser] = useState('');
   const [mainTab, setMainTab] = useState<'rm'|'pm'>('rm');
+
+  // Edit Modal State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<RMItem | null>(null);
+  const [editForm, setEditForm] = useState({ po_no: '', supplier: '', rm_code: '', rm_name: '', quantity: 0, unit: '', eta_date: '' });
+
+  // Receive Modal State
+  const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
+  const [receivingItem, setReceivingItem] = useState<RMItem | null>(null);
+  const [controlNoInput, setControlNoInput] = useState('');
+  const [isGeneratingControlNo, setIsGeneratingControlNo] = useState(false);
 
   // Customer Supplied PM State
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
-  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
+  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
 
   const fetchItems = async () => {
     setLoading(true);
@@ -82,6 +96,7 @@ export default function RMControlCenterPage() {
   useEffect(() => {
     fetchItems();
     fetchLots();
+    setCurrentUser(localStorage.getItem('currentUser') || '');
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -207,10 +222,13 @@ export default function RMControlCenterPage() {
   };
 
   const handleStatusChange = async (item: RMItem, newStatus: string) => {
+    if (newStatus === 'RECEIVED') {
+      await openReceiveModal(item);
+      return;
+    }
+
     const updates: any = { status: newStatus };
-    if (newStatus === 'RECEIVED' && !item.receive_date) {
-      updates.receive_date = new Date().toISOString();
-    } else if (newStatus === 'PENDING_DELIVERY') {
+    if (newStatus === 'PENDING_DELIVERY') {
       updates.receive_date = null;
     }
     
@@ -222,7 +240,89 @@ export default function RMControlCenterPage() {
     if (error) {
       toast.error('อัปเดตสถานะไม่สำเร็จ');
     } else {
-      toast.success('อัปเดตสถานะ และประทับเวลาเรียบร้อยแล้ว');
+      toast.success('อัปเดตสถานะเรียบร้อยแล้ว');
+      fetchItems();
+    }
+  };
+
+  const openReceiveModal = async (item: RMItem) => {
+    setReceivingItem(item);
+    setIsGeneratingControlNo(true);
+    setIsReceiveModalOpen(true);
+    setControlNoInput('');
+    
+    try {
+      const prefix = item.warehouse === 'MMRM' ? 'R' : 'P';
+      const d = new Date();
+      const yy = d.getFullYear().toString().slice(2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateString = `${yy}${mm}${dd}`;
+      const searchPattern = `${prefix}${dateString}-%`;
+
+      const { data, error } = await supabase
+        .from('production_lot_rms')
+        .select('control_no')
+        .like('control_no', searchPattern)
+        .order('control_no', { ascending: false })
+        .limit(1);
+
+      let nextNum = 1;
+      if (!error && data && data.length > 0 && data[0].control_no) {
+        const parts = data[0].control_no.split('-');
+        if (parts.length === 2) {
+          const lastNum = parseInt(parts[1], 10);
+          if (!isNaN(lastNum)) {
+            nextNum = lastNum + 1;
+          }
+        }
+      }
+      setControlNoInput(`${prefix}${dateString}-${String(nextNum).padStart(3, '0')}`);
+    } catch (error) {
+      console.error("Error generating control no:", error);
+    } finally {
+      setIsGeneratingControlNo(false);
+    }
+  };
+
+  const confirmReceive = async () => {
+    if (!receivingItem) return;
+    if (!controlNoInput.trim()) {
+      toast.error('กรุณาระบุ Control No.');
+      return;
+    }
+
+    // Check for duplicate
+    const { data: duplicateData } = await supabase
+      .from('production_lot_rms')
+      .select('id')
+      .eq('control_no', controlNoInput.trim())
+      .limit(1);
+
+    if (duplicateData && duplicateData.length > 0) {
+      toast.error('Control No. นี้มีอยู่ในระบบแล้ว กรุณาใช้เลขอื่น');
+      return;
+    }
+
+    const updates: any = { 
+      status: 'RECEIVED',
+      control_no: controlNoInput.trim()
+    };
+    if (!receivingItem.receive_date) {
+      updates.receive_date = new Date().toISOString();
+    }
+
+    const { error } = await supabase
+      .from('production_lot_rms')
+      .update(updates)
+      .eq('id', receivingItem.id);
+
+    if (error) {
+      toast.error('อัปเดตสถานะไม่สำเร็จ');
+    } else {
+      toast.success('รับของและบันทึก Control No. เรียบร้อยแล้ว');
+      setIsReceiveModalOpen(false);
+      setReceivingItem(null);
       fetchItems();
     }
   };
@@ -251,6 +351,41 @@ export default function RMControlCenterPage() {
     }
   };
 
+  const openEditModal = (item: RMItem) => {
+    setEditingItem(item);
+    setEditForm({
+      po_no: item.po_no || '',
+      supplier: item.supplier || '',
+      rm_code: item.rm_code || '',
+      rm_name: item.rm_name || '',
+      quantity: item.quantity || 0,
+      unit: item.unit || '',
+      eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : ''
+    });
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditSubmit = async () => {
+    if (!editingItem) return;
+    const { error } = await supabase.from('production_lot_rms').update({
+      po_no: editForm.po_no,
+      supplier: editForm.supplier,
+      rm_code: editForm.rm_code,
+      rm_name: editForm.rm_name,
+      quantity: editForm.quantity,
+      unit: editForm.unit,
+      eta_date: editForm.eta_date || null
+    }).eq('id', editingItem.id);
+
+    if (error) {
+      toast.error('แก้ไขข้อมูลไม่สำเร็จ');
+    } else {
+      toast.success('แก้ไขข้อมูลสำเร็จ');
+      setIsEditModalOpen(false);
+      fetchItems();
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm('ยืนยันการลบรายการนี้?')) return;
     const { error } = await supabase.from('production_lot_rms').delete().eq('id', id);
@@ -262,8 +397,58 @@ export default function RMControlCenterPage() {
     }
   };
 
+  const openCmd2Modal = async () => {
+    setIsCmd2ModalOpen(true);
+    setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
+    
+    try {
+      const prefix = 'P';
+      const d = new Date();
+      const yy = d.getFullYear().toString().slice(2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateString = `${yy}${mm}${dd}`;
+      const searchPattern = `${prefix}${dateString}-%`;
+
+      const { data, error } = await supabase
+        .from('production_lot_rms')
+        .select('control_no')
+        .like('control_no', searchPattern)
+        .order('control_no', { ascending: false })
+        .limit(1);
+
+      let nextNum = 1;
+      if (!error && data && data.length > 0 && data[0].control_no) {
+        const parts = data[0].control_no.split('-');
+        if (parts.length === 2) {
+          const lastNum = parseInt(parts[1], 10);
+          if (!isNaN(lastNum)) {
+            nextNum = lastNum + 1;
+          }
+        }
+      }
+      setCmd2Form(prev => ({ ...prev, controlNo: `${prefix}${dateString}-${String(nextNum).padStart(3, '0')}` }));
+    } catch (error) {
+      console.error("Error generating control no:", error);
+    }
+  };
+
   const handleCmd2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (cmd2Form.controlNo.trim()) {
+      const { data: duplicateData } = await supabase
+        .from('production_lot_rms')
+        .select('id')
+        .eq('control_no', cmd2Form.controlNo.trim())
+        .limit(1);
+
+      if (duplicateData && duplicateData.length > 0) {
+        toast.error('Control No. นี้มีอยู่ในระบบแล้ว กรุณาใช้เลขอื่น');
+        return;
+      }
+    }
+
     setUploading(true);
     
     // Generate pseudo PO/PR number
@@ -282,6 +467,7 @@ export default function RMControlCenterPage() {
       unit: 'pcs',
       warehouse: cmd2Form.warehouse,
       lot_product: cmd2Form.lotProduct,
+      control_no: cmd2Form.controlNo.trim() || undefined,
       status: 'RECEIVED',
       receive_date: new Date().toISOString()
     });
@@ -293,7 +479,7 @@ export default function RMControlCenterPage() {
     } else {
       toast.success('รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ!');
       setIsCmd2ModalOpen(false);
-      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM' });
+      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
       fetchItems();
     }
   };
@@ -332,15 +518,27 @@ export default function RMControlCenterPage() {
   
   const typeFilteredItems = items.filter(item => mainTab === 'pm' ? isPM(item.rm_code) : !isPM(item.rm_code));
 
-  const filteredItems = typeFilteredItems.filter(item => 
-    (item.po_no || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.rm_code || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.rm_name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.lot_product || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.production_lots?.products?.sku || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (item.production_lots?.lot_no || '').toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredItems = typeFilteredItems.filter(item => {
+    if (statusFilter !== 'ALL') {
+      if (statusFilter === 'READY') {
+        if (item.status !== 'READY' && item.status !== 'QC_PASS' && item.status !== 'PASSED') return false;
+      } else {
+        if (item.status !== statusFilter) return false;
+      }
+    }
+    const term = searchQuery.toLowerCase();
+    const statusTh = item.status === 'PENDING_DELIVERY' ? 'รอรับเข้า' : item.status === 'RECEIVED' ? 'รับของแล้ว' : item.status === 'WAITING_QC' ? 'รอตรวจ qc' : item.status === 'PASSED' ? 'ผ่าน' : item.status === 'REJECTED' ? 'ไม่ผ่าน' : item.status === 'QUARANTINED' ? 'กักกัน' : '';
+    return (
+      (item.po_no || '').toLowerCase().includes(term) ||
+      (item.rm_code || '').toLowerCase().includes(term) ||
+      (item.rm_name || '').toLowerCase().includes(term) ||
+      (item.lot_product || '').toLowerCase().includes(term) ||
+      (item.supplier || '').toLowerCase().includes(term) ||
+      (item.production_lots?.products?.sku || '').toLowerCase().includes(term) ||
+      (item.production_lots?.lot_no || '').toLowerCase().includes(term) ||
+      statusTh.includes(term)
+    );
+  });
 
   const exportToCSV = () => {
     const headers = ['PO No', 'Supplier', 'PO Date', 'ETA', 'Code', 'Name', 'Warehouse', 'Qty', 'Unit', 'LOT/Job', 'PR', 'Status'];
@@ -397,7 +595,7 @@ export default function RMControlCenterPage() {
         <div className="flex-shrink-0">
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <Package className="w-8 h-8 text-yellow-400" />
-            <span className="whitespace-nowrap">Material Control Center</span>
+            <span className="whitespace-normal break-words">Material Control Center</span>
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
              <div>ศูนย์กลางจัดการใบสั่งซื้อ การรับเข้า และสถานะวัตถุดิบสำหรับการผลิต</div>
@@ -411,7 +609,7 @@ export default function RMControlCenterPage() {
           <div className="relative flex-shrink-0">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
             <Input 
-              placeholder="ค้นหา PO, Code, Name..." 
+              placeholder="ค้นหา PO, Code, Name, สถานะ..." 
               className="pl-9 w-full sm:w-[250px] bg-white"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -466,7 +664,7 @@ export default function RMControlCenterPage() {
                    </CardTitle>
                  </CardHeader>
                  <CardContent className="p-0">
-                    <Table className="whitespace-nowrap text-sm">
+                    <Table className="text-sm table-fixed w-full">
                       <TableHeader className="bg-red-50/50">
                         <TableRow>
                           <TableHead className="text-red-800">SKU / LOT</TableHead>
@@ -499,7 +697,7 @@ export default function RMControlCenterPage() {
                                 <div className="font-medium text-slate-700">{item.rm_code}</div>
                               </TableCell>
                               <TableCell>
-                                <div className="text-xs text-slate-500 max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                                 {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                                   <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                     {item.bottom_remark.split('/')[0].trim()}
@@ -550,17 +748,17 @@ export default function RMControlCenterPage() {
             <Card className="shadow-sm">
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="whitespace-nowrap text-sm">
+                  <Table className="text-sm table-fixed w-full">
                     <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead>PO No.</TableHead>
-                        <TableHead>Supplier</TableHead>
+                        <TableHead className="w-[10%]">PO No.</TableHead>
+                        <TableHead className="w-[12%]">Supplier</TableHead>
                         <TableHead>PO Date</TableHead>
-                        <TableHead>ETA</TableHead>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[8%]">ETA</TableHead>
+                        <TableHead className="w-[10%]">Code</TableHead>
+                        <TableHead className="w-[15%]">Name</TableHead>
+                        <TableHead className="w-[8%]">Qty</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
                         <TableHead>File</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -569,11 +767,11 @@ export default function RMControlCenterPage() {
                       {filteredItems.map((item) => (
                         <TableRow key={item.id} className="hover:bg-[#F8F6F0]/">
                           <TableCell className="font-medium text-[#D4AF37]">{item.po_no || '-'}</TableCell>
-                          <TableCell className="max-w-[150px] truncate" title={item.supplier}>{item.supplier || '-'}</TableCell>
+                          <TableCell className="line-clamp-2 break-words text-wrap" title={item.supplier}>{item.supplier || '-'}</TableCell>
                           <TableCell>{item.po_date ? new Date(item.po_date).toLocaleDateString('th-TH') : '-'}</TableCell>
                           <TableCell>{item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-'}</TableCell>
                           <TableCell>{item.rm_code}</TableCell>
-                          <TableCell className="max-w-[200px] truncate" title={item.rm_name}>{item.rm_name}</TableCell>
+                          <TableCell className="line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
                           <TableCell>{getStatusBadge(item.status)}</TableCell>
                           <TableCell>
@@ -584,15 +782,26 @@ export default function RMControlCenterPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell>
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              onClick={() => handleDelete(item.id)} 
-                              disabled={item.status !== 'PENDING_DELIVERY'}
-                              className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
-                            >
-                               <Trash2 className="w-4 h-4" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => openEditModal(item)} 
+                                disabled={item.status !== 'PENDING_DELIVERY'}
+                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                              >
+                                <Edit className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => handleDelete(item.id)} 
+                                disabled={item.status !== 'PENDING_DELIVERY'}
+                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                              >
+                                 <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -611,19 +820,19 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">Receiving Plan (รอรับของเข้า)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="whitespace-nowrap text-sm">
+                  <Table className="text-sm table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>ETA</TableHead>
-                        <TableHead>PO No.</TableHead>
-                        <TableHead>Supplier</TableHead>
-                        <TableHead>SKU / LOT</TableHead>
-                        <TableHead>Code</TableHead>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Qty</TableHead>
-                        <TableHead>Warehouse</TableHead>
-                        <TableHead>Receive Date (Actual)</TableHead>
-                        <TableHead>Status</TableHead>
+                        <TableHead className="w-[8%]">ETA</TableHead>
+                        <TableHead className="w-[10%]">PO No.</TableHead>
+                        <TableHead className="w-[12%]">Supplier</TableHead>
+                        <TableHead className="w-[10%]">SKU / LOT</TableHead>
+                        <TableHead className="w-[10%]">Code</TableHead>
+                        <TableHead className="w-[15%]">Name</TableHead>
+                        <TableHead className="w-[8%]">Qty</TableHead>
+                        <TableHead className="w-[8%]">Warehouse</TableHead>
+                        <TableHead className="w-[9%]">Receive Date</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -638,14 +847,14 @@ export default function RMControlCenterPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell>{item.po_no}</TableCell>
-                          <TableCell className="max-w-[150px] truncate">{item.supplier}</TableCell>
+                          <TableCell className="line-clamp-2 break-words text-wrap">{item.supplier}</TableCell>
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
                           </TableCell>
                           <TableCell className="font-medium text-slate-700">{item.rm_code}</TableCell>
                           <TableCell>
-                            <div className="text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                            <div className="text-slate-600 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
@@ -668,7 +877,7 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                             <Select value={item.status || ''} onValueChange={(val) => handleStatusChange(item, val as string)}>
+                             <Select value={item.status || ''} onValueChange={(val) => handleStatusChange(item, val as string)} disabled={item.status !== 'PENDING_DELIVERY' || !currentUser?.toUpperCase().startsWith('MM')}>
                                 <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="PENDING_DELIVERY">รอรับเข้า</SelectItem>
@@ -690,11 +899,12 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">QC Status (รายการรอตรวจ)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="whitespace-nowrap text-sm">
+                  <Table className="text-sm table-fixed w-full">
                     <TableHeader className="bg-[#F8F6F0]">
                       <TableRow className="border-b border-slate-200">
                         <TableHead className="font-semibold text-slate-700 px-6 py-4">Receive Date</TableHead>
                         <TableHead className="font-semibold text-slate-700">PO No.</TableHead>
+                        <TableHead className="font-semibold text-slate-700 text-purple-700">Control No.</TableHead>
                         <TableHead className="font-semibold text-slate-700">SKU / LOT</TableHead>
                         <TableHead className="font-semibold text-slate-700">Code</TableHead>
                         <TableHead className="font-semibold text-slate-700">Name</TableHead>
@@ -720,6 +930,7 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell className="font-medium text-slate-700">{item.po_no}</TableCell>
+                          <TableCell className="font-bold text-purple-700">{item.control_no || '-'}</TableCell>
                           <TableCell>
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
                             <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
@@ -728,7 +939,7 @@ export default function RMControlCenterPage() {
                              {item.rm_code}
                           </TableCell>
                           <TableCell>
-                            <div className="text-sm text-slate-600 max-w-[250px] truncate" title={item.rm_name}>{item.rm_name}</div>
+                            <div className="text-sm text-slate-600 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
                               <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
                                 {item.bottom_remark.split('/')[0].trim()}
@@ -765,16 +976,16 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="whitespace-nowrap text-sm">
+                  <Table className="text-sm table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead>SKU / LOT</TableHead>
+                        <TableHead className="w-[10%]">SKU / LOT</TableHead>
                         <TableHead>คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)</TableHead>
                         <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
                         <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
                         <TableHead>Required Qty</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>ETA</TableHead>
+                        <TableHead className="w-[10%]">Status</TableHead>
+                        <TableHead className="w-[8%]">ETA</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -871,7 +1082,7 @@ export default function RMControlCenterPage() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-[#D4AF37]/ p-4 rounded-lg border border-[#D4AF37]/30">
                 <div><Label className="text-slate-500 text-xs">PO No.</Label><div className="font-bold text-[#D4AF37]">{extractedData.poNo || '-'}</div></div>
                 <div><Label className="text-slate-500 text-xs">PO Date</Label><div className="font-semibold">{extractedData.poDate ? new Date(extractedData.poDate).toLocaleDateString('th-TH') : '-'}</div></div>
-                <div className="col-span-2"><Label className="text-slate-500 text-xs">Supplier</Label><div className="font-semibold truncate">{extractedData.supplier || '-'}</div></div>
+                <div className="col-span-2"><Label className="text-slate-500 text-xs">Supplier</Label><div className="font-semibold line-clamp-2 break-words text-wrap">{extractedData.supplier || '-'}</div></div>
                 <div><Label className="text-slate-500 text-xs">กำหนดส่ง (ETA)</Label><div className="font-bold text-orange-600">{extractedData.etaDate ? new Date(extractedData.etaDate).toLocaleDateString('th-TH') : '-'}</div></div>
                 <div><Label className="text-slate-500 text-xs">PR No.</Label><div className="font-semibold">{extractedData.prNo || '-'}</div></div>
                 <div className="col-span-2"><Label className="text-slate-500 text-xs">Top Remark</Label><div className="font-semibold text-sm">{extractedData.topRemark || '-'}</div></div>
@@ -910,7 +1121,7 @@ export default function RMControlCenterPage() {
               <div>
                 <Label className="mb-2 block font-semibold">รายการวัตถุดิบ ({extractedData.items.length} รายการ)</Label>
                 <div className="border rounded-md overflow-hidden">
-                  <Table className="text-sm">
+                  <Table className="text-sm table-fixed w-full">
                     <TableHeader className="bg-slate-100">
                       <TableRow>
                         <TableHead>รหัส</TableHead>
@@ -1022,6 +1233,81 @@ export default function RMControlCenterPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Receive Item Modal for Control No */}
+      <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
+        <DialogContent className="sm:max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle>ยืนยันการรับเข้าคลังสินค้า</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-slate-50 p-3 rounded-lg border text-sm space-y-1">
+              <div className="grid grid-cols-3"><span className="text-slate-500">รหัสวัตถุดิบ/บรรจุภัณฑ์:</span><span className="col-span-2 font-medium">{receivingItem?.rm_code || '-'}</span></div>
+              <div className="grid grid-cols-3"><span className="text-slate-500">ชื่อรายการ:</span><span className="col-span-2">{receivingItem?.rm_name || '-'}</span></div>
+              <div className="grid grid-cols-3"><span className="text-slate-500">คลังสินค้า:</span><span className="col-span-2">{receivingItem?.warehouse || '-'}</span></div>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>Control No.</Label>
+              <Input 
+                value={controlNoInput} 
+                onChange={(e) => setControlNoInput(e.target.value.toUpperCase())}
+                placeholder="เช่น R260815-001"
+                disabled={isGeneratingControlNo}
+              />
+              <p className="text-xs text-slate-500">ระบบสร้างเลขอัตโนมัติให้แล้ว สามารถแก้ไขได้หากจำเป็น</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>ยกเลิก</Button>
+            <Button onClick={confirmReceive} disabled={isGeneratingControlNo} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+              {isGeneratingControlNo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              ยืนยันรับของ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Edit Modal */}
+      <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>แก้ไขข้อมูลนำเข้า (Purchasing Edit)</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">PO No.</Label>
+              <Input value={editForm.po_no} onChange={e => setEditForm({...editForm, po_no: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Supplier</Label>
+              <Input value={editForm.supplier} onChange={e => setEditForm({...editForm, supplier: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Code</Label>
+              <Input value={editForm.rm_code} onChange={e => setEditForm({...editForm, rm_code: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Name</Label>
+              <Input value={editForm.rm_name} onChange={e => setEditForm({...editForm, rm_name: e.target.value})} className="col-span-3" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">Quantity</Label>
+              <div className="col-span-3 flex gap-2">
+                <Input type="number" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: Number(e.target.value)})} className="w-full" />
+                <Input value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})} className="w-24 placeholder:text-slate-400" placeholder="Unit" />
+              </div>
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label className="text-right">ETA Date</Label>
+              <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="col-span-3" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleEditSubmit} className="bg-[#D4AF37] hover:bg-[#B3932F] text-white">บันทึกการแก้ไข</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

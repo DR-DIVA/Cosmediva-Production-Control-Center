@@ -35,10 +35,6 @@ export default function DashboardLayout({
               <Menu className="w-6 h-6" />
             </Link>
           </div>
-
-          <div className="hidden sm:block text-sm font-bold text-[#D4AF37] tracking-wide uppercase ml-auto text-right pr-6">
-            One Platform. Every Process. Total Control.
-          </div>
         </header>
 
         <main className="flex-1 bg-[#F8F6F0] flex flex-col">
