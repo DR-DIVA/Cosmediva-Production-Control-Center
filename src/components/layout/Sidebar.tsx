@@ -53,7 +53,7 @@ const routes = [
     icon: FileText,
     href: '/incoming-rm',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx', 'purchase']
+    allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx', 'purchase', 'qc']
   },
   {
     label: 'CosmeFlow Production',
