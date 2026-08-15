@@ -303,7 +303,7 @@ export default function RMControlCenterPage() {
       const remainingSplits = splitRows.slice(1);
       if (remainingSplits.length > 0) {
         const insertData = remainingSplits.map(split => {
-          const { id, created_at, receive_date, control_no, ...baseItem } = splittingItem;
+          const { id, receive_date, control_no, ...baseItem } = splittingItem;
           return {
             ...baseItem,
             quantity: Number(split.quantity),
