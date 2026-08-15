@@ -322,13 +322,13 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">SKU</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[100px]">LOT No.</TableHead>
-                    <TableHead className="min-w-[350px]">สินค้า</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">ขั้นตอน / ห้อง</TableHead>
-                    <TableHead className="min-w-[350px]">รายละเอียดปัญหา</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">เวลาที่แจ้ง</TableHead>
-                    <TableHead className="text-right whitespace-nowrap min-w-[150px]">จัดการ (QA)</TableHead>
+                    <TableHead className="whitespace-nowrap">SKU</TableHead>
+                    <TableHead className="whitespace-nowrap">LOT No.</TableHead>
+                    <TableHead className="w-[25%]">สินค้า</TableHead>
+                    <TableHead className="whitespace-nowrap">ขั้นตอน / ห้อง</TableHead>
+                    <TableHead className="w-[35%]">รายละเอียดปัญหา</TableHead>
+                    <TableHead className="whitespace-nowrap">เวลาที่แจ้ง</TableHead>
+                    <TableHead className="text-right whitespace-nowrap">จัดการ (QA)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -407,12 +407,12 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">SKU</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[100px]">LOT No.</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[150px]">ขั้นตอน / ห้อง</TableHead>
-                    <TableHead className="min-w-[350px]">รายละเอียด / บันทึกการแก้ไข</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">ผู้ตรวจสอบ (QA)</TableHead>
-                    <TableHead className="whitespace-nowrap min-w-[120px]">เวลาที่แก้ไขล่าสุด</TableHead>
+                    <TableHead className="whitespace-nowrap">SKU</TableHead>
+                    <TableHead className="whitespace-nowrap">LOT No.</TableHead>
+                    <TableHead className="whitespace-nowrap">ขั้นตอน / ห้อง</TableHead>
+                    <TableHead className="w-[50%]">รายละเอียด / บันทึกการแก้ไข</TableHead>
+                    <TableHead className="whitespace-nowrap">ผู้ตรวจสอบ (QA)</TableHead>
+                    <TableHead className="whitespace-nowrap">เวลาที่แก้ไขล่าสุด</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -435,10 +435,10 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`} className="opacity-75">
-                        <TableCell className="font-medium min-w-[120px] text-purple-600 whitespace-nowrap">
+                        <TableCell className="font-medium text-purple-600 whitespace-nowrap">
                           <span className="whitespace-nowrap">{issue.production_lots?.products?.sku || '-'}</span>
                         </TableCell>
-                        <TableCell className="font-medium min-w-[120px] whitespace-nowrap">
+                        <TableCell className="font-medium whitespace-nowrap">
                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit whitespace-nowrap">{issue.production_lots?.lot_no}</Badge>
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
