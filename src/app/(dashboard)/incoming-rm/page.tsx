@@ -51,6 +51,7 @@ export default function RMControlCenterPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [currentUser, setCurrentUser] = useState('');
+  const [userRole, setUserRole] = useState('user');
   const [mainTab, setMainTab] = useState<'rm'|'pm'>('rm');
 
   // Edit Modal State
@@ -98,6 +99,7 @@ export default function RMControlCenterPage() {
     fetchLots();
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user?.email) {
+        setUserRole(data.user?.user_metadata?.role || 'user');
         const email = data.user.email;
         if (email.endsWith('@cosmediva.local')) {
           setCurrentUser(email.split('@')[0]);
@@ -809,8 +811,8 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => openEditModal(item)} 
-                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN'))}
-                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN')) ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -818,8 +820,8 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => handleDelete(item.id)} 
-                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN'))}
-                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN')) ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
                               >
                                  <Trash2 className="w-4 h-4" />
                               </Button>
@@ -899,7 +901,7 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                             <Select value={item.status || ''} onValueChange={(val) => handleStatusChange(item, val as string)} disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN'))}>
+                             <Select value={item.status || ''} onValueChange={(val) => handleStatusChange(item, val as string)} disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}>
                                 <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="PENDING_DELIVERY">รอรับเข้า</SelectItem>
