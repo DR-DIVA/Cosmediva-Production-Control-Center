@@ -322,13 +322,13 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>LOT No.</TableHead>
-                    <TableHead>สินค้า</TableHead>
-                    <TableHead>ขั้นตอน / ห้อง</TableHead>
-                    <TableHead>รายละเอียดปัญหา</TableHead>
-                    <TableHead>เวลาที่แจ้ง</TableHead>
-                    <TableHead className="text-right">จัดการ (QA)</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">SKU</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[100px]">LOT No.</TableHead>
+                    <TableHead className="min-w-[350px]">สินค้า</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">ขั้นตอน / ห้อง</TableHead>
+                    <TableHead className="min-w-[350px]">รายละเอียดปัญหา</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">เวลาที่แจ้ง</TableHead>
+                    <TableHead className="text-right whitespace-nowrap min-w-[150px]">จัดการ (QA)</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -351,20 +351,22 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`}>
-                        <TableCell className="font-medium text-purple-600">
-                          {issue.production_lots?.products?.sku || '-'}
+                        <TableCell className="font-medium text-purple-600 whitespace-nowrap">
+                          <span className="whitespace-nowrap">{issue.production_lots?.products?.sku || '-'}</span>
                         </TableCell>
-                        <TableCell className="font-medium">
-                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                        <TableCell className="font-medium whitespace-nowrap">
+                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit whitespace-nowrap">{issue.production_lots?.lot_no}</Badge>
                         </TableCell>
-                        <TableCell className="max-w-[200px] truncate text-xs" title={issue.production_lots?.products?.product_name}>
+                        <TableCell className="text-xs whitespace-normal break-words" title={issue.production_lots?.products?.product_name}>
                           {issue.production_lots?.products?.product_name}
                         </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-semibold">
-                            {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="text-sm font-semibold whitespace-nowrap">
+                              {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                            </span>
+                            {issue.rooms?.room_name && <span className="text-xs text-slate-500 whitespace-nowrap">({issue.rooms.room_name})</span>}
                           </div>
-                          {issue.rooms?.room_name && <div className="text-xs text-slate-500">{issue.rooms.room_name}</div>}
                         </TableCell>
                         <TableCell>
                           <div className={`text-xs p-2 rounded border inline-block ${getIssueStyle(issue.parsedNote)}`}>
@@ -375,10 +377,10 @@ export default function IssuesPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-600">
+                        <TableCell className="text-xs text-slate-600 whitespace-nowrap">
                           {new Date(issue.updated_at).toLocaleString('th-TH')}
                         </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell className="text-right whitespace-nowrap">
                           <Button 
                             size="sm" 
                             onClick={() => openResolveDialog(issue)}
@@ -405,12 +407,12 @@ export default function IssuesPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>SKU</TableHead>
-                    <TableHead>LOT No.</TableHead>
-                    <TableHead>ขั้นตอน</TableHead>
-                    <TableHead>รายละเอียด / บันทึกการแก้ไข</TableHead>
-                    <TableHead>ผู้ตรวจสอบ (QA)</TableHead>
-                    <TableHead>เวลาที่แก้ไขล่าสุด</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">SKU</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[100px]">LOT No.</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[150px]">ขั้นตอน / ห้อง</TableHead>
+                    <TableHead className="min-w-[350px]">รายละเอียด / บันทึกการแก้ไข</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">ผู้ตรวจสอบ (QA)</TableHead>
+                    <TableHead className="whitespace-nowrap min-w-[120px]">เวลาที่แก้ไขล่าสุด</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -433,15 +435,17 @@ export default function IssuesPage() {
                       return sku.includes(term) || lotNo.includes(term);
                     }).map((issue, idx) => (
                       <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`} className="opacity-75">
-                        <TableCell className="font-medium min-w-[120px] text-purple-600">
-                          {issue.production_lots?.products?.sku || '-'}
+                        <TableCell className="font-medium min-w-[120px] text-purple-600 whitespace-nowrap">
+                          <span className="whitespace-nowrap">{issue.production_lots?.products?.sku || '-'}</span>
                         </TableCell>
-                        <TableCell className="font-medium min-w-[120px]">
-                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                        <TableCell className="font-medium min-w-[120px] whitespace-nowrap">
+                           <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit whitespace-nowrap">{issue.production_lots?.lot_no}</Badge>
                         </TableCell>
-                        <TableCell>
-                          <div className="text-sm font-semibold">
-                            {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex items-center gap-2 whitespace-nowrap">
+                            <span className="text-sm font-semibold whitespace-nowrap">
+                              {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                            </span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -453,18 +457,16 @@ export default function IssuesPage() {
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-600 font-medium">
-                          {(() => {
-                            const match = issue.parsedNote.match(/\(โดย (.*?) - /)
-                            return match ? (
-                              <div className="flex items-center gap-1 text-blue-700 bg-blue-50 px-2 py-1 rounded-md w-fit">
-                                <User className="w-3 h-3" />
-                                {match[1]}
-                              </div>
-                            ) : '-'
-                          })()}
+                        <TableCell className="whitespace-nowrap">
+                          <div className="flex items-center text-xs text-slate-500 whitespace-nowrap">
+                            <User className="w-3 h-3 mr-1" />
+                            {(() => {
+                              const match = issue.parsedNote.match(/\(โดย (.*?) - /)
+                              return match ? match[1] : '-'
+                            })()}
+                          </div>
                         </TableCell>
-                        <TableCell className="text-xs text-slate-600">
+                        <TableCell className="text-xs text-slate-600 whitespace-nowrap">
                           {new Date(issue.updated_at).toLocaleString('th-TH')}
                         </TableCell>
                       </TableRow>
