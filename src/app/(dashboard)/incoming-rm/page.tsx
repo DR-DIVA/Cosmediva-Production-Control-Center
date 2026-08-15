@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle, Filter } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
 
 type RMItem = {
   id: string;
@@ -50,6 +50,8 @@ export default function RMControlCenterPage() {
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [poSearch, setPoSearch] = useState('');
+  const [etaSort, setEtaSort] = useState<'asc' | 'desc' | null>(null);
   const [currentUser, setCurrentUser] = useState('');
   const [userRole, setUserRole] = useState('user');
   const [mainTab, setMainTab] = useState<'rm'|'pm'>('rm');
@@ -537,6 +539,9 @@ export default function RMControlCenterPage() {
         if (item.status !== statusFilter) return false;
       }
     }
+    if (poSearch && !((item.po_no || '').toLowerCase().includes(poSearch.toLowerCase()))) {
+      return false;
+    }
     const term = searchQuery.toLowerCase();
     const statusTh = item.status === 'PENDING_DELIVERY' ? 'รอรับเข้า' : item.status === 'RECEIVED' ? 'รับของแล้ว' : item.status === 'WAITING_QC' ? 'รอตรวจ qc' : item.status === 'PASSED' ? 'ผ่าน' : item.status === 'REJECTED' ? 'ไม่ผ่าน' : item.status === 'QUARANTINED' ? 'กักกัน' : '';
     return (
@@ -549,7 +554,14 @@ export default function RMControlCenterPage() {
       (item.production_lots?.lot_no || '').toLowerCase().includes(term) ||
       statusTh.includes(term)
     );
-  });
+  }).sort((a, b) => {
+      if (etaSort) {
+        const dateA = a.eta_date ? new Date(a.eta_date).getTime() : 0;
+        const dateB = b.eta_date ? new Date(b.eta_date).getTime() : 0;
+        return etaSort === 'asc' ? dateA - dateB : dateB - dateA;
+      }
+      return 0;
+    });
 
   const exportToCSV = () => {
     const headers = ['PO No', 'Supplier', 'PO Date', 'ETA', 'Code', 'Name', 'Warehouse', 'Qty', 'Unit', 'LOT/Job', 'PR', 'Status'];
@@ -762,10 +774,30 @@ export default function RMControlCenterPage() {
                   <Table className="text-sm table-fixed w-full">
                     <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead className="w-[10%]">PO No.</TableHead>
+                        <TableHead className="w-[10%] p-0">
+                          <div className="flex flex-col px-2 py-1 gap-1 w-full h-full justify-center">
+                            <span className="font-semibold text-slate-500">PO No.</span>
+                            <Input 
+                              placeholder="ค้นหา PO..." 
+                              value={poSearch}
+                              onChange={(e) => setPoSearch(e.target.value)}
+                              className="h-6 text-[10px] w-full bg-slate-50 border-slate-200 px-1"
+                            />
+                          </div>
+                        </TableHead>
                         <TableHead className="w-[12%]">Supplier</TableHead>
                         <TableHead>PO Date</TableHead>
-                        <TableHead className="w-[8%]">ETA</TableHead>
+                        <TableHead 
+                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
+                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>ETA</span>
+                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                          </div>
+                        </TableHead>
                         <TableHead className="w-[10%]">Code</TableHead>
                         <TableHead className="w-[15%]">Name</TableHead>
                         <TableHead className="w-[8%]">Qty</TableHead>
@@ -853,8 +885,28 @@ export default function RMControlCenterPage() {
                   <Table className="text-sm table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[8%]">ETA</TableHead>
-                        <TableHead className="w-[10%]">PO No.</TableHead>
+                        <TableHead 
+                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
+                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>ETA</span>
+                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[10%] p-0">
+                          <div className="flex flex-col px-2 py-1 gap-1 w-full h-full justify-center">
+                            <span className="font-semibold text-slate-500">PO No.</span>
+                            <Input 
+                              placeholder="ค้นหา PO..." 
+                              value={poSearch}
+                              onChange={(e) => setPoSearch(e.target.value)}
+                              className="h-6 text-[10px] w-full bg-slate-50 border-slate-200 px-1"
+                            />
+                          </div>
+                        </TableHead>
                         <TableHead className="w-[12%]">Supplier</TableHead>
                         <TableHead className="w-[10%]">SKU / LOT</TableHead>
                         <TableHead className="w-[10%]">Code</TableHead>
@@ -1053,7 +1105,17 @@ export default function RMControlCenterPage() {
                             </SelectContent>
                           </Select>
                         </TableHead>
-                        <TableHead className="w-[8%]">ETA</TableHead>
+                        <TableHead 
+                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
+                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>ETA</span>
+                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                          </div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
