@@ -442,7 +442,7 @@ export default function WeighingTasksPage() {
                     </div>
                   </TooltipTrigger>
                   {tooltipContent && (
-                    <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100] max-h-64 overflow-y-auto">
+                    <TooltipContent side="top" className="w-56 p-3 bg-[#2D2721] border-[#2D2721] text-white shadow-xl z-[100]">
                       {tooltipContent}
                     </TooltipContent>
                   )}
