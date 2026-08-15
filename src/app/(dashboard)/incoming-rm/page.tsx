@@ -96,7 +96,16 @@ export default function RMControlCenterPage() {
   useEffect(() => {
     fetchItems();
     fetchLots();
-    setCurrentUser(localStorage.getItem('currentUser') || '');
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.email) {
+        const email = data.user.email;
+        if (email.endsWith('@cosmediva.local')) {
+          setCurrentUser(email.split('@')[0]);
+        } else {
+          setCurrentUser(email);
+        }
+      }
+    });
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
