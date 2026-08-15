@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, Scissors, Plus, X } from 'lucide-react';
 
 type RMItem = {
   id: string;
@@ -60,6 +60,11 @@ export default function RMControlCenterPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RMItem | null>(null);
   const [editForm, setEditForm] = useState({ po_no: '', supplier: '', rm_code: '', rm_name: '', quantity: 0, unit: '', eta_date: '' });
+
+  // Split Modal State
+  const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
+  const [splittingItem, setSplittingItem] = useState<RMItem | null>(null);
+  const [splitRows, setSplitRows] = useState<{ id: string, quantity: number | string, eta_date: string, bottom_remark: string }[]>([]);
 
   // Receive Modal State
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
@@ -255,6 +260,73 @@ export default function RMControlCenterPage() {
     } else {
       toast.success('อัปเดตสถานะเรียบร้อยแล้ว');
       fetchItems();
+    }
+  };
+
+  const openSplitModal = (item: RMItem) => {
+    setSplittingItem(item);
+    setSplitRows([
+      { id: crypto.randomUUID(), quantity: item.quantity, eta_date: item.eta_date ? item.eta_date.split('T')[0] : '', bottom_remark: 'งวดที่ 1' },
+      { id: crypto.randomUUID(), quantity: '', eta_date: '', bottom_remark: 'งวดที่ 2' }
+    ]);
+    setIsSplitModalOpen(true);
+  };
+
+  const handleSplitSubmit = async () => {
+    if (!splittingItem) return;
+    
+    // Validation
+    const totalSplitQty = splitRows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    if (Math.abs(totalSplitQty - splittingItem.quantity) > 0.001) {
+      toast.error(`จำนวนรวม (${totalSplitQty.toFixed(2)}) ไม่เท่ากับจำนวนใน PO (${splittingItem.quantity})`);
+      return;
+    }
+    if (splitRows.some(r => !r.quantity || !r.eta_date)) {
+      toast.error('กรุณาระบุจำนวนและวันที่ ETA ให้ครบทุกงวด');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const firstSplit = splitRows[0];
+      const { error: updateError } = await supabase
+        .from('production_lot_rms')
+        .update({
+          quantity: Number(firstSplit.quantity),
+          eta_date: firstSplit.eta_date,
+          bottom_remark: firstSplit.bottom_remark
+        })
+        .eq('id', splittingItem.id);
+
+      if (updateError) throw updateError;
+
+      const remainingSplits = splitRows.slice(1);
+      if (remainingSplits.length > 0) {
+        const insertData = remainingSplits.map(split => {
+          const { id, created_at, receive_date, control_no, ...baseItem } = splittingItem;
+          return {
+            ...baseItem,
+            quantity: Number(split.quantity),
+            eta_date: split.eta_date,
+            bottom_remark: split.bottom_remark
+          };
+        });
+
+        const { error: insertError } = await supabase
+          .from('production_lot_rms')
+          .insert(insertData);
+          
+        if (insertError) throw insertError;
+      }
+
+      toast.success('แยกงวดส่งของเรียบร้อยแล้ว');
+      setIsSplitModalOpen(false);
+      fetchItems();
+    } catch (error) {
+      console.error(error);
+      toast.error('เกิดข้อผิดพลาดในการแยกงวดส่งของ');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -844,7 +916,17 @@ export default function RMControlCenterPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
+                            <div className="flex items-center justify-end">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => openSplitModal(item)} 
+                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-purple-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                                title="แยกงวดส่งของ (Split Delivery)"
+                              >
+                                <Scissors className="w-4 h-4" />
+                              </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1399,6 +1481,78 @@ export default function RMControlCenterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Split Modal */}
+      <Dialog open={isSplitModalOpen} onOpenChange={setIsSplitModalOpen}>
+        <DialogContent className="sm:max-w-xl w-full">
+          <DialogHeader>
+            <DialogTitle>แยกงวดส่งของ (Split Delivery)</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="bg-slate-50 p-3 rounded-lg border text-sm space-y-1">
+              <div className="grid grid-cols-4"><span className="text-slate-500 text-right pr-2">PO No:</span><span className="col-span-3 font-medium">{splittingItem?.po_no || '-'}</span></div>
+              <div className="grid grid-cols-4"><span className="text-slate-500 text-right pr-2">รหัส/ชื่อ:</span><span className="col-span-3">{splittingItem?.rm_code || '-'} / {splittingItem?.rm_name || '-'}</span></div>
+              <div className="grid grid-cols-4"><span className="text-slate-500 text-right pr-2">จำนวนรวม:</span><span className="col-span-3 font-semibold text-purple-700">{splittingItem?.quantity} {splittingItem?.unit}</span></div>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <Label>แบ่งงวดส่งของ (รวมต้องเท่ากับ {splittingItem?.quantity})</Label>
+                <Button variant="outline" size="sm" onClick={() => setSplitRows([...splitRows, { id: crypto.randomUUID(), quantity: '', eta_date: '', bottom_remark: `งวดที่ ${splitRows.length + 1}` }])}>
+                  <Plus className="w-3 h-3 mr-1" /> เพิ่มงวด
+                </Button>
+              </div>
+              
+              {splitRows.map((row, index) => (
+                <div key={row.id} className="grid grid-cols-12 gap-2 items-end border p-3 rounded-md bg-white relative">
+                  {splitRows.length > 2 && (
+                    <button onClick={() => setSplitRows(splitRows.filter(r => r.id !== row.id))} className="absolute -top-2 -right-2 bg-red-100 text-red-600 rounded-full p-1 hover:bg-red-200"><X className="w-3 h-3" /></button>
+                  )}
+                  <div className="col-span-3 space-y-1">
+                    <Label className="text-xs">จำนวน ({splittingItem?.unit})</Label>
+                    <Input type="number" value={row.quantity} onChange={e => {
+                      const newRows = [...splitRows];
+                      newRows[index].quantity = e.target.value;
+                      setSplitRows(newRows);
+                    }} />
+                  </div>
+                  <div className="col-span-4 space-y-1">
+                    <Label className="text-xs">วันที่ ETA</Label>
+                    <Input type="date" value={row.eta_date} onChange={e => {
+                      const newRows = [...splitRows];
+                      newRows[index].eta_date = e.target.value;
+                      setSplitRows(newRows);
+                    }} />
+                  </div>
+                  <div className="col-span-5 space-y-1">
+                    <Label className="text-xs">หมายเหตุ (เช่น งวดที่ 1)</Label>
+                    <Input value={row.bottom_remark} onChange={e => {
+                      const newRows = [...splitRows];
+                      newRows[index].bottom_remark = e.target.value;
+                      setSplitRows(newRows);
+                    }} />
+                  </div>
+                </div>
+              ))}
+              
+              <div className="text-right text-sm">
+                <span className="text-slate-500">รวมทั้งหมด: </span>
+                <span className={`font-semibold ${Math.abs(splitRows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0) - (splittingItem?.quantity || 0)) > 0.001 ? 'text-red-600' : 'text-green-600'}`}>
+                  {splitRows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0)} / {splittingItem?.quantity}
+                </span>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSplitModalOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleSplitSubmit} disabled={loading} className="bg-purple-600 hover:bg-purple-700 text-white">
+              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Scissors className="w-4 h-4 mr-2" />}
+              ยืนยันการแยกงวด
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="sm:max-w-[500px]">
