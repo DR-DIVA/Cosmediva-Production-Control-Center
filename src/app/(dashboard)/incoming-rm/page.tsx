@@ -1125,7 +1125,7 @@ export default function RMControlCenterPage() {
                             <input type="text" placeholder="ค้นหา Code..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={qcCodeSearch} onChange={(e) => setQcCodeSearch(e.target.value)} />
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700">Name</TableHead>
+                        <TableHead className="font-semibold text-slate-700 w-72">Name</TableHead>
                         <TableHead className="font-semibold text-slate-700 w-44">QC Status</TableHead>
                       </TableRow>
                     </TableHeader>

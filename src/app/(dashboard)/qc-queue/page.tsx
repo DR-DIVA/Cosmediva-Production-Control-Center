@@ -637,7 +637,7 @@ export default function QCQueuePage() {
                         <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
                         <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
                         <th className="px-4 py-3 font-medium text-purple-700">Control No.</th>
-                        <th className="px-4 py-3 font-medium">รหัส / ชื่อวัตถุดิบ</th>
+                        <th className="px-4 py-3 font-medium w-72">รหัส / ชื่อวัตถุดิบ</th>
                         <th className="px-4 py-3 font-medium">จำนวน</th>
                         <th className="px-4 py-3 font-medium">PO No.</th>
                         <th className="px-4 py-3 font-medium">สถานะ QC</th>
@@ -741,7 +741,7 @@ export default function QCQueuePage() {
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
                             <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
-                            <th className="px-4 py-3 font-medium">รหัส / ชื่อวัตถุดิบ</th>
+                            <th className="px-4 py-3 font-medium w-72">รหัส / ชื่อวัตถุดิบ</th>
                             <th className="px-4 py-3 font-medium">สถานะ QC</th>
                             <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
                           </tr>
