@@ -28,11 +28,11 @@ export function TooltipContent({
 }: TooltipPrimitive.Popup.Props & { sideOffset?: number, side?: "top" | "right" | "bottom" | "left" }) {
   return (
     <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Positioner sideOffset={sideOffset} side={side}>
+      <TooltipPrimitive.Positioner sideOffset={sideOffset} side={side} className="z-[9999]">
         <TooltipPrimitive.Popup
           data-slot="tooltip-content"
           className={cn(
-            "z-[200] overflow-hidden rounded-md bg-slate-900 px-3 py-1.5 text-xs text-slate-50 animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+            "z-[9999] overflow-hidden rounded-md bg-slate-900 px-3 py-1.5 text-xs text-slate-50 animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
             className
           )}
           {...props}
