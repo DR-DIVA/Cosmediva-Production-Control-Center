@@ -627,7 +627,7 @@ export default function RMControlCenterPage() {
             />
           </div>
           <div className="w-[160px] flex-shrink-0">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
               <SelectTrigger className="bg-white">
                 <SelectValue placeholder="ทุกสถานะ (All)" />
               </SelectTrigger>
