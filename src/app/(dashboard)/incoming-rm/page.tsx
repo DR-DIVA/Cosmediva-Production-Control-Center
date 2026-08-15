@@ -615,6 +615,19 @@ export default function RMControlCenterPage() {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <div className="w-[160px] flex-shrink-0">
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="bg-white">
+                <SelectValue placeholder="ทุกสถานะ (All)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ALL">ทุกสถานะ (All)</SelectItem>
+                <SelectItem value="PENDING_DELIVERY">รอรับของ (Pending)</SelectItem>
+                <SelectItem value="RECEIVED">รับของแล้ว (Received)</SelectItem>
+                <SelectItem value="READY">พร้อมจ่าย (Ready)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Button variant="outline" onClick={exportToCSV} className="bg-white flex-shrink-0">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
