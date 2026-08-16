@@ -5,7 +5,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, Filter, ListTodo, CalendarDays } from 'lucide-react'
+import { 
+  Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, 
+  Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
+  Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
+  RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare
+} from 'lucide-react'
 import {
   Table,
   TableBody,
@@ -25,7 +30,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Calendar as CalendarIcon, CheckCircle2, Clock, AlertTriangle, Activity, History } from "lucide-react"
+import { Badge } from "@/components/ui/badge"
 import { format, differenceInDays, startOfDay, addDays } from "date-fns"
 import { createClient } from "@supabase/supabase-js"
 import { toast } from "sonner"
@@ -468,25 +473,102 @@ export default function PlannerPage() {
   const today = new Date()
   const timelineDates = Array.from({ length: 14 }).map((_, i) => addDays(today, i))
 
+  // Executive Planning Calculations
+  const totalLotsCount = lots.length
+  const uniqueSkusCount = new Set(lots.map(l => l.products?.sku || l.sku_id)).size
+  const totalTargetUnits = lots.reduce((acc, l) => acc + (Number(l.planned_quantity) || Number(l.order_quantity) || 0), 0)
+  const totalBulksKg = lots.reduce((acc, l) => acc + ((Number(l.total_tanks) || 0) * (Number(l.kg_per_tank) || 0)), 0)
+  const totalTanksCount = lots.reduce((acc, l) => acc + (Number(l.total_tanks) || 0), 0)
+
+  const mtsLots = lots.filter(l => l.order_type === 'MTS')
+  const mtoLots = lots.filter(l => l.order_type !== 'MTS')
+  const lotsWithDueDate = lots.filter(l => l.fg_due_date || l.fg_due_date_start)
+
+  // Accurate task progression & on-time stats
+  const totalTasksCount = logs.length
+  const doneTasks = logs.filter(l => l.status === 'DONE')
+  const doneTasksCount = doneTasks.length
+  const progressPct = totalTasksCount > 0 ? ((doneTasksCount / totalTasksCount) * 100).toFixed(1) : '0.0'
+
+  const todayStart = startOfDay(new Date())
+  let onTimeTasksCount = 0
+  let delayedTasksCount = 0
+  let upcomingTasksCount = 0
+
+  logs.forEach(l => {
+    if (l.status === 'DONE') {
+      if (l.activity_date && l.end_time) {
+        const planned = startOfDay(new Date(l.activity_date))
+        const actual = startOfDay(new Date(l.end_time))
+        if (differenceInDays(actual, planned) <= 0) onTimeTasksCount++
+        else delayedTasksCount++
+      } else {
+        onTimeTasksCount++
+      }
+    } else if (l.activity_date) {
+      const planned = startOfDay(new Date(l.activity_date))
+      if (differenceInDays(todayStart, planned) > 0) {
+        delayedTasksCount++
+      } else {
+        upcomingTasksCount++
+      }
+    } else {
+      upcomingTasksCount++
+    }
+  })
+
+  const otifRate = (onTimeTasksCount + delayedTasksCount) > 0 
+    ? ((onTimeTasksCount / (onTimeTasksCount + delayedTasksCount)) * 100).toFixed(1)
+    : '100.0'
+
+  // Department Process Breakdown
+  const rmTasks = logs.filter(l => {
+    const pName = l.processes?.process_name || ''
+    return pName.includes('ชั่ง') || l.process_id?.includes('RM')
+  })
+  const rmDone = rmTasks.filter(l => l.status === 'DONE').length
+
+  const mxTasks = logs.filter(l => {
+    const pName = l.processes?.process_name || ''
+    return pName.includes('ผสม') || l.process_id?.includes('MX')
+  })
+  const mxDone = mxTasks.filter(l => l.status === 'DONE').length
+
+  const pkTasks = logs.filter(l => {
+    const pName = l.processes?.process_name || ''
+    return pName.includes('บรรจุ') || pName.includes('ลงลัง') || l.process_id?.includes('PK')
+  })
+  const pkDone = pkTasks.filter(l => l.status === 'DONE').length
+
+  const handleRefreshData = () => {
+    fetchData()
+    toast.success('รีเฟรชข้อมูลแผนการผลิตล่าสุดเรียบร้อยแล้ว')
+  }
+
   return (
     <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <CalendarDays className="w-8 h-8 text-yellow-400 shrink-0" />
+            <CalendarDays className="w-8 h-8 text-yellow-500 shrink-0" />
             CosmeFlow Planning: PD Master Plan
           </h1>
-          <div className="text-sm text-[#8B7355] flex items-center mt-2 font-medium">
-            <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
-            Plan Smarter. Produce Better.
+          <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
+            <div>วางแผนการผลิตแม่บท, ควบคุมความพร้อม และติดตามกำหนดส่งมอบ FG</div>
+            <div className="flex items-center mt-1 text-[#8B7355] font-medium">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
+              Plan Smarter. Produce Better.
+            </div>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-2 mr-4">
+          <div className="flex gap-2 mr-2">
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-[#2D2721] text-white hover:bg-[#3E352B] font-bold' : ''}
             >
               <ListTodo className="w-4 h-4 mr-2" /> แบบตาราง
             </Button>
@@ -494,11 +576,16 @@ export default function PlannerPage() {
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
+              className={viewMode === 'calendar' ? 'bg-[#2D2721] text-white hover:bg-[#3E352B] font-bold' : ''}
             >
               <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน กำหนดส่งมอบ FG
             </Button>
           </div>
-          <Button variant="outline"><Download className="w-4 h-4 mr-2" /> Export</Button>
+          <Button onClick={handleRefreshData} variant="outline" size="sm" className="flex items-center gap-1.5 bg-[#F8F6F0] hover:bg-slate-100">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" />
+            รีเฟรช
+          </Button>
+          <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" /> Export</Button>
           <Button onClick={() => {
             setNewLot({
               id: "", product_id: "", lot_number: "", target_quantity: "",
@@ -509,40 +596,307 @@ export default function PlannerPage() {
               mfg_date: "", exp_date: "", product_name: ""
             })
             setIsDialogOpen(true)
-          }} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover">
+          }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
             <Plus className="w-4 h-4 mr-2" /> เพิ่มออเดอร์ใหม่ (Project)
           </Button>
         </div>
       </div>
 
+      {/* 1. Executive Master Planning KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Layers className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Master Schedule & Capacity Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Master Planning KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              ภาพรวมแผนการผลิต • ความจุการผลิต (Capacity) • และอัตราความตรงต่อเวลาตามแผน (OTIF)
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Master Lots */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">ล็อตการผลิตทั้งหมด</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {totalLotsCount} <span className="text-xs font-normal text-stone-300">ล็อต</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({uniqueSkusCount} SKU ไม่ซ้ำ)</div>
+          </div>
+
+          {/* Target Production Volume */}
+          <div className="bg-emerald-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">ยอดผลิตรวม (Target Units)</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {totalTargetUnits.toLocaleString()} <span className="text-xs font-normal text-emerald-200">ชิ้น</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({totalBulksKg.toLocaleString()} kg Bulk)</div>
+          </div>
+
+          {/* OTIF Schedule Adherence */}
+          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[11px] text-blue-200 font-medium">ตรงตามแผนงาน (On-Time)</div>
+            <div className="text-2xl font-black text-blue-300">
+              {otifRate}%
+            </div>
+            <div className="text-[10px] text-blue-300 mt-0.5">({onTimeTasksCount} คิวตรงเวลา)</div>
+          </div>
+
+          {/* Process Progression */}
+          <div className="bg-indigo-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
+            <div className="text-[11px] text-indigo-200 font-medium">ความคืบหน้ารวม (Progress)</div>
+            <div className="text-2xl font-black text-indigo-300">
+              {progressPct}%
+            </div>
+            <div className="text-[10px] text-indigo-300 mt-0.5">({doneTasksCount}/{totalTasksCount} งานเสร็จ)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Planning Dimension KPI Cards */}
       {viewMode === 'list' ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card className="bg-white shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1"><p className="text-sm font-medium text-slate-500">ออเดอร์ทั้งหมด</p><p className="text-3xl font-bold text-slate-900">{lots.length}</p></div>
-            <div className="h-12 w-12 bg-slate-100 rounded-full flex items-center justify-center"><Activity className="w-6 h-6 text-slate-600" /></div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1"><p className="text-sm font-medium text-slate-500">ตรงตามแผน (On Track)</p><p className="text-3xl font-bold text-slate-900">{stats.onTime}</p></div>
-            <div className="h-12 w-12 bg-green-50 rounded-full flex items-center justify-center"><CheckCircle2 className="w-6 h-6 text-green-600" /></div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1"><p className="text-sm font-medium text-slate-500">ล่าช้า (Delayed)</p><p className="text-3xl font-bold text-slate-900">{stats.delayed}</p></div>
-            <div className="h-12 w-12 bg-red-50 rounded-full flex items-center justify-center"><AlertTriangle className="w-6 h-6 text-red-600" /></div>
-          </CardContent>
-        </Card>
-        <Card className="bg-white shadow-sm border-slate-200">
-          <CardContent className="p-6 flex items-center justify-between">
-            <div className="space-y-1"><p className="text-sm font-medium text-slate-500">รอดำเนินการ (Pending)</p><p className="text-3xl font-bold text-slate-900">{stats.early}</p></div>
-            <div className="h-12 w-12 bg-amber-50 rounded-full flex items-center justify-center"><Clock className="w-6 h-6 text-amber-600" /></div>
-          </CardContent>
-        </Card>
-      </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Card 1: Master Lots */}
+          <Card 
+            onClick={() => setActiveTab('table')}
+            className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'table' ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/20 bg-[#F8F6F0]' : 'border-slate-200 hover:border-[#D4AF37]/50 bg-white'}`}
+          >
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                    <Layers className="w-4 h-4 text-[#D4AF37]" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">1. ยอดผลิตและออเดอร์</div>
+                    <div className="text-[11px] text-slate-500">Master Production Lots</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                  {totalLotsCount} ล็อต
+                </Badge>
+              </div>
+
+              {/* Big Display */}
+              <div className="flex items-baseline justify-between pt-1">
+                <div>
+                  <span className="text-2xl font-black text-[#4A4238]">{totalTargetUnits.toLocaleString()}</span>
+                  <span className="text-xs text-slate-500 ml-1.5 font-medium">ชิ้น</span>
+                </div>
+                <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                  {totalTanksCount} ถัง
+                </Badge>
+              </div>
+
+              {/* Progress */}
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+                <div style={{ width: '100%' }} className="bg-[#D4AF37] h-full" />
+              </div>
+
+              {/* Breakdown */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+                <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                  <div className="text-[10px] font-semibold text-[#8B7355]">เนื้อ Bulk รวม</div>
+                  <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalBulksKg.toLocaleString()}</div>
+                  <div className="text-[9px] text-[#8B7355] font-medium">kg</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                  <div className="text-[10px] font-semibold text-[#8B7355]">จำนวน SKU</div>
+                  <div className="text-xs font-bold text-[#4A4238] mt-0.5">{uniqueSkusCount}</div>
+                  <div className="text-[9px] text-[#8B7355] font-medium">SKU</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                  <div className="text-[10px] font-semibold text-[#8B7355]">ประเภทงาน</div>
+                  <div className="text-xs font-bold text-[#4A4238] mt-0.5">{mtsLots.length}/{mtoLots.length}</div>
+                  <div className="text-[9px] text-[#8B7355] font-medium">MTS / MTO</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Process Progression */}
+          <Card 
+            onClick={() => setActiveTab('table')}
+            className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'table' ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-300 bg-white'}`}
+          >
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shadow-sm">
+                    <Activity className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">2. ความคืบหน้ากระบวนการ</div>
+                    <div className="text-[11px] text-slate-500">Shopfloor Execution</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold">
+                  {progressPct}% เสร็จสิ้น
+                </Badge>
+              </div>
+
+              {/* Big Display */}
+              <div className="flex items-baseline justify-between pt-1">
+                <div>
+                  <span className="text-2xl font-black text-indigo-600">{doneTasksCount}</span>
+                  <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalTasksCount} คิวงาน</span>
+                </div>
+                <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
+                  {totalTasksCount - doneTasksCount} คงค้าง
+                </Badge>
+              </div>
+
+              {/* Progress */}
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+                <div style={{ width: `${progressPct}%` }} className="bg-indigo-500 h-full transition-all duration-500" title={`Progress: ${progressPct}%`} />
+              </div>
+
+              {/* Breakdown */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+                <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                  <div className="text-[10px] font-semibold text-amber-700">1. ชั่งสาร</div>
+                  <div className="text-xs font-bold text-amber-800 mt-0.5">{rmDone}/{rmTasks.length}</div>
+                  <div className="text-[9px] text-amber-600 font-medium">เสร็จแล้ว</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                  <div className="text-[10px] font-semibold text-indigo-700">2. ผสม Bulk</div>
+                  <div className="text-xs font-bold text-indigo-800 mt-0.5">{mxDone}/{mxTasks.length}</div>
+                  <div className="text-[9px] text-indigo-600 font-medium">เสร็จแล้ว</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-[10px] font-semibold text-emerald-700">3. บรรจุ/ลงลัง</div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">{pkDone}/{pkTasks.length}</div>
+                  <div className="text-[9px] text-emerald-600 font-medium">เสร็จแล้ว</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 3: FG Delivery Due Dates */}
+          <Card 
+            onClick={() => setViewMode('calendar')}
+            className="cursor-pointer transition-all duration-200 border-2 hover:shadow-lg border-slate-200 hover:border-emerald-400 bg-white hover:bg-emerald-50/20"
+          >
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                    <CalendarIcon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">3. กำหนดส่งมอบ FG</div>
+                    <div className="text-[11px] text-slate-500">Delivery Milestones</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                  {lotsWithDueDate.length} ล็อตมี Due
+                </Badge>
+              </div>
+
+              {/* Big Display */}
+              <div className="flex items-baseline justify-between pt-1">
+                <div>
+                  <span className="text-2xl font-black text-emerald-600">{mtoLots.length}</span>
+                  <span className="text-xs text-slate-500 ml-1.5 font-medium">MTO • {mtsLots.length} MTS</span>
+                </div>
+                <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                  ปฏิทินส่งมอบ
+                </Badge>
+              </div>
+
+              {/* Progress */}
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+                <div style={{ width: `${(lotsWithDueDate.length / (totalLotsCount || 1)) * 100}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+              </div>
+
+              {/* Breakdown */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+                <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-[10px] font-semibold text-emerald-700">MTO Due Date</div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">{mtoLots.length}</div>
+                  <div className="text-[9px] text-emerald-600 font-medium">ออเดอร์</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-[10px] font-semibold text-emerald-700">MTS Rolling</div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">{mtsLots.length}</div>
+                  <div className="text-[9px] text-emerald-600 font-medium">ล็อตสต๊อก</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-[10px] font-semibold text-emerald-700">ดูปฏิทิน</div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">คลิกเพื่อดู</div>
+                  <div className="text-[9px] text-emerald-600 font-medium">Calendar</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Card 4: Schedule Adherence */}
+          <Card 
+            onClick={() => setActiveTab('timeline')}
+            className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'timeline' ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50' : 'border-slate-200 hover:border-blue-300 bg-white'}`}
+          >
+            <CardContent className="p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                    <Clock className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm text-slate-800">4. สถานะตามแผนงาน</div>
+                    <div className="text-[11px] text-slate-500">Schedule Adherence</div>
+                  </div>
+                </div>
+                <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-semibold">
+                  OTIF {otifRate}%
+                </Badge>
+              </div>
+
+              {/* Big Display */}
+              <div className="flex items-baseline justify-between pt-1">
+                <div>
+                  <span className="text-2xl font-black text-blue-600">{onTimeTasksCount}</span>
+                  <span className="text-xs text-slate-500 ml-1.5 font-medium">คิวตรงแผน ({otifRate}%)</span>
+                </div>
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                  {delayedTasksCount > 0 ? `${delayedTasksCount} ล่าช้า` : 'ไม่มีงานล่าช้า'}
+                </Badge>
+              </div>
+
+              {/* Progress */}
+              <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+                <div style={{ width: `${otifRate}%` }} className="bg-blue-500 h-full transition-all duration-500" title={`On Time: ${otifRate}%`} />
+                <div style={{ width: `${100 - Number(otifRate)}%` }} className="bg-rose-500 h-full transition-all duration-500" title="Delayed" />
+              </div>
+
+              {/* Breakdown */}
+              <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+                <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                  <div className="text-[10px] font-semibold text-emerald-700">ตรงแผน</div>
+                  <div className="text-xs font-bold text-emerald-800 mt-0.5">{onTimeTasksCount}</div>
+                  <div className="text-[9px] text-emerald-600 font-medium">คิวงาน</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                  <div className="text-[10px] font-semibold text-rose-700">ล่าช้า/เสี่ยง</div>
+                  <div className="text-xs font-bold text-rose-800 mt-0.5">{delayedTasksCount}</div>
+                  <div className="text-[9px] text-rose-600 font-medium">คิวงาน</div>
+                </div>
+                <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                  <div className="text-[10px] font-semibold text-blue-700">รอดำเนินการ</div>
+                  <div className="text-xs font-bold text-blue-800 mt-0.5">{upcomingTasksCount}</div>
+                  <div className="text-[9px] text-blue-600 font-medium">คิวในอนาคต</div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
       <Card className="border-slate-200 shadow-sm overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
