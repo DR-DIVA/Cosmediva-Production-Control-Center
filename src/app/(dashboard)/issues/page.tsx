@@ -365,9 +365,9 @@ export default function IssuesPage() {
                             <span className="text-sm font-semibold whitespace-nowrap">
                               {(() => {
                                 const note = issue.parsedNote || ''
-                                if (note.includes(' RM ') || note.includes(' RM/PM ')) return 'QC RM'
-                                if (note.includes(' PM ')) return 'QC PM'
-                                if (note.includes(' FG ')) return 'QC FG'
+                                if (note.includes('RM/PM') || note.includes(' RM [') || note.includes(' RM:')) return 'QC RM'
+                                if (note.includes(' PM [') || note.includes(' PM:')) return 'QC PM'
+                                if (note.includes(' FG ') || note.includes(' FG(')) return 'QC FG'
                                 if (note.includes(' ถัง ')) return 'QC Bulk'
                                 if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
                                 return issue.processes?.process_name
@@ -454,9 +454,9 @@ export default function IssuesPage() {
                             <span className="text-sm font-semibold whitespace-nowrap">
                               {(() => {
                                 const note = issue.parsedNote || ''
-                                if (note.includes(' RM ') || note.includes(' RM/PM ')) return 'QC RM'
-                                if (note.includes(' PM ')) return 'QC PM'
-                                if (note.includes(' FG ')) return 'QC FG'
+                                if (note.includes('RM/PM') || note.includes(' RM [') || note.includes(' RM:')) return 'QC RM'
+                                if (note.includes(' PM [') || note.includes(' PM:')) return 'QC PM'
+                                if (note.includes(' FG ') || note.includes(' FG(')) return 'QC FG'
                                 if (note.includes(' ถัง ')) return 'QC Bulk'
                                 if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
                                 return issue.processes?.process_name
