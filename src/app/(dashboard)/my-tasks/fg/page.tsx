@@ -180,7 +180,31 @@ export default function FgTasksPage() {
       toast.error('อัปเดตสถานะ QC ไม่สำเร็จ')
     } else {
       toast.success('อัปเดตสถานะ QC เรียบร้อยแล้ว')
+      
+      if (newStatus === 'RELEASED') {
+        const item = inventory.find(i => i.id === invId)
+        if (item) {
+          const { data: fgTasks } = await supabase.from('production_logs')
+            .select('id, tank_details')
+            .eq('status', 'DONE')
+          
+          if (fgTasks) {
+            for (const t of fgTasks) {
+              const d = typeof t.tank_details === 'object' && t.tank_details !== null ? { ...t.tank_details } : {}
+              if (item.lot_no && (JSON.stringify(d).includes(item.lot_no) || (item.box_lot_no && JSON.stringify(d).includes(item.box_lot_no)))) {
+                d.qc_release_info = {
+                  user: currentUser,
+                  timestamp: new Date().toISOString()
+                }
+                await supabase.from('production_logs').update({ tank_details: d }).eq('id', t.id)
+              }
+            }
+          }
+        }
+      }
+
       fetchInventory()
+      fetchFgTasks()
     }
   }
 
@@ -886,12 +910,36 @@ export default function FgTasksPage() {
                <div className="w-[180px] p-3 space-y-4 relative">
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้อนุมัติ</span>
-                     <span className="flex-1 border-b border-black border-dashed inline-block"></span>
+                     <div className="flex-1 border-b border-black border-dashed relative">
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">
+                           {(() => {
+                              const qcUser = receiveDialog.task?.tank_details?.qc_release_info?.user || 
+                                             receiveDialog.task?.tank_details?.qc_info?.user;
+                              const invItem = inventory.find(i => i.lot_no === receiveDialog.task?.production_lots?.lot_no && (i.box_lot_no === receiveDialog.boxLot || !receiveDialog.boxLot));
+                              const isReleased = invItem?.qc_status === 'RELEASED' || !!qcUser;
+                              
+                              if (isReleased) {
+                                 return formatUserCode(qcUser || 'QCCHJ1801');
+                              }
+                              return (receiveDialog.isReadOnly ? '' : '.....................');
+                           })()}
+                        </span>
+                     </div>
                   </div>
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">วันที่</span>
                      <span className="flex-1 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
-                        {new Date().toLocaleDateString('en-GB')}
+                        {(() => {
+                           const qcTime = receiveDialog.task?.tank_details?.qc_release_info?.timestamp;
+                           const invItem = inventory.find(i => i.lot_no === receiveDialog.task?.production_lots?.lot_no && (i.box_lot_no === receiveDialog.boxLot || !receiveDialog.boxLot));
+                           const isReleased = invItem?.qc_status === 'RELEASED' || !!qcTime;
+                           
+                           if (isReleased) {
+                              const d = qcTime ? new Date(qcTime) : (invItem?.updated_at ? new Date(invItem.updated_at) : new Date());
+                              return d.toLocaleDateString('en-GB');
+                           }
+                           return '';
+                        })()}
                      </span>
                   </div>
                   <div className="absolute bottom-1 right-2 text-[8px] text-slate-500">FG-WF-001A</div>

@@ -573,6 +573,25 @@ export default function QCQueuePage() {
       const { error: fgError } = await supabase.from('fg_inventory').update({ qc_status: newQcStatus }).eq('id', activeFg.id)
       if (fgError) throw fgError
 
+      if (statusAction === 'QC_PASS') {
+        const { data: fgTasks } = await supabase.from('production_logs')
+          .select('id, tank_details')
+          .eq('status', 'DONE')
+        
+        if (fgTasks) {
+          for (const t of fgTasks) {
+            const d = typeof t.tank_details === 'object' && t.tank_details !== null ? { ...t.tank_details } : {}
+            if (activeFg.lot_no && (JSON.stringify(d).includes(activeFg.lot_no) || (activeFg.box_lot_no && JSON.stringify(d).includes(activeFg.box_lot_no)))) {
+              d.qc_release_info = {
+                user: currentUser,
+                timestamp: new Date().toISOString()
+              }
+              await supabase.from('production_logs').update({ tank_details: d }).eq('id', t.id)
+            }
+          }
+        }
+      }
+
       // Log issue to production_logs if it's an issue
       if (statusAction === 'PAUSED' || statusAction === 'FAILED' || statusAction === 'REPROCESS') {
         const issueType = statusAction === 'PAUSED' ? '[QC HOLD]' : statusAction === 'FAILED' ? '[QC REJECT]' : '[QC REPROCESS]'
