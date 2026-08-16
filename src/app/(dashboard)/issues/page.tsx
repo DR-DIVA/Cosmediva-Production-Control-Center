@@ -90,7 +90,7 @@ export default function IssuesPage() {
       // 1. Fetch RM & PM data
       const { data: rmData } = await supabase
         .from('production_lot_rms')
-        .select('id, rm_code, qc_status, warehouse_status')
+        .select('id, rm_code, qc_status, status, receive_date')
 
       let rmTotal = 0, rmPassed = 0, rmHold = 0, rmReject = 0
       let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
@@ -98,16 +98,15 @@ export default function IssuesPage() {
       ;(rmData || []).forEach((item: any) => {
         const isPM = item.rm_code?.toLowerCase().startsWith('p') || item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
         const qc = item.qc_status?.toUpperCase()
+        const isReceived = item.receive_date != null || item.status === 'RECEIVED' || item.status === 'READY' || item.status === 'REJECTED'
 
-        if (isPM) {
-          if (qc === 'PASSED' || qc === 'HOLD' || qc === 'REJECTED' || item.warehouse_status === 'RECEIVED') {
+        if (isReceived || qc) {
+          if (isPM) {
             pmTotal++
             if (qc === 'PASSED') pmPassed++
             else if (qc === 'HOLD') pmHold++
             else if (qc === 'REJECTED') pmReject++
-          }
-        } else {
-          if (qc === 'PASSED' || qc === 'HOLD' || qc === 'REJECTED' || item.warehouse_status === 'RECEIVED') {
+          } else {
             rmTotal++
             if (qc === 'PASSED') rmPassed++
             else if (qc === 'HOLD') rmHold++
@@ -116,7 +115,7 @@ export default function IssuesPage() {
         }
       })
 
-      // 2. Fetch Bulk data
+      // 2. Fetch Bulk data (strictly from 'รอ QC' process)
       const { data: bulkData } = await supabase
         .from('production_logs')
         .select('id, status, tank_start, tank_end, total_tanks, tank_details, processes(process_name)')
@@ -125,21 +124,19 @@ export default function IssuesPage() {
 
       ;(bulkData || []).forEach((task: any) => {
         const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (pName === 'รอ QC' || task.tank_details) {
+        if (pName === 'รอ QC') {
           const details = task.tank_details || {}
           const start = parseInt(task.tank_start) || 1
           const end = parseInt(task.tank_end) || start
           for (let i = start; i <= end; i++) {
             const s = details[i]
-            if (s && s !== 'WAITING' && s !== 'LOCKED') {
-              bulkTotal++
-              if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
-                bulkPassed++
-              } else if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD') {
-                bulkHold++
-              } else if (s === 'FAILED' || s === 'REJECTED') {
-                bulkReject++
-              }
+            bulkTotal++
+            if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
+              bulkPassed++
+            } else if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD') {
+              bulkHold++
+            } else if (s === 'FAILED' || s === 'REJECTED') {
+              bulkReject++
             }
           }
         }
