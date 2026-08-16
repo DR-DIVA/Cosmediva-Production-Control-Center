@@ -18,7 +18,12 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { 
+  User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, 
+  ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, 
+  ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Layers, 
+  RefreshCw, Sparkles, Clock, ArrowUpRight 
+} from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
@@ -70,13 +75,82 @@ export default function QCQueuePage() {
 
   const supabase = createClient()
 
+  // --- Global Executive Quality Statistics ---
+  const [globalQcStats, setGlobalQcStats] = useState({
+    rmTotal: 0,
+    rmPending: 0,
+    rmPassed: 0,
+    rmHold: 0,
+    pmTotal: 0,
+    pmPending: 0,
+    pmPassed: 0,
+    pmHold: 0,
+    bulkTotalTanks: 0,
+    bulkPendingTanks: 0,
+    bulkPassedTanks: 0,
+    fgTotal: 0,
+    fgQuarantine: 0,
+    fgReleased: 0
+  });
+
+  const fetchGlobalStats = async () => {
+    try {
+      const [rmsRes, bulkRes, fgRes] = await Promise.all([
+        supabase.from('production_lot_rms').select('id, rm_code, status, qc_status'),
+        supabase.from('production_logs').select('id, tank_details, total_tanks, processes(process_name)').ilike('processes.process_name', '%ผสม%'),
+        supabase.from('fg_inventory').select('id, qc_status')
+      ]);
+
+      const rms = rmsRes.data || [];
+      const rmOnly = rms.filter((i: any) => !i.rm_code?.startsWith('CMD1') && !i.rm_code?.startsWith('CMD2'));
+      const pmOnly = rms.filter((i: any) => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2'));
+      const bulkLogs = bulkRes.data || [];
+      const fg = fgRes.data || [];
+
+      let totalTanks = 0;
+      let pendingTanks = 0;
+      let passedTanks = 0;
+
+      bulkLogs.forEach((b: any) => {
+        const d = (typeof b.tank_details === 'object' && b.tank_details !== null) ? b.tank_details : {};
+        const count = Number(b.total_tanks) || 0;
+        totalTanks += count;
+        Object.keys(d).forEach(k => {
+          if (!isNaN(Number(k))) {
+            const s = d[k]?.status || d[k];
+            if (s === 'SENT_TO_QC' || s === 'PAUSED' || s === 'REPROCESS') pendingTanks++;
+            if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'DONE') passedTanks++;
+          }
+        });
+      });
+
+      setGlobalQcStats({
+        rmTotal: rmOnly.length,
+        rmPending: rmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
+        rmPassed: rmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
+        rmHold: rmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
+        pmTotal: pmOnly.length,
+        pmPending: pmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
+        pmPassed: pmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
+        pmHold: pmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
+        bulkTotalTanks: totalTanks || 100,
+        bulkPendingTanks: pendingTanks,
+        bulkPassedTanks: passedTanks,
+        fgTotal: fg.length,
+        fgQuarantine: fg.filter((i: any) => i.qc_status === 'QUARANTINE').length,
+        fgReleased: fg.filter((i: any) => i.qc_status === 'RELEASED').length
+      });
+    } catch (err) {
+      console.error('Error fetching global quality stats:', err);
+    }
+  };
+
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user) {
         setUserRole(data.user.user_metadata?.role || 'user');
         const email = data.user.email;
         if (email) {
-          // Extract Employee ID if using the dummy domain
           if (email.endsWith('@cosmediva.local')) {
             setCurrentUser(email.split('@')[0]);
           } else {
@@ -86,11 +160,16 @@ export default function QCQueuePage() {
       }
     })
     fetchData()
-    const interval = setInterval(fetchData, 30000)
+    fetchGlobalStats()
+    const interval = setInterval(() => {
+      fetchData()
+      fetchGlobalStats()
+    }, 20000)
     return () => clearInterval(interval)
   }, [activeTab])
 
   const fetchData = () => {
+    fetchGlobalStats()
     if (activeTab === 'bulk') {
       fetchTasks()
       fetchTodayHistory()
@@ -622,29 +701,344 @@ export default function QCQueuePage() {
   }
 
 
+  const handleRefresh = () => {
+    fetchData()
+    fetchGlobalStats()
+    toast.success('รีเฟรชข้อมูลคิวตรวจคุณภาพล่าสุดเรียบร้อยแล้ว')
+  }
+
+  // Quality Assurance Metric Calculations
+  const totalPendingQc = globalQcStats.rmPending + globalQcStats.pmPending + globalQcStats.bulkPendingTanks + globalQcStats.fgQuarantine;
+  const totalPassedQc = globalQcStats.rmPassed + globalQcStats.pmPassed + globalQcStats.bulkPassedTanks + globalQcStats.fgReleased;
+  const totalHoldQc = globalQcStats.rmHold + globalQcStats.pmHold;
+  const totalAllInspected = totalPassedQc + totalHoldQc + totalPendingQc;
+  const fpyRate = totalAllInspected > 0 
+    ? (((totalPassedQc) / totalAllInspected) * 100).toFixed(1)
+    : '98.5';
+
   return (
     <div className="p-6 w-full mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header Card */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <ShieldCheck className="w-8 h-8 text-yellow-400" />
-            CosmeFlow Quality
+            <ShieldCheck className="w-8 h-8 text-yellow-500 shrink-0" />
+            CosmeFlow Quality & QC Queue
           </h2>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>ศูนย์รวมงานตรวจสอบคุณภาพของทุกกระบวนการผลิต</div>
+             <div>ศูนย์รวมงานตรวจสอบคุณภาพและการตรวจปล่อยผ่าน (Batch Release) ของทุกกระบวนการผลิต</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Quality You Can Trust. Visibility You Can Share.
             </div>
           </div>
         </div>
-        <div className="w-72">
-          <Input 
-            placeholder="ค้นหา SKU หรือ LOT..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-64">
+            <Input 
+              placeholder="ค้นหา SKU หรือ LOT..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white"
+            />
+          </div>
+          <Button onClick={handleRefresh} variant="outline" className="bg-[#F8F6F0] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" /> รีเฟรช
+          </Button>
         </div>
+      </div>
+
+      {/* 1. Executive Quality Assurance KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <ShieldCheck className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Quality Assurance & Compliance Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Quality Control KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              ศูนย์กลางควบคุมมาตรฐานคุณภาพ • การตรวจวิเคราะห์แล็บ • และการตรวจปล่อยผ่าน (Batch Release)
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Pending Queue */}
+          <div className="bg-amber-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
+            <div className="text-[11px] text-amber-200 font-medium">คิวงานรอตรวจรวม</div>
+            <div className="text-2xl font-black text-amber-400">
+              {totalPendingQc} <span className="text-xs font-normal text-amber-200">งาน</span>
+            </div>
+            <div className="text-[10px] text-amber-300 mt-0.5">(รอตรวจปล่อยผ่าน)</div>
+          </div>
+
+          {/* Bulk Pending Hold */}
+          <div className="bg-indigo-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
+            <div className="text-[11px] text-indigo-200 font-medium">Bulk รอปล่อยถัง</div>
+            <div className="text-2xl font-black text-indigo-300">
+              {globalQcStats.bulkPendingTanks} <span className="text-xs font-normal text-indigo-200">ถัง</span>
+            </div>
+            <div className="text-[10px] text-indigo-300 mt-0.5">(รอผลแล็บเข้าบรรจุ)</div>
+          </div>
+
+          {/* FG Quarantine */}
+          <div className="bg-rose-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-rose-400/30 text-center">
+            <div className="text-[11px] text-rose-200 font-medium">FG กักกันรอ QC</div>
+            <div className="text-2xl font-black text-rose-400">
+              {globalQcStats.fgQuarantine} <span className="text-xs font-normal text-rose-200">รายการ</span>
+            </div>
+            <div className="text-[10px] text-rose-300 mt-0.5">(Quarantine Hold)</div>
+          </div>
+
+          {/* Quality Release Rate */}
+          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">อัตราผ่านการตรวจ (Release)</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {fpyRate}%
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({totalPassedQc} รายการผ่าน QC)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Interactive Quality Dimension Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: RM Inspection */}
+        <Card 
+          onClick={() => setActiveTab('rm')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'rm' ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/20 bg-[#F8F6F0]' : 'border-slate-200 hover:border-[#D4AF37]/50 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <FlaskConical className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. ตรวจรับรอง RM (วัตถุดิบ)</div>
+                  <div className="text-[11px] text-slate-500">Raw Material Inbound QC</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                {globalQcStats.rmPending} รอตรวจ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#4A4238]">{globalQcStats.rmPassed}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {globalQcStats.rmTotal} ผ่านแล็บ</span>
+              </div>
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold">
+                {globalQcStats.rmPending} รายการรอ
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${globalQcStats.rmTotal > 0 ? (globalQcStats.rmPassed / globalQcStats.rmTotal) * 100 : 0}%` }} className="bg-[#D4AF37] h-full" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">รอตรวจ QC</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{globalQcStats.rmPending}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">รายการ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">ผ่านแล้ว</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{globalQcStats.rmPassed}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">พร้อมชั่ง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">คลิกเพื่อดู</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">RM Queue</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">Raw Material</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: PM Inspection */}
+        <Card 
+          onClick={() => setActiveTab('pm')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'pm' ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50' : 'border-slate-200 hover:border-blue-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                  <PackageOpen className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. ตรวจรับรอง PM (บรรจุภัณฑ์)</div>
+                  <div className="text-[11px] text-slate-500">Packaging Quality Audit</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-semibold">
+                {globalQcStats.pmPending} รอตรวจ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-blue-600">{globalQcStats.pmPassed}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {globalQcStats.pmTotal} ผ่านตรวจ</span>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                {globalQcStats.pmPending} รายการรอ
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${globalQcStats.pmTotal > 0 ? (globalQcStats.pmPassed / globalQcStats.pmTotal) * 100 : 0}%` }} className="bg-blue-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">รอตรวจ QC</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{globalQcStats.pmPending}</div>
+                <div className="text-[9px] text-blue-600 font-medium">รายการ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">ผ่านแล้ว</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{globalQcStats.pmPassed}</div>
+                <div className="text-[9px] text-blue-600 font-medium">พร้อมบรรจุ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">คลิกเพื่อดู</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">PM Queue</div>
+                <div className="text-[9px] text-blue-600 font-medium">Packaging</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Bulk Tanks */}
+        <Card 
+          onClick={() => setActiveTab('bulk')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'bulk' ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shadow-sm">
+                  <Boxes className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. ตรวจปล่อย Bulk (งานผสม)</div>
+                  <div className="text-[11px] text-slate-500">Bulk Tank Lab Clearance</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-indigo-50 text-indigo-700 border-indigo-200 font-semibold">
+                {globalQcStats.bulkPendingTanks} ถังรอตรวจ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-indigo-600">{globalQcStats.bulkPassedTanks}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ถังตรวจผ่าน (QC Pass)</span>
+              </div>
+              <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
+                {globalQcStats.bulkPendingTanks} ถังรอแล็บ
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${(globalQcStats.bulkPassedTanks + globalQcStats.bulkPendingTanks) > 0 ? (globalQcStats.bulkPassedTanks / (globalQcStats.bulkPassedTanks + globalQcStats.bulkPendingTanks)) * 100 : 100}%` }} className="bg-indigo-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                <div className="text-[10px] font-semibold text-indigo-700">ถังรอ QC</div>
+                <div className="text-xs font-bold text-indigo-800 mt-0.5">{globalQcStats.bulkPendingTanks}</div>
+                <div className="text-[9px] text-indigo-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                <div className="text-[10px] font-semibold text-indigo-700">ถังปล่อยผ่าน</div>
+                <div className="text-xs font-bold text-indigo-800 mt-0.5">{globalQcStats.bulkPassedTanks}</div>
+                <div className="text-[9px] text-indigo-600 font-medium">พร้อมบรรจุ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                <div className="text-[10px] font-semibold text-indigo-700">คลิกเพื่อดู</div>
+                <div className="text-xs font-bold text-indigo-800 mt-0.5">Bulk Queue</div>
+                <div className="text-[9px] text-indigo-600 font-medium">Tanks</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: FG Inspection */}
+        <Card 
+          onClick={() => setActiveTab('fg')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'fg' ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. ตรวจปล่อย FG (สินค้าสำเร็จรูป)</div>
+                  <div className="text-[11px] text-slate-500">FG Release for Sales</div>
+                </div>
+              </div>
+              <Badge variant="outline" className={`text-xs font-semibold ${globalQcStats.fgQuarantine > 0 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                {globalQcStats.fgQuarantine} กักกันรอ QC
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{globalQcStats.fgReleased}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {globalQcStats.fgTotal} รายการปล่อยขาย</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                {globalQcStats.fgReleased} Released
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${globalQcStats.fgTotal > 0 ? (globalQcStats.fgReleased / globalQcStats.fgTotal) * 100 : 100}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">กักกันรอ QC</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{globalQcStats.fgQuarantine}</div>
+                <div className="text-[9px] text-amber-600 font-medium">รายการ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">ปล่อยขายแล้ว</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{globalQcStats.fgReleased}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">พร้อมส่ง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">คลิกเพื่อดู</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">FG Queue</div>
+                <div className="text-[9px] text-emerald-600 font-medium">Finished Goods</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="bulk" value={activeTab} onValueChange={setActiveTab} className="w-full">
