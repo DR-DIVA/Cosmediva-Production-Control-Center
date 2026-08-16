@@ -87,11 +87,29 @@ export default function IssuesPage() {
   
   const fetchQualityMetrics = async () => {
     try {
-      // 1. Fetch RM & PM data
-      const { data: rmData } = await supabase
-        .from('production_lot_rms')
-        .select('id, rm_code, qc_status, status, receive_date')
+      // 1. Fetch RM & PM data and logs for historical hold events
+      const [{ data: rmData }, { data: logsData }, { data: bulkData }, { data: fgData }] = await Promise.all([
+        supabase.from('production_lot_rms').select('id, rm_code, rm_name, qc_status, status, receive_date'),
+        supabase.from('production_logs').select('id, note, status, tank_details, processes(process_name)'),
+        supabase.from('production_logs').select('id, status, tank_start, tank_end, total_tanks, tank_details, note, processes(process_name)'),
+        supabase.from('fg_inventory').select('id, qc_status')
+      ])
 
+      // Extract all RM / PM hold logs from production_logs note
+      const rmHoldCodes = new Set<string>()
+      const pmHoldCodes = new Set<string>()
+      ;(logsData || []).forEach(l => {
+        const note = l.note || ''
+        if (note.includes('[QC HOLD]')) {
+          if (note.includes(' PM [') || note.includes(' PM:')) {
+            pmHoldCodes.add(note)
+          } else if (note.includes(' RM [') || note.includes(' RM:') || note.includes('RM/PM')) {
+            rmHoldCodes.add(note)
+          }
+        }
+      })
+
+      // 1. RM & PM Calculation
       let rmTotal = 0, rmPassed = 0, rmHold = 0, rmReject = 0
       let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
 
@@ -104,49 +122,59 @@ export default function IssuesPage() {
           if (isPM) {
             pmTotal++
             if (qc === 'PASSED') pmPassed++
-            else if (qc === 'HOLD') pmHold++
-            else if (qc === 'REJECTED') pmReject++
+            if (qc === 'REJECTED') pmReject++
+            
+            const inHoldLogs = Array.from(pmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+            if (qc === 'HOLD' || inHoldLogs) {
+              pmHold++
+            }
           } else {
             rmTotal++
             if (qc === 'PASSED') rmPassed++
-            else if (qc === 'HOLD') rmHold++
-            else if (qc === 'REJECTED') rmReject++
-          }
-        }
-      })
-
-      // 2. Fetch Bulk data (strictly from 'รอ QC' process)
-      const { data: bulkData } = await supabase
-        .from('production_logs')
-        .select('id, status, tank_start, tank_end, total_tanks, tank_details, processes(process_name)')
-
-      let bulkTotal = 0, bulkPassed = 0, bulkHold = 0, bulkReject = 0
-
-      ;(bulkData || []).forEach((task: any) => {
-        const pName = Array.isArray(task.processes) ? task.processes[0]?.process_name : (task.processes as any)?.process_name
-        if (pName === 'รอ QC') {
-          const details = task.tank_details || {}
-          const start = parseInt(task.tank_start) || 1
-          const end = parseInt(task.tank_end) || start
-          for (let i = start; i <= end; i++) {
-            const s = details[i]
-            bulkTotal++
-            if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
-              bulkPassed++
-            } else if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD') {
-              bulkHold++
-            } else if (s === 'FAILED' || s === 'REJECTED') {
-              bulkReject++
+            if (qc === 'REJECTED') rmReject++
+            
+            const inHoldLogs = Array.from(rmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+            if (qc === 'HOLD' || inHoldLogs) {
+              rmHold++
             }
           }
         }
       })
 
-      // 3. Fetch FG data
-      const { data: fgData } = await supabase
-        .from('fg_inventory')
-        .select('id, qc_status')
+      // 2. Bulk Calculation (with historical hold / reprocess per tank)
+      let bulkTotal = 0, bulkPassed = 0, bulkHold = 0, bulkReject = 0
+      const qcLogs = (bulkData || []).filter(t => {
+        const pName = Array.isArray(t.processes) ? t.processes[0]?.process_name : (t.processes as any)?.process_name
+        return pName === 'รอ QC'
+      })
 
+      qcLogs.forEach((task: any) => {
+        const details = task.tank_details || {}
+        const start = parseInt(task.tank_start) || 1
+        const end = parseInt(task.tank_end) || start
+        for (let i = start; i <= end; i++) {
+          const s = details[i]
+          bulkTotal++
+          if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
+            bulkPassed++
+          }
+          if (s === 'FAILED' || s === 'REJECTED') {
+            bulkReject++
+          }
+
+          const historyKey = `${i}_history`
+          const histories = details[historyKey]
+          const hasHoldHistory = Array.isArray(histories) && histories.some((h: any) => 
+            h.status === 'PAUSED' || h.status === 'REPROCESS' || h.status === 'HOLD' || (h.note && (h.note.includes('HOLD') || h.note.includes('REPROCESS')))
+          )
+
+          if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD' || hasHoldHistory) {
+            bulkHold++
+          }
+        }
+      })
+
+      // 3. FG Calculation
       let fgTotal = 0, fgPassed = 0, fgHold = 0, fgReject = 0
 
       ;(fgData || []).forEach((item: any) => {
