@@ -65,15 +65,14 @@ export default function DashboardPage() {
     
     const sevenDaysAgo = addDays(todayStart, -7).toISOString()
 
-    // Fetch all Active Lots or Recently Done Lots
+    // Fetch all lots (active and completed)
     const { data: activeLotsData } = await supabase.from('production_lots')
       .select(`
-        id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity, updated_at,
+        id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity, updated_at, created_at,
         order_type, planned_start_date, fg_due_date,
         processes (process_name),
         products:sku_id (sku, product_name)
       `)
-      .or(`current_status.neq.DONE,and(current_status.eq.DONE,updated_at.gte.${sevenDaysAgo})`)
       .order('created_at', { ascending: true })
 
     const activeLotIds = activeLotsData && activeLotsData.length > 0 ? activeLotsData.map((l: any) => l.id) : ['none']
@@ -95,7 +94,27 @@ export default function DashboardPage() {
     }
 
     if (activeLotsData) {
-      const sortedLots = [...activeLotsData]
+      const sevenDaysLimit = new Date(today).getTime() - 7 * 24 * 60 * 60 * 1000
+
+      // Filter: Keep active lots, and for DONE lots only keep if completed within the last 7 days
+      const filteredLots = activeLotsData.filter((lot: any) => {
+        if (lot.current_status !== 'DONE') return true
+
+        const lotLogs = logs.filter(l => l.production_lot_id === lot.id)
+        let latestTime = 0
+        lotLogs.forEach(l => {
+          const t = new Date(l.activity_date || l.updated_at || l.created_at).getTime()
+          if (t > latestTime) latestTime = t
+        })
+
+        if (latestTime === 0) {
+          latestTime = new Date(lot.updated_at || lot.created_at).getTime()
+        }
+
+        return latestTime >= sevenDaysLimit
+      })
+
+      const sortedLots = [...filteredLots]
       
       const getWeighDate = (lotId: string) => {
         const weighLog = logs.find(l => 
