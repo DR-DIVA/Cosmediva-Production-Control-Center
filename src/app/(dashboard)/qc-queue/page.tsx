@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
 export default function QCQueuePage() {
@@ -62,6 +63,10 @@ export default function QCQueuePage() {
   const [controlNoSort, setControlNoSort] = useState<'asc' | 'desc' | null>(null)
   const [poSearch, setPoSearch] = useState('')
   const [codeSearch, setCodeSearch] = useState('')
+  const [rmQcStatusSearch, setRmQcStatusSearch] = useState('ALL')
+  const [pmQcStatusSearch, setPmQcStatusSearch] = useState('ALL')
+  const [bulkQcStatusSearch, setBulkQcStatusSearch] = useState('ALL')
+  const [fgQcStatusSearch, setFgQcStatusSearch] = useState('ALL')
 
   const supabase = createClient()
 
@@ -699,7 +704,23 @@ export default function QCQueuePage() {
                             <input type="text" placeholder="ค้นหา PO..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={poSearch} onChange={(e) => setPoSearch(e.target.value)} />
                           </div>
                         </th>
-                        <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>สถานะ QC</span>
+                            <Select value={rmQcStatusSearch} onValueChange={(val) => setRmQcStatusSearch(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">ทั้งหมด</SelectItem>
+                                <SelectItem value="QUARANTINED">QUARANTINED</SelectItem>
+                                <SelectItem value="PASSED">PASSED</SelectItem>
+                                <SelectItem value="HOLD">HOLD</SelectItem>
+                                <SelectItem value="REJECTED">REJECTED</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium text-right">จัดการ</th>
                       </tr>
                     </thead>
@@ -711,6 +732,7 @@ export default function QCQueuePage() {
                       })
                       .filter(item => poSearch ? (item.po_no || '').toLowerCase().includes(poSearch.toLowerCase()) : true)
                       .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
+                      .filter(item => rmQcStatusSearch !== 'ALL' ? (item.qc_status || 'PENDING') === rmQcStatusSearch : true)
                       .sort((a, b) => {
                         if (controlNoSort) {
                           const ca = a.control_no || '';
@@ -925,7 +947,23 @@ export default function QCQueuePage() {
                               </div>
                             </th>
                             <th className="px-4 py-3 font-medium">จำนวน</th>
-                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                            <th className="px-4 py-3 font-medium">
+                              <div className="flex flex-col space-y-1 mt-1 mb-1">
+                                <span>สถานะ QC</span>
+                                <Select value={pmQcStatusSearch} onValueChange={(val) => setPmQcStatusSearch(val || 'ALL')}>
+                                  <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="ALL">ทั้งหมด</SelectItem>
+                                    <SelectItem value="QUARANTINED">QUARANTINED</SelectItem>
+                                    <SelectItem value="PASSED">PASSED</SelectItem>
+                                    <SelectItem value="HOLD">HOLD</SelectItem>
+                                    <SelectItem value="REJECTED">REJECTED</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </th>
                             <th className="px-4 py-3 font-medium text-right">จัดการ</th>
                           </tr>
                         </thead>
@@ -936,6 +974,7 @@ export default function QCQueuePage() {
                             return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && isPM
                           })
                           .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
+                          .filter(item => pmQcStatusSearch !== 'ALL' ? (item.qc_status || 'PENDING') === pmQcStatusSearch : true)
                           .sort((a, b) => {
                             if (controlNoSort) {
                               const ca = a.control_no || '';
@@ -1122,7 +1161,23 @@ export default function QCQueuePage() {
                             {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                           </div>
                         </th>
-                        <th className="px-4 py-3 font-medium">สถานะ QC</th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>สถานะ QC</span>
+                            <Select value={bulkQcStatusSearch} onValueChange={(val) => setBulkQcStatusSearch(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">ทั้งหมด</SelectItem>
+                                <SelectItem value="PENDING">PENDING</SelectItem>
+                                <SelectItem value="PASSED">PASSED</SelectItem>
+                                <SelectItem value="HOLD">HOLD</SelectItem>
+                                <SelectItem value="REJECTED">REJECTED</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -1136,6 +1191,16 @@ export default function QCQueuePage() {
                         if (!codeSearch) return true;
                         const sku = (task.production_lots?.products?.sku || '').toLowerCase()
                         return sku.includes(codeSearch.toLowerCase())
+                      })
+                      .filter(task => {
+                        if (bulkQcStatusSearch === 'ALL') return true;
+                        if (!task.tank_details) return bulkQcStatusSearch === 'PENDING';
+                        const statuses = Object.values(task.tank_details);
+                        if (bulkQcStatusSearch === 'PASSED') return statuses.includes('QC_PASS');
+                        if (bulkQcStatusSearch === 'HOLD') return statuses.includes('PAUSED');
+                        if (bulkQcStatusSearch === 'REJECTED') return statuses.includes('FAILED');
+                        if (bulkQcStatusSearch === 'PENDING') return statuses.length < task.total_tanks || statuses.some(s => !s);
+                        return false;
                       })
                       .sort((a, b) => {
                         if (dateSort) {
@@ -1427,6 +1492,23 @@ export default function QCQueuePage() {
                             {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                           </div>
                         </th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>สถานะ QC</span>
+                            <Select value={fgQcStatusSearch} onValueChange={(val) => setFgQcStatusSearch(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">ทั้งหมด</SelectItem>
+                                <SelectItem value="QUARANTINE">QUARANTINE</SelectItem>
+                                <SelectItem value="PASSED">PASSED</SelectItem>
+                                <SelectItem value="HOLD">HOLD</SelectItem>
+                                <SelectItem value="REJECTED">REJECTED</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium text-right">ดำเนินการ (QC)</th>
                       </tr>
                     </thead>
@@ -1442,6 +1524,7 @@ export default function QCQueuePage() {
                         const sku = (item.products?.sku || '').toLowerCase()
                         return sku.includes(codeSearch.toLowerCase())
                       })
+                      .filter(item => fgQcStatusSearch !== 'ALL' ? (item.qc_status || 'QUARANTINE') === fgQcStatusSearch : true)
                       .sort((a, b) => {
                         if (dateSort) {
                           const ta = new Date(a.created_at || 0).getTime();
@@ -1467,6 +1550,16 @@ export default function QCQueuePage() {
                           </td>
                           <td className="px-4 py-3 text-slate-500">
                             {new Date(item.created_at).toLocaleString('th-TH')}
+                          </td>
+                          <td className="px-4 py-3">
+                            <Badge variant="outline" className={`
+                              ${(item.qc_status || 'QUARANTINE') === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' : ''}
+                              ${(item.qc_status || 'QUARANTINE') === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' : ''}
+                              ${(item.qc_status || 'QUARANTINE') === 'HOLD' ? 'bg-amber-100 text-amber-700 border-amber-200' : ''}
+                              ${(item.qc_status || 'QUARANTINE') === 'QUARANTINE' ? 'bg-orange-100 text-orange-700 border-orange-200' : ''}
+                            `}>
+                              {item.qc_status || 'QUARANTINE'}
+                            </Badge>
                           </td>
                           <td className="px-4 py-3 text-right">
                             <Button disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')} size="sm" variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700 disabled:opacity-50" onClick={() => {
