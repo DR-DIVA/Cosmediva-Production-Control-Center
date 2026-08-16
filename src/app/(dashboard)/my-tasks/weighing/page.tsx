@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, ShoppingBasket, ChevronDown, ChevronRight, Play, CheckCircle2, Clock , Box, Scale} from 'lucide-react'
+import { Loader2, ShoppingBasket, ChevronDown, ChevronRight, Play, CheckCircle2, Clock , Box, Scale, TrendingUp, Layers, RefreshCw, Sparkles, Truck, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { TaskCalendar } from '@/components/ui/TaskCalendar'
@@ -476,47 +476,365 @@ export default function WeighingTasksPage() {
     )
   }
 
+  const handleRefresh = () => {
+    fetchWeighingTasks()
+    fetchHistory()
+    toast.success('รีเฟรชข้อมูลคิวงานชั่งสารล่าสุดเรียบร้อยแล้ว')
+  }
+
+  // Weighing Metric Calculations
+  const readyLots = tasks.filter(t => (t.rm_items || []).length > 0 && (t.rm_items || []).every((r: any) => r.status === 'READY')).length;
+  const waitingRmLots = tasks.filter(t => (t.rm_items || []).some((r: any) => r.status !== 'READY')).length;
+  
+  let totalBasketsCount = 0;
+  let inProgressBasketsCount = 0;
+  let doneBasketsCount = 0;
+  let movedToMixCount = 0;
+
+  tasks.forEach(t => {
+    const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {};
+    const total = t.production_lots?.total_tanks || 1;
+    const start = parseInt(t.tank_start) || 1;
+    const end = parseInt(t.tank_end) || total;
+    const count = Math.max(start, end) - start + 1;
+    totalBasketsCount += count;
+
+    for (let i = start; i <= Math.max(start, end); i++) {
+      const s = details[i] || 'WAITING';
+      if (s === 'IN_PROGRESS') inProgressBasketsCount++;
+      if (s === 'DONE') doneBasketsCount++;
+      if (s === 'MOVED') movedToMixCount++;
+    }
+  });
+
+  const totalCompoundWeight = tasks.reduce((sum, t) => {
+    const kgPerTank = t.production_lots?.kg_per_tank || 0;
+    const total = t.production_lots?.total_tanks || 1;
+    const start = parseInt(t.tank_start) || 1;
+    const end = parseInt(t.tank_end) || total;
+    const count = Math.max(start, end) - start + 1;
+    return sum + (count * kgPerTank);
+  }, 0);
+
+  const readyPct = tasks.length > 0 ? ((readyLots / tasks.length) * 100).toFixed(1) : '100.0';
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header Card */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <Scale className="w-8 h-8 text-yellow-400" />
-            งานชั่งสาร (Weighing)
+            <Scale className="w-8 h-8 text-yellow-500 shrink-0" />
+            งานชั่งสาร (Weighing & RM Kitting)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>รายการงานชั่งสารทั้งหมด</div>
+             <div>รายการงานชั่งสาร จัดเตรียมวัตถุดิบ และส่งมอบเข้าสู่กระบวนการผสม</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="w-64">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-60">
             <Input 
               placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white"
             />
           </div>
-          <div className="flex gap-2">
+          <Button onClick={handleRefresh} variant="outline" className="bg-[#F8F6F0] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" /> รีเฟรช
+          </Button>
+          <div className="flex gap-1.5 shrink-0">
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
+              <ListIcon className="w-4 h-4 mr-1.5" /> ตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
+              className={viewMode === 'calendar' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
+              <CalendarIcon className="w-4 h-4 mr-1.5" /> ปฏิทิน
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* 1. Executive Weighing KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Scale className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> RM Preparation & Weighing Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Weighing Station KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              ภาพรวมการจัดเตรียมวัตถุดิบ • คิวการชั่งสาร • และการส่งมอบชุดสารเข้าห้องผสม
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Weighing Jobs */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">คิวงานชั่งสารรวม</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {tasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({totalBasketsCount} ชุดชั่งสาร)</div>
+          </div>
+
+          {/* RM 100% Ready */}
+          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">สารครบพร้อมชั่ง 100%</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {readyLots} <span className="text-xs font-normal text-emerald-200">ล็อต ({readyPct}%)</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({totalCompoundWeight.toLocaleString()} KG สารรวม)</div>
+          </div>
+
+          {/* Waiting RM */}
+          <div className="bg-rose-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-rose-400/30 text-center">
+            <div className="text-[11px] text-rose-200 font-medium">รอวัตถุดิบเข้าคลัง</div>
+            <div className="text-2xl font-black text-rose-400">
+              {waitingRmLots} <span className="text-xs font-normal text-rose-200">ล็อต</span>
+            </div>
+            <div className="text-[10px] text-rose-300 mt-0.5">(รอของส่งมอบ/QC)</div>
+          </div>
+
+          {/* Handed Over to Mix */}
+          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[11px] text-blue-200 font-medium">ส่งมอบห้องผสมแล้ว</div>
+            <div className="text-2xl font-black text-blue-300">
+              {movedToMixCount} <span className="text-xs font-normal text-blue-200">ชุดชั่ง</span>
+            </div>
+            <div className="text-[10px] text-blue-300 mt-0.5">({doneBasketsCount} ชุดชั่งเสร็จรอส่ง)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Interactive Dimension Cards for Weighing */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: RM Readiness */}
+        <Card className="border-2 border-slate-200 hover:border-emerald-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <Box className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. ความพร้อมสาร (Kitting)</div>
+                  <div className="text-[11px] text-slate-500">RM Warehouse Release</div>
+                </div>
+              </div>
+              <Badge variant="outline" className={`text-xs font-semibold ${waitingRmLots > 0 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                {readyPct}% สารพร้อม
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{readyLots}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {tasks.length} ล็อตสารพร้อม</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                พร้อมชั่ง 100%
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${readyPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">สารครบ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{readyLots}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ล็อต</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">รอวัตถุดิบ</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{waitingRmLots}</div>
+                <div className="text-[9px] text-rose-600 font-medium">ล็อต</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">อัตราพร้อม</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{readyPct}%</div>
+                <div className="text-[9px] text-emerald-600 font-medium">Ready</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Active Weighing Station */}
+        <Card className="border-2 border-slate-200 hover:border-amber-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold shadow-sm">
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. สถานะการชั่ง (Station)</div>
+                  <div className="text-[11px] text-slate-500">Weighing Desk Progress</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 font-semibold">
+                {inProgressBasketsCount} กำลังชั่ง
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-amber-600">{doneBasketsCount + movedToMixCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalBasketsCount} ชุดชั่งเสร็จแล้ว</span>
+              </div>
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold">
+                {inProgressBasketsCount} กำลังชั่ง
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalBasketsCount > 0 ? (((doneBasketsCount + movedToMixCount) / totalBasketsCount) * 100) : 0}%` }} className="bg-amber-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">กำลังชั่ง</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{inProgressBasketsCount}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ชุด</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">ชั่งเสร็จแล้ว</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{doneBasketsCount}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ชุด</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">รอชั่ง</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{totalBasketsCount - (inProgressBasketsCount + doneBasketsCount + movedToMixCount)}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ชุด</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Mixing Hand-off */}
+        <Card className="border-2 border-slate-200 hover:border-blue-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                  <Truck className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. ส่งมอบห้องผสม (Hand-off)</div>
+                  <div className="text-[11px] text-slate-500">Mixing Staging Transfer</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-semibold">
+                {movedToMixCount} ส่งมอบแล้ว
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-blue-600">{movedToMixCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalBasketsCount} ชุดเข้าห้องผสม</span>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                Auto Synced
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalBasketsCount > 0 ? ((movedToMixCount / totalBasketsCount) * 100) : 0}%` }} className="bg-blue-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">ส่งเข้า Mix</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{movedToMixCount}</div>
+                <div className="text-[9px] text-blue-600 font-medium">ชุด</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">รอส่งมอบ</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{doneBasketsCount}</div>
+                <div className="text-[9px] text-blue-600 font-medium">ชุด</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">สถานะ</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">Mix Flow</div>
+                <div className="text-[9px] text-blue-600 font-medium">Ready</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Total Volume */}
+        <Card className="border-2 border-slate-200 hover:border-[#D4AF37] bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Layers className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. ปริมาณเนื้อสารรวม (KG)</div>
+                  <div className="text-[11px] text-slate-500">Total Batch Compound</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-[#F8F6F0] text-[#8B7355] border-[#D4AF37]/30 font-semibold">
+                {totalCompoundWeight.toLocaleString()} KG
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#4A4238]">{totalCompoundWeight.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">กิโลกรัมสารตามแผน</span>
+              </div>
+              <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                Compound
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: '100%' }} className="bg-[#D4AF37] h-full" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">น้ำหนักรวม</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalCompoundWeight.toLocaleString()}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">KG</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">ชุดสาร</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalBasketsCount}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">ชุด</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">เฉลี่ย/ถัง</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalBasketsCount > 0 ? Math.round(totalCompoundWeight / totalBasketsCount) : 0}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">KG/ชุด</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="queue" className="w-full">

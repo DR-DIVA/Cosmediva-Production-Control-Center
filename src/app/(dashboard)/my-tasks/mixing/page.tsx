@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Beaker, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, Droplet, AlertTriangle, ShoppingBasket, Blender, Cylinder, FlaskConical } from 'lucide-react'
+import { Loader2, Beaker, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, Droplet, AlertTriangle, ShoppingBasket, Blender, Cylinder, FlaskConical, TrendingUp, Layers, RefreshCw, Sparkles, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { TaskCalendar } from '@/components/ui/TaskCalendar'
@@ -591,47 +591,367 @@ export default function MixingTasksPage() {
     )
   }
 
+  const handleRefresh = () => {
+    fetchMixingTasks()
+    fetchHistory()
+    toast.success('รีเฟรชข้อมูลคิวงานผสมล่าสุดเรียบร้อยแล้ว')
+  }
+
+  // Mixing Metric Calculations
+  let totalTanksCount = 0;
+  let inProgressTanksCount = 0;
+  let soakTanksCount = 0;
+  let doneTanksCount = 0;
+  let qcSentTanksCount = 0;
+  let pausedTanksCount = 0;
+
+  tasks.forEach(t => {
+    const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {};
+    const total = t.production_lots?.total_tanks || 1;
+    const start = parseInt(t.tank_start) || 1;
+    const end = parseInt(t.tank_end) || total;
+    const count = Math.max(start, end) - start + 1;
+    totalTanksCount += count;
+
+    for (let i = start; i <= Math.max(start, end); i++) {
+      const s = details[i]?.status || details[i] || 'WAITING';
+      if (s === 'IN_PROGRESS') inProgressTanksCount++;
+      if (s === 'SOAK' || s === 'PREMIX') soakTanksCount++;
+      if (s === 'DONE' || s === 'SENT_TO_PACKING') doneTanksCount++;
+      if (s === 'SENT_TO_QC' || s === 'QC_PASS') qcSentTanksCount++;
+      if (s === 'PAUSED' || s === 'REPROCESS') pausedTanksCount++;
+    }
+  });
+
+  const totalBulkVolume = tasks.reduce((sum, t) => {
+    const kgPerTank = t.production_lots?.kg_per_tank || 0;
+    const total = t.production_lots?.total_tanks || 1;
+    const start = parseInt(t.tank_start) || 1;
+    const end = parseInt(t.tank_end) || total;
+    const count = Math.max(start, end) - start + 1;
+    return sum + (count * kgPerTank);
+  }, 0);
+
+  const activeTanksRunning = inProgressTanksCount + soakTanksCount;
+  const runningPct = totalTanksCount > 0 ? (((doneTanksCount + qcSentTanksCount) / totalTanksCount) * 100).toFixed(1) : '0.0';
+
   return (
     <div className="p-4 md:p-6 w-full mx-auto space-y-6 bg-slate-50 min-h-screen">
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header Card */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <FlaskConical className="w-8 h-8 text-yellow-400" />
-            งานผสม (Mixing)
+            <FlaskConical className="w-8 h-8 text-yellow-500 shrink-0" />
+            งานผสม (Mixing & Bulk Formulation)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>รายการงานผสมทั้งหมด</div>
+             <div>รายการงานผสมเนื้อครีม/เซรั่ม ควบคุมอุณหภูมิ และสุ่มตรวจวิเคราะห์แล็บ</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="w-64">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-60">
             <Input 
               placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white"
             />
           </div>
-          <div className="flex gap-2">
+          <Button onClick={handleRefresh} variant="outline" className="bg-[#F8F6F0] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" /> รีเฟรช
+          </Button>
+          <div className="flex gap-1.5 shrink-0">
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
+              <ListIcon className="w-4 h-4 mr-1.5" /> ตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
+              className={viewMode === 'calendar' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
+              <CalendarIcon className="w-4 h-4 mr-1.5" /> ปฏิทิน
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* 1. Executive Mixing KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <FlaskConical className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Bulk Formulation & Mixing Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Mixing Station KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              สถานะเครื่องกวนผสม (Mix 1-6) • การแช่สาร • ปริมาตร Bulk รวม • และการสุ่มตรวจส่งแล็บ QC
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Mixing Tanks */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">งานผสมทั้งหมด</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {tasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({totalTanksCount} ถังในคิว)</div>
+          </div>
+
+          {/* Active Stirring & Mixing */}
+          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">กำลังผสม / แช่สาร</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {activeTanksRunning} <span className="text-xs font-normal text-emerald-200">ถัง</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({totalBulkVolume.toLocaleString()} KG เนื้อสาร)</div>
+          </div>
+
+          {/* QC Lab Hold */}
+          <div className="bg-purple-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-purple-400/30 text-center">
+            <div className="text-[11px] text-purple-200 font-medium">ส่งตรวจแล็บ QC</div>
+            <div className="text-2xl font-black text-purple-300">
+              {qcSentTanksCount} <span className="text-xs font-normal text-purple-200">ถัง</span>
+            </div>
+            <div className="text-[10px] text-purple-300 mt-0.5">(รอผลตรวจปล่อย)</div>
+          </div>
+
+          {/* Mixed & Ready for Packing */}
+          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[11px] text-blue-200 font-medium">ผสมเสร็จ / ส่งบรรจุ</div>
+            <div className="text-2xl font-black text-blue-300">
+              {doneTanksCount} <span className="text-xs font-normal text-blue-200">ถัง</span>
+            </div>
+            <div className="text-[10px] text-blue-300 mt-0.5">({runningPct}% ความคืบหน้า)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Interactive Dimension Cards for Mixing */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Active Stirring */}
+        <Card className="border-2 border-slate-200 hover:border-emerald-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <Blender className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. ถังกำลังผสม (Stirring)</div>
+                  <div className="text-[11px] text-slate-500">Mix 1-6 Running</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                {inProgressTanksCount} กำลังผสม
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{inProgressTanksCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalTanksCount} ถังเดินเครื่อง</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                In-Progress
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalTanksCount > 0 ? ((inProgressTanksCount / totalTanksCount) * 100) : 0}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">กำลังผสม</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{inProgressTanksCount}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">แช่สาร</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{soakTanksCount}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">รวมเดินงาน</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{activeTanksRunning}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Soak & Pre-mix */}
+        <Card className="border-2 border-slate-200 hover:border-blue-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                  <Droplet className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. ขั้นตอนแช่สาร (Soak)</div>
+                  <div className="text-[11px] text-slate-500">Hydration & Premix Stage</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-semibold">
+                {soakTanksCount} แช่สารอยู่
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-blue-600">{soakTanksCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ถังแช่สารบ่มเนื้อ</span>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                Soak Stage
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalTanksCount > 0 ? ((soakTanksCount / totalTanksCount) * 100) : 0}%` }} className="bg-blue-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">แช่สาร</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{soakTanksCount}</div>
+                <div className="text-[9px] text-blue-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">รอแช่</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{totalTanksCount - (activeTanksRunning + doneTanksCount + qcSentTanksCount)}</div>
+                <div className="text-[9px] text-blue-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">สถานะ</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">Hydration</div>
+                <div className="text-[9px] text-blue-600 font-medium">Normal</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: QC Lab Sampling */}
+        <Card className="border-2 border-slate-200 hover:border-purple-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold shadow-sm">
+                  <Beaker className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. ส่งตรวจแล็บ QC (Lab)</div>
+                  <div className="text-[11px] text-slate-500">QC Bulk Assay & Viscosity</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200 font-semibold">
+                {qcSentTanksCount} รอผลแล็บ
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-purple-600">{qcSentTanksCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ถังรอ QC ตรวจปล่อย</span>
+              </div>
+              <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px] font-bold">
+                Lab Clearance
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalTanksCount > 0 ? ((qcSentTanksCount / totalTanksCount) * 100) : 0}%` }} className="bg-purple-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-purple-50/70 border border-purple-100">
+                <div className="text-[10px] font-semibold text-purple-700">ส่งแล็บ</div>
+                <div className="text-xs font-bold text-purple-800 mt-0.5">{qcSentTanksCount}</div>
+                <div className="text-[9px] text-purple-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">ปัญหา/พัก</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{pausedTanksCount}</div>
+                <div className="text-[9px] text-rose-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-purple-50/70 border border-purple-100">
+                <div className="text-[10px] font-semibold text-purple-700">ผลแล็บ</div>
+                <div className="text-xs font-bold text-purple-800 mt-0.5">Assay</div>
+                <div className="text-[9px] text-purple-600 font-medium">Pending</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Total Compound Volume */}
+        <Card className="border-2 border-slate-200 hover:border-[#D4AF37] bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Cylinder className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. ปริมาณ Bulk รวม (KG)</div>
+                  <div className="text-[11px] text-slate-500">Total Bulk Volume</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-[#F8F6F0] text-[#8B7355] border-[#D4AF37]/30 font-semibold">
+                {totalBulkVolume.toLocaleString()} KG
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#4A4238]">{totalBulkVolume.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">KG รวมในห้องผสม</span>
+              </div>
+              <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                Formulation
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: '100%' }} className="bg-[#D4AF37] h-full" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">น้ำหนัก Bulk</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalBulkVolume.toLocaleString()}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">KG</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">ถังทั้งหมด</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalTanksCount}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">เฉลี่ย/ถัง</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalTanksCount > 0 ? Math.round(totalBulkVolume / totalTanksCount) : 0}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">KG/ถัง</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="queue" className="w-full">

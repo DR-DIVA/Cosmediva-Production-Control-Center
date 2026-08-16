@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AlertTriangle, Loader2, Pipette, Cylinder, SprayCan, Package as BoxIcon, Inbox, Mail, PillBottle, TestTube, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Factory , PackageSearch, Box} from 'lucide-react'
+import { AlertTriangle, Loader2, Pipette, Cylinder, SprayCan, Package as BoxIcon, Inbox, Mail, PillBottle, TestTube, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Factory , PackageSearch, Box, TrendingUp, Layers, RefreshCw, Sparkles, ArrowUpRight } from 'lucide-react'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
@@ -583,49 +583,368 @@ export default function PackingTasksPage() {
     )
   }
 
+  const handleRefresh = () => {
+    fetchPackingTasks()
+    fetchHistory()
+    toast.success('รีเฟรชข้อมูลคิวงานบรรจุล่าสุดเรียบร้อยแล้ว')
+  }
+
+  // Packing Metric Calculations
+  let totalPcsTarget = 0;
+  let totalTanksCount = 0;
+  let inProgressTanksCount = 0;
+  let doneTanksCount = 0;
+  let sentToPofCount = 0;
+  let totalCartonsProduced = 0;
+
+  tasks.forEach(t => {
+    const lot = t.production_lots;
+    const kgPerTank = lot?.kg_per_tank || 0;
+    const gPerPiece = lot?.g_per_piece || 1;
+    const pcsPerCarton = lot?.pcs_per_carton || 1;
+    const total = lot?.total_tanks || 1;
+    const start = parseInt(t.tank_start) || 1;
+    const end = parseInt(t.tank_end) || total;
+    const count = Math.max(start, end) - start + 1;
+    totalTanksCount += count;
+    
+    if (kgPerTank && gPerPiece) {
+      totalPcsTarget += Math.round(count * ((kgPerTank * 1000) / gPerPiece));
+    }
+
+    const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {};
+    for (let i = start; i <= Math.max(start, end); i++) {
+      const s = details[i]?.status || details[i] || 'WAITING';
+      if (s === 'IN_PROGRESS') inProgressTanksCount++;
+      if (s === 'DONE') doneTanksCount++;
+      if (s === 'SENT_TO_POF') sentToPofCount++;
+      
+      const c = Number(details[i]?.cartons) || 0;
+      totalCartonsProduced += c;
+    }
+  });
+
+  const activeLinesRunning = inProgressTanksCount;
+  const completedTanks = doneTanksCount + sentToPofCount;
+  const packingPct = totalTanksCount > 0 ? ((completedTanks / totalTanksCount) * 100).toFixed(1) : '0.0';
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-
-      
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header Card */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <Box className="w-8 h-8 text-yellow-400" />
-            งานบรรจุ (Packing)
+            <Box className="w-8 h-8 text-yellow-500 shrink-0" />
+            งานบรรจุ (Packing & Filling Lines)
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>รายการงานบรรจุสินค้าประจำวัน</div>
+             <div>รายการงานบรรจุลงขวด/กระปุก/ซอง ประจำวัน และส่งต่อไปยังห้องอบฟิล์ม POF</div>
              <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Synchronize RM-MX-PK One Team
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="w-64">
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-60">
             <Input 
               placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              className="bg-white"
             />
           </div>
-          <div className="flex gap-2">
+          <Button onClick={handleRefresh} variant="outline" className="bg-[#F8F6F0] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" /> รีเฟรช
+          </Button>
+          <div className="flex gap-1.5 shrink-0">
             <Button
               variant={viewMode === 'list' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('list')}
+              className={viewMode === 'list' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <ListIcon className="w-4 h-4 mr-2" /> แบบตาราง
+              <ListIcon className="w-4 h-4 mr-1.5" /> ตาราง
             </Button>
             <Button
               variant={viewMode === 'calendar' ? 'default' : 'outline'}
               size="sm"
               onClick={() => setViewMode('calendar')}
+              className={viewMode === 'calendar' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
-              <CalendarIcon className="w-4 h-4 mr-2" /> ปฏิทิน
+              <CalendarIcon className="w-4 h-4 mr-1.5" /> ปฏิทิน
             </Button>
           </div>
         </div>
+      </div>
+
+      {/* 1. Executive Packing KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Box className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Assembly & Filling Line Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Packing Station KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              ภาพรวมไลน์บรรจุ • อัตราการผลิตจริง (Yield) • ลังสะสม • และการส่งมอบต่อไปยังห้องอุโมงค์ POF
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Packing Orders */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">คิวงานบรรจุรวม</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {tasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({totalTanksCount} ถังบรรจุ)</div>
+          </div>
+
+          {/* Active Filling Lines */}
+          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">กำลังเดินไลน์บรรจุ</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {activeLinesRunning} <span className="text-xs font-normal text-emerald-200">ถัง/ไลน์</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({totalPcsTarget.toLocaleString()} ชิ้นเป้าหมาย)</div>
+          </div>
+
+          {/* Packed Output */}
+          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[11px] text-blue-200 font-medium">บรรจุเสร็จ / ส่ง POF</div>
+            <div className="text-2xl font-black text-blue-300">
+              {completedTanks} <span className="text-xs font-normal text-blue-200">ถัง ({packingPct}%)</span>
+            </div>
+            <div className="text-[10px] text-blue-300 mt-0.5">({sentToPofCount} ถังส่งมอบ POF แล้ว)</div>
+          </div>
+
+          {/* Cartons Output */}
+          <div className="bg-cyan-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-cyan-400/30 text-center">
+            <div className="text-[11px] text-cyan-200 font-medium">ยอดลงกล่องสะสม</div>
+            <div className="text-2xl font-black text-cyan-300">
+              {totalCartonsProduced} <span className="text-xs font-normal text-cyan-200">ลัง</span>
+            </div>
+            <div className="text-[10px] text-cyan-300 mt-0.5">(จากถังที่ส่งมอบ)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Interactive Dimension Cards for Packing */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Active Lines */}
+        <Card className="border-2 border-slate-200 hover:border-emerald-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <Factory className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. ไลน์บรรจุที่กำลังเดิน</div>
+                  <div className="text-[11px] text-slate-500">Active Filling Operations</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                {activeLinesRunning} กำลังบรรจุ
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{activeLinesRunning}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalTanksCount} ถังกำลังเดินเครื่อง</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                Filling
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalTanksCount > 0 ? ((activeLinesRunning / totalTanksCount) * 100) : 0}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">กำลังบรรจุ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{activeLinesRunning}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">รอบรรจุ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{totalTanksCount - (activeLinesRunning + completedTanks)}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">รวมทั้งกะ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{totalTanksCount}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ถัง</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Pieces Output Target */}
+        <Card className="border-2 border-slate-200 hover:border-blue-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                  <Pipette className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. ยอดบรรจุเป้าหมาย (Pcs)</div>
+                  <div className="text-[11px] text-slate-500">Planned Filling Pieces</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-200 font-semibold">
+                {totalPcsTarget.toLocaleString()} ชิ้น
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-blue-600">{totalPcsTarget.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ชิ้นรวมทุกออเดอร์</span>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                Capacity Yield
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${packingPct}%` }} className="bg-blue-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">เป้าหมาย</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{totalPcsTarget.toLocaleString()}</div>
+                <div className="text-[9px] text-blue-600 font-medium">ชิ้น</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">อัตราสำเร็จ</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{packingPct}%</div>
+                <div className="text-[9px] text-blue-600 font-medium">ความคืบหน้า</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">สถานะ</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">Flow</div>
+                <div className="text-[9px] text-blue-600 font-medium">Normal</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: POF Hand-off */}
+        <Card className="border-2 border-slate-200 hover:border-teal-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-teal-100 text-teal-700 flex items-center justify-center font-bold shadow-sm">
+                  <PackageSearch className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. ส่งมอบห้องอุโมงค์ (POF)</div>
+                  <div className="text-[11px] text-slate-500">Shrink Tunnel Transfer</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-teal-50 text-teal-700 border-teal-200 font-semibold">
+                {sentToPofCount} ส่งมอบแล้ว
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-teal-600">{sentToPofCount}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {totalTanksCount} ถังส่งเข้า POF</span>
+              </div>
+              <Badge className="bg-teal-100 text-teal-800 border-teal-200 text-[10px] font-bold">
+                Auto Synced
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${totalTanksCount > 0 ? ((sentToPofCount / totalTanksCount) * 100) : 0}%` }} className="bg-teal-500 h-full transition-all duration-500" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-teal-50/70 border border-teal-100">
+                <div className="text-[10px] font-semibold text-teal-700">ส่งเข้า POF</div>
+                <div className="text-xs font-bold text-teal-800 mt-0.5">{sentToPofCount}</div>
+                <div className="text-[9px] text-teal-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-teal-50/70 border border-teal-100">
+                <div className="text-[10px] font-semibold text-teal-700">เสร็จรอบรรจุ</div>
+                <div className="text-xs font-bold text-teal-800 mt-0.5">{doneTanksCount}</div>
+                <div className="text-[9px] text-teal-600 font-medium">ถัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-teal-50/70 border border-teal-100">
+                <div className="text-[10px] font-semibold text-teal-700">สถานะ</div>
+                <div className="text-xs font-bold text-teal-800 mt-0.5">POF Sync</div>
+                <div className="text-[9px] text-teal-600 font-medium">Ready</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Cartons Total */}
+        <Card className="border-2 border-slate-200 hover:border-[#D4AF37] bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Box className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. ยอดลงกล่องสะสม (ลัง)</div>
+                  <div className="text-[11px] text-slate-500">Total Cartons Output</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-[#F8F6F0] text-[#8B7355] border-[#D4AF37]/30 font-semibold">
+                {totalCartonsProduced} ลัง
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#4A4238]">{totalCartonsProduced}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ลังสะสมที่บรรจุแล้ว</span>
+              </div>
+              <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                Cartons
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: '100%' }} className="bg-[#D4AF37] h-full" />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">ยอดลงกล่อง</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{totalCartonsProduced}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">ลัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">งานทั้งหมด</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{tasks.length}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">งาน</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">สถานะ</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">Boxed</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">Staged</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <Tabs defaultValue="queue" className="w-full">
