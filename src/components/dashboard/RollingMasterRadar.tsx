@@ -357,26 +357,30 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
 
       {/* Radar Master Header */}
       <CardHeader className="bg-gradient-to-b from-[#FAF8F5] to-white border-b border-[#D4AF37]/25 p-5 md:p-6">
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
-          <div>
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
+          <div className="min-w-0">
             <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-xs">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-xs shrink-0">
                 <Compass className="w-6 h-6 text-[#D4AF37] animate-spin-slow" />
               </div>
-              <div>
-                <CardTitle className="text-xl md:text-2xl font-black text-[#4A4238] flex items-center gap-2.5">
-                  14-Day Rolling Master Radar
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2.5">
+                  <h2 className="text-xl md:text-2xl font-black text-[#4A4238] whitespace-nowrap tracking-tight">
+                    14-Day Rolling Master Radar
+                  </h2>
+                  <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
                     แผนงานล่วงหน้า 2 สัปดาห์
                   </span>
-                </CardTitle>
-                <div className="text-xs text-[#8B7355] font-medium flex items-center gap-2 mt-1">
-                  <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
-                  <span>
-                    หน้าต่างแผนงาน: <strong className="text-[#4A4238]">{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className="text-[#4A4238]">{horizonDates[13]?.dayNum} {horizonDates[13]?.monthName} 2026</strong>
-                  </span>
-                  <span className="text-slate-300">•</span>
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1">
+                </div>
+                <div className="text-xs text-[#8B7355] font-medium flex flex-wrap items-center gap-2 mt-1">
+                  <div className="flex items-center gap-1.5 whitespace-nowrap">
+                    <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
+                    <span>
+                      หน้าต่างแผนงาน: <strong className="text-[#4A4238]">{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className="text-[#4A4238]">{horizonDates[13]?.dayNum} {horizonDates[13]?.monthName} 2026</strong>
+                    </span>
+                  </div>
+                  <span className="text-slate-300 hidden sm:inline">•</span>
+                  <span className="text-emerald-700 font-semibold flex items-center gap-1 whitespace-nowrap">
                     <CheckCircle2 className="w-3.5 h-3.5" /> ซิงค์อัตโนมัติทุกวัน (Auto Rolling)
                   </span>
                 </div>
@@ -385,7 +389,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
           </div>
 
           {/* View Switcher Controls */}
-          <div className="flex flex-wrap items-center gap-2 self-stretch lg:self-auto">
+          <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto shrink-0">
             {/* View Mode Buttons */}
             <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200 shadow-inner">
               <button
