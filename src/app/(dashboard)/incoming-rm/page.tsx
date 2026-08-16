@@ -1180,21 +1180,9 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                             <Select 
-                                value={item.qc_status || 'QUARANTINED'} 
-                                onValueChange={(val) => handleQcStatusChange(item, val as string)}
-                                disabled={!(currentUser?.toUpperCase().startsWith('QC') || userRole === 'admin')}
-                              >
-                                <SelectTrigger className={`w-[140px] h-9 text-xs font-medium border-0 shadow-sm ${getQcColor(item.qc_status || 'QUARANTINED')}`}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="QUARANTINED" className="text-yellow-700 font-medium focus:bg-yellow-50">QUARANTINED</SelectItem>
-                                  <SelectItem value="PASSED" className="text-green-700 font-medium focus:bg-green-50">PASSED</SelectItem>
-                                  <SelectItem value="HOLD" className="text-orange-700 font-medium focus:bg-orange-50">HOLD</SelectItem>
-                                  <SelectItem value="REJECTED" className="text-red-700 font-medium focus:bg-red-50">REJECTED</SelectItem>
-                                </SelectContent>
-                             </Select>
+                             <div className={`inline-flex items-center justify-center w-[140px] h-9 text-xs font-medium rounded-md shadow-sm ${getQcColor(item.qc_status || 'QUARANTINED')}`}>
+                               {item.qc_status || 'QUARANTINED'}
+                             </div>
                           </TableCell>
                         </TableRow>
                       ))}
