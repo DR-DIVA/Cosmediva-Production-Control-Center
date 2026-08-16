@@ -29,7 +29,7 @@ export default function IssuesPage() {
   const [isResolveOpen, setIsResolveOpen] = useState(false)
   const [resolvingIssue, setResolvingIssue] = useState<any>(null)
   const [resolveNote, setResolveNote] = useState('')
-  const [qaInspectorCode, setQaInspectorCode] = useState('')
+  const [currentUserInfo, setCurrentUserInfo] = useState<any>(null)
   const [masterUsers, setMasterUsers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('System')
@@ -149,21 +149,14 @@ export default function IssuesPage() {
           u.employee_id?.toLowerCase() === user.user_metadata?.employee_id?.toLowerCase()
         )
 
-        const empId = matched?.employee_id 
-          ? matched.employee_id.toUpperCase() 
-          : (user.user_metadata?.employee_id 
+        if (matched) {
+          setCurrentUserInfo(matched)
+          setCurrentUser(matched.employee_id.toUpperCase())
+        } else {
+          const empId = user.user_metadata?.employee_id 
             ? user.user_metadata.employee_id.toUpperCase() 
-            : (prefix && prefix !== 'system' ? prefix.toUpperCase() : ''))
-
-        if (empId) {
+            : (prefix && prefix !== 'system' ? prefix.toUpperCase() : 'QA')
           setCurrentUser(empId)
-          setQaInspectorCode(empId)
-        } else if (uList.length > 0) {
-          // If logged in as QA or someone in master data
-          const defaultQa = uList.find(u => u.role?.toUpperCase().includes('QA') || u.employee_id?.toUpperCase().startsWith('QA'))
-          if (defaultQa) {
-            setQaInspectorCode(defaultQa.employee_id.toUpperCase())
-          }
         }
       }
     }
@@ -176,29 +169,14 @@ export default function IssuesPage() {
   const openResolveDialog = (issue: any) => {
     setResolvingIssue(issue)
     setResolveNote('')
-    if (!qaInspectorCode) {
-      if (currentUser && currentUser !== 'System' && currentUser !== 'SYSTEM') {
-        setQaInspectorCode(currentUser)
-      } else if (masterUsers.length > 0) {
-        const defaultQa = masterUsers.find(u => u.role?.toUpperCase().includes('QA') || u.employee_id?.toUpperCase().startsWith('QA'))
-        if (defaultQa) {
-          setQaInspectorCode(defaultQa.employee_id.toUpperCase())
-        }
-      }
-    }
     setIsResolveOpen(true)
   }
 
   const handleResolveConfirm = async () => {
     if (!resolvingIssue) return
     
-    if (!qaInspectorCode.trim()) {
-      toast.error('กรุณาระบุรหัสพนักงานผู้ตรวจสอบ (QA)')
-      return
-    }
-
     const timestamp = new Date().toLocaleString('th-TH')
-    const inspector = qaInspectorCode.trim().toUpperCase()
+    const inspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
     const resolutionText = resolveNote.trim() 
       ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${inspector} - ${timestamp})` 
       : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${inspector} - ${timestamp})`
@@ -606,41 +584,24 @@ export default function IssuesPage() {
             <DialogTitle>บันทึกการแก้ไขปัญหา (QA Resolution)</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-sm font-semibold text-slate-700">
-                  รหัสพนักงานผู้ตรวจสอบ (QA) <span className="text-red-500">*</span>
-                </Label>
-                {masterUsers.length > 0 && (
-                  <span className="text-xs text-[#8B7355] font-medium">จาก Master Data Users</span>
-                )}
-              </div>
-              {masterUsers.length > 0 ? (
-                <div className="space-y-1.5">
-                  <select
-                    value={qaInspectorCode}
-                    onChange={(e) => setQaInspectorCode(e.target.value)}
-                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
-                  >
-                    <option value="">-- เลือกรหัสพนักงาน (Master Data) --</option>
-                    {masterUsers.map(u => (
-                      <option key={u.id || u.employee_id} value={u.employee_id?.toUpperCase()}>
-                        {u.employee_id?.toUpperCase()} - {u.full_name} ({u.role || 'พนักงาน'})
-                      </option>
-                    ))}
-                  </select>
+            <div className="bg-[#F8F6F0] p-3.5 rounded-xl border border-[#D4AF37]/30 flex items-center justify-between">
+              <div>
+                <div className="text-xs text-[#8B7355] font-medium">ผู้ตรวจสอบ (QA) ที่บันทึกรายการ</div>
+                <div className="text-sm font-bold text-[#4A4238] flex items-center gap-2 mt-1">
+                  <User className="w-4 h-4 text-[#D4AF37]" />
+                  <span className="font-mono">{currentUserInfo?.employee_id || currentUser || 'QA'}</span>
+                  {currentUserInfo?.full_name && (
+                    <span className="text-xs font-normal text-slate-600">({currentUserInfo.full_name})</span>
+                  )}
                 </div>
-              ) : (
-                <Input 
-                  value={qaInspectorCode} 
-                  onChange={(e) => setQaInspectorCode(e.target.value)} 
-                  placeholder="เช่น QA01, QA02..."
-                  className="font-medium uppercase"
-                />
-              )}
+              </div>
+              <Badge variant="outline" className="bg-[#D4AF37]/15 text-[#8B7355] border-[#D4AF37]/40 text-xs">
+                Auto-Stamp
+              </Badge>
             </div>
+
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-slate-700">หมายเหตุ / วิธีแก้ไข / ข้อสรุป NC</Label>
+              <Label className="text-sm font-semibold text-slate-700">หมายเหตุ / วิธีแก้ไข / ข้อสรุป NC (ตัวเลือก)</Label>
               <Textarea 
                 value={resolveNote} 
                 onChange={(e) => setResolveNote(e.target.value)} 
@@ -653,8 +614,7 @@ export default function IssuesPage() {
             <Button variant="outline" onClick={() => setIsResolveOpen(false)}>ยกเลิก</Button>
             <Button 
               onClick={handleResolveConfirm} 
-              disabled={!qaInspectorCode.trim()} 
-              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+              className="bg-green-600 hover:bg-green-700 text-white"
             >
               <CheckCircle2 className="w-4 h-4 mr-1" />
               บันทึกและปิดปัญหา
