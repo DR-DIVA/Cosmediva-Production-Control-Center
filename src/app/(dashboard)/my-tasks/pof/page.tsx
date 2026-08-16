@@ -73,7 +73,7 @@ export default function PofTasksPage() {
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email || 'Unknown User')
+      setCurrentUser(user.email ? user.email.split('@')[0] : 'Unknown User')
     }
   }
 

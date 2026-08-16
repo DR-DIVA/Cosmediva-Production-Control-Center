@@ -57,10 +57,15 @@ export default function FgTasksPage() {
     fetchInventory()
   }, [])
 
+  const formatUserCode = (u?: string) => {
+    if (!u) return ''
+    return u.split('@')[0]
+  }
+
   const fetchUser = async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      setCurrentUser(user.email || 'Unknown User')
+      setCurrentUser(user.email ? user.email.split('@')[0] : 'Unknown User')
     }
   }
 
@@ -836,7 +841,7 @@ export default function FgTasksPage() {
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้ส่งมอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{formatUserCode(receiveDialog.task?.tank_details?.delivery_info?.sender)}</span>
                      </div>
                      <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
@@ -846,7 +851,7 @@ export default function FgTasksPage() {
                    <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้อนุมัติส่ง</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{receiveDialog.task?.tank_details?.delivery_info?.sender || ''}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{formatUserCode(receiveDialog.task?.tank_details?.delivery_info?.sender)}</span>
                      </div>
                      <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
@@ -859,7 +864,7 @@ export default function FgTasksPage() {
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้รับมอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{receiveDialog.task?.tank_details?.fg_receive_info?.user || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{formatUserCode(receiveDialog.task?.tank_details?.fg_receive_info?.user) || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
                      </div>
                      <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
@@ -994,7 +999,7 @@ export default function FgTasksPage() {
               {!receiveDialog.isReadOnly && (
                 <Button size="lg" className="bg-[#D4AF37] hover:bg-[#B8962A] text-white shadow-md text-base px-8" onClick={confirmReceive}>
                   <span className="text-xl mr-2">✍️</span>
-                  ลงนามรับมอบ ({currentUser}) และรับเข้าคลัง
+                  ลงนามรับมอบ ({formatUserCode(currentUser)}) และรับเข้าคลัง
                 </Button>
               )}
             </div>
