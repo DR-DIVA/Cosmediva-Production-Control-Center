@@ -1130,16 +1130,22 @@ export default function QCQueuePage() {
             </TabsList>
 
             <TabsContent value="queue">
-              <div className="space-y-4">
-            {tasks.length === 0 ? (
-              <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
-                ไม่มีรายการรอตรวจ
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left table-fixed">
-                    <thead className="bg-[#F8F6F0] text-[#8B7355] border-b border-[#D4AF37]/20">
+              <Card>
+                <CardHeader className="border-b bg-[#F8F6F0]">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <FlaskConical className="w-5 h-5 text-indigo-600" />
+                    รายการงานผสมรอตรวจ (Bulk)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  {tasks.length === 0 ? (
+                    <div className="text-center py-12 text-slate-500">
+                      ไม่มีรายการงานผสมรอตรวจ
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left table-fixed">
+                        <thead className="bg-slate-100 text-slate-700">
                       <tr>
                         <th className="px-4 py-3 font-medium">
                           <div className="flex flex-col space-y-1 mt-1 mb-1">
@@ -1357,9 +1363,9 @@ export default function QCQueuePage() {
                     </tbody>
                   </table>
                 </div>
-              </div>
             )}
-              </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="history">
