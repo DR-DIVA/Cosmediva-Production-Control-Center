@@ -319,6 +319,15 @@ export default function QCQueuePage() {
         } else {
             newNote = lines.join('\n')
         }
+
+        await supabase.from('production_issues').insert({
+          production_lot_id: task.production_lot_id,
+          issue_type: 'QC_REJECT',
+          description: `Bulk QC [${task.production_lots?.products?.sku || '-'}] ${issueType} ถัง ${tankNum}: ${cleanReason}`,
+          reported_by: currentUser,
+          status: 'OPEN',
+          priority: 'HIGH'
+        })
       } else if (statusAction === 'QC_PASS' && isReturningToPass) {
         // Find the active issue line for this tank and append > [QC PASSED] ...
         const lines = newNote.split('\n')
@@ -551,6 +560,15 @@ export default function QCQueuePage() {
         const issueType = statusAction === 'PAUSED' ? '[QC HOLD]' : statusAction === 'FAILED' ? '[QC REJECT]' : '[QC REPROCESS]'
         const cleanReason = reasonText.replace(/\n/g, ' ')
         const note = `${issueType} FG (Box ${activeFg.box_lot_no || '-'}): ${cleanReason}`
+        
+        await supabase.from('production_issues').insert({
+          production_lot_id: activeFg.production_lot_id || null,
+          issue_type: 'QC_REJECT',
+          description: `FG QC [${activeFg.products?.sku || '-'}] ${issueType} Lot ${activeFg.lot_no || '-'}: ${cleanReason}`,
+          reported_by: currentUser,
+          status: 'OPEN',
+          priority: 'HIGH'
+        })
         
         const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
         
