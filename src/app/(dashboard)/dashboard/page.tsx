@@ -41,6 +41,30 @@ export default function DashboardPage() {
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
   const [dashboardDate, setDashboardDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
 
+  const [qcMetrics, setQcMetrics] = useState({
+    totalHold: 0,
+    holdRM: 0,
+    holdBulk: 0,
+    holdFG: 0,
+    reprocessBulk: 0,
+    rejectTotal: 0
+  })
+
+  const [qaMetrics, setQaMetrics] = useState({
+    openNc: 0,
+    carCount: 0,
+    resolvedCount: 0
+  })
+
+  const [fgInventoryStats, setFgInventoryStats] = useState({
+    fgTotalPcs: 0,
+    fgTotalCartons: 0,
+    fgReleasedPcs: 0,
+    fgQuarantinePcs: 0,
+    fgMonthPcs: 0,
+    fgTodayPcs: 0
+  })
+
   const supabase = createClient()
 
   useEffect(() => {
@@ -65,8 +89,6 @@ export default function DashboardPage() {
         )
       `
     
-    const sevenDaysAgo = addDays(todayStart, -7).toISOString()
-
     // Fetch all lots (active and completed)
     const { data: activeLotsData } = await supabase.from('production_lots')
       .select(`
@@ -98,7 +120,6 @@ export default function DashboardPage() {
     if (activeLotsData) {
       const sevenDaysLimit = new Date(today).getTime() - 7 * 24 * 60 * 60 * 1000
 
-      // Filter: Keep active lots, and for DONE lots only keep if completed within the last 7 days
       const filteredLots = activeLotsData.filter((lot: any) => {
         if (lot.current_status !== 'DONE') return true
 
@@ -118,7 +139,6 @@ export default function DashboardPage() {
           dueDateTime = new Date(lot.fg_due_date).getTime()
         }
 
-        // Effective completion time is whichever is earlier between due date and completion activity
         const effectiveTime = Math.min(latestTime || Infinity, dueDateTime)
 
         return effectiveTime >= sevenDaysLimit
@@ -148,45 +168,101 @@ export default function DashboardPage() {
       .lte('created_at', todayEnd)
     if (defects) setAllDefects(defects)
 
-    // 3. Fetch QA/QC Issues (Today)
-    const { data: qaqc } = await supabase.from('production_logs')
-      .select('*')
-      .in('status', ['NC', 'CAR', 'HOLD', 'REPROCESS', 'REJECT'])
-      .gte('created_at', todayStart)
-      .lte('created_at', todayEnd)
-    if (qaqc) setQaQcLogs(qaqc)
+    // 3. Fetch Comprehensive QC & QA & FG & Planner metrics
+    const [
+      { data: rmItemsData },
+      { data: bulkLogsData },
+      { data: fgInventoryData },
+      { data: qaLogsData },
+      { data: plannedLotsData }
+    ] = await Promise.all([
+      supabase.from('production_lot_rms').select('id, rm_code, qc_status, status, receive_date'),
+      supabase.from('production_logs').select('id, status, tank_start, tank_end, tank_details, processes(process_name)'),
+      supabase.from('fg_inventory').select('id, lot_no, receive_qty_cartons, receive_qty_pcs, qc_status, created_at'),
+      supabase.from('production_logs').select('id, note, status, updated_at, created_at').or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%,note.ilike.%[CAR]%,note.ilike.%[QA RESOLVED]%'),
+      supabase.from('production_lots').select('id, planned_quantity, order_quantity').neq('current_status', 'DONE')
+    ])
 
-    // 4. Fetch FG Delivery (This Month)
-    const fgProcessId = 'dc1a9686-3846-4631-a5a2-4340a79eeebb' // รับเข้า FG
-    const { data: fg } = await supabase.from('production_logs')
-      .select('*, production_lots(pcs_per_carton)')
-      .eq('process_id', fgProcessId)
-      .gte('created_at', monthStart)
-      .lte('created_at', monthEnd)
-    if (fg) setFgLogs(fg)
+    if (plannedLotsData) setPlannerLots(plannedLotsData)
 
-    // 5. Fetch Planner Queue (All active planned orders)
-    const { data: plannedLots } = await supabase.from('production_lots')
-      .select('id, planned_quantity')
-      .neq('current_status', 'DONE')
-    if (plannedLots) setPlannerLots(plannedLots)
+    // Compute QC Metrics
+    let holdRM = 0, holdBulk = 0, holdFG = 0, reprocessBulk = 0, rejectTotal = 0
+    ;(rmItemsData || []).forEach(r => {
+      if (r.qc_status === 'HOLD') holdRM++
+      if (r.qc_status === 'REJECTED') rejectTotal++
+    })
 
-    // 6. Fetch RM/PM/CMD2 QC Queues (Today)
-    const { data: rmQc } = await supabase.from('production_lot_rms')
-      .select('status, qc_status, receive_date, updated_at')
-    const { data: pmQc } = await supabase.from('production_lot_pms')
-      .select('status, qc_status, receive_date, updated_at')
-    const { data: cmd2Qc } = await supabase.from('production_lot_cmd2_pms')
-      .select('status, qc_status, receive_date, updated_at')
-      
-    if (rmQc || pmQc || cmd2Qc) {
-      setRmQcLogs([...(rmQc || []), ...(pmQc || []), ...(cmd2Qc || [])])
-    }
+    ;(bulkLogsData || []).forEach((t: any) => {
+      const pName = Array.isArray(t.processes) ? t.processes[0]?.process_name : t.processes?.process_name
+      if (pName === 'รอ QC') {
+        const details = t.tank_details || {}
+        const start = parseInt(t.tank_start) || 1
+        const end = parseInt(t.tank_end) || start
+        for (let i = start; i <= end; i++) {
+          const s = details[i]
+          if (s === 'PAUSED' || s === 'HOLD') holdBulk++
+          if (s === 'REPROCESS') reprocessBulk++
+          if (s === 'FAILED' || s === 'REJECTED') rejectTotal++
+        }
+      }
+    })
 
-    // 7. Fetch FG QC Queues (Today)
-    const { data: fgQc } = await supabase.from('fg_inventory')
-      .select('qc_status, created_at, updated_at')
-    if (fgQc) setFgQcLogs(fgQc)
+    let fgReleasedPcs = 0, fgQuarantinePcs = 0, fgTotalPcs = 0, fgTotalCartons = 0, fgMonthPcs = 0, fgTodayPcs = 0
+    ;(fgInventoryData || []).forEach(f => {
+      const pcs = f.receive_qty_pcs || 0
+      const ctn = f.receive_qty_cartons || 0
+      fgTotalPcs += pcs
+      fgTotalCartons += ctn
+
+      if (f.created_at >= monthStart && f.created_at <= monthEnd) {
+        fgMonthPcs += pcs
+      }
+      if (f.created_at >= todayStart && f.created_at <= todayEnd) {
+        fgTodayPcs += pcs
+      }
+
+      if (f.qc_status === 'RELEASED' || f.qc_status === 'PASSED') {
+        fgReleasedPcs += pcs
+      } else if (f.qc_status === 'QUARANTINE' || f.qc_status === 'HOLD') {
+        holdFG++
+        fgQuarantinePcs += pcs
+      } else if (f.qc_status === 'REJECTED') {
+        rejectTotal++
+      }
+    })
+
+    setQcMetrics({
+      totalHold: holdRM + holdBulk + holdFG,
+      holdRM,
+      holdBulk,
+      holdFG,
+      reprocessBulk,
+      rejectTotal
+    })
+
+    // Compute QA Metrics
+    let openNc = 0, carCount = 0, resolvedCount = 0
+    ;(qaLogsData || []).forEach(l => {
+      const note = l.note || ''
+      const isResolved = note.includes('[QA RESOLVED]') || note.includes('ปิดปัญหาแล้ว') || note.includes('RESOLVED')
+      if (note.includes('[CAR]')) carCount++
+      if (isResolved) {
+        resolvedCount++
+      } else if (note.includes('[QC HOLD]') || note.includes('[QC REJECT]') || note.includes('[QC REPROCESS]') || note.includes('[แจ้งปัญหา]')) {
+        openNc++
+      }
+    })
+
+    setQaMetrics({ openNc, carCount, resolvedCount })
+
+    setFgInventoryStats({
+      fgTotalPcs,
+      fgTotalCartons,
+      fgReleasedPcs,
+      fgQuarantinePcs,
+      fgMonthPcs,
+      fgTodayPcs
+    })
   }
 
   // --- Calculations ---
@@ -728,51 +804,182 @@ export default function DashboardPage() {
 
       <div className="grid gap-6 md:grid-cols-2 mt-10">
          {/* 5. QC Status & 6. QA Issues */}
-         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group">
+         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group rounded-2xl">
            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <CardHeader className="bg-[#F8F6F0]/ border-b border-[#D4AF37]/30 pb-4">
-             <CardTitle className="text-lg flex items-center gap-3 text-rose-400">
-               <ShieldAlert className="w-6 h-6 text-rose-500" /> 
-               <div><span className="text-yellow-400 font-black">5-6.</span> คุณภาพและปัญหา (QC & QA)</div>
-             </CardTitle>
+           <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/30 pb-3">
+             <div className="flex justify-between items-center">
+               <CardTitle className="text-base font-bold flex items-center gap-2.5 text-[#4A4238]">
+                 <ShieldAlert className="w-5 h-5 text-rose-500" /> 
+                 <div><span className="text-[#D4AF37] font-black">5-6.</span> คุณภาพและปัญหา (QC & QA)</div>
+               </CardTitle>
+               <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
+                 Real-time Assurance
+               </span>
+             </div>
            </CardHeader>
-           <CardContent className="p-6 relative z-10">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-               <div className="space-y-5">
-                 <h4 className="font-semibold text-[#4A4238] border-b border-[#D4AF37]/30 pb-2 uppercase tracking-wider text-sm">สถานะ QC</h4>
-                 <div className="flex justify-between items-center"><span className="text-amber-400 font-medium tracking-wide">HOLD</span> <span className="text-lg font-bold bg-amber-400/10 text-amber-400 border border-amber-400/20 px-4 py-1 rounded-lg">{countQcStatus('HOLD')}</span></div>
-                 <div className="flex justify-between items-center"><span className="text-[#D4AF37] font-medium tracking-wide">REPROCESS</span> <span className="text-lg font-bold bg-sky-400/10 text-[#D4AF37] border border-sky-400/20 px-4 py-1 rounded-lg">{countQcStatus('REPROCESS')}</span></div>
-                 <div className="flex justify-between items-center"><span className="text-rose-500 font-medium tracking-wide">REJECT</span> <span className="text-lg font-bold bg-rose-500/10 text-rose-400 border border-rose-500/20 px-4 py-1 rounded-lg">{countQcStatus('REJECT')}</span></div>
+           <CardContent className="p-5 relative z-10">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+               {/* QC Inspection Status */}
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-amber-500"></span> สถานะการตรวจ (QC)
+                   </h4>
+                   <span className="text-[10px] text-slate-400 font-medium">หน้างานทั้งหมด</span>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                     <div>
+                       <span className="text-amber-900 font-bold text-xs">🟡 กักตรวจ (HOLD)</span>
+                       <div className="text-[10px] text-amber-700">RM/PM {qcMetrics.holdRM} • FG {qcMetrics.holdFG} กล่อง</div>
+                     </div>
+                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                       {qcMetrics.totalHold}
+                     </span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-sky-50/70 border border-sky-200/60">
+                     <div>
+                       <span className="text-sky-900 font-bold text-xs">🔵 สั่งแก้สูตร (REPROCESS)</span>
+                       <div className="text-[10px] text-sky-700">ถังผสมที่ต้องปรับปรุง</div>
+                     </div>
+                     <span className="text-base font-black text-sky-700 bg-sky-100/80 px-2.5 py-0.5 rounded-lg">
+                       {qcMetrics.reprocessBulk}
+                     </span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-rose-50/70 border border-rose-200/60">
+                     <div>
+                       <span className="text-rose-900 font-bold text-xs">🔴 ไม่ผ่าน/ตีกลับ (REJECT)</span>
+                       <div className="text-[10px] text-rose-700">ของตกเกณฑ์/ส่งคืน</div>
+                     </div>
+                     <span className="text-base font-black text-rose-700 bg-rose-100/80 px-2.5 py-0.5 rounded-lg">
+                       {qcMetrics.rejectTotal}
+                     </span>
+                   </div>
+                 </div>
                </div>
-               <div className="space-y-5">
-                 <h4 className="font-semibold text-[#4A4238] border-b border-[#D4AF37]/30 pb-2 uppercase tracking-wider text-sm">ใบแจ้งปัญหา QA</h4>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238] font-medium tracking-wide">NC</span> <span className="text-lg font-bold bg-white text-[#4A4238] border border-[#D4AF37]/30 px-4 py-1 rounded-lg">{countQaStatus('NC')}</span></div>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238] font-medium tracking-wide">CAR</span> <span className="text-lg font-bold bg-white text-[#4A4238] border border-[#D4AF37]/30 px-4 py-1 rounded-lg">{countQaStatus('CAR')}</span></div>
+
+               {/* QA Compliance & Issues */}
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-rose-500"></span> ข้อบกพร่อง (QA)
+                   </h4>
+                   <span className="text-[10px] text-slate-400 font-medium">Compliance & Issues</span>
+                 </div>
+
+                 <div className="space-y-2">
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                     <div>
+                       <span className="text-[#4A4238] font-bold text-xs">⚠️ รอแก้ไข (Open NCs)</span>
+                       <div className="text-[10px] text-slate-500">เคสปัญหาที่รอปิด</div>
+                     </div>
+                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                       {qaMetrics.openNc}
+                     </span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                     <div>
+                       <span className="text-[#4A4238] font-bold text-xs">📋 มาตรการป้องกัน (CAR)</span>
+                       <div className="text-[10px] text-slate-500">เคสระดับโรงงาน</div>
+                     </div>
+                     <span className="text-base font-black text-slate-700 bg-slate-200/80 px-2.5 py-0.5 rounded-lg">
+                       {qaMetrics.carCount}
+                     </span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
+                     <div>
+                       <span className="text-emerald-900 font-bold text-xs">✅ ปิดปัญหาแล้ว (Resolved)</span>
+                       <div className="text-[10px] text-emerald-700">QA อนุมัติผ่านเกณฑ์</div>
+                     </div>
+                     <span className="text-base font-black text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-lg">
+                       {qaMetrics.resolvedCount}
+                     </span>
+                   </div>
+                 </div>
                </div>
              </div>
            </CardContent>
          </Card>
 
          {/* 7-9. Planner & Warehouse */}
-         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group">
+         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group rounded-2xl">
            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <CardHeader className="bg-[#F8F6F0]/ border-b border-[#D4AF37]/30 pb-4">
-             <CardTitle className="text-lg flex items-center gap-3 text-[#D4AF37]">
-               <Package className="w-6 h-6 text-emerald-500" /> 
-               <div><span className="text-yellow-400 font-black">7-9.</span> คิวงานและคลังสินค้า (Planner & FG)</div>
-             </CardTitle>
+           <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/30 pb-3">
+             <div className="flex justify-between items-center">
+               <CardTitle className="text-base font-bold flex items-center gap-2.5 text-[#4A4238]">
+                 <Package className="w-5 h-5 text-emerald-600" /> 
+                 <div><span className="text-[#D4AF37] font-black">7-9.</span> คิวงานและคลังสินค้า (Planner & FG)</div>
+               </CardTitle>
+               <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
+                 สต็อก FG รวม {fgInventoryStats.fgTotalPcs.toLocaleString()} ชิ้น
+               </span>
+             </div>
            </CardHeader>
-           <CardContent className="p-6 relative z-10">
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
-               <div className="space-y-5">
-                 <h4 className="font-semibold text-[#4A4238] border-b border-[#D4AF37]/30 pb-2 uppercase tracking-wider text-sm">Planner Queue</h4>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238]">PO On Hand</span> <span className="text-xl font-black text-[#D4AF37]">{poOnHand}</span></div>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238]">ชิ้นงาน On Hand</span> <span className="text-xl font-black text-[#D4AF37]">{piecesOnHand.toLocaleString()}</span></div>
+           <CardContent className="p-5 relative z-10">
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+               {/* Planner Queue */}
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-amber-500"></span> แผนการผลิต (Planner)
+                   </h4>
+                   <span className="text-[10px] text-slate-400 font-medium">Active Backlog</span>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                     <div>
+                       <span className="text-xs font-semibold text-slate-700">📋 PO ในมือ (Active POs)</span>
+                       <div className="text-[10px] text-slate-400">คำสั่งผลิตที่กำลังดำเนินการ</div>
+                     </div>
+                     <span className="text-base font-black text-[#D4AF37]">{poOnHand} ล็อต</span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                     <div>
+                       <span className="text-xs font-semibold text-slate-700">📦 ยอดชิ้นงานรอผลิต</span>
+                       <div className="text-[10px] text-slate-400">รวมทุกคำสั่งผลิตตามแผน</div>
+                     </div>
+                     <span className="text-base font-black text-[#4A4238]">{piecesOnHand.toLocaleString()}</span>
+                   </div>
+                 </div>
                </div>
-               <div className="space-y-5">
-                 <h4 className="font-semibold text-[#4A4238] border-b border-[#D4AF37]/30 pb-2 uppercase tracking-wider text-sm">FG Delivery</h4>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238]">ส่งมอบวันนี้</span> <span className="text-xl font-black text-[#D4AF37]">{fgToday.toLocaleString()}</span></div>
-                 <div className="flex justify-between items-center"><span className="text-[#4A4238]">สะสมเดือนนี้</span> <span className="text-xl font-black text-[#D4AF37]">{fgMonth.toLocaleString()}</span></div>
+
+               {/* FG Warehouse */}
+               <div className="space-y-3">
+                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span> คลังสินค้าสำเร็จรูป (FG)
+                   </h4>
+                   <span className="text-[10px] text-slate-400 font-medium">Warehouse & Delivery</span>
+                 </div>
+
+                 <div className="space-y-2">
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
+                     <div>
+                       <span className="text-xs font-bold text-emerald-800">🟢 พร้อมส่งมอบ (Released)</span>
+                       <div className="text-[10px] text-emerald-600">ตรวจแล็บผ่านแล้ว พร้อมส่ง</div>
+                     </div>
+                     <span className="text-base font-black text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-lg">
+                       {fgInventoryStats.fgReleasedPcs.toLocaleString()}
+                     </span>
+                   </div>
+
+                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                     <div>
+                       <span className="text-xs font-bold text-amber-800">🟡 กักตรวจเชื้อ (Quarantine)</span>
+                       <div className="text-[10px] text-amber-600">อยู่ระหว่างรอบ่มเชื้อ/ผลตรวจ</div>
+                     </div>
+                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                       {fgInventoryStats.fgQuarantinePcs.toLocaleString()}
+                     </span>
+                   </div>
+                 </div>
                </div>
              </div>
            </CardContent>
