@@ -159,12 +159,50 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isChangingPassword, setIsChangingPassword] = useState(false)
 
+  // Real-time Notification Badges
+  const [badgeCounts, setBadgeCounts] = useState<{
+    fgQuarantine: number
+    issues: number
+    inboundFg: number
+  }>({
+    fgQuarantine: 0,
+    issues: 0,
+    inboundFg: 0
+  })
+
   useEffect(() => {
     const fetchRole = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       setUserRole(user?.user_metadata?.role || 'user')
     }
     fetchRole()
+
+    const fetchBadges = async () => {
+      try {
+        const [{ count: fgQCount }, { data: issueLogs }, { count: inboundCount }] = await Promise.all([
+          supabase.from('fg_inventory').select('id', { count: 'exact', head: true }).eq('qc_status', 'QUARANTINE'),
+          supabase.from('production_logs').select('id, note').or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%'),
+          supabase.from('production_logs').select('id', { count: 'exact', head: true }).in('status', ['WAITING', 'IN_PROGRESS']).ilike('processes.process_name', '%FG%')
+        ])
+
+        const activeIss = (issueLogs || []).filter((i: any) => {
+          const lines = (i.note || '').split('\n')
+          return lines.some((l: string) => (l.includes('[QC ') || l.includes('[แจ้งปัญหา]')) && !l.includes('[Resolved') && !l.includes('> [QA Approved]'))
+        }).length
+
+        setBadgeCounts({
+          fgQuarantine: fgQCount || 0,
+          issues: activeIss || 0,
+          inboundFg: inboundCount || 0
+        })
+      } catch (err) {
+        console.error('Error fetching notification badges:', err)
+      }
+    }
+
+    fetchBadges()
+    const interval = setInterval(fetchBadges, 15000)
+    return () => clearInterval(interval)
   }, [])
 
   // Track expanded state for routes with subRoutes
@@ -303,7 +341,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                   href={route.href}
                   onClick={handleLinkClick}
                   className={cn(
-                    "group flex p-3 w-full justify-start cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
+                    "group relative flex p-3 w-full justify-start cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
                     pathname === route.href ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-[#D4AF37]/10" : "text-zinc-400",
                     isCollapsed ? "justify-center px-0" : ""
                   )}
@@ -318,6 +356,41 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                       </div>
                     )}
                   </div>
+
+                  {/* Real-time In-App Notification Badges */}
+                  {!isCollapsed && (
+                    <>
+                      {route.href === '/my-tasks/fg' && badgeCounts.fgQuarantine > 0 && (
+                        <span className="ml-auto shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
+                          {badgeCounts.fgQuarantine} รอปล่อย
+                        </span>
+                      )}
+                      {route.href === '/issues' && badgeCounts.issues > 0 && (
+                        <span className="ml-auto shrink-0 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
+                          {badgeCounts.issues} เคส
+                        </span>
+                      )}
+                      {route.href === '/qc-queue' && badgeCounts.fgQuarantine > 0 && (
+                        <span className="ml-auto shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          {badgeCounts.fgQuarantine} FG
+                        </span>
+                      )}
+                    </>
+                  )}
+
+                  {/* Collapsed Dot Indicators */}
+                  {isCollapsed && (
+                    <>
+                      {route.href === '/my-tasks/fg' && badgeCounts.fgQuarantine > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#2D2721] animate-pulse" />
+                      )}
+                      {route.href === '/issues' && badgeCounts.issues > 0 && (
+                        <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-400 ring-2 ring-[#2D2721]" />
+                      )}
+                    </>
+                  )}
                 </Link>
               )}
             </div>
