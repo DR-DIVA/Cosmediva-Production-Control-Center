@@ -1130,7 +1130,7 @@ export default function RMControlCenterPage() {
                         <TableHead className="font-semibold text-slate-700 w-44">
                           <div className="flex flex-col space-y-1 mt-1 mb-1">
                             <span>QC Status</span>
-                            <Select value={qcStatusSearch} onValueChange={setQcStatusSearch}>
+                            <Select value={qcStatusSearch} onValueChange={(val) => setQcStatusSearch(val || 'ALL')}>
                               <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
                                 <SelectValue />
                               </SelectTrigger>
