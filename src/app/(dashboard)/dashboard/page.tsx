@@ -111,7 +111,15 @@ export default function DashboardPage() {
           latestTime = new Date(lot.updated_at || lot.created_at).getTime()
         }
 
-        return latestTime >= sevenDaysLimit
+        let dueDateTime = Infinity
+        if (lot.fg_due_date) {
+          dueDateTime = new Date(lot.fg_due_date).getTime()
+        }
+
+        // Effective completion time is whichever is earlier between due date and completion activity
+        const effectiveTime = Math.min(latestTime || Infinity, dueDateTime)
+
+        return effectiveTime >= sevenDaysLimit
       })
 
       const sortedLots = [...filteredLots]
