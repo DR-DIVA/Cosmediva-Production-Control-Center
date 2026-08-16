@@ -28,6 +28,7 @@ export default function IssuesPage() {
   const [isResolveOpen, setIsResolveOpen] = useState(false)
   const [resolvingIssue, setResolvingIssue] = useState<any>(null)
   const [resolveNote, setResolveNote] = useState('')
+  const [qaInspectorCode, setQaInspectorCode] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('System')
   
@@ -124,8 +125,13 @@ export default function IssuesPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) {
-        setCurrentUser(user.email || 'System')
+      if (user && user.email) {
+        const email = user.email
+        const username = email.includes('@') ? email.split('@')[0].toUpperCase() : email.toUpperCase()
+        setCurrentUser(username)
+        if (username !== 'SYSTEM' && username !== 'UNKNOWN USER') {
+          setQaInspectorCode(username)
+        }
       }
     })
     fetchIssues()
@@ -135,17 +141,25 @@ export default function IssuesPage() {
   const openResolveDialog = (issue: any) => {
     setResolvingIssue(issue)
     setResolveNote('')
+    if (!qaInspectorCode && currentUser && currentUser !== 'System' && currentUser !== 'SYSTEM') {
+      setQaInspectorCode(currentUser)
+    }
     setIsResolveOpen(true)
   }
 
   const handleResolveConfirm = async () => {
     if (!resolvingIssue) return
     
+    if (!qaInspectorCode.trim()) {
+      toast.error('กรุณาระบุรหัสพนักงานผู้ตรวจสอบ (QA)')
+      return
+    }
+
     const timestamp = new Date().toLocaleString('th-TH')
-    const username = currentUser.split('@')[0]
+    const inspector = qaInspectorCode.trim().toUpperCase()
     const resolutionText = resolveNote.trim() 
-      ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${username} - ${timestamp})` 
-      : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${username} - ${timestamp})`
+      ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${inspector} - ${timestamp})` 
+      : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${inspector} - ${timestamp})`
     
     const lines = resolvingIssue.originalNote.split('\n')
     lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]}${resolutionText}`
@@ -536,22 +550,40 @@ export default function IssuesPage() {
       <Dialog open={isResolveOpen} onOpenChange={setIsResolveOpen}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
-            <DialogTitle>บันทึกการแก้ไขปัญหา</DialogTitle>
+            <DialogTitle>บันทึกการแก้ไขปัญหา (QA Resolution)</DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <Label>หมายเหตุ / วิธีแก้ไข (ตัวเลือก)</Label>
+              <Label className="text-sm font-semibold text-slate-700">
+                รหัสพนักงานผู้ตรวจสอบ (QA) <span className="text-red-500">*</span>
+              </Label>
+              <Input 
+                value={qaInspectorCode} 
+                onChange={(e) => setQaInspectorCode(e.target.value)} 
+                placeholder="เช่น QA01, QA02..."
+                className="font-medium uppercase"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-slate-700">หมายเหตุ / วิธีแก้ไข / ข้อสรุป NC</Label>
               <Textarea 
                 value={resolveNote} 
                 onChange={(e) => setResolveNote(e.target.value)} 
-                placeholder="ระบุวิธีการแก้ไขปัญหา หรือคำแนะนำเพิ่มเติม..."
+                placeholder="ระบุวิธีการแก้ไขปัญหา, ข้อสรุปการจัดการ NC, หรือผลตรวจซ้ำ..."
                 rows={3}
               />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsResolveOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleResolveConfirm} className="bg-green-600 hover:bg-green-700 text-white">บันทึกและปิดปัญหา</Button>
+            <Button 
+              onClick={handleResolveConfirm} 
+              disabled={!qaInspectorCode.trim()} 
+              className="bg-green-600 hover:bg-green-700 text-white disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              บันทึกและปิดปัญหา
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
