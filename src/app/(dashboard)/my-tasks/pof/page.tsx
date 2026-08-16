@@ -386,28 +386,19 @@ export default function PofTasksPage() {
       existingBoxLot = `Lot.${task.production_lots.lot_no}`
     }
 
-    // Calculate standard cartons for remaining tanks
-    const kgPerTank = task.production_lots?.kg_per_tank || 0
-    const gPerPiece = task.production_lots?.g_per_piece || 1
-    const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
-    const stdYieldPieces = Math.round((kgPerTank * 1000) / gPerPiece)
-    const stdCartonsPerTank = pcsPerCarton > 0 ? (stdYieldPieces / pcsPerCarton) : 14.5
-    const numRemaining = Math.max(1, end - firstIncomplete + 1)
-    const suggestedTotalCartons = Math.round(stdCartonsPerTank * numRemaining)
-
     setBatchDialog({
       open: true,
       taskId: task.id,
       task,
       startTank: firstIncomplete,
       endTank: end,
-      totalCartons: suggestedTotalCartons > 0 ? String(suggestedTotalCartons) : '',
+      totalCartons: '',
       boxLot: existingBoxLot
     })
   }
 
   const handleBatchConfirm = async () => {
-    const { taskId, task, startTank, endTank, totalCartons, boxLot } = batchDialog
+    const { taskId, task, startTank, totalCartons, boxLot } = batchDialog
     const totalC = parseInt(totalCartons)
     if (!totalCartons || isNaN(totalC) || totalC <= 0) {
       toast.error('กรุณาระบุจำนวนลังรวมที่ถูกต้อง')
@@ -417,31 +408,39 @@ export default function PofTasksPage() {
       toast.error('กรุณาระบุข้อมูลกล่องพิมพ์ล็อต (เช่น Lot.010/26)')
       return
     }
-    if (startTank > endTank) {
-      toast.error('ช่วงถังเริ่มต้นต้องไม่เกินถังสุดท้าย')
-      return
-    }
 
-    const numTanks = endTank - startTank + 1
-    const base = Math.floor(totalC / numTanks)
-    const rem = totalC % numTanks
+    const taskEnd = parseInt(task.tank_end) || (task.production_lots?.total_tanks || 200)
+    const kgPerTank = task.production_lots?.kg_per_tank || 0
+    const gPerPiece = task.production_lots?.g_per_piece || 1
+    const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
+    const stdYieldPieces = Math.round((kgPerTank * 1000) / gPerPiece)
+    const stdCartonsPerTank = pcsPerCarton > 0 ? (stdYieldPieces / pcsPerCarton) : 14.5
 
+    // Compute rolling capacity allocation
+    let remaining = totalC
+    let currentT = startTank
     let details = typeof task.tank_details === 'object' && task.tank_details !== null ? { ...task.tank_details } : {}
 
-    for (let i = 0; i < numTanks; i++) {
-      const t = startTank + i
-      const c = base + (i >= (numTanks - rem) ? 1 : 0)
-      const prevDetails = typeof details[t] === 'object' && details[t] !== null ? details[t] : {}
-      
-      details[t] = {
+    const allocatedTanks: number[] = []
+
+    while (remaining > 0 && currentT <= taskEnd) {
+      const tankCap = (stdCartonsPerTank % 1 !== 0) 
+        ? ((currentT % 2 === 0) ? Math.ceil(stdCartonsPerTank) : Math.floor(stdCartonsPerTank))
+        : Math.round(stdCartonsPerTank)
+
+      const c = Math.min(remaining, tankCap)
+      remaining -= c
+
+      const prevDetails = typeof details[currentT] === 'object' && details[currentT] !== null ? details[currentT] : {}
+      details[currentT] = {
         ...prevDetails,
         status: 'DONE',
         cartons: c,
         box_lot: boxLot
       }
 
-      const history = details[`${t}_history`] || []
-      details[`${t}_history`] = [
+      const history = details[`${currentT}_history`] || []
+      details[`${currentT}_history`] = [
         ...history,
         {
           status: 'DONE',
@@ -449,14 +448,23 @@ export default function PofTasksPage() {
           box_lot: boxLot,
           timestamp: new Date().toISOString(),
           user: currentUser,
-          note: `บันทึกรวบยอด (${totalC} ลัง / ${numTanks} ถัง)`
+          note: `บันทึกรวบยอด (${totalC} ลัง Rolling ถังที่ ${startTank}-${currentT})`
         }
       ]
+
+      allocatedTanks.push(currentT)
+      currentT++
     }
 
+    // If leftover beyond taskEnd, attach to last tank
+    if (remaining > 0 && allocatedTanks.length > 0) {
+      const lastT = allocatedTanks[allocatedTanks.length - 1]
+      details[lastT].cartons += remaining
+    }
+
+    const calculatedEndTank = allocatedTanks.length > 0 ? allocatedTanks[allocatedTanks.length - 1] : startTank
     const total = task.production_lots?.total_tanks || 0
     const taskStart = parseInt(task.tank_start) || 1
-    const taskEnd = parseInt(task.tank_end) || total
     
     let allDone = true
     for (let i = taskStart; i <= taskEnd; i++) {
@@ -484,24 +492,24 @@ export default function PofTasksPage() {
       toast.error('บันทึกรวบยอดไม่สำเร็จ')
       console.error(error)
     } else {
-      toast.success(`🎉 บันทึกรวบยอด ${totalC} ลัง (ตัดถังที่ ${startTank}-${endTank}) เรียบร้อยแล้ว!`)
+      toast.success(`🎉 บันทึกรวบยอด ${totalC} ลัง (ตัดเต็มถัง ${startTank} ถึง ${calculatedEndTank}) เรียบร้อยแล้ว!`)
       setBatchDialog(prev => ({ ...prev, open: false }))
 
       // Auto Hand-off to FG
       const { data: fgProcess } = await supabase.from('processes').select('id').or('process_name.ilike.%FG%,process_name.ilike.%คลัง%').limit(1).single()
       if (fgProcess) {
         const fgDetails: any = {}
-        for (let i = startTank; i <= endTank; i++) {
-          fgDetails[i] = {
+        for (const t of allocatedTanks) {
+          fgDetails[t] = {
             status: 'WAITING',
             box_lot: boxLot,
-            cartons: details[i]?.cartons || 0
+            cartons: details[t]?.cartons || 0
           }
         }
         fgDetails.delivery_info = {
           sender: currentUser,
           timestamp: new Date().toISOString(),
-          note: `ส่งมอบรวบยอด ${totalC} ลัง (ถัง ${startTank}-${endTank})`
+          note: `ส่งมอบรวบยอด ${totalC} ลัง (ถัง ${startTank}-${calculatedEndTank})`
         }
 
         await supabase.from('production_logs').insert({
@@ -510,7 +518,7 @@ export default function PofTasksPage() {
           status: 'WAITING',
           activity_date: new Date().toISOString().split('T')[0],
           tank_start: String(startTank),
-          tank_end: String(endTank),
+          tank_end: String(calculatedEndTank),
           tank_details: fgDetails,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
@@ -1172,7 +1180,7 @@ export default function PofTasksPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold text-[#4A4238]">
               <Boxes className="w-6 h-6 text-amber-500" />
-              บันทึกรวบยอดลงลัง & ตัดถังอัตโนมัติ (Batch Auto-Allocation)
+              บันทึกรวบยอดลงลัง & ตัดถังอัตโนมัติ (Rolling Auto-Allocation)
             </DialogTitle>
           </DialogHeader>
 
@@ -1181,11 +1189,15 @@ export default function PofTasksPage() {
             const lotNo = task.production_lots?.lot_no || ''
             const sku = task.production_lots?.products?.sku || ''
             const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
+            const kgPerTank = task.production_lots?.kg_per_tank || 0
+            const gPerPiece = task.production_lots?.g_per_piece || 1
+            const stdYieldPieces = Math.round((kgPerTank * 1000) / gPerPiece)
+            const stdCartonsPerTank = pcsPerCarton > 0 ? (stdYieldPieces / pcsPerCarton) : 14.5
+
             const startT = Number(batchDialog.startTank) || 1
-            const endT = Number(batchDialog.endTank) || startT
-            const numTanks = Math.max(1, endT - startT + 1)
             const totalC = parseInt(batchDialog.totalCartons) || 0
             const totalPieces = totalC * pcsPerCarton
+            const maxTaskEnd = parseInt(task.tank_end) || (task.production_lots?.total_tanks || 200)
 
             // Compute continuous carton run number
             let cartonsBefore = 0
@@ -1204,24 +1216,42 @@ export default function PofTasksPage() {
               }
             }
 
-            // Allocation simulation
-            const base = Math.floor(totalC / numTanks)
-            const rem = totalC % numTanks
+            // Rolling Capacity Allocation Simulation
+            let remaining = totalC
+            let currentT = startT
             let currentStart = cartonsBefore + 1
-
             const previewList = []
-            for (let i = 0; i < numTanks; i++) {
-              const t = startT + i
-              const c = base + (i >= (numTanks - rem) ? 1 : 0)
+
+            while (remaining > 0 && currentT <= maxTaskEnd) {
+              const tankCap = (stdCartonsPerTank % 1 !== 0) 
+                ? ((currentT % 2 === 0) ? Math.ceil(stdCartonsPerTank) : Math.floor(stdCartonsPerTank))
+                : Math.round(stdCartonsPerTank)
+
+              const c = Math.min(remaining, tankCap)
               const sC = currentStart
               const eC = currentStart + c - 1
               currentStart = eC + 1
+              remaining -= c
+
               previewList.push({
-                tankNum: t,
+                tankNum: currentT,
                 cartons: c,
-                range: c > 0 ? `ลังที่ ${sC} - ${eC}` : '-'
+                tankCap,
+                isFull: c === tankCap,
+                range: c > 0 ? `ลังที่ ${sC.toLocaleString()} - ${eC.toLocaleString()}` : '-'
               })
+
+              currentT++
             }
+
+            if (remaining > 0 && previewList.length > 0) {
+              const lastP = previewList[previewList.length - 1]
+              lastP.cartons += remaining
+              lastP.range = `ลังที่ ${(cartonsBefore + totalC - lastP.cartons + 1).toLocaleString()} - ${(cartonsBefore + totalC).toLocaleString()}`
+            }
+
+            const autoEndTank = previewList.length > 0 ? previewList[previewList.length - 1].tankNum : startT
+            const numTanksUsed = previewList.length
 
             return (
               <div className="py-2 space-y-4 text-xs">
@@ -1236,34 +1266,36 @@ export default function PofTasksPage() {
                     </div>
                   </div>
                   <div className="text-right">
-                    <span className="text-[10px] text-amber-600 font-medium">บรรจุต่อลัง</span>
-                    <div className="font-bold text-amber-900">{pcsPerCarton} ชิ้น/ลัง</div>
+                    <span className="text-[10px] text-amber-600 font-medium">Std Yield ต่อถัง</span>
+                    <div className="font-bold text-amber-900">~{stdCartonsPerTank} ลัง/ถัง ({pcsPerCarton} ชิ้น/ลัง)</div>
                   </div>
                 </div>
 
-                {/* Range of tanks input */}
+                {/* Range of tanks & Rolling auto stop */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">ตั้งแต่ถังที่</label>
+                    <label className="text-xs font-bold text-slate-700">เริ่มตัดจากถังที่</label>
                     <Input
                       type="number"
                       value={batchDialog.startTank}
                       min={parseInt(task.tank_start) || 1}
-                      max={parseInt(task.tank_end) || 200}
+                      max={maxTaskEnd}
                       onChange={(e) => setBatchDialog(prev => ({ ...prev, startTank: parseInt(e.target.value) || 1 }))}
                       className="font-bold text-sm"
                     />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700">ถึงถังที่</label>
-                    <Input
-                      type="number"
-                      value={batchDialog.endTank}
-                      min={batchDialog.startTank}
-                      max={parseInt(task.tank_end) || 200}
-                      onChange={(e) => setBatchDialog(prev => ({ ...prev, endTank: parseInt(e.target.value) || 1 }))}
-                      className="font-bold text-sm"
-                    />
+                    <label className="text-xs font-bold text-slate-700 flex justify-between">
+                      <span>ถึงถังที่ (ระบบรันหยุดอัตโนมัติ)</span>
+                    </label>
+                    <div className="h-9 px-3 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-between font-extrabold text-slate-800 text-sm">
+                      <span>ถังที่ {totalC > 0 ? autoEndTank : '-'}</span>
+                      {totalC > 0 && (
+                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                          ตัด {numTanksUsed} ถัง
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -1272,11 +1304,11 @@ export default function PofTasksPage() {
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
                       <span>ยอดลงลังจริงรวม (ลัง) <span className="text-red-500">*</span></span>
-                      <span className="text-[10px] text-amber-600 font-normal">({numTanks} ถัง)</span>
+                      {totalC > 0 && <span className="text-[10px] text-amber-600 font-medium">({totalPieces.toLocaleString()} ชิ้น)</span>}
                     </label>
                     <Input
                       type="number"
-                      placeholder="เช่น 100"
+                      placeholder="เช่น 24, 48 หรือ 100"
                       value={batchDialog.totalCartons}
                       onChange={(e) => setBatchDialog(prev => ({ ...prev, totalCartons: e.target.value }))}
                       className="font-black text-base text-[#D4AF37]"
@@ -1296,32 +1328,41 @@ export default function PofTasksPage() {
                   </div>
                 </div>
 
-                {/* Live Preview Table of Auto Allocation */}
-                {totalC > 0 && (
+                {/* Live Preview Table of Rolling Auto Allocation */}
+                {totalC > 0 ? (
                   <div className="space-y-2 pt-2 border-t border-slate-100">
                     <div className="flex justify-between items-center font-bold text-slate-700">
                       <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold">
-                        <Sparkles className="w-3.5 h-3.5" /> จำลองการตัดยอดลงแต่ละถังอัตโนมัติ:
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" /> Rolling เติมเต็มถังตามความจุจริง (~{stdCartonsPerTank} ลัง/ถัง):
                       </span>
                       <span className="text-xs text-slate-600 font-bold">
-                        รวม {totalC.toLocaleString()} ลัง ({totalPieces.toLocaleString()} ชิ้น)
+                        รวม {totalC.toLocaleString()} ลัง
                       </span>
                     </div>
 
-                    <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
+                    <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
                       {previewList.map((p) => (
-                        <div key={p.tankNum} className="p-2 flex justify-between items-center text-xs">
+                        <div key={p.tankNum} className="p-2.5 flex justify-between items-center text-xs hover:bg-emerald-50/30 transition-colors">
                           <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${p.isFull ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
                             <strong className="text-slate-800 font-bold">ถังที่ {p.tankNum}</strong>
                             <span className="text-slate-400 text-[10px]">({p.range})</span>
                           </div>
-                          <span className="font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
-                            {p.cartons} ลัง
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded ${p.isFull ? 'text-emerald-700 bg-emerald-100' : 'text-amber-700 bg-amber-100'}`}>
+                              {p.isFull ? `เต็มถัง (${p.cartons}/${p.tankCap})` : `เศษถัง (${p.cartons}/${p.tankCap})`}
+                            </span>
+                            <span className="font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md min-w-[50px] text-right">
+                              {p.cartons} ลัง
+                            </span>
+                          </div>
                         </div>
                       ))}
                     </div>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-amber-50/50 rounded-xl border border-dashed border-amber-200 text-amber-800 text-[11px] text-center">
+                    💡 พนักงานใส่ยอดลงลังรวม (เช่น 24, 48 หรือ 100 ลัง) ระบบจะตัดเต็มถังและหยุดที่ถังสุดท้ายให้อัตโนมัติ
                   </div>
                 )}
               </div>
