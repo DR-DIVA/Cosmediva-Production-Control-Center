@@ -3,8 +3,12 @@
 import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Play, Square, Pause, Droplet, Beaker, Archive, CheckCircle, Factory, AlertTriangle, ClipboardCheck } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { 
+  Play, Square, Pause, Droplet, Beaker, Archive, CheckCircle, Factory, 
+  AlertTriangle, ClipboardCheck, TrendingUp, Layers, RefreshCw, Scale, 
+  Package, Boxes, CheckSquare, Clock, Sparkles, ArrowUpRight 
+} from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -770,11 +774,51 @@ export default function MyTasksPage() {
   
   const isOverLimit = activeStartTask && getTaskColumn(activeStartTask) === 'POF' && (currentTaskPieces + inputPieces) > maxAllowedPieces
 
+  const handleRefresh = () => {
+    fetchTasks();
+    fetchRooms();
+    fetchProcesses();
+    toast.success('รีเฟรชสถานะไลน์ผลิตล่าสุดเรียบร้อยแล้ว');
+  };
+
+  // Executive Production Floor Calculations
+  const activeWipTasks = tasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'WAITING' || t.status === 'PAUSED');
+  const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS');
+  const pausedTasks = tasks.filter(t => t.status === 'PAUSED' || (t.note && t.note.includes('[สารขาด]')));
+  const waitingTasks = tasks.filter(t => t.status === 'WAITING' && (!t.note || !t.note.includes('[สารขาด]')));
+
+  // Category Tasks
+  const weighingTasks = tasks.filter(t => getTaskColumn(t) === 'MM-RM');
+  const weighingReady = weighingTasks.filter(t => (t.rm_items || []).every((r: any) => r.status === 'READY')).length;
+  const weighingWaiting = weighingTasks.length - weighingReady;
+
+  const mixingTasks = tasks.filter(t => getTaskColumn(t) === 'MIX');
+  const mixingRunning = mixingTasks.filter(t => t.status === 'IN_PROGRESS').length;
+  const mixingWaiting = mixingTasks.filter(t => t.status === 'WAITING').length;
+
+  const qcTasks = tasks.filter(t => getTaskColumn(t) === 'QC');
+  const packingTasks = tasks.filter(t => getTaskColumn(t) === 'PACKING');
+  const packingRunning = packingTasks.filter(t => t.status === 'IN_PROGRESS').length;
+
+  const pofTasks = tasks.filter(t => getTaskColumn(t) === 'POF');
+  const fgTasks = tasks.filter(t => getTaskColumn(t) === 'FG');
+
+  const totalTanksInProduction = tasks.reduce((sum, t) => {
+    if (t.tank_start && t.tank_end) {
+      return sum + (parseInt(t.tank_end) - parseInt(t.tank_start) + 1);
+    }
+    return sum + 1;
+  }, 0);
+
+  const flowRatePct = tasks.length > 0 
+    ? (((tasks.length - pausedTasks.length) / tasks.length) * 100).toFixed(1)
+    : '100.0';
+
   return (
     <div className="p-4 md:p-8 flex-1 flex flex-col space-y-6 overflow-hidden">
       {/* Alert for Defect Report */}
       {isDefectReportMissing && (
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex justify-between items-center shadow-sm mb-6">
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-lg flex justify-between items-center shadow-sm">
           <div className="flex items-center">
             <AlertTriangle className="h-5 w-5 text-red-500 mr-3" />
             <p className="text-sm text-red-700 font-medium">⚠️ หัวหน้าห้องยังไม่มีการรายงานของเสียประจำวัน โปรดบันทึกของเสียเพื่อความแม่นยำของระบบ</p>
@@ -785,25 +829,312 @@ export default function MyTasksPage() {
         </div>
       )}
       
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Title Header Card */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <Factory className="w-8 h-8 text-yellow-400" />
-            CosmeFlow Production
+            <Factory className="w-8 h-8 text-yellow-500 shrink-0" />
+            CosmeFlow Production (Shopfloor Overview)
           </h2>
           <div className="text-sm text-[#8B7355] flex items-center mt-2 font-medium">
              <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
-             Track Every Step. Improve Every Batch.
+             Track Every Step. Improve Every Batch. Real-time Shopfloor Flow.
           </div>
         </div>
-        <div className="w-full md:w-64">
-          <Input 
-            placeholder="ค้นหา SKU..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-slate-50 border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]"
-          />
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <div className="w-full sm:w-64">
+            <Input 
+              placeholder="ค้นหา SKU หรือ LOT..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full bg-white border-slate-200 focus:border-[#D4AF37] focus:ring-[#D4AF37]"
+            />
+          </div>
+          <Button onClick={handleRefresh} variant="outline" className="bg-[#F8F6F0] hover:bg-slate-100 flex items-center gap-1.5 shrink-0">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" /> รีเฟรช
+          </Button>
         </div>
+      </div>
+
+      {/* 1. Executive Production Floor & Shopfloor Capacity KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Factory className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Production Operations & Shopfloor Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Production KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              ศูนย์รวมข้อมูลกระบวนการผลิต • สถิติงานเรียลไทม์ • และความคืบหน้ารายสถานี (Shopfloor Tracking)
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Active WIP Jobs */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">งานในกระบวนการผลิตรวม</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {tasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({totalTanksInProduction} ถัง/ล็อตทั้งหมด)</div>
+          </div>
+
+          {/* Running In-Progress */}
+          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">กำลังเดินงาน (Running)</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {inProgressTasks.length} <span className="text-xs font-normal text-emerald-200">งาน</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">(เดินเครื่องในไลน์)</div>
+          </div>
+
+          {/* Paused or Waiting RM */}
+          <div className="bg-amber-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
+            <div className="text-[11px] text-amber-200 font-medium">งานสะดุด / พัก / รอสาร</div>
+            <div className="text-2xl font-black text-amber-400">
+              {pausedTasks.length} <span className="text-xs font-normal text-amber-200">งาน</span>
+            </div>
+            <div className="text-[10px] text-amber-300 mt-0.5">(รอแก้ไข / สารขาด)</div>
+          </div>
+
+          {/* Shopfloor Flow Rate */}
+          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[11px] text-blue-200 font-medium">อัตราการไหลงาน (Flow Rate)</div>
+            <div className="text-2xl font-black text-blue-300">
+              {flowRatePct}%
+            </div>
+            <div className="text-[10px] text-blue-300 mt-0.5">({tasks.length - pausedTasks.length} งานไหลลื่น)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Interactive Production Dimension Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Weighing MM-RM */}
+        <Card className="border-2 border-slate-200 hover:border-amber-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold shadow-sm">
+                  <Scale className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. งานชั่งสาร (Weighing)</div>
+                  <div className="text-[11px] text-slate-500">MM-RM Preparation</div>
+                </div>
+              </div>
+              <Badge variant="outline" className={`text-xs font-semibold ${weighingWaiting > 0 ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                {weighingTasks.length} ล็อตในคิว
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-amber-600">{weighingReady}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {weighingTasks.length} ล็อตพร้อมชั่ง 100%</span>
+              </div>
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold">
+                {weighingTasks.length} คิวชั่ง
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${weighingTasks.length > 0 ? (weighingReady / weighingTasks.length) * 100 : 100}%` }} className="bg-amber-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">พร้อมชั่ง</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{weighingReady}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">สารครบ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">รอวัตถุดิบ</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{weighingWaiting}</div>
+                <div className="text-[9px] text-rose-600 font-medium">รอเข้า</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">คิวทั้งหมด</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{weighingTasks.length}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ล็อต</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Mixing Mix 1-6 */}
+        <Card className="border-2 border-slate-200 hover:border-[#D4AF37] bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Beaker className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. ห้องผสม (Mix 1-6)</div>
+                  <div className="text-[11px] text-slate-500">Bulk Mixing & Tanks</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-[#F8F6F0] text-[#8B7355] border-[#D4AF37]/30 font-semibold">
+                {mixingTasks.length} คิวผสม
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#4A4238]">{mixingRunning}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {mixingTasks.length} กำลังเดินเครื่องผสม</span>
+              </div>
+              <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                {mixingRunning} ถัง In Progress
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${mixingTasks.length > 0 ? (mixingRunning / mixingTasks.length) * 100 : 0}%` }} className="bg-[#D4AF37] h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">กำลังผสม</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{mixingRunning}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">เดินเครื่อง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">รอเริ่มผสม</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{mixingWaiting}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">รอคิว</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-purple-50/70 border border-purple-100">
+                <div className="text-[10px] font-semibold text-purple-700">ส่งตรวจ QC</div>
+                <div className="text-xs font-bold text-purple-800 mt-0.5">{qcTasks.length}</div>
+                <div className="text-[9px] text-purple-600 font-medium">รอผลแล็บ</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Packing */}
+        <Card className="border-2 border-slate-200 hover:border-emerald-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. ห้องบรรจุ (Packing)</div>
+                  <div className="text-[11px] text-slate-500">Filling & Assembly Lines</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                {packingTasks.length} งานบรรจุ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{packingRunning}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {packingTasks.length} กำลังบรรจุอยู่</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                {packingTasks.length} งาน
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${packingTasks.length > 0 ? (packingRunning / packingTasks.length) * 100 : 0}%` }} className="bg-emerald-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">กำลังบรรจุ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{packingRunning}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">เดินไลน์</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">รอบรรจุ</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{packingTasks.length - packingRunning}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">รอคิว</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">คิวทั้งหมด</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{packingTasks.length}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">งาน</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: POF & Cartoning */}
+        <Card className="border-2 border-slate-200 hover:border-cyan-400 bg-white transition-all duration-200 hover:shadow-lg">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-100 text-cyan-700 flex items-center justify-center font-bold shadow-sm">
+                  <Boxes className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. อุโมงค์ & ลงลัง (POF / FG)</div>
+                  <div className="text-[11px] text-slate-500">Cartoning & Palletizing</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-cyan-50 text-cyan-700 border-cyan-200 font-semibold">
+                {pofTasks.length + fgTasks.length} คิวลงลัง
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-cyan-600">{pofTasks.length + fgTasks.length}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">งานรออบฟิล์ม / ลงลัง FG</span>
+              </div>
+              <Badge className="bg-cyan-100 text-cyan-800 border-cyan-200 text-[10px] font-bold">
+                POF & FG
+              </Badge>
+            </div>
+
+            {/* Progress */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: '100%' }} className="bg-cyan-500 h-full transition-all duration-500" />
+            </div>
+
+            {/* Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-cyan-50/70 border border-cyan-100">
+                <div className="text-[10px] font-semibold text-cyan-700">ห้องอุโมงค์</div>
+                <div className="text-xs font-bold text-cyan-800 mt-0.5">{pofTasks.length}</div>
+                <div className="text-[9px] text-cyan-600 font-medium">งาน POF</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-slate-100 border border-slate-200">
+                <div className="text-[10px] font-semibold text-slate-700">เข้าคลัง FG</div>
+                <div className="text-xs font-bold text-slate-800 mt-0.5">{fgTasks.length}</div>
+                <div className="text-[9px] text-slate-600 font-medium">พร้อมรับ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-cyan-50/70 border border-cyan-100">
+                <div className="text-[10px] font-semibold text-cyan-700">รวมปลายทาง</div>
+                <div className="text-xs font-bold text-cyan-800 mt-0.5">{pofTasks.length + fgTasks.length}</div>
+                <div className="text-[9px] text-cyan-600 font-medium">ล็อต</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden flex gap-4 pb-4 snap-x snap-mandatory">
