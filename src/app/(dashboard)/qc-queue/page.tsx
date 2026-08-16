@@ -755,7 +755,7 @@ export default function QCQueuePage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <DropdownMenu>
-                              <DropdownMenuTrigger disabled={(userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) || item.qc_status === 'PASSED'} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                              <DropdownMenuTrigger disabled={(userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) || item.qc_status === 'PASSED' || item.qc_status === 'REJECTED'} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
                                 อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -986,7 +986,7 @@ export default function QCQueuePage() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <DropdownMenu>
-                                  <DropdownMenuTrigger disabled={(userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) || item.qc_status === 'PASSED'} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
+                                  <DropdownMenuTrigger disabled={(userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) || item.qc_status === 'PASSED' || item.qc_status === 'REJECTED'} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
                                     อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
