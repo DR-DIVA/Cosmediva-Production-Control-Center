@@ -146,6 +146,7 @@ export default function QCQueuePage() {
       const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
       if (qcProc) {
         await supabase.from('production_logs').insert({
+          activity_date: new Date().toISOString().split('T')[0],
           production_lot_id: activeRm.production_lot_id || null,
           process_id: qcProc.id,
           status: 'COMPLETED',
@@ -561,6 +562,7 @@ export default function QCQueuePage() {
         
         if (qcProc) {
           await supabase.from('production_logs').insert({
+            activity_date: new Date().toISOString().split('T')[0],
             production_lot_id: null,
             process_id: qcProc.id,
             status: 'COMPLETED',
