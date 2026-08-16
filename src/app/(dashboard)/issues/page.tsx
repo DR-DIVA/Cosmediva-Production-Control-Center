@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import { getUsers } from "@/app/actions/users"
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -29,6 +30,7 @@ export default function IssuesPage() {
   const [resolvingIssue, setResolvingIssue] = useState<any>(null)
   const [resolveNote, setResolveNote] = useState('')
   const [qaInspectorCode, setQaInspectorCode] = useState('')
+  const [masterUsers, setMasterUsers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('System')
   
@@ -124,16 +126,49 @@ export default function IssuesPage() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user && user.email) {
-        const email = user.email
-        const username = email.includes('@') ? email.split('@')[0].toUpperCase() : email.toUpperCase()
-        setCurrentUser(username)
-        if (username !== 'SYSTEM' && username !== 'UNKNOWN USER') {
-          setQaInspectorCode(username)
+    const initData = async () => {
+      let uList: any[] = []
+      try {
+        const res = await getUsers()
+        if (res.success && res.data) {
+          uList = res.data
+          setMasterUsers(res.data)
+        }
+      } catch (err) {
+        console.error('Error fetching master users:', err)
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (user) {
+        const email = user.email || ''
+        const prefix = email.includes('@') ? email.split('@')[0].toLowerCase() : email.toLowerCase()
+        
+        const matched = uList.find(u => 
+          u.id === user.id || 
+          u.employee_id?.toLowerCase() === prefix ||
+          u.employee_id?.toLowerCase() === user.user_metadata?.employee_id?.toLowerCase()
+        )
+
+        const empId = matched?.employee_id 
+          ? matched.employee_id.toUpperCase() 
+          : (user.user_metadata?.employee_id 
+            ? user.user_metadata.employee_id.toUpperCase() 
+            : (prefix && prefix !== 'system' ? prefix.toUpperCase() : ''))
+
+        if (empId) {
+          setCurrentUser(empId)
+          setQaInspectorCode(empId)
+        } else if (uList.length > 0) {
+          // If logged in as QA or someone in master data
+          const defaultQa = uList.find(u => u.role?.toUpperCase().includes('QA') || u.employee_id?.toUpperCase().startsWith('QA'))
+          if (defaultQa) {
+            setQaInspectorCode(defaultQa.employee_id.toUpperCase())
+          }
         }
       }
-    })
+    }
+
+    initData()
     fetchIssues()
     fetchActiveTasks()
   }, [])
@@ -141,8 +176,15 @@ export default function IssuesPage() {
   const openResolveDialog = (issue: any) => {
     setResolvingIssue(issue)
     setResolveNote('')
-    if (!qaInspectorCode && currentUser && currentUser !== 'System' && currentUser !== 'SYSTEM') {
-      setQaInspectorCode(currentUser)
+    if (!qaInspectorCode) {
+      if (currentUser && currentUser !== 'System' && currentUser !== 'SYSTEM') {
+        setQaInspectorCode(currentUser)
+      } else if (masterUsers.length > 0) {
+        const defaultQa = masterUsers.find(u => u.role?.toUpperCase().includes('QA') || u.employee_id?.toUpperCase().startsWith('QA'))
+        if (defaultQa) {
+          setQaInspectorCode(defaultQa.employee_id.toUpperCase())
+        }
+      }
     }
     setIsResolveOpen(true)
   }
@@ -488,11 +530,22 @@ export default function IssuesPage() {
                           </div>
                         </TableCell>
                         <TableCell className="whitespace-nowrap">
-                          <div className="flex items-center text-xs text-slate-500 whitespace-nowrap">
-                            <User className="w-3 h-3 mr-1" />
+                          <div className="flex items-center text-xs text-slate-700 whitespace-nowrap">
+                            <User className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" />
                             {(() => {
                               const match = issue.parsedNote.match(/\(โดย (.*?) - /)
-                              return match ? match[1] : '-'
+                              const inspectorId = match ? match[1] : '-'
+                              const matchedUser = masterUsers.find(u => u.employee_id?.toLowerCase() === inspectorId.toLowerCase())
+                              return (
+                                <div className="flex items-center gap-1.5">
+                                  <Badge variant="outline" className="bg-amber-50 text-[#8B7355] border-[#D4AF37]/30 font-bold px-2 py-0.5">
+                                    {inspectorId}
+                                  </Badge>
+                                  {matchedUser && (
+                                    <span className="text-slate-500 font-normal">({matchedUser.full_name})</span>
+                                  )}
+                                </div>
+                              )
                             })()}
                           </div>
                         </TableCell>
@@ -554,15 +607,37 @@ export default function IssuesPage() {
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-semibold text-slate-700">
-                รหัสพนักงานผู้ตรวจสอบ (QA) <span className="text-red-500">*</span>
-              </Label>
-              <Input 
-                value={qaInspectorCode} 
-                onChange={(e) => setQaInspectorCode(e.target.value)} 
-                placeholder="เช่น QA01, QA02..."
-                className="font-medium uppercase"
-              />
+              <div className="flex justify-between items-center">
+                <Label className="text-sm font-semibold text-slate-700">
+                  รหัสพนักงานผู้ตรวจสอบ (QA) <span className="text-red-500">*</span>
+                </Label>
+                {masterUsers.length > 0 && (
+                  <span className="text-xs text-[#8B7355] font-medium">จาก Master Data Users</span>
+                )}
+              </div>
+              {masterUsers.length > 0 ? (
+                <div className="space-y-1.5">
+                  <select
+                    value={qaInspectorCode}
+                    onChange={(e) => setQaInspectorCode(e.target.value)}
+                    className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-medium"
+                  >
+                    <option value="">-- เลือกรหัสพนักงาน (Master Data) --</option>
+                    {masterUsers.map(u => (
+                      <option key={u.id || u.employee_id} value={u.employee_id?.toUpperCase()}>
+                        {u.employee_id?.toUpperCase()} - {u.full_name} ({u.role || 'พนักงาน'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <Input 
+                  value={qaInspectorCode} 
+                  onChange={(e) => setQaInspectorCode(e.target.value)} 
+                  placeholder="เช่น QA01, QA02..."
+                  className="font-medium uppercase"
+                />
+              )}
             </div>
             <div className="space-y-2">
               <Label className="text-sm font-semibold text-slate-700">หมายเหตุ / วิธีแก้ไข / ข้อสรุป NC</Label>
