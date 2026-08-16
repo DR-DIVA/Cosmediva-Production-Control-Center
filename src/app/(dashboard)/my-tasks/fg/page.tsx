@@ -1283,7 +1283,7 @@ export default function FgTasksPage() {
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้รับมอบ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">{formatUserCode(receiveDialog.task?.tank_details?.fg_receive_info?.user) || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">{formatUserCode(receiveDialog.task?.tank_details?.fg_receive_info?.user) || (receiveDialog.isReadOnly ? '' : '.....................')}</span>
                      </div>
                      <span className="whitespace-nowrap">วันที่</span>
                      <span className="w-20 border-b border-black border-dashed text-center font-handwriting text-[#4A4238]">
@@ -1306,7 +1306,7 @@ export default function FgTasksPage() {
                   <div className="flex items-end gap-1">
                      <span className="whitespace-nowrap">ผู้อนุมัติ</span>
                      <div className="flex-1 border-b border-black border-dashed relative">
-                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap text-lg">
+                        <span className="absolute -top-4 left-1/2 -translate-x-1/2 font-handwriting text-[#4A4238] whitespace-nowrap">
                            {(() => {
                               const qcUser = receiveDialog.task?.tank_details?.qc_release_info?.user || 
                                              receiveDialog.task?.tank_details?.qc_info?.user;
