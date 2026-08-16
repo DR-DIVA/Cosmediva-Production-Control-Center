@@ -56,6 +56,13 @@ export default function DashboardPage() {
     resolvedCount: 0
   })
 
+  const [plannerStats, setPlannerStats] = useState({
+    poOnHand: 0,
+    piecesOnHand: 0,
+    totalTanksPlanned: 0,
+    onTrackPct: '100.0'
+  })
+
   const [fgInventoryStats, setFgInventoryStats] = useState({
     fgTotalPcs: 0,
     fgTotalCartons: 0,
@@ -180,10 +187,29 @@ export default function DashboardPage() {
       supabase.from('production_logs').select('id, status, tank_start, tank_end, tank_details, processes(process_name)'),
       supabase.from('fg_inventory').select('id, lot_no, receive_qty_cartons, receive_qty_pcs, qc_status, created_at'),
       supabase.from('production_logs').select('id, note, status, updated_at, created_at').or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%,note.ilike.%[CAR]%,note.ilike.%[QA RESOLVED]%'),
-      supabase.from('production_lots').select('id, planned_quantity, order_quantity').neq('current_status', 'DONE')
+      supabase.from('production_lots').select('id, planned_quantity, order_quantity, total_tanks, fg_due_date').neq('current_status', 'DONE')
     ])
 
-    if (plannedLotsData) setPlannerLots(plannedLotsData)
+    if (plannedLotsData) {
+      setPlannerLots(plannedLotsData)
+      let onTrackCount = 0
+      let totalTanks = 0
+      const todayDateStr = format(new Date(), 'yyyy-MM-dd')
+      plannedLotsData.forEach((l: any) => {
+        totalTanks += (l.total_tanks || 0)
+        if (!l.fg_due_date || l.fg_due_date >= todayDateStr) {
+          onTrackCount++
+        }
+      })
+      const pieces = plannedLotsData.reduce((sum: number, l: any) => sum + (l.planned_quantity || 0), 0)
+      const onTrack = plannedLotsData.length > 0 ? ((onTrackCount / plannedLotsData.length) * 100).toFixed(1) : '100.0'
+      setPlannerStats({
+        poOnHand: plannedLotsData.length,
+        piecesOnHand: pieces,
+        totalTanksPlanned: totalTanks,
+        onTrackPct: onTrack
+      })
+    }
 
     // Compute QC Metrics
     let holdRM = 0, holdBulk = 0, holdFG = 0, reprocessBulk = 0, rejectTotal = 0
@@ -928,16 +954,18 @@ export default function DashboardPage() {
                    <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> แผนการผลิต (Planner)
                    </h4>
-                   <span className="text-[10px] text-slate-400 font-medium">Active Backlog</span>
+                   <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                     ตรงแผน {plannerStats.onTrackPct}%
+                   </span>
                  </div>
                  
                  <div className="space-y-2">
                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
                      <div>
                        <span className="text-xs font-semibold text-slate-700">📋 PO ในมือ (Active POs)</span>
-                       <div className="text-[10px] text-slate-400">คำสั่งผลิตที่กำลังดำเนินการ</div>
+                       <div className="text-[10px] text-slate-400">กำลังผลิต {plannerStats.totalTanksPlanned} ถัง</div>
                      </div>
-                     <span className="text-base font-black text-[#D4AF37]">{poOnHand} ล็อต</span>
+                     <span className="text-base font-black text-[#D4AF37]">{plannerStats.poOnHand} ล็อต</span>
                    </div>
 
                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
@@ -945,7 +973,7 @@ export default function DashboardPage() {
                        <span className="text-xs font-semibold text-slate-700">📦 ยอดชิ้นงานรอผลิต</span>
                        <div className="text-[10px] text-slate-400">รวมทุกคำสั่งผลิตตามแผน</div>
                      </div>
-                     <span className="text-base font-black text-[#4A4238]">{piecesOnHand.toLocaleString()}</span>
+                     <span className="text-base font-black text-[#4A4238]">{plannerStats.piecesOnHand.toLocaleString()}</span>
                    </div>
                  </div>
                </div>
@@ -956,7 +984,9 @@ export default function DashboardPage() {
                    <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span> คลังสินค้าสำเร็จรูป (FG)
                    </h4>
-                   <span className="text-[10px] text-slate-400 font-medium">Warehouse & Delivery</span>
+                   <span className="text-[10px] text-slate-500 font-medium">
+                     เข้าเดือนนี้ {fgInventoryStats.fgMonthPcs.toLocaleString()}
+                   </span>
                  </div>
 
                  <div className="space-y-2">
@@ -973,7 +1003,7 @@ export default function DashboardPage() {
                    <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
                      <div>
                        <span className="text-xs font-bold text-amber-800">🟡 กักตรวจเชื้อ (Quarantine)</span>
-                       <div className="text-[10px] text-amber-600">อยู่ระหว่างรอบ่มเชื้อ/ผลตรวจ</div>
+                       <div className="text-[10px] text-amber-600">อยู่ระหว่างรอบ่มเชื้อ/ผลตรวจ ({fgInventoryStats.fgTotalCartons} ลัง)</div>
                      </div>
                      <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
                        {fgInventoryStats.fgQuarantinePcs.toLocaleString()}
