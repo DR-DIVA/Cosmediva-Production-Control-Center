@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
+import { RollingMasterRadar } from '@/components/dashboard/RollingMasterRadar'
 
 const parseRanges = (str: string) => {
   if (!str) return 0;
@@ -780,6 +781,12 @@ export default function DashboardPage() {
           </Popover>
         </div>
       </div>
+
+      {/* 🧭 14-Day Rolling Master Radar (Placed at top as requested) */}
+      <RollingMasterRadar 
+        startDateStr={dashboardDate} 
+        onSelectLot={(lotId) => setSelectedFilter(lotId)} 
+      />
       
       {/* 1. กำลังการผลิตวันนี้ */}
       <h3 className="text-xl font-bold text-[#4A4238] mt-10 mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
