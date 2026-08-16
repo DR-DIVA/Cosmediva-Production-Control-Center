@@ -5,9 +5,11 @@ import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Activity, AlertTriangle, TrendingUp, Package, Box, ShieldAlert, CheckCircle2, Factory, Calendar } from 'lucide-react'
+import { Activity, AlertTriangle, TrendingUp, Package, Box, ShieldAlert, CheckCircle2, Factory, Calendar, Search, Check, ChevronsUpDown, X, Layers, Filter } from 'lucide-react'
 import ProductionLine from '@/components/dashboard/ProductionLine'
-import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 
 const parseRanges = (str: string) => {
@@ -449,20 +451,20 @@ export default function DashboardPage() {
     }
   })
 
-  // Group Lots by SKU for Dropdown
-  const groupedLots: Record<string, any[]> = {}
-  activeLots.forEach(lot => {
-    const sku = lot.products?.sku || 'Unknown SKU'
-    if (!groupedLots[sku]) groupedLots[sku] = []
-    groupedLots[sku].push(lot)
+  const [filterSearch, setFilterSearch] = useState('')
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+
+  // Group Lots by SKU for Dropdown (optional) & Search Filtering
+  const filteredSearchLots = activeLots.filter(lot => {
+    if (!filterSearch.trim()) return true
+    const q = filterSearch.toLowerCase().trim()
+    const sku = (lot.products?.sku || '').toLowerCase()
+    const lotNo = (lot.lot_no || '').toLowerCase()
+    const pName = (lot.products?.product_name || '').toLowerCase()
+    return sku.includes(q) || lotNo.includes(q) || pName.includes(q)
   })
 
   const selectedLot = activeLots.find(l => l.id === selectedFilter)
-  const displayFilterText = selectedFilter === 'all' 
-    ? <span className="font-bold text-[#D4AF37]">ภาพรวมโรงงาน (Factory Overview)</span>
-    : selectedLot 
-      ? <span className="font-semibold text-[#4A4238]">LOT {selectedLot.lot_no}</span>
-      : <span className="text-gray-400">เลือกการแสดงผล</span>
 
   return (
     <div className="p-8 space-y-6 max-w-[1400px] mx-auto bg-transparent min-h-screen pb-12 font-sans text-[#4A4238]">
@@ -480,38 +482,200 @@ export default function DashboardPage() {
           </div>
         </div>
         
-        <div className="flex flex-wrap items-center gap-4 mt-4 md:mt-0">
-          <div className="flex items-center gap-2 bg-white border border-[#D4AF37]/30 rounded-md p-1">
-             <Calendar className="w-5 h-5 text-yellow-500 ml-2" />
+        <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
+          <div className="flex items-center gap-2 bg-white border border-[#D4AF37]/30 rounded-xl p-1.5 shadow-xs">
+             <Calendar className="w-5 h-5 text-yellow-500 ml-1.5" />
              <input 
                type="date" 
-               className="bg-transparent border-none outline-none text-sm font-semibold text-[#4A4238] p-1 cursor-pointer"
+               className="bg-transparent border-none outline-none text-sm font-semibold text-[#4A4238] p-0.5 pr-2 cursor-pointer"
                value={dashboardDate}
                onChange={(e) => setDashboardDate(e.target.value)}
              />
           </div>
-          <div className="w-48">
-            <Select value={selectedFilter} onValueChange={(val) => setSelectedFilter(val || '')}>
-              <SelectTrigger className="bg-white border-[#D4AF37]/30 text-[#4A4238] font-semibold h-11 focus:ring-yellow-400">
-                <span data-slot="select-value" className="flex flex-1 text-left line-clamp-1">{displayFilterText}</span>
-              </SelectTrigger>
-              <SelectContent className="bg-white border-[#D4AF37]/30 text-[#4A4238]">
-                <SelectItem value="all" className="focus:bg-slate-700 focus:text-yellow-400">
-                  <span className="font-bold text-yellow-400">ภาพรวมโรงงาน (Factory Overview)</span>
-                </SelectItem>
-                {Object.keys(groupedLots).map(sku => (
-                  <SelectGroup key={sku}>
-                    <SelectLabel className="bg-white text-[#4A4238] border-t border-b border-[#D4AF37]/30">{sku}</SelectLabel>
-                    {groupedLots[sku].map(lot => (
-                      <SelectItem key={lot.id} value={lot.id} className="ml-2 focus:bg-slate-700 focus:text-[#4A4238]">
-                        LOT {lot.lot_no}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
+          {/* Smart Searchable Lot Filter */}
+          <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
+            <PopoverTrigger
+              className="flex items-center justify-between gap-2 px-3.5 h-11 bg-white hover:bg-slate-50 border border-[#D4AF37]/40 rounded-xl shadow-xs transition-all duration-200 min-w-[220px] max-w-[320px] text-left cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
+            >
+              <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                {selectedFilter === 'all' ? (
+                  <>
+                    <div className="p-1.5 rounded-lg bg-[#D4AF37]/15 text-[#8B7355] shrink-0">
+                      <Layers className="w-4 h-4 text-[#D4AF37]" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-[#4A4238] truncate">ภาพรวมโรงงาน</span>
+                      <span className="text-[10px] text-slate-500 font-medium truncate">ทุกล็อตการผลิต ({activeLots.length})</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="p-1.5 rounded-lg bg-amber-500/15 text-amber-700 shrink-0">
+                      <Package className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-xs font-bold text-[#4A4238] truncate">
+                        {selectedLot?.products?.sku || 'SKU'} • LOT {selectedLot?.lot_no}
+                      </span>
+                      <span className="text-[10px] text-slate-500 font-medium truncate">
+                        {selectedLot?.products?.product_name || 'เฉพาะล็อตนี้'}
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 ml-1">
+                {selectedFilter !== 'all' && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedFilter('all')
+                    }}
+                    className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700 transition"
+                    title="กลับสู่ภาพรวมโรงงาน"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </span>
+                )}
+                <ChevronsUpDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition" />
+              </div>
+            </PopoverTrigger>
+
+            <PopoverContent className="w-80 md:w-96 p-0 bg-white border border-[#D4AF37]/30 shadow-2xl rounded-2xl overflow-hidden z-50" align="end">
+              {/* Search Box Header */}
+              <div className="p-3 border-b border-slate-100 bg-slate-50/70">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <Input
+                    placeholder="พิมพ์ค้นหา SKU, Lot No, หรือชื่อสินค้า..."
+                    value={filterSearch}
+                    onChange={(e) => setFilterSearch(e.target.value)}
+                    className="pl-9 pr-8 h-9 text-xs bg-white border-slate-200 focus-visible:ring-[#D4AF37]/40 rounded-lg"
+                    autoFocus
+                  />
+                  {filterSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setFilterSearch('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Option: Factory Overview */}
+              <div className="p-2 border-b border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedFilter('all')
+                    setIsFilterOpen(false)
+                    setFilterSearch('')
+                  }}
+                  className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
+                    selectedFilter === 'all'
+                      ? 'bg-amber-500/10 text-[#4A4238] font-bold border border-[#D4AF37]/40'
+                      : 'hover:bg-slate-100 text-slate-700'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`p-1.5 rounded-lg ${selectedFilter === 'all' ? 'bg-[#D4AF37] text-white shadow-xs' : 'bg-slate-200 text-slate-600'}`}>
+                      <Layers className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold flex items-center gap-1.5">
+                        <span>ภาพรวมโรงงานทั้งหมด (Factory Overview)</span>
+                      </div>
+                      <div className="text-[10px] text-slate-500 font-normal">แสดงสรุปผลรวมทุกสายงานการผลิต</div>
+                    </div>
+                  </div>
+                  {selectedFilter === 'all' && (
+                    <div className="p-1 rounded-full bg-[#D4AF37] text-white shrink-0">
+                      <Check className="w-3.5 h-3.5" />
+                    </div>
+                  )}
+                </button>
+              </div>
+
+              {/* Search Results List */}
+              <div className="max-h-72 overflow-y-auto p-2 space-y-1 divide-y divide-slate-100/60">
+                {filteredSearchLots.length === 0 ? (
+                  <div className="p-6 text-center text-xs text-slate-400">
+                    <Search className="w-6 h-6 mx-auto mb-2 opacity-40" />
+                    ไม่พบงานที่ตรงกับ &quot;{filterSearch}&quot;
+                  </div>
+                ) : (
+                  filteredSearchLots.map((lot) => {
+                    const isSelected = selectedFilter === lot.id
+                    return (
+                      <button
+                        key={lot.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedFilter(lot.id)
+                          setIsFilterOpen(false)
+                          setFilterSearch('')
+                        }}
+                        className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer pt-2 ${
+                          isSelected
+                            ? 'bg-amber-500/10 border border-[#D4AF37]/40 shadow-xs'
+                            : 'hover:bg-slate-50 text-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                            <Package className="w-4 h-4" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs font-bold text-slate-900">{lot.products?.sku || 'SKU'}</span>
+                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-700">
+                                LOT {lot.lot_no}
+                              </span>
+                              {lot.total_tanks && (
+                                <span className="text-[10px] text-amber-700 font-medium bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/50">
+                                  {lot.total_tanks} ถัง
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                              {lot.products?.product_name || 'ไม่มีชื่อสินค้า'}
+                            </div>
+                          </div>
+                        </div>
+
+                        {isSelected && (
+                          <div className="p-1 rounded-full bg-[#D4AF37] text-white shrink-0 ml-2">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+
+              {/* Footer Summary */}
+              <div className="p-2 border-t border-slate-100 bg-slate-50 text-[10px] text-slate-500 flex justify-between items-center px-3">
+                <span>แสดง {filteredSearchLots.length} จาก {activeLots.length} ล็อต</span>
+                {filterSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setFilterSearch('')}
+                    className="text-[#8B7355] font-semibold hover:underline"
+                  >
+                    ล้างการค้นหา
+                  </button>
+                )}
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       
