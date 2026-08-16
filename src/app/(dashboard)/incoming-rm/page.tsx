@@ -58,6 +58,7 @@ export default function RMControlCenterPage() {
   const [qcPoSearch, setQcPoSearch] = useState('');
   const [qcControlNoSort, setQcControlNoSort] = useState<'asc' | 'desc' | null>(null);
   const [qcCodeSearch, setQcCodeSearch] = useState('');
+  const [qcStatusSearch, setQcStatusSearch] = useState('ALL');
 
   const [currentUser, setCurrentUser] = useState('');
   const [userRole, setUserRole] = useState('user');
@@ -1126,13 +1127,30 @@ export default function RMControlCenterPage() {
                           </div>
                         </TableHead>
                         <TableHead className="font-semibold text-slate-700 w-72">Name</TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-44">QC Status</TableHead>
+                        <TableHead className="font-semibold text-slate-700 w-44">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>QC Status</span>
+                            <Select value={qcStatusSearch} onValueChange={setQcStatusSearch}>
+                              <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">ทั้งหมด</SelectItem>
+                                <SelectItem value="QUARANTINED">QUARANTINED</SelectItem>
+                                <SelectItem value="PASSED">PASSED</SelectItem>
+                                <SelectItem value="HOLD">HOLD</SelectItem>
+                                <SelectItem value="REJECTED">REJECTED</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY')
                         .filter(i => qcPoSearch ? (i.po_no || '').toLowerCase().includes(qcPoSearch.toLowerCase()) : true)
                         .filter(i => qcCodeSearch ? (i.rm_code || '').toLowerCase().includes(qcCodeSearch.toLowerCase()) : true)
+                        .filter(i => qcStatusSearch !== 'ALL' ? (i.qc_status || 'QUARANTINED') === qcStatusSearch : true)
                         .sort((a, b) => {
                           if (qcControlNoSort) {
                             const ca = a.control_no || '';
