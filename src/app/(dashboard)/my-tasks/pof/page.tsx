@@ -7,7 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, PackageOpen, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Package, Wind, AlertTriangle, ArrowDownToLine, Boxes } from 'lucide-react'
+import { Loader2, PackageOpen, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Package, Wind, AlertTriangle, ArrowDownToLine, Boxes, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -33,7 +33,25 @@ export default function PofTasksPage() {
   const [historyList, setHistoryList] = useState<any[]>([])
   const [qtyDialog, setQtyDialog] = useState<{open: boolean, taskId: string, tankNum: number, task: any, qty: string, boxLot: string, nextStatus: string, maxCartons?: number}>({open: false, taskId: '', tankNum: 0, task: null, qty: '', boxLot: '', nextStatus: ''})
   
-    const [isDefectModalOpen, setIsDefectModalOpen] = useState(false)
+  const [batchDialog, setBatchDialog] = useState<{
+    open: boolean
+    taskId: string
+    task: any
+    startTank: number
+    endTank: number
+    totalCartons: string
+    boxLot: string
+  }>({
+    open: false,
+    taskId: '',
+    task: null,
+    startTank: 1,
+    endTank: 1,
+    totalCartons: '',
+    boxLot: ''
+  })
+  
+  const [isDefectModalOpen, setIsDefectModalOpen] = useState(false)
   const [defectLotId, setDefectLotId] = useState('')
   const [defectQuantity, setDefectQuantity] = useState('')
   const [defectNote, setDefectNote] = useState('')
@@ -340,6 +358,169 @@ export default function PofTasksPage() {
     setQtyDialog(prev => ({ ...prev, open: false }))
   }
 
+  const openBatchDialog = (task: any) => {
+    const total = task.production_lots?.total_tanks || 0
+    const start = parseInt(task.tank_start) || 1
+    const end = parseInt(task.tank_end) || total
+    const details = typeof task.tank_details === 'object' && task.tank_details !== null ? task.tank_details : {}
+
+    // Find first tank not done
+    let firstIncomplete = start
+    for (let i = start; i <= end; i++) {
+      const s = details[i]?.status || details[i] || 'WAITING'
+      if (s !== 'DONE') {
+        firstIncomplete = i
+        break
+      }
+    }
+
+    // Default boxLot from task or existing completed tanks
+    let existingBoxLot = ''
+    for (let i = 1; i <= total; i++) {
+      if (details[i]?.box_lot) {
+        existingBoxLot = details[i].box_lot
+        break
+      }
+    }
+    if (!existingBoxLot && task.production_lots?.lot_no) {
+      existingBoxLot = `Lot.${task.production_lots.lot_no}`
+    }
+
+    // Calculate standard cartons for remaining tanks
+    const kgPerTank = task.production_lots?.kg_per_tank || 0
+    const gPerPiece = task.production_lots?.g_per_piece || 1
+    const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
+    const stdYieldPieces = Math.round((kgPerTank * 1000) / gPerPiece)
+    const stdCartonsPerTank = pcsPerCarton > 0 ? (stdYieldPieces / pcsPerCarton) : 14.5
+    const numRemaining = Math.max(1, end - firstIncomplete + 1)
+    const suggestedTotalCartons = Math.round(stdCartonsPerTank * numRemaining)
+
+    setBatchDialog({
+      open: true,
+      taskId: task.id,
+      task,
+      startTank: firstIncomplete,
+      endTank: end,
+      totalCartons: suggestedTotalCartons > 0 ? String(suggestedTotalCartons) : '',
+      boxLot: existingBoxLot
+    })
+  }
+
+  const handleBatchConfirm = async () => {
+    const { taskId, task, startTank, endTank, totalCartons, boxLot } = batchDialog
+    const totalC = parseInt(totalCartons)
+    if (!totalCartons || isNaN(totalC) || totalC <= 0) {
+      toast.error('กรุณาระบุจำนวนลังรวมที่ถูกต้อง')
+      return
+    }
+    if (!boxLot || boxLot.trim() === '') {
+      toast.error('กรุณาระบุข้อมูลกล่องพิมพ์ล็อต (เช่น Lot.010/26)')
+      return
+    }
+    if (startTank > endTank) {
+      toast.error('ช่วงถังเริ่มต้นต้องไม่เกินถังสุดท้าย')
+      return
+    }
+
+    const numTanks = endTank - startTank + 1
+    const base = Math.floor(totalC / numTanks)
+    const rem = totalC % numTanks
+
+    let details = typeof task.tank_details === 'object' && task.tank_details !== null ? { ...task.tank_details } : {}
+
+    for (let i = 0; i < numTanks; i++) {
+      const t = startTank + i
+      const c = base + (i >= (numTanks - rem) ? 1 : 0)
+      const prevDetails = typeof details[t] === 'object' && details[t] !== null ? details[t] : {}
+      
+      details[t] = {
+        ...prevDetails,
+        status: 'DONE',
+        cartons: c,
+        box_lot: boxLot
+      }
+
+      const history = details[`${t}_history`] || []
+      details[`${t}_history`] = [
+        ...history,
+        {
+          status: 'DONE',
+          cartons: c,
+          box_lot: boxLot,
+          timestamp: new Date().toISOString(),
+          user: currentUser,
+          note: `บันทึกรวบยอด (${totalC} ลัง / ${numTanks} ถัง)`
+        }
+      ]
+    }
+
+    const total = task.production_lots?.total_tanks || 0
+    const taskStart = parseInt(task.tank_start) || 1
+    const taskEnd = parseInt(task.tank_end) || total
+    
+    let allDone = true
+    for (let i = taskStart; i <= taskEnd; i++) {
+      const s = details[i]?.status || details[i] || 'WAITING'
+      if (s !== 'DONE') {
+        allDone = false
+        break
+      }
+    }
+
+    const updates: any = { tank_details: details }
+    if (allDone) {
+      updates.status = 'DONE'
+      updates.end_time = new Date().toISOString()
+    } else {
+      updates.status = 'IN_PROGRESS'
+    }
+
+    const { error } = await supabase
+      .from('production_logs')
+      .update(updates)
+      .eq('id', taskId)
+
+    if (error) {
+      toast.error('บันทึกรวบยอดไม่สำเร็จ')
+      console.error(error)
+    } else {
+      toast.success(`🎉 บันทึกรวบยอด ${totalC} ลัง (ตัดถังที่ ${startTank}-${endTank}) เรียบร้อยแล้ว!`)
+      setBatchDialog(prev => ({ ...prev, open: false }))
+
+      // Auto Hand-off to FG
+      const { data: fgProcess } = await supabase.from('processes').select('id').or('process_name.ilike.%FG%,process_name.ilike.%คลัง%').limit(1).single()
+      if (fgProcess) {
+        const fgDetails: any = {}
+        for (let i = startTank; i <= endTank; i++) {
+          fgDetails[i] = {
+            status: 'WAITING',
+            box_lot: boxLot,
+            cartons: details[i]?.cartons || 0
+          }
+        }
+        fgDetails.delivery_info = {
+          sender: currentUser,
+          timestamp: new Date().toISOString(),
+          note: `ส่งมอบรวบยอด ${totalC} ลัง (ถัง ${startTank}-${endTank})`
+        }
+
+        await supabase.from('production_logs').insert({
+          production_lot_id: task.production_lot_id,
+          process_id: fgProcess.id,
+          status: 'WAITING',
+          activity_date: new Date().toISOString().split('T')[0],
+          tank_start: String(startTank),
+          tank_end: String(endTank),
+          tank_details: fgDetails,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+      }
+
+      fetchPofTasks()
+    }
+  }
+
   const executeTankUpdate = async (taskId: string, currentTank: number, task: any, nextStatus: string, qty: number, boxLot: string) => {
     let details = typeof task.tank_details === 'object' && task.tank_details !== null ? { ...task.tank_details } : {}
 
@@ -468,13 +649,23 @@ export default function PofTasksPage() {
 
           </div>
           
-          <div className="flex gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(task.status === 'WAITING' || task.status === 'PLANNED' || !task.status) && (
-              <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-orange-600 hover:bg-orange-700">
-                <ArrowDownToLine className="w-4 h-4 mr-2" /> เริ่มลงลัง
+              <Button size="sm" onClick={() => updateTaskStatus(task.id, 'IN_PROGRESS')} className="bg-orange-600 hover:bg-orange-700 text-white shadow-xs">
+                <ArrowDownToLine className="w-4 h-4 mr-1.5" /> เริ่มลงลัง
               </Button>
             )}
 
+            {task.status !== 'DONE' && (
+              <Button
+                size="sm"
+                onClick={() => openBatchDialog(task)}
+                className="bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold shadow-md flex items-center gap-1.5 transition-all hover:scale-105 active:scale-95"
+              >
+                <Boxes className="w-4 h-4" />
+                ⚡ บันทึกรวบยอด (Auto Batch)
+              </Button>
+            )}
           </div>
         </div>
 
@@ -972,6 +1163,179 @@ export default function PofTasksPage() {
             <Button variant="outline" onClick={() => setQtyDialog(prev => ({ ...prev, open: false }))}>ยกเลิก</Button>
             <Button onClick={handleQtyConfirm} className="bg-orange-600 hover:bg-orange-700 text-white">ยืนยัน</Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog for Batch Multi-Tank Cartoning Auto-Allocation */}
+      <Dialog open={batchDialog.open} onOpenChange={(open) => !open && setBatchDialog(prev => ({ ...prev, open: false }))}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg font-bold text-[#4A4238]">
+              <Boxes className="w-6 h-6 text-amber-500" />
+              บันทึกรวบยอดลงลัง & ตัดถังอัตโนมัติ (Batch Auto-Allocation)
+            </DialogTitle>
+          </DialogHeader>
+
+          {batchDialog.task && (() => {
+            const task = batchDialog.task
+            const lotNo = task.production_lots?.lot_no || ''
+            const sku = task.production_lots?.products?.sku || ''
+            const pcsPerCarton = task.production_lots?.pcs_per_carton || 1
+            const startT = Number(batchDialog.startTank) || 1
+            const endT = Number(batchDialog.endTank) || startT
+            const numTanks = Math.max(1, endT - startT + 1)
+            const totalC = parseInt(batchDialog.totalCartons) || 0
+            const totalPieces = totalC * pcsPerCarton
+
+            // Compute continuous carton run number
+            let cartonsBefore = 0
+            const sameLotTasks = tasks.filter((x: any) => x.production_lot_id === task.production_lot_id)
+            for (let i = 1; i < startT; i++) {
+              const taskForTank = sameLotTasks.find((x: any) => {
+                if (i >= parseInt(x.tank_start) && i <= parseInt(x.tank_end)) {
+                  const d = typeof x.tank_details === 'object' && x.tank_details !== null ? (x.tank_details as any) : {}
+                  return d[i] && d[i].cartons !== undefined
+                }
+                return false
+              })
+              if (taskForTank) {
+                const d = taskForTank.tank_details as any
+                cartonsBefore += Number(d[i].cartons) || 0
+              }
+            }
+
+            // Allocation simulation
+            const base = Math.floor(totalC / numTanks)
+            const rem = totalC % numTanks
+            let currentStart = cartonsBefore + 1
+
+            const previewList = []
+            for (let i = 0; i < numTanks; i++) {
+              const t = startT + i
+              const c = base + (i >= (numTanks - rem) ? 1 : 0)
+              const sC = currentStart
+              const eC = currentStart + c - 1
+              currentStart = eC + 1
+              previewList.push({
+                tankNum: t,
+                cartons: c,
+                range: c > 0 ? `ลังที่ ${sC} - ${eC}` : '-'
+              })
+            }
+
+            return (
+              <div className="py-2 space-y-4 text-xs">
+                {/* Lot info banner */}
+                <div className="p-3 rounded-xl bg-amber-50/70 border border-amber-200/80 flex justify-between items-center">
+                  <div>
+                    <div className="font-extrabold text-amber-900 text-sm">
+                      LOT {lotNo} ({sku})
+                    </div>
+                    <div className="text-[11px] text-amber-700">
+                      {task.production_lots?.products?.product_name || 'งานลงลังต่อเนื่อง'}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[10px] text-amber-600 font-medium">บรรจุต่อลัง</span>
+                    <div className="font-bold text-amber-900">{pcsPerCarton} ชิ้น/ลัง</div>
+                  </div>
+                </div>
+
+                {/* Range of tanks input */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">ตั้งแต่ถังที่</label>
+                    <Input
+                      type="number"
+                      value={batchDialog.startTank}
+                      min={parseInt(task.tank_start) || 1}
+                      max={parseInt(task.tank_end) || 200}
+                      onChange={(e) => setBatchDialog(prev => ({ ...prev, startTank: parseInt(e.target.value) || 1 }))}
+                      className="font-bold text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">ถึงถังที่</label>
+                    <Input
+                      type="number"
+                      value={batchDialog.endTank}
+                      min={batchDialog.startTank}
+                      max={parseInt(task.tank_end) || 200}
+                      onChange={(e) => setBatchDialog(prev => ({ ...prev, endTank: parseInt(e.target.value) || 1 }))}
+                      className="font-bold text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Total Cartons and Box Lot */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                      <span>ยอดลงลังจริงรวม (ลัง) <span className="text-red-500">*</span></span>
+                      <span className="text-[10px] text-amber-600 font-normal">({numTanks} ถัง)</span>
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="เช่น 100"
+                      value={batchDialog.totalCartons}
+                      onChange={(e) => setBatchDialog(prev => ({ ...prev, totalCartons: e.target.value }))}
+                      className="font-black text-base text-[#D4AF37]"
+                      autoFocus
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-bold text-slate-700">
+                      กล่องพิมพ์ล็อต (Box Lot No.) <span className="text-red-500">*</span>
+                    </label>
+                    <Input
+                      value={batchDialog.boxLot}
+                      onChange={(e) => setBatchDialog(prev => ({ ...prev, boxLot: e.target.value }))}
+                      placeholder="เช่น Lot.010/26"
+                      className="font-bold text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Live Preview Table of Auto Allocation */}
+                {totalC > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <div className="flex justify-between items-center font-bold text-slate-700">
+                      <span className="flex items-center gap-1.5 text-xs text-emerald-700 font-bold">
+                        <Sparkles className="w-3.5 h-3.5" /> จำลองการตัดยอดลงแต่ละถังอัตโนมัติ:
+                      </span>
+                      <span className="text-xs text-slate-600 font-bold">
+                        รวม {totalC.toLocaleString()} ลัง ({totalPieces.toLocaleString()} ชิ้น)
+                      </span>
+                    </div>
+
+                    <div className="max-h-44 overflow-y-auto border border-slate-200 rounded-xl divide-y divide-slate-100 bg-slate-50/50">
+                      {previewList.map((p) => (
+                        <div key={p.tankNum} className="p-2 flex justify-between items-center text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                            <strong className="text-slate-800 font-bold">ถังที่ {p.tankNum}</strong>
+                            <span className="text-slate-400 text-[10px]">({p.range})</span>
+                          </div>
+                          <span className="font-extrabold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
+                            {p.cartons} ลัง
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )
+          })()}
+
+          <DialogFooter className="mt-4 gap-2">
+            <Button variant="outline" onClick={() => setBatchDialog(prev => ({ ...prev, open: false }))}>
+              ยกเลิก
+            </Button>
+            <Button onClick={handleBatchConfirm} className="bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold">
+              ยืนยันบันทึกรวบยอด
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
           {/* Defect Modal */}
