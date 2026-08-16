@@ -141,12 +141,12 @@ export default function QCQueuePage() {
     // Create issue if rejected or hold
     if (rmStatusAction === 'REJECTED' || rmStatusAction === 'HOLD') {
       const issueType = rmStatusAction === 'HOLD' ? '[QC HOLD]' : '[QC REJECT]'
-      const isPM = activeRm.rm_code?.toLowerCase().startsWith('p')
+      const isPM = activeRm.rm_code?.toLowerCase().startsWith('p') || activeRm.rm_code?.startsWith('CMD1') || activeRm.rm_code?.startsWith('CMD2')
       const note = `${issueType} ${isPM ? 'PM' : 'RM'} [${activeRm.rm_code} - ${activeRm.rm_name}]: ${reasonText}`
       
       const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
       if (qcProc) {
-        await supabase.from('production_logs').insert({
+        const { error: insertError } = await supabase.from('production_logs').insert({
           activity_date: new Date().toISOString().split('T')[0],
           production_lot_id: activeRm.production_lot_id || null,
           process_id: qcProc.id,
@@ -154,10 +154,15 @@ export default function QCQueuePage() {
           note: note,
           tank_details: {}
         })
+        if (insertError) {
+          toast.error('เกิดข้อผิดพลาดในการส่งเรื่องให้ QA: ' + insertError.message)
+          console.error('Insert log error:', insertError)
+        }
       }
     }
     
-    toast.success(`อัปเดตสถานะ QC ของ RM เรียบร้อย`)
+    const finalIsPM = activeRm.rm_code?.toLowerCase().startsWith('p') || activeRm.rm_code?.startsWith('CMD1') || activeRm.rm_code?.startsWith('CMD2')
+    toast.success(`อัปเดตสถานะ QC ของ ${finalIsPM ? 'PM' : 'RM'} เรียบร้อย`)
     setIsRmStatusDialogOpen(false)
     fetchRmTasks()
     fetchRmTodayHistory()
