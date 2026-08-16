@@ -141,7 +141,8 @@ export default function QCQueuePage() {
     // Create issue if rejected or hold
     if (rmStatusAction === 'REJECTED' || rmStatusAction === 'HOLD') {
       const issueType = rmStatusAction === 'HOLD' ? '[QC HOLD]' : '[QC REJECT]'
-      const note = `${issueType} RM/PM [${activeRm.rm_code} - ${activeRm.rm_name}]: ${reasonText}`
+      const isPM = activeRm.rm_code?.toLowerCase().startsWith('p')
+      const note = `${issueType} ${isPM ? 'PM' : 'RM'} [${activeRm.rm_code} - ${activeRm.rm_name}]: ${reasonText}`
       
       const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
       if (qcProc) {

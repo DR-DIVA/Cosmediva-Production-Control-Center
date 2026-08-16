@@ -363,7 +363,15 @@ export default function IssuesPage() {
                         <TableCell className="whitespace-nowrap">
                           <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-sm font-semibold whitespace-nowrap">
-                              {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                              {(() => {
+                                const note = issue.parsedNote || ''
+                                if (note.includes(' RM ') || note.includes(' RM/PM ')) return 'QC RM'
+                                if (note.includes(' PM ')) return 'QC PM'
+                                if (note.includes(' FG ')) return 'QC FG'
+                                if (note.includes(' ถัง ')) return 'QC Bulk'
+                                if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
+                                return issue.processes?.process_name
+                              })()}
                             </span>
                             {issue.rooms?.room_name && <span className="text-xs text-slate-500 whitespace-nowrap">({issue.rooms.room_name})</span>}
                           </div>
@@ -444,7 +452,15 @@ export default function IssuesPage() {
                         <TableCell className="whitespace-nowrap">
                           <div className="flex items-center gap-2 whitespace-nowrap">
                             <span className="text-sm font-semibold whitespace-nowrap">
-                              {issue.processes?.process_name === 'รอ QC' ? 'QC Bulk' : issue.processes?.process_name}
+                              {(() => {
+                                const note = issue.parsedNote || ''
+                                if (note.includes(' RM ') || note.includes(' RM/PM ')) return 'QC RM'
+                                if (note.includes(' PM ')) return 'QC PM'
+                                if (note.includes(' FG ')) return 'QC FG'
+                                if (note.includes(' ถัง ')) return 'QC Bulk'
+                                if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
+                                return issue.processes?.process_name
+                              })()}
                             </span>
                           </div>
                         </TableCell>
