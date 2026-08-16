@@ -18,7 +18,7 @@ import * as XLSX from 'xlsx'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 
@@ -55,18 +55,28 @@ export default function QCQueuePage() {
   const [statusAction, setStatusAction] = useState<'QC_PASS' | 'PAUSED' | 'FAILED' | 'REPROCESS' | null>(null)
   const [reasonText, setReasonText] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+  const [userRole, setUserRole] = useState('user')
+
+  // --- Sorting & Filtering State ---
+  const [dateSort, setDateSort] = useState<'asc' | 'desc' | null>(null)
+  const [controlNoSort, setControlNoSort] = useState<'asc' | 'desc' | null>(null)
+  const [poSearch, setPoSearch] = useState('')
+  const [codeSearch, setCodeSearch] = useState('')
 
   const supabase = createClient()
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.email) {
+      if (data?.user) {
+        setUserRole(data.user.user_metadata?.role || 'user');
         const email = data.user.email;
-        // Extract Employee ID if using the dummy domain
-        if (email.endsWith('@cosmediva.local')) {
-          setCurrentUser(email.split('@')[0]);
-        } else {
-          setCurrentUser(email);
+        if (email) {
+          // Extract Employee ID if using the dummy domain
+          if (email.endsWith('@cosmediva.local')) {
+            setCurrentUser(email.split('@')[0]);
+          } else {
+            setCurrentUser(email);
+          }
         }
       }
     })
@@ -233,6 +243,10 @@ export default function QCQueuePage() {
   }
 
   const handleTankClick = (task: any, tankNum: number, currentStatus: string) => {
+    if (userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) {
+      toast.error('สิทธิ์ของคุณไม่สามารถแก้ไขสถานะ QC ได้');
+      return;
+    }
     if (currentStatus === 'LOCKED' || !currentStatus) return
     if (currentStatus === 'FAILED') {
       toast.error('ถังที่ถูก REJECT จะไม่สามารถแก้ไขได้อีก')
@@ -635,11 +649,39 @@ export default function QCQueuePage() {
                     <thead className="bg-slate-100 text-slate-700">
                       <tr>
                         <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
-                        <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
-                        <th className="px-4 py-3 font-medium text-purple-700">Control No.</th>
-                        <th className="px-4 py-3 font-medium w-72">รหัส / ชื่อวัตถุดิบ</th>
+                        <th className="px-4 py-3 font-medium cursor-pointer hover:text-purple-700" onClick={() => {
+                          if (dateSort === 'asc') setDateSort('desc');
+                          else if (dateSort === 'desc') setDateSort(null);
+                          else { setDateSort('asc'); setControlNoSort(null); }
+                        }}>
+                          <div className="flex items-center space-x-1">
+                            <span>วันที่รับเข้า</span>
+                            {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 font-medium text-purple-700 cursor-pointer hover:text-purple-900" onClick={() => {
+                          if (controlNoSort === 'asc') setControlNoSort('desc');
+                          else if (controlNoSort === 'desc') setControlNoSort(null);
+                          else { setControlNoSort('asc'); setDateSort(null); }
+                        }}>
+                          <div className="flex items-center space-x-1">
+                            <span>Control No.</span>
+                            {controlNoSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : controlNoSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                          </div>
+                        </th>
+                        <th className="px-4 py-3 font-medium w-72">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>รหัส / ชื่อวัตถุดิบ</span>
+                            <input type="text" placeholder="ค้นหารหัส..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={codeSearch} onChange={(e) => setCodeSearch(e.target.value)} />
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium">จำนวน</th>
-                        <th className="px-4 py-3 font-medium">PO No.</th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>PO No.</span>
+                            <input type="text" placeholder="ค้นหา PO..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={poSearch} onChange={(e) => setPoSearch(e.target.value)} />
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium">สถานะ QC</th>
                         <th className="px-4 py-3 font-medium text-right">จัดการ</th>
                       </tr>
@@ -649,7 +691,23 @@ export default function QCQueuePage() {
                         const term = searchQuery.toLowerCase()
                         const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
                         return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && !isPM
-                      }).map((item) => (
+                      })
+                      .filter(item => poSearch ? (item.po_no || '').toLowerCase().includes(poSearch.toLowerCase()) : true)
+                      .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
+                      .sort((a, b) => {
+                        if (controlNoSort) {
+                          const ca = a.control_no || '';
+                          const cb = b.control_no || '';
+                          return controlNoSort === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
+                        }
+                        if (dateSort) {
+                          const ta = new Date(a.receive_date || 0).getTime();
+                          const tb = new Date(b.receive_date || 0).getTime();
+                          return dateSort === 'asc' ? ta - tb : tb - ta;
+                        }
+                        return 0; // maintain original order if no sort is active
+                      })
+                      .map((item) => (
                         <tr key={item.id} className="hover:bg-[#F8F6F0]">
                           <td className="px-4 py-3">
                             <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
@@ -680,7 +738,7 @@ export default function QCQueuePage() {
                           </td>
                           <td className="px-4 py-3 text-right">
                             <DropdownMenu>
-                              <DropdownMenuTrigger className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                              <DropdownMenuTrigger disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
                                 อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
@@ -823,9 +881,32 @@ export default function QCQueuePage() {
                           <tr>
                             <th className="px-4 py-3 font-medium">ประเภท</th>
                             <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
-                            <th className="px-4 py-3 font-medium">วันที่รับเข้า</th>
-                            <th className="px-4 py-3 font-medium text-purple-700">Control No.</th>
-                            <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
+                            <th className="px-4 py-3 font-medium cursor-pointer hover:text-purple-700" onClick={() => {
+                              if (dateSort === 'asc') setDateSort('desc');
+                              else if (dateSort === 'desc') setDateSort(null);
+                              else { setDateSort('asc'); setControlNoSort(null); }
+                            }}>
+                              <div className="flex items-center space-x-1">
+                                <span>วันที่รับเข้า</span>
+                                {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 font-medium text-purple-700 cursor-pointer hover:text-purple-900" onClick={() => {
+                              if (controlNoSort === 'asc') setControlNoSort('desc');
+                              else if (controlNoSort === 'desc') setControlNoSort(null);
+                              else { setControlNoSort('asc'); setDateSort(null); }
+                            }}>
+                              <div className="flex items-center space-x-1">
+                                <span>Control No.</span>
+                                {controlNoSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : controlNoSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                              </div>
+                            </th>
+                            <th className="px-4 py-3 font-medium w-72">
+                              <div className="flex flex-col space-y-1 mt-1 mb-1">
+                                <span>รหัส / ชื่อบรรจุภัณฑ์</span>
+                                <input type="text" placeholder="ค้นหารหัส..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={codeSearch} onChange={(e) => setCodeSearch(e.target.value)} />
+                              </div>
+                            </th>
                             <th className="px-4 py-3 font-medium">จำนวน</th>
                             <th className="px-4 py-3 font-medium">สถานะ QC</th>
                             <th className="px-4 py-3 font-medium text-right">จัดการ</th>
@@ -836,7 +917,22 @@ export default function QCQueuePage() {
                             const term = searchQuery.toLowerCase()
                             const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
                             return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && isPM
-                          }).map((item) => (
+                          })
+                          .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
+                          .sort((a, b) => {
+                            if (controlNoSort) {
+                              const ca = a.control_no || '';
+                              const cb = b.control_no || '';
+                              return controlNoSort === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
+                            }
+                            if (dateSort) {
+                              const ta = new Date(a.receive_date || 0).getTime();
+                              const tb = new Date(b.receive_date || 0).getTime();
+                              return dateSort === 'asc' ? ta - tb : tb - ta;
+                            }
+                            return 0;
+                          })
+                          .map((item) => (
                             <tr key={item.id} className="hover:bg-[#F8F6F0]">
                               <td className="px-4 py-3">
                                 {item.rm_code?.startsWith('CMD2') ? (
@@ -873,7 +969,7 @@ export default function QCQueuePage() {
                               </td>
                               <td className="px-4 py-3 text-right">
                                 <DropdownMenu>
-                                  <DropdownMenuTrigger className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3">
+                                  <DropdownMenuTrigger disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')} className="inline-flex items-center justify-center  rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-9 px-3 disabled:opacity-50 disabled:pointer-events-none">
                                     อัปเดตสถานะ <ChevronDown className="w-4 h-4 ml-2" />
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
@@ -989,12 +1085,26 @@ export default function QCQueuePage() {
                   <table className="w-full text-sm text-left table-fixed">
                     <thead className="bg-[#F8F6F0] text-[#8B7355] border-b border-[#D4AF37]/20">
                       <tr>
-                        <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>สินค้า / SKU</span>
+                            <input type="text" placeholder="ค้นหา SKU..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={codeSearch} onChange={(e) => setCodeSearch(e.target.value)} />
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
                         <th className="px-4 py-3 font-medium">ถังที่ (ตามแผน)</th>
                         <th className="px-4 py-3 font-medium">จำนวนถัง (รวม)</th>
                         <th className="px-4 py-3 font-medium">Bulk size (kg/ถัง)</th>
-                        <th className="px-4 py-3 font-medium">วันที่จัดทำ (แผน)</th>
+                        <th className="px-4 py-3 font-medium cursor-pointer hover:text-purple-700" onClick={() => {
+                          if (dateSort === 'asc') setDateSort('desc');
+                          else if (dateSort === 'desc') setDateSort(null);
+                          else { setDateSort('asc'); }
+                        }}>
+                          <div className="flex items-center space-x-1">
+                            <span>วันที่จัดทำ (แผน)</span>
+                            {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium">สถานะ QC</th>
                       </tr>
                     </thead>
@@ -1004,7 +1114,21 @@ export default function QCQueuePage() {
                         const sku = (task.production_lots?.products?.sku || '').toLowerCase()
                         const lotNo = (task.production_lots?.lot_no || '').toLowerCase()
                         return sku.includes(term) || lotNo.includes(term)
-                      }).map(task => {
+                      })
+                      .filter(task => {
+                        if (!codeSearch) return true;
+                        const sku = (task.production_lots?.products?.sku || '').toLowerCase()
+                        return sku.includes(codeSearch.toLowerCase())
+                      })
+                      .sort((a, b) => {
+                        if (dateSort) {
+                          const ta = new Date(a.activity_date || 0).getTime();
+                          const tb = new Date(b.activity_date || 0).getTime();
+                          return dateSort === 'asc' ? ta - tb : tb - ta;
+                        }
+                        return 0;
+                      })
+                      .map(task => {
                         const isExpanded = expandedTasks.includes(task.id)
                         const lotNo = task.production_lots?.lot_no || '-'
                         const sku = task.production_lots?.products?.sku || '-'
@@ -1267,11 +1391,25 @@ export default function QCQueuePage() {
                   <table className="w-full text-sm text-left table-fixed">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
+                        <th className="px-4 py-3 font-medium">
+                          <div className="flex flex-col space-y-1 mt-1 mb-1">
+                            <span>สินค้า / SKU</span>
+                            <input type="text" placeholder="ค้นหา SKU..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={codeSearch} onChange={(e) => setCodeSearch(e.target.value)} />
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium">LOT No.</th>
                         <th className="px-4 py-3 font-medium">Box Lot</th>
                         <th className="px-4 py-3 font-medium">จำนวน (ชิ้น)</th>
-                        <th className="px-4 py-3 font-medium">เวลาที่รับเข้า</th>
+                        <th className="px-4 py-3 font-medium cursor-pointer hover:text-purple-700" onClick={() => {
+                          if (dateSort === 'asc') setDateSort('desc');
+                          else if (dateSort === 'desc') setDateSort(null);
+                          else { setDateSort('asc'); }
+                        }}>
+                          <div className="flex items-center space-x-1">
+                            <span>เวลาที่รับเข้า</span>
+                            {dateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : dateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                          </div>
+                        </th>
                         <th className="px-4 py-3 font-medium text-right">ดำเนินการ (QC)</th>
                       </tr>
                     </thead>
@@ -1281,7 +1419,21 @@ export default function QCQueuePage() {
                         const sku = (item.products?.sku || '').toLowerCase()
                         const lotNo = (item.lot_no || '').toLowerCase()
                         return sku.includes(term) || lotNo.includes(term)
-                      }).map((item) => (
+                      })
+                      .filter(item => {
+                        if (!codeSearch) return true;
+                        const sku = (item.products?.sku || '').toLowerCase()
+                        return sku.includes(codeSearch.toLowerCase())
+                      })
+                      .sort((a, b) => {
+                        if (dateSort) {
+                          const ta = new Date(a.created_at || 0).getTime();
+                          const tb = new Date(b.created_at || 0).getTime();
+                          return dateSort === 'asc' ? ta - tb : tb - ta;
+                        }
+                        return 0;
+                      })
+                      .map((item) => (
                         <tr key={item.id} className="hover:bg-[#F8F6F0]">
                           <td className="px-4 py-3 font-medium text-[#D4AF37]">
                             {item.products?.sku}
@@ -1300,7 +1452,7 @@ export default function QCQueuePage() {
                             {new Date(item.created_at).toLocaleString('th-TH')}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <Button size="sm" variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700" onClick={() => {
+                            <Button disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')} size="sm" variant="outline" className="bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100 hover:text-amber-700 disabled:opacity-50" onClick={() => {
                               setActiveFg(item)
                               setStatusAction(null)
                               setReasonText('')
