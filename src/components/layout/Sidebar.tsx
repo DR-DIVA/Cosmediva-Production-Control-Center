@@ -53,7 +53,7 @@ const routes = [
     icon: FileText,
     href: '/incoming-rm',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx', 'purchase', 'qc']
+    allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx', 'purchase', 'qc', 'qa']
   },
   {
     label: 'CosmeFlow Production',
@@ -61,13 +61,13 @@ const routes = [
     icon: CheckSquare,
     href: '/my-tasks', // Used as base route for expansion
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'planner', 'production_mx', 'production_pk', 'warehouse_mmrm_bu'],
+    allowedRoles: ['admin', 'planner', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'qa', 'qc'],
     subRoutes: [
-      { label: 'ภาพรวม (Overview)', href: '/my-tasks/overview', allowedRoles: ['admin', 'planner'] },
-      { label: 'ชั่งสาร (Weighing)', href: '/my-tasks/weighing', allowedRoles: ['admin', 'production_mx', 'warehouse_mmrm_bu'] },
-      { label: 'งานผสม (Mixing)', href: '/my-tasks/mixing', allowedRoles: ['admin', 'production_mx'] },
-      { label: 'งานบรรจุ (Packing)', href: '/my-tasks/packing', allowedRoles: ['admin', 'production_pk'] },
-      { label: 'งานลงลัง (Cartoning/POF)', href: '/my-tasks/pof', allowedRoles: ['admin', 'production_pk'] }
+      { label: 'ภาพรวม (Overview)', href: '/my-tasks/overview', allowedRoles: ['admin', 'planner', 'qa', 'qc'] },
+      { label: 'ชั่งสาร (Weighing)', href: '/my-tasks/weighing', allowedRoles: ['admin', 'production_mx', 'warehouse_mmrm_bu', 'qa', 'qc'] },
+      { label: 'งานผสม (Mixing)', href: '/my-tasks/mixing', allowedRoles: ['admin', 'production_mx', 'qa', 'qc'] },
+      { label: 'งานบรรจุ (Packing)', href: '/my-tasks/packing', allowedRoles: ['admin', 'production_pk', 'qa', 'qc'] },
+      { label: 'งานลงลัง (Cartoning/POF)', href: '/my-tasks/pof', allowedRoles: ['admin', 'production_pk', 'qa', 'qc'] }
     ]
   },
   {
@@ -84,7 +84,7 @@ const routes = [
     icon: AlertTriangle,
     href: '/issues',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'qa']
+    allowedRoles: ['admin', 'qa', 'qc']
   },
   {
     label: 'CosmeFlow FG Warehouse',
