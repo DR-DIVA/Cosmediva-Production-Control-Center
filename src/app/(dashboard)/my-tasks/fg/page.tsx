@@ -7,7 +7,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Loader2, Boxes, ChevronDown, ChevronRight, Clock, Archive, List as ListIcon, Calendar as CalendarIcon, User, Package, Send, PackageOpen, Warehouse } from 'lucide-react'
+import { 
+  Loader2, Boxes, ChevronDown, ChevronRight, Clock, Archive, List as ListIcon, 
+  Calendar as CalendarIcon, User, Package, Send, PackageOpen, Warehouse,
+  TrendingUp, ShieldCheck, ShieldAlert, CheckCircle2, AlertCircle, RefreshCw,
+  Layers, Sparkles, Filter, ArrowDownToLine, Check, PackageCheck, Truck,
+  Grid, CheckSquare, Layers3
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { differenceInDays, startOfDay } from 'date-fns'
@@ -29,6 +35,9 @@ export default function FgTasksPage() {
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [filterDate, setFilterDate] = useState<string>('')
+  
+  const [activeTab, setActiveTab] = useState<string>('inbound')
+  const [inventoryQcFilter, setInventoryQcFilter] = useState<'ALL' | 'RELEASED' | 'QUARANTINE' | 'REJECTED'>('ALL')
   
   // Receive Dialog State
   const [receiveDialog, setReceiveDialog] = useState<{ 
@@ -460,42 +469,391 @@ export default function FgTasksPage() {
     )
   }
 
+  // Executive Finished Goods KPI Calculations
+  const totalStockPcs = inventory.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
+  const totalStockCartons = inventory.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
+  const uniqueSkus = new Set(inventory.map(i => i.products?.sku || i.sku_id)).size
+
+  const releasedItems = inventory.filter(i => i.qc_status === 'RELEASED')
+  const releasedPcs = releasedItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
+  const releasedCartons = releasedItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
+  const releasedPct = totalStockPcs > 0 ? ((releasedPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
+
+  const quaranItems = inventory.filter(i => i.qc_status === 'QUARANTINE')
+  const quaranPcs = quaranItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
+  const quaranCartons = quaranItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
+  const quaranPct = totalStockPcs > 0 ? ((quaranPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
+
+  const rejectedItems = inventory.filter(i => i.qc_status === 'REJECTED')
+  const rejectedPcs = rejectedItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
+  const rejectedCartons = rejectedItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
+  const rejectedPct = totalStockPcs > 0 ? ((rejectedPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
+
+  // Inbound stats
+  const pendingInboundTasks = tasks.filter(t => t.status !== 'DONE')
+  const completedInboundTasks = tasks.filter(t => t.status === 'DONE')
+  const totalInboundTasks = tasks.length
+  const inboundFulfillmentPct = totalInboundTasks > 0 ? ((completedInboundTasks.length / totalInboundTasks) * 100).toFixed(1) : '100.0'
+
+  // Storage utilization
+  const occupiedLocIds = new Set(inventory.map(i => i.location_id).filter(Boolean))
+  const totalLocCount = locations.length || 1
+  const storageUtilizationPct = ((occupiedLocIds.size / totalLocCount) * 100).toFixed(0)
+
+  const handleRefreshAll = () => {
+    fetchFgTasks()
+    fetchInventory()
+    fetchLocations()
+    toast.success('รีเฟรชข้อมูลคลัง FG ล่าสุดเรียบร้อย')
+  }
+
+  const filteredInventory = inventory.filter(item => {
+    const term = searchQuery.toLowerCase()
+    const sku = (item.products?.sku || '').toLowerCase()
+    const lotNo = (item.lot_no || '').toLowerCase()
+    const matchesSearch = !term || sku.includes(term) || lotNo.includes(term)
+    if (!matchesSearch) return false
+
+    if (inventoryQcFilter === 'ALL') return true
+    return item.qc_status === inventoryQcFilter
+  })
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-6">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
-            <Warehouse className="w-8 h-8 text-yellow-400 shrink-0" />
+            <Warehouse className="w-8 h-8 text-yellow-500 shrink-0" />
             CosmeFlow FG Warehouse
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
-             <div>จัดการรับเข้า, สต๊อกคงเหลือ และเบิกจ่ายสินค้า FG แบบเต็มรูปแบบ</div>
-             <div className="flex items-center mt-1 text-[#8B7355] font-medium">
+            <div>จัดการรับเข้า, สต๊อกคงเหลือ และเบิกจ่ายสินค้า FG แบบเต็มรูปแบบ</div>
+            <div className="flex items-center mt-1 text-[#8B7355] font-medium">
               <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
               Every Item. Every Movement. Fully Visible.
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-4">
-          <div className="w-64">
+        <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center w-full md:w-auto">
+          <div className="w-full sm:w-64">
             <Input 
               placeholder="ค้นหา SKU หรือ LOT..." 
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <Button onClick={handleRefreshAll} variant="outline" className="whitespace-nowrap flex items-center gap-2 bg-[#F8F6F0] hover:bg-slate-100">
+            <RefreshCw className="w-4 h-4 text-[#D4AF37]" />
+            รีเฟรชข้อมูล
+          </Button>
         </div>
       </div>
 
-      <Tabs defaultValue="inbound" className="w-full">
+      {/* 1. Executive Finished Goods KPI Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Layers className="w-7 h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> FG Inventory & Logistics Intelligence
+            </div>
+            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+              Executive FG Warehouse KPI
+            </div>
+            <div className="text-xs text-stone-300 mt-0.5">
+              สรุปภาพรวมสินค้าคงคลัง • สถานะความพร้อมส่งมอบ • อัตราการกักกัน (Quarantine) และการบริหารคลังสินค้า
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+          {/* Total Stock */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">ยอดคงคลังรวม (Total FG)</div>
+            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+              {totalStockPcs.toLocaleString()} <span className="text-xs font-normal text-stone-300">ชิ้น</span>
+            </div>
+            <div className="text-[10px] text-stone-400 mt-0.5">({totalStockCartons.toLocaleString()} ลัง • {uniqueSkus} SKU)</div>
+          </div>
+
+          {/* Ready to Ship (Released) */}
+          <div className="bg-emerald-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">พร้อมส่งมอบ (Released)</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {releasedPcs.toLocaleString()} <span className="text-xs font-normal text-emerald-200">ชิ้น</span>
+            </div>
+            <div className="text-[10px] text-emerald-300 mt-0.5">({releasedPct}% • {releasedCartons} ลัง)</div>
+          </div>
+
+          {/* Quarantine Hold */}
+          <div className="bg-amber-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
+            <div className="text-[11px] text-amber-200 font-medium">กักกันรอ QC (Quarantine)</div>
+            <div className="text-2xl font-black text-amber-300">
+              {quaranPcs.toLocaleString()} <span className="text-xs font-normal text-amber-200">ชิ้น</span>
+            </div>
+            <div className="text-[10px] text-amber-300 mt-0.5">({quaranPct}% • {quaranCartons} ลัง)</div>
+          </div>
+
+          {/* Inbound Rate */}
+          <div className="bg-indigo-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
+            <div className="text-[11px] text-indigo-200 font-medium">อัตราการรับเข้า (Inbound)</div>
+            <div className="text-2xl font-black text-indigo-300">
+              {inboundFulfillmentPct}%
+            </div>
+            <div className="text-[10px] text-indigo-300 mt-0.5">({completedInboundTasks.length}/{totalInboundTasks} คิวสำเร็จ)</div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four FG Warehouse Dimension KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Inbound Flow */}
+        <Card 
+          onClick={() => setActiveTab('inbound')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'inbound' ? 'border-indigo-500 ring-2 ring-indigo-500/20 bg-indigo-50/50' : 'border-slate-200 hover:border-indigo-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold shadow-sm">
+                  <Archive className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. คิวรับเข้า (Inbound)</div>
+                  <div className="text-[11px] text-slate-500">From POF Packaging</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                คิวรวม {totalInboundTasks}
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-indigo-600">{inboundFulfillmentPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">รับเข้าสำเร็จ</span>
+              </div>
+              <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200 text-[10px] font-bold">
+                {completedInboundTasks.length}/{totalInboundTasks} ล็อต
+              </Badge>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${inboundFulfillmentPct}%` }} className="bg-indigo-500 h-full transition-all duration-500" title={`Completed: ${inboundFulfillmentPct}%`} />
+              <div style={{ width: `${100 - Number(inboundFulfillmentPct)}%` }} className="bg-amber-400 h-full transition-all duration-500" title="Pending" />
+            </div>
+
+            {/* Sub Metrics Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">สำเร็จ (Done)</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{completedInboundTasks.length}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">{inboundFulfillmentPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">รอรับเข้า</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{pendingInboundTasks.length}</div>
+                <div className="text-[9px] text-amber-600 font-medium">คิวค้างรับ</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-indigo-50/70 border border-indigo-100">
+                <div className="text-[10px] font-semibold text-indigo-700">เอกสาร E-Form</div>
+                <div className="text-xs font-bold text-indigo-800 mt-0.5">ครบถ้วน</div>
+                <div className="text-[9px] text-indigo-600 font-medium">Auto-Sign</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Released Stock */}
+        <Card 
+          onClick={() => { setActiveTab('inventory'); setInventoryQcFilter('RELEASED'); }}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'inventory' && inventoryQcFilter === 'RELEASED' ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <CheckCircle2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. พร้อมส่งมอบ (Released)</div>
+                  <div className="text-[11px] text-slate-500">Ready for Dispatch</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200 font-semibold">
+                พร้อมส่ง {releasedItems.length} รายการ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{releasedPcs.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ชิ้น ({releasedPct}%)</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                {releasedCartons} ลัง
+              </Badge>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${releasedPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Released: ${releasedPct}%`} />
+            </div>
+
+            {/* Sub Metrics Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">พร้อมขาย</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{releasedPcs.toLocaleString()}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ชิ้น</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">จำนวนลัง</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{releasedCartons}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ลัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">สถานะ QC</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">PASSED</div>
+                <div className="text-[9px] text-emerald-600 font-medium">ตรวจปล่อยแล้ว</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Quarantine Stock */}
+        <Card 
+          onClick={() => { setActiveTab('inventory'); setInventoryQcFilter('QUARANTINE'); }}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'inventory' && inventoryQcFilter === 'QUARANTINE' ? 'border-amber-500 ring-2 ring-amber-500/20 bg-amber-50/50' : 'border-slate-200 hover:border-amber-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center font-bold shadow-sm">
+                  <ShieldAlert className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. กักกันรอผล QC</div>
+                  <div className="text-[11px] text-slate-500">Quarantine Hold</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200 font-semibold">
+                กักกัน {quaranItems.length} รายการ
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-amber-600">{quaranPcs.toLocaleString()}</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">ชิ้น ({quaranPct}%)</span>
+              </div>
+              <Badge className="bg-amber-100 text-amber-800 border-amber-200 text-[10px] font-bold">
+                {quaranCartons} ลัง
+              </Badge>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${quaranPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Quarantine: ${quaranPct}%`} />
+            </div>
+
+            {/* Sub Metrics Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">ยอดกักกัน</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{quaranPcs.toLocaleString()}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ชิ้น</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">จำนวนลัง</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{quaranCartons}</div>
+                <div className="text-[9px] text-amber-600 font-medium">ลัง</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">การควบคุม</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">ห้ามเบิก</div>
+                <div className="text-[9px] text-amber-600 font-medium">รอผล Lab QC</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Storage & Outbound */}
+        <Card 
+          onClick={() => setActiveTab('outbound')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${activeTab === 'outbound' ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/20 bg-[#F8F6F0]' : 'border-slate-200 hover:border-[#D4AF37]/50 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Send className="w-4 h-4 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. พื้นที่ & เบิกจ่าย FEFO</div>
+                  <div className="text-[11px] text-slate-500">Storage & Outbound</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                {locations.length} โลเคชั่น
+              </Badge>
+            </div>
+
+            {/* Big Display */}
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#D4AF37]">{storageUtilizationPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">พื้นที่ใช้งาน</span>
+              </div>
+              <Badge className="bg-[#D4AF37]/20 text-[#8B7355] border-[#D4AF37]/30 text-[10px] font-bold">
+                {occupiedLocIds.size}/{locations.length} Racks
+              </Badge>
+            </div>
+
+            {/* Segmented Progress Bar */}
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${storageUtilizationPct}%` }} className="bg-[#D4AF37] h-full transition-all duration-500" title={`Storage: ${storageUtilizationPct}%`} />
+            </div>
+
+            {/* Sub Metrics Breakdown */}
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">โลเคชั่นจัดเก็บ</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">{occupiedLocIds.size} / {locations.length}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">โซน A/B/C</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">หลักการเบิก</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">FEFO</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">หมดอายุก่อน</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-[#F8F6F0] border border-[#D4AF37]/20">
+                <div className="text-[10px] font-semibold text-[#8B7355]">คลังสินค้า</div>
+                <div className="text-xs font-bold text-[#4A4238] mt-0.5">ONLINE</div>
+                <div className="text-[9px] text-emerald-600 font-medium">Real-time</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* 3. Main Functional Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-3 max-w-2xl bg-white border shadow-sm h-12 mb-6">
-          <TabsTrigger value="inbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+          <TabsTrigger value="inbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10 font-bold">
             <Archive className="w-4 h-4 mr-2" /> 1. คิวรับเข้า (Inbound)
           </TabsTrigger>
-          <TabsTrigger value="inventory" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+          <TabsTrigger value="inventory" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10 font-bold">
             <Package className="w-4 h-4 mr-2" /> 2. สต๊อกสินค้า (Inventory)
           </TabsTrigger>
-          <TabsTrigger value="outbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10">
+          <TabsTrigger value="outbound" className="data-[state=active]:bg-indigo-50 data-[state=active]:text-indigo-700 h-10 font-bold">
             <Send className="w-4 h-4 mr-2" /> 3. เบิกจ่าย (Dispatch)
           </TabsTrigger>
         </TabsList>
@@ -503,7 +861,13 @@ export default function FgTasksPage() {
         <TabsContent value="inbound">
           <Card className="shadow-sm overflow-hidden border ring-1 ring-slate-200">
             <div className="p-4 bg-[#F8F6F0] border-b flex items-center justify-between">
-              <h2 className="font-semibold text-slate-700">คิวงานรอรับเข้าจาก POF</h2>
+              <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+                <Archive className="w-5 h-5 text-indigo-600" />
+                คิวงานรอรับเข้าจาก POF
+              </h2>
+              <Badge variant="outline" className="bg-white text-indigo-700 border-indigo-200 font-bold">
+                {tasks.length} รายการ
+              </Badge>
             </div>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
@@ -581,8 +945,49 @@ export default function FgTasksPage() {
 
         <TabsContent value="inventory">
           <Card className="shadow-sm border ring-1 ring-slate-200">
-            <div className="p-4 bg-[#F8F6F0] border-b">
-              <h2 className="font-semibold text-slate-700">สต๊อกสินค้าคงเหลือ (Real-time Balance)</h2>
+            <div className="p-4 bg-[#F8F6F0] border-b flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <h2 className="font-semibold text-slate-700 flex items-center gap-2">
+                <Package className="w-5 h-5 text-emerald-600" />
+                สต๊อกสินค้าคงเหลือ (Real-time Balance)
+              </h2>
+              
+              {/* Quick Status Filter Pills */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button 
+                  size="sm" 
+                  variant={inventoryQcFilter === 'ALL' ? 'default' : 'outline'}
+                  onClick={() => setInventoryQcFilter('ALL')}
+                  className={inventoryQcFilter === 'ALL' ? 'bg-[#2D2721] text-white hover:bg-[#3E352B] h-8 text-xs font-bold' : 'h-8 text-xs bg-white'}
+                >
+                  ทั้งหมด ({inventory.length})
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={inventoryQcFilter === 'RELEASED' ? 'default' : 'outline'}
+                  onClick={() => setInventoryQcFilter('RELEASED')}
+                  className={inventoryQcFilter === 'RELEASED' ? 'bg-emerald-600 text-white hover:bg-emerald-700 h-8 text-xs font-bold' : 'h-8 text-xs bg-white text-emerald-700 border-emerald-200 hover:bg-emerald-50'}
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                  พร้อมขาย ({releasedItems.length})
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={inventoryQcFilter === 'QUARANTINE' ? 'default' : 'outline'}
+                  onClick={() => setInventoryQcFilter('QUARANTINE')}
+                  className={inventoryQcFilter === 'QUARANTINE' ? 'bg-amber-600 text-white hover:bg-amber-700 h-8 text-xs font-bold' : 'h-8 text-xs bg-white text-amber-700 border-amber-200 hover:bg-amber-50'}
+                >
+                  <ShieldAlert className="w-3.5 h-3.5 mr-1" />
+                  กักกันรอ QC ({quaranItems.length})
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant={inventoryQcFilter === 'REJECTED' ? 'default' : 'outline'}
+                  onClick={() => setInventoryQcFilter('REJECTED')}
+                  className={inventoryQcFilter === 'REJECTED' ? 'bg-rose-600 text-white hover:bg-rose-700 h-8 text-xs font-bold' : 'h-8 text-xs bg-white text-rose-700 border-rose-200 hover:bg-rose-50'}
+                >
+                  Reject ({rejectedItems.length})
+                </Button>
+              </div>
             </div>
             <CardContent className="p-0">
               <Table>
@@ -598,27 +1003,17 @@ export default function FgTasksPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {inventory.filter(item => {
-                      const term = searchQuery.toLowerCase()
-                      const sku = (item.products?.sku || '').toLowerCase()
-                      const lotNo = (item.lot_no || '').toLowerCase()
-                      return sku.includes(term) || lotNo.includes(term)
-                    }).length === 0 ? (
-                    <TableRow><TableCell colSpan={7} className="text-center h-32">ไม่มีสินค้าในคลัง</TableCell></TableRow>
-                  ) : inventory.filter(item => {
-                      const term = searchQuery.toLowerCase()
-                      const sku = (item.products?.sku || '').toLowerCase()
-                      const lotNo = (item.lot_no || '').toLowerCase()
-                      return sku.includes(term) || lotNo.includes(term)
-                    }).map(item => (
-                    <TableRow key={item.id}>
+                  {filteredInventory.length === 0 ? (
+                    <TableRow><TableCell colSpan={7} className="text-center h-32 text-slate-500">ไม่มีสินค้าตรงตามเงื่อนไข</TableCell></TableRow>
+                  ) : filteredInventory.map(item => (
+                    <TableRow key={item.id} className="hover:bg-slate-50">
                       <TableCell className="font-medium text-slate-800">
                         {item.products?.sku}
                         <div className="text-xs text-slate-500 font-normal">{item.products?.product_name}</div>
                       </TableCell>
-                      <TableCell>{item.lot_no}</TableCell>
-                      <TableCell><Badge variant="outline" className="bg-amber-50">{item.box_lot_no}</Badge></TableCell>
-                      <TableCell className="font-bold text-indigo-600">{item.available_qty_pcs.toLocaleString()} ชิ้น</TableCell>
+                      <TableCell className="font-semibold">{item.lot_no}</TableCell>
+                      <TableCell><Badge variant="outline" className="bg-amber-50 font-mono">{item.box_lot_no}</Badge></TableCell>
+                      <TableCell className="font-bold text-indigo-600 text-base">{item.available_qty_pcs.toLocaleString()} ชิ้น</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-1.5 text-sm text-slate-600">
                           <PackageOpen className="w-4 h-4 text-slate-400" />
