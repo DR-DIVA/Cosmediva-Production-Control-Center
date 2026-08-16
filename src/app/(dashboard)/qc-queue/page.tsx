@@ -136,6 +136,12 @@ export default function QCQueuePage() {
   const confirmRmStatus = async () => {
     if (!activeRm || !rmStatusAction) return
     
+    // Require reason if transitioning from HOLD to PASSED, or if REJECTED/HOLD
+    if ((rmStatusAction !== 'PASSED' || (activeRm.qc_status === 'HOLD' && rmStatusAction === 'PASSED')) && !reasonText.trim()) {
+      toast.error(rmStatusAction === 'PASSED' ? 'กรุณาระบุการแก้ไข/เหตุผล' : 'กรุณาระบุเหตุผล')
+      return
+    }
+    
     // Update rm item
     const updates: any = { qc_status: rmStatusAction }
     if (rmStatusAction === 'PASSED') updates.status = 'READY'
@@ -553,8 +559,8 @@ export default function QCQueuePage() {
   const handleFgStatusConfirm = async () => {
     if (!activeFg || !statusAction) return
 
-    if (statusAction !== 'QC_PASS' && !reasonText.trim()) {
-      toast.error('กรุณาระบุเหตุผล')
+    if ((statusAction !== 'QC_PASS' || (activeFg.qc_status === 'HOLD' && statusAction === 'QC_PASS')) && !reasonText.trim()) {
+      toast.error(statusAction === 'QC_PASS' ? 'กรุณาระบุการแก้ไข/เหตุผล' : 'กรุณาระบุเหตุผล')
       return
     }
 
@@ -1785,7 +1791,7 @@ export default function QCQueuePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsFgStatusDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleFgStatusConfirm} disabled={!statusAction} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+            <Button onClick={handleFgStatusConfirm} disabled={!statusAction || ((statusAction !== 'QC_PASS' || (activeFg?.qc_status === 'HOLD' && statusAction === 'QC_PASS')) && !reasonText)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
               บันทึกสถานะ
             </Button>
           </DialogFooter>
@@ -1812,7 +1818,7 @@ export default function QCQueuePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsRmStatusDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={confirmRmStatus} disabled={!rmStatusAction || (rmStatusAction !== 'PASSED' && !reasonText)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+            <Button onClick={confirmRmStatus} disabled={!rmStatusAction || ((rmStatusAction !== 'PASSED' || (activeRm?.qc_status === 'HOLD' && rmStatusAction === 'PASSED')) && !reasonText)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
               ยืนยัน ({rmStatusAction})
             </Button>
           </DialogFooter>
