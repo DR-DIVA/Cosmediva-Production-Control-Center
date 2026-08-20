@@ -1056,6 +1056,19 @@ export default function PackingTasksPage() {
                       const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
                       const passSearch = sku.includes(term) || lotNo.includes(term)
                       return passDate && passSearch
+                    }).sort((a: any, b: any) => {
+                      const lotA = (a.production_lots?.lot_no || '').toString()
+                      const lotB = (b.production_lots?.lot_no || '').toString()
+                      const lotCompare = lotA.localeCompare(lotB, undefined, { numeric: true })
+                      if (lotCompare !== 0) return lotCompare
+
+                      const startA = parseInt(a.tank_start) || 0
+                      const startB = parseInt(b.tank_start) || 0
+                      if (startA !== startB) return startA - startB
+
+                      const dateA = a.activity_date || ''
+                      const dateB = b.activity_date || ''
+                      return dateA.localeCompare(dateB)
                     }).map((task) => (
                       <React.Fragment key={task.id}>
                         <TableRow 
