@@ -290,35 +290,41 @@ export default function WeighingTasksPage() {
     } else {
       toast.success(`อัปเดตชุดชั่งสารที่ ${currentBasket} เป็นสถานะ ${nextStatus}`)
       
-      // --- AUTO HAND-OFF TO MIXING ---
+      // --- SMART AUTO HAND-OFF TO MIXING ---
       if (nextStatus === 'MOVED') {
         const { data: mixProcess } = await supabase.from('processes').select('id').like('process_name', '%ผสม%').limit(1).single()
         if (mixProcess) {
-          const { data: existingMixLog } = await supabase.from('production_logs')
-            .select('id, tank_details')
+          const { data: mixLogs } = await supabase.from('production_logs')
+            .select('id, tank_start, tank_end, tank_details, status')
             .eq('production_lot_id', task.production_lot_id)
             .eq('process_id', mixProcess.id)
-            .eq('tank_start', task.tank_start)
-            .eq('tank_end', task.tank_end)
-            .maybeSingle()
             
-          if (existingMixLog) {
-            const mixDetails = typeof existingMixLog.tank_details === 'object' && existingMixLog.tank_details !== null 
-              ? { ...existingMixLog.tank_details } 
+          const currentBasketNum = Number(currentBasket);
+          const targetLog = (mixLogs || []).find(l => {
+            const s = parseInt(l.tank_start) || 1;
+            const e = parseInt(l.tank_end) || s;
+            return currentBasketNum >= s && currentBasketNum <= e;
+          });
+
+          if (targetLog) {
+            const mixDetails = typeof targetLog.tank_details === 'object' && targetLog.tank_details !== null 
+              ? { ...targetLog.tank_details } 
               : {}
             
-            // Allow update if empty, LOCKED string, or LOCKED object
             const currentMixState = mixDetails[currentBasket]?.status || mixDetails[currentBasket]
             if (!currentMixState || currentMixState === 'LOCKED') {
                mixDetails[currentBasket] = 'WAITING'
-               await supabase.from('production_logs').update({ tank_details: mixDetails }).eq('id', existingMixLog.id)
+               await supabase.from('production_logs').update({ 
+                 tank_details: mixDetails,
+                 status: targetLog.status === 'PLANNED' ? 'WAITING' : targetLog.status
+               }).eq('id', targetLog.id)
             }
           } else {
             const start = parseInt(task.tank_start) || 1
             const end = parseInt(task.tank_end) || 1
             const initialMixDetails: any = {}
             for(let i=start; i<=end; i++) {
-               initialMixDetails[i] = (i === currentBasket) ? 'WAITING' : 'LOCKED'
+               initialMixDetails[i] = (i === currentBasketNum) ? 'WAITING' : 'LOCKED'
             }
             await supabase.from('production_logs').insert({
               production_lot_id: task.production_lot_id,

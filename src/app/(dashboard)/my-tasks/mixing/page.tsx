@@ -292,40 +292,44 @@ export default function MixingTasksPage() {
     } else {
       toast.success(`อัปเดตถังที่ ${currentTank} เป็นสถานะ ${nextStatus}`)
       
-      // --- AUTO HAND-OFF TO QC ---
+      // --- SMART AUTO HAND-OFF TO QC ---
       if (nextStatus === 'SENT_TO_QC') {
         const { data: qcProcess } = await supabase.from('processes').select('id').eq('process_name', 'รอ QC').single()
         if (qcProcess) {
-          const { data: existingQCLog } = await supabase.from('production_logs')
-            .select('id, tank_details')
+          const { data: qcLogs } = await supabase.from('production_logs')
+            .select('id, tank_start, tank_end, tank_details, status')
             .eq('production_lot_id', task.production_lot_id)
             .eq('process_id', qcProcess.id)
-            .eq('tank_start', task.tank_start)
-            .eq('tank_end', task.tank_end)
-            .maybeSingle()
             
-          if (existingQCLog) {
-            const qcDetails = typeof existingQCLog.tank_details === 'object' && existingQCLog.tank_details !== null 
-              ? { ...existingQCLog.tank_details } 
+          const currentTankNum = Number(currentTank);
+          const targetQCLog = (qcLogs || []).find(l => {
+            const s = parseInt(l.tank_start) || 1;
+            const e = parseInt(l.tank_end) || s;
+            return currentTankNum >= s && currentTankNum <= e;
+          });
+
+          if (targetQCLog) {
+            const qcDetails = typeof targetQCLog.tank_details === 'object' && targetQCLog.tank_details !== null 
+              ? { ...targetQCLog.tank_details } 
               : {}
             
-            const currentQCState = qcDetails[currentTank]?.status || qcDetails[currentTank]
-            if (!currentQCState || currentQCState === 'LOCKED') {
-               qcDetails[currentTank] = 'WAITING'
-               const qcHistory = qcDetails[`${currentTank}_history`] || []
-               qcDetails[`${currentTank}_history`] = [
-                 ...qcHistory,
-                 { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
-               ]
-               await supabase.from('production_logs').update({ tank_details: qcDetails }).eq('id', existingQCLog.id)
-            }
+            qcDetails[currentTank] = 'WAITING'
+            const qcHistory = qcDetails[`${currentTank}_history`] || []
+            qcDetails[`${currentTank}_history`] = [
+              ...qcHistory,
+              { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
+            ]
+            await supabase.from('production_logs').update({ 
+              tank_details: qcDetails,
+              status: targetQCLog.status === 'PLANNED' ? 'WAITING' : targetQCLog.status
+            }).eq('id', targetQCLog.id)
           } else {
             const start = parseInt(task.tank_start) || 1
             const end = parseInt(task.tank_end) || 1
             const initialQCDetails: any = {}
             for(let i=start; i<=end; i++) {
-               initialQCDetails[i] = (i === currentTank) ? 'WAITING' : 'LOCKED'
-               if (i === currentTank) {
+               initialQCDetails[i] = (i === currentTankNum) ? 'WAITING' : 'LOCKED'
+               if (i === currentTankNum) {
                  initialQCDetails[`${i}_history`] = [
                    { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
                  ]
@@ -346,30 +350,37 @@ export default function MixingTasksPage() {
       } else if (nextStatus === 'SENT_TO_PACKING') {
         const { data: packingProcess } = await supabase.from('processes').select('id').eq('process_name', 'บรรจุ').single()
         if (packingProcess) {
-          const { data: existingPackingLog } = await supabase.from('production_logs')
-            .select('id, tank_details')
+          const { data: packingLogs } = await supabase.from('production_logs')
+            .select('id, tank_start, tank_end, tank_details, status')
             .eq('production_lot_id', task.production_lot_id)
             .eq('process_id', packingProcess.id)
-            .eq('tank_start', task.tank_start)
-            .eq('tank_end', task.tank_end)
-            .maybeSingle()
             
-          if (existingPackingLog) {
-            const packingDetails = typeof existingPackingLog.tank_details === 'object' && existingPackingLog.tank_details !== null 
-              ? { ...existingPackingLog.tank_details } 
+          const currentTankNum = Number(currentTank);
+          const targetPackingLog = (packingLogs || []).find(l => {
+            const s = parseInt(l.tank_start) || 1;
+            const e = parseInt(l.tank_end) || s;
+            return currentTankNum >= s && currentTankNum <= e;
+          });
+
+          if (targetPackingLog) {
+            const packingDetails = typeof targetPackingLog.tank_details === 'object' && targetPackingLog.tank_details !== null 
+              ? { ...targetPackingLog.tank_details } 
               : {}
             
             const currentPackingState = packingDetails[currentTank]?.status || packingDetails[currentTank]
             if (!currentPackingState || currentPackingState === 'LOCKED') {
                packingDetails[currentTank] = 'WAITING'
-               await supabase.from('production_logs').update({ tank_details: packingDetails }).eq('id', existingPackingLog.id)
+               await supabase.from('production_logs').update({ 
+                 tank_details: packingDetails,
+                 status: targetPackingLog.status === 'PLANNED' ? 'WAITING' : targetPackingLog.status
+               }).eq('id', targetPackingLog.id)
             }
           } else {
             const start = parseInt(task.tank_start) || 1
             const end = parseInt(task.tank_end) || 1
             const initialPackingDetails: any = {}
             for(let i=start; i<=end; i++) {
-               initialPackingDetails[i] = (i === currentTank) ? 'WAITING' : 'LOCKED'
+               initialPackingDetails[i] = (i === currentTankNum) ? 'WAITING' : 'LOCKED'
             }
             await supabase.from('production_logs').insert({
               production_lot_id: task.production_lot_id,

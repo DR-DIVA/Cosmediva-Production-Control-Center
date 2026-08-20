@@ -8,71 +8,97 @@ export async function GET(request: Request) {
   );
 
   const results: string[] = [];
+  const toDeleteIds: string[] = [];
 
   try {
-    // 1. Update created_by for old records to PLPTB1234
-    const { data: users, error: userErr } = await supabase.from('profiles').select('id, full_name').eq('employee_id', 'PLPTB1234');
-    if (userErr || !users || users.length === 0) {
-      results.push('Error finding user PLPTB1234 in profiles: ' + (userErr?.message || 'Not found'));
-    } else {
-      const plannerId = users[0].id;
-      // Update logs where created_by is null
-      const { data: updateData, error: updateErr } = await supabase.from('production_logs').update({ created_by: plannerId }).is('created_by', null).select();
-      if (updateErr) {
-        results.push('Error updating historical created_by: ' + updateErr.message);
-      } else {
-        results.push('Updated ' + (updateData?.length || 0) + ' historical logs to user ' + users[0].full_name);
+    // 1. Fetch all production logs with lots and processes
+    const { data: logs, error: logsErr } = await supabase
+      .from('production_logs')
+      .select('id, production_lot_id, process_id, status, tank_start, tank_end, tank_details, start_time, end_time, activity_date, piece_quantity')
+      .order('created_at', { ascending: true });
+
+    if (logsErr || !logs) {
+      return NextResponse.json({ error: logsErr?.message || 'No logs found' }, { status: 500 });
+    }
+
+    // Group logs by `${production_lot_id}_${process_id}`
+    const grouped = new Map<string, any[]>();
+    logs.forEach(l => {
+      const key = `${l.production_lot_id}_${l.process_id}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(l);
+    });
+
+    // Check each group for overlapping duplicate/orphan tasks
+    grouped.forEach((groupLogs, key) => {
+      // Find logs that have actual active work
+      const activeLogs = groupLogs.filter(l => {
+        const details = typeof l.tank_details === 'object' && l.tank_details !== null ? l.tank_details : {};
+        const hasHistory = Object.keys(details).some(k => k.endsWith('_history') && Array.isArray(details[k]) && details[k].length > 0);
+        const hasNonWaiting = Object.keys(details).some(k => !k.endsWith('_history') && (details[k] === 'DONE' || details[k] === 'IN_PROGRESS' || details[k] === 'SENT_TO_POF' || details[k]?.status === 'DONE' || details[k]?.status === 'IN_PROGRESS' || details[k]?.status === 'SENT_TO_POF'));
+        const hasWorkStatus = l.status === 'DONE' || l.status === 'IN_PROGRESS' || l.status === 'COMPLETED';
+        const hasTime = !!l.start_time || !!l.end_time;
+        const hasQty = Number(l.piece_quantity) > 0;
+        return hasHistory || hasNonWaiting || hasWorkStatus || hasTime || hasQty;
+      });
+
+      if (activeLogs.length > 0) {
+        // Collect tank numbers covered by active logs
+        const activeCoveredTanks = new Set<number>();
+        activeLogs.forEach(al => {
+          const s = parseInt(al.tank_start) || 1;
+          const e = parseInt(al.tank_end) || s;
+          for (let t = s; t <= Math.max(s, e); t++) {
+            activeCoveredTanks.add(t);
+          }
+        });
+
+        // Find empty/unworked logs that are fully covered by active logs
+        groupLogs.forEach(l => {
+          if (activeLogs.some(al => al.id === l.id)) return; // Don't delete active logs
+
+          const details = typeof l.tank_details === 'object' && l.tank_details !== null ? l.tank_details : {};
+          const hasHistory = Object.keys(details).some(k => k.endsWith('_history') && Array.isArray(details[k]) && details[k].length > 0);
+          const hasNonWaiting = Object.keys(details).some(k => !k.endsWith('_history') && (details[k] === 'DONE' || details[k] === 'IN_PROGRESS' || details[k] === 'SENT_TO_POF' || details[k]?.status === 'DONE' || details[k]?.status === 'IN_PROGRESS' || details[k]?.status === 'SENT_TO_POF'));
+          
+          if (!hasHistory && !hasNonWaiting && (l.status === 'WAITING' || l.status === 'PLANNED' || !l.status)) {
+            const s = parseInt(l.tank_start) || 1;
+            const e = parseInt(l.tank_end) || s;
+            let isOverlapping = false;
+            for (let t = s; t <= Math.max(s, e); t++) {
+              if (activeCoveredTanks.has(t)) {
+                isOverlapping = true;
+                break;
+              }
+            }
+
+            if (isOverlapping) {
+              toDeleteIds.push(l.id);
+              results.push(`Marked for deletion: Task ID ${l.id} (Tanks ${s}-${e}, status=${l.status}) overlapping with active batch`);
+            }
+          }
+        });
       }
-    }
+    });
 
-    // 2. Find Lot 004/26
-    const { data: lot, error: lotErr } = await supabase.from('production_lots').select('id').eq('lot_no', '004/26').single();
-    if (lotErr || !lot) {
-      results.push('Error finding Lot 004/26');
-      return NextResponse.json({ results });
-    }
-    const lotId = lot.id;
-
-    // 3. Find processes
-    const { data: processes } = await supabase.from('processes').select('id, process_name');
-    // Using hex codes to avoid encoding issues just in case
-    const packingProc = processes?.find(p => p.process_name === '\u0E1A\u0E23\u0E23\u0E08\u0E38');
-    const mixingProc = processes?.find(p => p.process_name === '\u0E1C\u0E2A\u0E21');
-
-    // 4. Delete packing tasks on 25/7/2569 (2026-07-25)
-    if (packingProc) {
-      const { data: delPacking, error: delPackingErr } = await supabase.from('production_logs')
+    if (toDeleteIds.length > 0) {
+      const { error: delErr } = await supabase
+        .from('production_logs')
         .delete()
-        .eq('production_lot_id', lotId)
-        .eq('process_id', packingProc.id)
-        .eq('activity_date', '2026-07-25')
-        .select();
-      if (delPackingErr) results.push('Error deleting packing tasks: ' + delPackingErr.message);
-      else results.push('Deleted ' + (delPacking?.length || 0) + ' packing tasks on 2026-07-25');
-    }
+        .in('id', toDeleteIds);
 
-    // 5. Delete mixing tasks NOT on 31/7/2569 (2026-07-31)
-    if (mixingProc) {
-      const { data: mixLogs } = await supabase.from('production_logs')
-        .select('id, activity_date')
-        .eq('production_lot_id', lotId)
-        .eq('process_id', mixingProc.id);
-        
-      if (mixLogs) {
-        const toDeleteIds = mixLogs.filter(l => l.activity_date !== '2026-07-31').map(l => l.id);
-        if (toDeleteIds.length > 0) {
-          const { error: delMixErr } = await supabase.from('production_logs').delete().in('id', toDeleteIds);
-          if (delMixErr) results.push('Error deleting mixing tasks: ' + delMixErr.message);
-          else results.push('Deleted ' + toDeleteIds.length + ' mixing tasks NOT on 2026-07-31');
-        } else {
-          results.push('No mixing tasks found that are NOT on 2026-07-31');
-        }
+      if (delErr) {
+        results.push('Error deleting records: ' + delErr.message);
+      } else {
+        results.push(`Successfully cleaned ${toDeleteIds.length} duplicate/overlapping orphaned tasks.`);
       }
+    } else {
+      results.push('No overlapping empty orphan tasks found to clean.');
     }
 
   } catch (err: any) {
     results.push('Exception: ' + err.message);
   }
 
-  return NextResponse.json({ results });
+  return NextResponse.json({ results, totalCleaned: toDeleteIds.length });
 }

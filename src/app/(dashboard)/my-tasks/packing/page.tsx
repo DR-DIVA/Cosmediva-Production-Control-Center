@@ -344,35 +344,42 @@ export default function PackingTasksPage() {
     } else {
       toast.success(`อัปเดตบรรจุถังที่ ${currentTank} เป็นสถานะ ${nextStatus}`)
       
-      // --- AUTO HAND-OFF TO POF ---
+      // --- SMART AUTO HAND-OFF TO POF ---
       if (nextStatus === 'SENT_TO_POF') {
         const passedBoxLot = details[currentTank]?.box_lot || ''
         const { data: pofProcess } = await supabase.from('processes').select('id').like('process_name', '%POF%').limit(1).single()
         if (pofProcess) {
-          const { data: existingPOFLog } = await supabase.from('production_logs')
-            .select('id, tank_details')
+          const { data: pofLogs } = await supabase.from('production_logs')
+            .select('id, tank_start, tank_end, tank_details, status')
             .eq('production_lot_id', task.production_lot_id)
             .eq('process_id', pofProcess.id)
-            .eq('tank_start', task.tank_start)
-            .eq('tank_end', task.tank_end)
-            .maybeSingle()
             
-          if (existingPOFLog) {
-            const pofDetails = typeof existingPOFLog.tank_details === 'object' && existingPOFLog.tank_details !== null 
-              ? { ...existingPOFLog.tank_details } 
+          const currentTankNum = Number(currentTank);
+          const targetPOFLog = (pofLogs || []).find(l => {
+            const s = parseInt(l.tank_start) || 1;
+            const e = parseInt(l.tank_end) || s;
+            return currentTankNum >= s && currentTankNum <= e;
+          });
+
+          if (targetPOFLog) {
+            const pofDetails = typeof targetPOFLog.tank_details === 'object' && targetPOFLog.tank_details !== null 
+              ? { ...targetPOFLog.tank_details } 
               : {}
             
             const currentPOFState = pofDetails[currentTank]?.status || pofDetails[currentTank]
             if (!currentPOFState || currentPOFState === 'LOCKED') {
                pofDetails[currentTank] = { status: 'WAITING', box_lot: passedBoxLot }
-               await supabase.from('production_logs').update({ tank_details: pofDetails }).eq('id', existingPOFLog.id)
+               await supabase.from('production_logs').update({ 
+                 tank_details: pofDetails,
+                 status: targetPOFLog.status === 'PLANNED' ? 'WAITING' : targetPOFLog.status
+               }).eq('id', targetPOFLog.id)
             }
           } else {
             const start = parseInt(task.tank_start) || 1
             const end = parseInt(task.tank_end) || 1
             const initialPOFDetails: any = {}
             for(let i=start; i<=end; i++) {
-               initialPOFDetails[i] = (i === currentTank) ? { status: 'WAITING', box_lot: passedBoxLot } : 'LOCKED'
+               initialPOFDetails[i] = (i === currentTankNum) ? { status: 'WAITING', box_lot: passedBoxLot } : 'LOCKED'
             }
             await supabase.from('production_logs').insert({
               production_lot_id: task.production_lot_id,
