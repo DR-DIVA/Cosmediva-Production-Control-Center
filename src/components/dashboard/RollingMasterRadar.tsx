@@ -127,14 +127,12 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
           .lte('activity_date', horizonEndStr)
           .order('activity_date', { ascending: true }),
 
-        // 3. FG Due Date & Planned Deliveries
+        // 3. FG Due Date & Planned Deliveries (All active lots)
         supabase.from('production_lots')
           .select(`
-            id, lot_no, fg_due_date, planned_quantity, order_quantity, order_type, current_status, total_tanks,
+            id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks,
             products:sku_id (sku, product_name)
           `)
-          .gte('fg_due_date', horizonStartStr)
-          .lte('fg_due_date', horizonEndStr)
           .neq('current_status', 'DONE')
           .order('fg_due_date', { ascending: true })
       ])
@@ -257,17 +255,44 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
       }
     })
 
-    // 3. Process FG Due
+    // 3. Process FG Due & MTS Daily Delivery Ranges
     radarData.fgDueLots.forEach(lot => {
-      const d = lot.fg_due_date
-      if (map[d]) {
+      const sku = lot.products?.sku || 'SKU'
+      const qty = lot.planned_quantity || lot.order_quantity || 0
+      const isMTS = lot.order_type === 'MTS'
+      const startStr = lot.planned_start_date || lot.fg_due_date
+      const endStr = lot.fg_due_date || lot.planned_start_date
+
+      if (isMTS && (startStr || endStr)) {
+        // MTS Range: Delivery occurs on every day within [startStr, endStr]
+        const effectiveStart = startStr || endStr
+        const effectiveEnd = endStr || startStr
+
+        horizonDates.forEach(hd => {
+          if (hd.dateStr >= effectiveStart && hd.dateStr <= effectiveEnd) {
+            totalFgDue++
+            map[hd.dateStr].FG_DUE.push({
+              id: `${lot.id}-${hd.dateStr}`,
+              streamType: 'FG_DUE',
+              date: hd.dateStr,
+              title: `LOT ${lot.lot_no} (${sku})`,
+              subtitle: lot.products?.product_name || 'ส่งมอบ FG ประจำวัน (MTS Rolling)',
+              tag: `MTS (${Number(qty).toLocaleString()} ชิ้น)`,
+              quantity: qty,
+              lotNo: lot.lot_no,
+              sku,
+              lotId: lot.id,
+              meta: { ...lot, isMtsRange: true }
+            })
+          }
+        })
+      } else if (lot.fg_due_date && map[lot.fg_due_date]) {
+        // MTO / Single Due Date
         totalFgDue++
-        const sku = lot.products?.sku || 'SKU'
-        const qty = lot.planned_quantity || lot.order_quantity || 0
-        map[d].FG_DUE.push({
+        map[lot.fg_due_date].FG_DUE.push({
           id: lot.id,
           streamType: 'FG_DUE',
-          date: d,
+          date: lot.fg_due_date,
           title: `LOT ${lot.lot_no} (${sku})`,
           subtitle: lot.products?.product_name || 'กำหนดส่งมอบ FG ปิดออเดอร์',
           tag: `${Number(qty).toLocaleString()} ชิ้น`,
