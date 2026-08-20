@@ -9,7 +9,8 @@ import {
   Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, 
   Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
-  RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare
+  RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
+  ArrowUpDown, ArrowUp, ArrowDown
 } from 'lucide-react'
 import {
   Table,
@@ -69,6 +70,8 @@ export default function PlannerPage() {
   const [activeTab, setActiveTab] = useState("table")
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [historySearchQuery, setHistorySearchQuery] = useState("")
+  const [sortColumn, setSortColumn] = useState<string>("lot_no")
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -460,6 +463,20 @@ export default function PlannerPage() {
     XLSX.writeFile(wb, `PD_Master_Plan_History_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
   };
 
+  const handleSort = (columnKey: string) => {
+    if (sortColumn === columnKey) {
+      if (sortDirection === "asc") {
+        setSortDirection("desc")
+      } else {
+        setSortColumn("")
+        setSortDirection("asc")
+      }
+    } else {
+      setSortColumn(columnKey)
+      setSortDirection("asc")
+    }
+  }
+
   const filteredLots = lots.filter(lot => {
     if (activeTab === "completed" && lot.current_status !== "DONE") return false;
     if (activeTab !== "completed" && lot.current_status === "DONE") return false;
@@ -468,6 +485,62 @@ export default function PlannerPage() {
     return (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
       (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
       (lot.products?.sku?.toLowerCase() || "").includes(searchQuery.toLowerCase());
+  })
+
+  const sortedLots = [...filteredLots].sort((a, b) => {
+    if (!sortColumn) return 0
+
+    let aVal: any = ""
+    let bVal: any = ""
+
+    switch (sortColumn) {
+      case "po_sku":
+        aVal = `${a.po_no || ""} ${a.products?.sku || ""}`.toLowerCase()
+        bVal = `${b.po_no || ""} ${b.products?.sku || ""}`.toLowerCase()
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      case "lot_no":
+        return sortDirection === "asc" 
+          ? (a.lot_no || "").localeCompare(b.lot_no || "", undefined, { numeric: true }) 
+          : (b.lot_no || "").localeCompare(a.lot_no || "", undefined, { numeric: true })
+      case "order_quantity":
+        aVal = Number(a.order_quantity) || 0
+        bVal = Number(b.order_quantity) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "planned_quantity":
+        aVal = Number(a.planned_quantity) || 0
+        bVal = Number(b.planned_quantity) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "total_tanks":
+        aVal = Number(a.total_tanks) || 0
+        bVal = Number(b.total_tanks) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "kg_per_tank":
+        aVal = Number(a.kg_per_tank) || 0
+        bVal = Number(b.kg_per_tank) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "g_per_piece":
+        aVal = Number(a.g_per_piece) || 0
+        bVal = Number(b.g_per_piece) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "pcs_per_carton":
+        aVal = Number(a.pcs_per_carton) || 0
+        bVal = Number(b.pcs_per_carton) || 0
+        return sortDirection === "asc" ? aVal - bVal : bVal - aVal
+      case "order_type":
+        aVal = (a.order_type || "").toLowerCase()
+        bVal = (b.order_type || "").toLowerCase()
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      case "planned_start_date":
+        aVal = a.planned_start_date || a.fg_due_date_start || ""
+        bVal = b.planned_start_date || b.fg_due_date_start || ""
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      case "fg_due_date":
+        aVal = a.fg_due_date || ""
+        bVal = b.fg_due_date || ""
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      default:
+        return 0
+    }
   })
 
   const today = new Date()
@@ -924,6 +997,18 @@ export default function PlannerPage() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {sortColumn && (
+              <Button 
+                size="sm" 
+                variant="outline" 
+                onClick={() => setSortColumn("")} 
+                className="h-8 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 flex items-center gap-1"
+                title="คลิกเพื่อรีเซ็ตการเรียงลำดับ"
+              >
+                <span>เรียงตาม: {sortColumn} ({sortDirection.toUpperCase()})</span>
+                <X className="w-3 h-3 ml-1" />
+              </Button>
+            )}
             <div className="hidden md:flex bg-slate-100 p-1 rounded-md mr-2">
               <Button size="sm" variant={filterOrderType === "ALL" ? "default" : "ghost"} onClick={() => setFilterOrderType("ALL")} className="h-7 text-xs">ทั้งหมด</Button>
               <Button size="sm" variant={filterOrderType === "MTS" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTS")} className="h-7 text-xs">MTS</Button>
@@ -939,23 +1024,180 @@ export default function PlannerPage() {
               <TableHeader className="bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
                 <TableRow>
                   <TableHead className="w-[40px]"></TableHead>
-                  <TableHead className="min-w-[200px]">Project (PO/SKU)</TableHead>
-                  <TableHead>LOT</TableHead>
-                  <TableHead>ยอดออเดอร์</TableHead>
-                  <TableHead>FG Delivery</TableHead>
-                  <TableHead>จำนวนถัง</TableHead>
-                  <TableHead>Bulk (kg)</TableHead>
-                  <TableHead>บรรจุ (g)</TableHead>
-                  <TableHead>ลงลัง (ชิ้น)</TableHead>
-                  <TableHead>ประเภท</TableHead>
-                  <TableHead>วันที่เริ่มส่งมอบ FG (MTS)</TableHead>
-                  <TableHead>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</TableHead>
-                  <TableHead>กำหนดส่งมอบ FG (MTO)</TableHead>
+                  
+                  <TableHead 
+                    onClick={() => handleSort("po_sku")} 
+                    className="min-w-[200px] cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Project (PO/SKU)</span>
+                      {sortColumn === "po_sku" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("lot_no")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>LOT</span>
+                      {sortColumn === "lot_no" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("order_quantity")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>ยอดออเดอร์</span>
+                      {sortColumn === "order_quantity" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("planned_quantity")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>FG Delivery</span>
+                      {sortColumn === "planned_quantity" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("total_tanks")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>จำนวนถัง</span>
+                      {sortColumn === "total_tanks" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("kg_per_tank")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>Bulk (kg)</span>
+                      {sortColumn === "kg_per_tank" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("g_per_piece")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>บรรจุ (g)</span>
+                      {sortColumn === "g_per_piece" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("pcs_per_carton")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>ลงลัง (ชิ้น)</span>
+                      {sortColumn === "pcs_per_carton" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("order_type")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>ประเภท</span>
+                      {sortColumn === "order_type" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("planned_start_date")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>วันที่เริ่มส่งมอบ FG (MTS)</span>
+                      {sortColumn === "planned_start_date" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("fg_due_date")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</span>
+                      {sortColumn === "fg_due_date" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
+                  <TableHead 
+                    onClick={() => handleSort("fg_due_date")} 
+                    className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>กำหนดส่งมอบ FG (MTO)</span>
+                      {sortColumn === "fg_due_date" ? (
+                        sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
+                      ) : (
+                        <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
+                      )}
+                    </div>
+                  </TableHead>
+
                   <TableHead className="min-w-[150px] text-right">จัดการ</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredLots.map((lot) => {
+                {sortedLots.map((lot) => {
                   const isExpanded = expandedLots[lot.id]
                   const lotLogs = getSortedLotLogs(lot.id)
                   
