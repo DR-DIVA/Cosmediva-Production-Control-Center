@@ -138,6 +138,23 @@ export default function PofTasksPage() {
         (t.processes as any)?.process_name?.toLowerCase().includes('pof') || 
         (t.processes as any)?.process_name?.toLowerCase().includes('อุโมงค์')
       )
+
+      // Sort tasks: 1. Lot No (005/26 before 006/26), 2. Tank start numeric (1, 3, 5...), 3. Activity Date
+      pofTasks.sort((a: any, b: any) => {
+        const lotA = (a.production_lots?.lot_no || '').toString()
+        const lotB = (b.production_lots?.lot_no || '').toString()
+        const lotCompare = lotA.localeCompare(lotB, undefined, { numeric: true })
+        if (lotCompare !== 0) return lotCompare
+
+        const startA = parseInt(a.tank_start) || 0
+        const startB = parseInt(b.tank_start) || 0
+        if (startA !== startB) return startA - startB
+
+        const dateA = a.activity_date || ''
+        const dateB = b.activity_date || ''
+        return dateA.localeCompare(dateB)
+      })
+
       setAllTasks(data)
       setTasks(pofTasks)
       setSelectedTask((prev: any) => prev ? pofTasks.find(t => t.id === prev.id) || null : null)
