@@ -372,10 +372,13 @@ export default function UsersPage() {
               <SelectItem value="custom">-- กำหนดโมดูลเองอย่างอิสระ (Custom) --</SelectItem>
               <SelectItem value="admin">⭐ ผู้ดูแลระบบ (Admin - ทุกโมดูล)</SelectItem>
               <SelectItem value="planner">📋 ฝ่ายวางแผนผลิต (Planning)</SelectItem>
+              <SelectItem value="production">🏭 ฝ่ายผลิต (Production - ทุกสถานี)</SelectItem>
               <SelectItem value="production_mx">🥣 แผนกผสม (Production MX)</SelectItem>
               <SelectItem value="production_pk">📦 แผนกบรรจุและลงลัง (Production PK/POF)</SelectItem>
               <SelectItem value="qc">🔬 ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
               <SelectItem value="qa">🛡️ ฝ่ายประกันคุณภาพ (QA)</SelectItem>
+              <SelectItem value="ra">📑 ฝ่ายขึ้นทะเบียน (RA)</SelectItem>
+              <SelectItem value="acc">💰 ฝ่ายบัญชีและการเงิน (ACC)</SelectItem>
               <SelectItem value="warehouse_mmrm_bu">🏭 คลังวัตถุดิบ (MMRM / BU)</SelectItem>
               <SelectItem value="warehouse_mmpm_fg">🏬 คลังบรรจุภัณฑ์และ FG (MMPM / FG)</SelectItem>
               <SelectItem value="purchase">🛒 ฝ่ายจัดซื้อ (Purchase)</SelectItem>

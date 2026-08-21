@@ -134,6 +134,22 @@ export const ROLE_TEMPLATES: Record<string, { label: string; modules: string[] }
       'qc', 'issues'
     ]
   },
+  ra: {
+    label: 'ฝ่ายขึ้นทะเบียน (Regulatory Affairs - RA)',
+    modules: ['dashboard', 'planner', 'incoming-rm', 'qc', 'issues', 'master-data']
+  },
+  acc: {
+    label: 'ฝ่ายบัญชีและการเงิน (Accounting - ACC)',
+    modules: ['dashboard', 'planner', 'costing', 'purchase', 'fg', 'master-data']
+  },
+  production: {
+    label: 'ฝ่ายผลิต (Production - ทุกสถานี)',
+    modules: [
+      'dashboard', 'incoming-rm', 'production', 
+      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
+      'qc', 'issues'
+    ]
+  },
   warehouse_mmrm_bu: {
     label: 'คลังวัตถุดิบ (MMRM / BU)',
     modules: ['dashboard', 'incoming-rm', 'production', 'production_weighing']
