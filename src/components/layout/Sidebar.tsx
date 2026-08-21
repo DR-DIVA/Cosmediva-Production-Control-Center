@@ -29,6 +29,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
+import { hasAccessToRoute } from '@/lib/permissions'
 
 
 const routes = [
@@ -173,7 +174,14 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
   useEffect(() => {
     const fetchRole = async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUserRole(user?.user_metadata?.role || 'user')
+      if (user) {
+        try {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+          setUserRole(profile?.role || user.user_metadata?.role || 'user')
+        } catch {
+          setUserRole(user.user_metadata?.role || 'user')
+        }
+      }
     }
     fetchRole()
 
@@ -248,22 +256,33 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
     }
   }
 
-  // Filter routes based on role
+  // Filter routes based on role and custom permissions
   const filteredRoutes = routes.filter(route => {
-    if (!route.allowedRoles) return true; // if no restrictions, allow all
-    return userRole && route.allowedRoles.includes(userRole);
+    if (!userRole) return false;
+    if (userRole === 'admin') return true;
+    if (userRole.startsWith('custom:')) {
+      return hasAccessToRoute(route.href, userRole);
+    }
+    return !route.allowedRoles || route.allowedRoles.includes(userRole);
   }).map(route => {
     // Also filter subRoutes if they exist
     if (route.subRoutes) {
       return {
         ...route,
         subRoutes: route.subRoutes.filter(sub => {
-          if (!sub.allowedRoles) return true;
-          return userRole && sub.allowedRoles.includes(userRole);
+          if (!userRole) return false;
+          if (userRole === 'admin') return true;
+          if (userRole.startsWith('custom:')) {
+            return hasAccessToRoute(sub.href, userRole);
+          }
+          return !sub.allowedRoles || sub.allowedRoles.includes(userRole);
         })
       }
     }
     return route;
+  }).filter(route => {
+    if (route.subRoutes && route.subRoutes.length === 0) return false;
+    return true;
   })
 
   return (
