@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { 
   Plus, Search, RefreshCw, KeyRound, CheckSquare, 
-  Layers, Check, ShieldCheck, UserCheck, Sparkles, X, ChevronDown, ChevronRight, Info
+  Layers, Check, ShieldCheck, UserCheck, Sparkles, X, ChevronDown, ChevronRight, Info,
+  Eye, Edit3, Lock, Shield
 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -26,25 +27,31 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 import { getUsers, createUser, updateUser, deleteUser } from '@/app/actions/users'
-import { APP_MODULES, ROLE_TEMPLATES, getRoleDisplay } from '@/lib/permissions'
+import { 
+  ALL_MODULE_IDS, 
+  ROLE_TEMPLATES, 
+  parseRolePermissions, 
+  formatPermissionsToRole, 
+  getRoleDisplay,
+  AccessLevel 
+} from '@/lib/permissions'
 
-// Module groups for organized display in checkboxes
+// Module groups for organized display
 const MODULE_GROUPS = [
   {
     groupName: '📊 วางแผนและภาพรวม (Planning & Dashboard)',
     items: [
-      { id: 'dashboard', label: 'CosmeFlow Dashboard', desc: 'แดชบอร์ดภาพรวมโรงงาน' },
-      { id: 'planner', label: 'CosmeFlow Planning', desc: 'วางแผนการผลิตแม่บท (PD Master Plan)' },
+      { id: 'dashboard', label: 'CosmeFlow Dashboard', desc: 'แดชบอร์ดภาพรวมโรงงานและ Rolling Radar' },
+      { id: 'planner', label: 'CosmeFlow Planning', desc: 'วางแผนการผลิตแม่บท (PD Master Plan & KPI)' },
     ]
   },
   {
     groupName: '🏭 กระบวนการผลิต (Production Workstations)',
     items: [
-      { id: 'production_overview', label: 'ภาพรวมการผลิต (Overview)', desc: 'แดชบอร์ดติดตามคิวผลิต' },
+      { id: 'production_overview', label: 'ภาพรวมการผลิต (Overview)', desc: 'แดชบอร์ดติดตามคิวผลิตทุกไลน์' },
       { id: 'production_weighing', label: 'ชั่งสาร (Weighing)', desc: 'สถานีเตรียมและชั่งสารเคมี' },
       { id: 'production_mixing', label: 'งานผสม (Mixing)', desc: 'สถานีผสมเนื้อ Bulk' },
       { id: 'production_packing', label: 'งานบรรจุ (Packing)', desc: 'สถานีบรรจุและติดฉลาก' },
@@ -77,8 +84,6 @@ const MODULE_GROUPS = [
   }
 ]
 
-const ALL_MODULE_IDS = MODULE_GROUPS.flatMap(g => g.items.map(i => i.id))
-
 export default function UsersPage() {
   const [users, setUsers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -90,7 +95,7 @@ export default function UsersPage() {
   const [newUserId, setNewUserId] = useState('')
   const [newUserName, setNewUserName] = useState('')
   const [newUserPassword, setNewUserPassword] = useState('123456')
-  const [newUserSelectedModules, setNewUserSelectedModules] = useState<string[]>([])
+  const [newUserPerms, setNewUserPerms] = useState<Record<string, 'VIEW' | 'EDIT'>>({})
   const [newUserTemplate, setNewUserTemplate] = useState<string>('custom')
 
   // Edit User Modal State
@@ -98,7 +103,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<any>(null)
   const [editUserName, setEditUserName] = useState('')
   const [editUserPassword, setEditUserPassword] = useState('')
-  const [editUserSelectedModules, setEditUserSelectedModules] = useState<string[]>([])
+  const [editUserPerms, setEditUserPerms] = useState<Record<string, 'VIEW' | 'EDIT'>>({})
   const [editUserTemplate, setEditUserTemplate] = useState<string>('custom')
 
   const fetchUsersData = async () => {
@@ -127,60 +132,52 @@ export default function UsersPage() {
     u.full_name?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  // Parse existing user role string into array of module IDs
-  const parseRoleToModules = (roleString: string): string[] => {
-    if (!roleString) return []
-    if (roleString === 'admin') return [...ALL_MODULE_IDS]
-    if (roleString.startsWith('custom:')) {
-      return roleString.replace('custom:', '').split(',').map(s => s.trim()).filter(Boolean)
-    }
-    if (ROLE_TEMPLATES[roleString]) {
-      return [...ROLE_TEMPLATES[roleString].modules]
-    }
-    return []
-  }
-
-  // Convert array of module IDs back into role string for saving
-  const formatModulesToRole = (modules: string[]): string => {
-    if (modules.length === 0) return 'custom:'
-    // If all modules selected, mark as admin
-    if (ALL_MODULE_IDS.every(m => modules.includes(m))) {
-      return 'admin'
-    }
-    return `custom:${modules.join(',')}`
-  }
-
   // Handle template preset change
   const handleTemplateSelect = (templateKey: string, isEdit: boolean) => {
-    if (templateKey === 'all') {
+    if (templateKey === 'all_edit') {
+      const all: Record<string, 'VIEW' | 'EDIT'> = {}
+      ALL_MODULE_IDS.forEach(m => all[m] = 'EDIT')
       if (isEdit) {
-        setEditUserSelectedModules([...ALL_MODULE_IDS])
-        setEditUserTemplate('all')
+        setEditUserPerms(all)
+        setEditUserTemplate('admin')
       } else {
-        setNewUserSelectedModules([...ALL_MODULE_IDS])
-        setNewUserTemplate('all')
+        setNewUserPerms(all)
+        setNewUserTemplate('admin')
+      }
+      return
+    }
+
+    if (templateKey === 'all_view') {
+      const all: Record<string, 'VIEW' | 'EDIT'> = {}
+      ALL_MODULE_IDS.forEach(m => all[m] = 'VIEW')
+      if (isEdit) {
+        setEditUserPerms(all)
+        setEditUserTemplate('custom')
+      } else {
+        setNewUserPerms(all)
+        setNewUserTemplate('custom')
       }
       return
     }
 
     if (templateKey === 'clear') {
       if (isEdit) {
-        setEditUserSelectedModules([])
+        setEditUserPerms({})
         setEditUserTemplate('custom')
       } else {
-        setNewUserSelectedModules([])
+        setNewUserPerms({})
         setNewUserTemplate('custom')
       }
       return
     }
 
     if (ROLE_TEMPLATES[templateKey]) {
-      const targetModules = ROLE_TEMPLATES[templateKey].modules
+      const targetPerms = { ...ROLE_TEMPLATES[templateKey].perms }
       if (isEdit) {
-        setEditUserSelectedModules([...targetModules])
+        setEditUserPerms(targetPerms)
         setEditUserTemplate(templateKey)
       } else {
-        setNewUserSelectedModules([...targetModules])
+        setNewUserPerms(targetPerms)
         setNewUserTemplate(templateKey)
       }
     } else {
@@ -189,17 +186,27 @@ export default function UsersPage() {
     }
   }
 
-  // Toggle single module checkbox
-  const handleModuleToggle = (moduleId: string, isEdit: boolean) => {
+  // Set permission level for a single module
+  const handleSetModuleLevel = (moduleId: string, level: AccessLevel, isEdit: boolean) => {
     if (isEdit) {
-      setEditUserSelectedModules(prev => {
-        const next = prev.includes(moduleId) ? prev.filter(m => m !== moduleId) : [...prev, moduleId]
+      setEditUserPerms(prev => {
+        const next = { ...prev }
+        if (level === 'NONE') {
+          delete next[moduleId]
+        } else {
+          next[moduleId] = level
+        }
         setEditUserTemplate('custom')
         return next
       })
     } else {
-      setNewUserSelectedModules(prev => {
-        const next = prev.includes(moduleId) ? prev.filter(m => m !== moduleId) : [...prev, moduleId]
+      setNewUserPerms(prev => {
+        const next = { ...prev }
+        if (level === 'NONE') {
+          delete next[moduleId]
+        } else {
+          next[moduleId] = level
+        }
         setNewUserTemplate('custom')
         return next
       })
@@ -211,7 +218,7 @@ export default function UsersPage() {
     setNewUserId('')
     setNewUserName('')
     setNewUserPassword('123456')
-    setNewUserSelectedModules([])
+    setNewUserPerms({})
     setNewUserTemplate('custom')
     setIsAddModalOpen(true)
   }
@@ -223,8 +230,9 @@ export default function UsersPage() {
       return
     }
 
-    if (newUserSelectedModules.length === 0) {
-      toast.error('กรุณาเลือกโมดูลที่พนักงานสามารถเข้าถึงได้อย่างน้อย 1 โมดูล')
+    const permittedCount = Object.keys(newUserPerms).length
+    if (permittedCount === 0) {
+      toast.error('กรุณากำหนดสิทธิ์เข้าถึงโมดูลอย่างน้อย 1 โมดูล (ดูอย่างเดียว หรือ แก้ไขได้)')
       return
     }
 
@@ -232,7 +240,7 @@ export default function UsersPage() {
     const toastId = toast.loading('กำลังสร้างบัญชีพนักงาน...')
 
     try {
-      const finalRole = formatModulesToRole(newUserSelectedModules)
+      const finalRole = formatPermissionsToRole(newUserPerms)
       const res = await createUser({
         employee_id: newUserId,
         full_name: newUserName,
@@ -260,8 +268,8 @@ export default function UsersPage() {
     setEditUserName(user.full_name || '')
     setEditUserPassword('')
     
-    const parsedModules = parseRoleToModules(user.role)
-    setEditUserSelectedModules(parsedModules)
+    const parsedPerms = parseRolePermissions(user.role)
+    setEditUserPerms(parsedPerms)
     
     // Check if matches template
     if (user.role === 'admin') setEditUserTemplate('admin')
@@ -278,8 +286,9 @@ export default function UsersPage() {
       return
     }
 
-    if (editUserSelectedModules.length === 0) {
-      toast.error('กรุณาเลือกโมดูลที่พนักงานสามารถเข้าถึงได้อย่างน้อย 1 โมดูล')
+    const permittedCount = Object.keys(editUserPerms).length
+    if (permittedCount === 0) {
+      toast.error('กรุณากำหนดสิทธิ์เข้าถึงโมดูลอย่างน้อย 1 โมดูล (ดูอย่างเดียว หรือ แก้ไขได้)')
       return
     }
     
@@ -287,7 +296,7 @@ export default function UsersPage() {
     const toastId = toast.loading('กำลังอัปเดตสิทธิ์การใช้งาน...')
     
     try {
-      const finalRole = formatModulesToRole(editUserSelectedModules)
+      const finalRole = formatPermissionsToRole(editUserPerms)
       const res = await updateUser(editingUser.id, {
         full_name: editUserName,
         role: finalRole,
@@ -331,33 +340,46 @@ export default function UsersPage() {
     }
   }
 
-  // Render Module Checkbox Picker inside Dialog
-  const renderModulePicker = (selectedModules: string[], isEdit: boolean, currentTemplate: string) => {
+  // Render Granular Module Permission Matrix inside Dialog
+  const renderGranularPicker = (currentPerms: Record<string, 'VIEW' | 'EDIT' | undefined>, isEdit: boolean, currentTemplate: string) => {
+    const totalAllowed = Object.values(currentPerms).filter(Boolean).length
+    const editCount = Object.values(currentPerms).filter(v => v === 'EDIT').length
+    const viewCount = Object.values(currentPerms).filter(v => v === 'VIEW').length
+
     return (
       <div className="space-y-4">
         {/* Quick Template Selector */}
         <div className="bg-[#F8F6F0] p-3 rounded-xl border border-[#D4AF37]/30 space-y-2.5">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
             <Label className="text-xs font-bold text-[#4A4238] flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
-              เลือกสิทธิ์เริ่มต้นจากแม่แบบ (Template):
+              เลือกสิทธิ์เริ่มต้นตามแผนก (Presets):
             </Label>
-            <div className="flex gap-1.5">
+            <div className="flex flex-wrap gap-1">
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
-                onClick={() => handleTemplateSelect('all', isEdit)}
-                className="h-6 text-[11px] px-2 bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100"
+                onClick={() => handleTemplateSelect('all_edit', isEdit)}
+                className="h-6 text-[10px] px-2 bg-purple-50 text-purple-700 border-purple-300 hover:bg-purple-100"
               >
-                เลือกทั้งหมด ({ALL_MODULE_IDS.length})
+                ✏️ แก้ไขได้ทั้งหมด
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => handleTemplateSelect('all_view', isEdit)}
+                className="h-6 text-[10px] px-2 bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100"
+              >
+                👁️ ดูอย่างเดียวทั้งหมด
               </Button>
               <Button
                 type="button"
                 size="sm"
                 variant="outline"
                 onClick={() => handleTemplateSelect('clear', isEdit)}
-                className="h-6 text-[11px] px-2 bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100"
+                className="h-6 text-[10px] px-2 bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100"
               >
                 ล้างทั้งหมด
               </Button>
@@ -369,16 +391,16 @@ export default function UsersPage() {
               <SelectValue placeholder="เลือกแม่แบบสิทธิ์ตามแผนก..." />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="custom">-- กำหนดโมดูลเองอย่างอิสระ (Custom) --</SelectItem>
-              <SelectItem value="admin">⭐ ผู้ดูแลระบบ (Admin - ทุกโมดูล)</SelectItem>
+              <SelectItem value="custom">-- ⚙️ กำหนดระดับสิทธิ์เองอย่างอิสระ (Custom Matrix) --</SelectItem>
+              <SelectItem value="admin">⭐ ผู้ดูแลระบบ (Admin - แก้ไขได้ทุกโมดูล)</SelectItem>
               <SelectItem value="planner">📋 ฝ่ายวางแผนผลิต (Planning)</SelectItem>
+              <SelectItem value="ra">📑 ฝ่ายขึ้นทะเบียน (RA - ดูอย่างเดียวเกือบทั้งหมด)</SelectItem>
+              <SelectItem value="acc">💰 ฝ่ายบัญชีและการเงิน (ACC - Costing Edit + View)</SelectItem>
               <SelectItem value="production">🏭 ฝ่ายผลิต (Production - ทุกสถานี)</SelectItem>
               <SelectItem value="production_mx">🥣 แผนกผสม (Production MX)</SelectItem>
               <SelectItem value="production_pk">📦 แผนกบรรจุและลงลัง (Production PK/POF)</SelectItem>
               <SelectItem value="qc">🔬 ฝ่ายควบคุมคุณภาพ (QC)</SelectItem>
               <SelectItem value="qa">🛡️ ฝ่ายประกันคุณภาพ (QA)</SelectItem>
-              <SelectItem value="ra">📑 ฝ่ายขึ้นทะเบียน (RA)</SelectItem>
-              <SelectItem value="acc">💰 ฝ่ายบัญชีและการเงิน (ACC)</SelectItem>
               <SelectItem value="warehouse_mmrm_bu">🏭 คลังวัตถุดิบ (MMRM / BU)</SelectItem>
               <SelectItem value="warehouse_mmpm_fg">🏬 คลังบรรจุภัณฑ์และ FG (MMPM / FG)</SelectItem>
               <SelectItem value="purchase">🛒 ฝ่ายจัดซื้อ (Purchase)</SelectItem>
@@ -388,63 +410,126 @@ export default function UsersPage() {
           </Select>
         </div>
 
-        {/* Checkbox Groups */}
-        <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
-          <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
-            <span>ติ๊กเลือกโมดูลที่ต้องการให้พนักงานคนนี้เข้าถึงได้:</span>
-            <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full text-[11px]">
-              เลือกแล้ว {selectedModules.length} / {ALL_MODULE_IDS.length} โมดูล
-            </span>
+        {/* Granular Permission Rows */}
+        <div className="space-y-3 max-h-[380px] overflow-y-auto pr-1">
+          <div className="text-xs font-bold text-slate-700 flex items-center justify-between pb-1">
+            <span>กำหนดสิทธิ์รายโมดูล:</span>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-md font-bold">
+                ✏️ แก้ไขได้ {editCount}
+              </span>
+              <span className="bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded-md font-bold">
+                👁️ ดูอย่างเดียว {viewCount}
+              </span>
+              <span className="text-slate-400 font-normal">
+                (รวม {totalAllowed}/{ALL_MODULE_IDS.length})
+              </span>
+            </div>
           </div>
 
           {MODULE_GROUPS.map((group) => (
-            <div key={group.groupName} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2 shadow-2xs">
-              <div className="text-xs font-bold text-slate-800 pb-1 border-b border-slate-100 flex items-center justify-between">
+            <div key={group.groupName} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2.5 shadow-2xs">
+              <div className="text-xs font-bold text-slate-800 pb-1.5 border-b border-slate-100 flex items-center justify-between">
                 <span>{group.groupName}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const groupIds = group.items.map(i => i.id)
-                    const allInGroup = groupIds.every(id => selectedModules.includes(id))
-                    if (allInGroup) {
-                      // uncheck all in this group
-                      if (isEdit) setEditUserSelectedModules(prev => prev.filter(id => !groupIds.includes(id)))
-                      else setNewUserSelectedModules(prev => prev.filter(id => !groupIds.includes(id)))
-                    } else {
-                      // check all in this group
-                      if (isEdit) setEditUserSelectedModules(prev => Array.from(new Set([...prev, ...groupIds])))
-                      else setNewUserSelectedModules(prev => Array.from(new Set([...prev, ...groupIds])))
-                    }
-                  }}
-                  className="text-[10px] text-blue-600 hover:underline font-semibold"
-                >
-                  {group.items.every(i => selectedModules.includes(i.id)) ? 'ยกเลิกกลุ่มนี้' : 'เลือกทั้งกลุ่ม'}
-                </button>
+                <div className="flex gap-1.5 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      group.items.forEach(i => handleSetModuleLevel(i.id, 'EDIT', isEdit))
+                    }}
+                    className="text-emerald-700 hover:underline font-semibold"
+                  >
+                    แก้ไขทั้งหมด
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      group.items.forEach(i => handleSetModuleLevel(i.id, 'VIEW', isEdit))
+                    }}
+                    className="text-blue-700 hover:underline font-semibold"
+                  >
+                    ดูทั้งหมด
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      group.items.forEach(i => handleSetModuleLevel(i.id, 'NONE', isEdit))
+                    }}
+                    className="text-slate-500 hover:underline"
+                  >
+                    ปิดกลุ่มนี้
+                  </button>
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="space-y-1.5">
                 {group.items.map((item) => {
-                  const isChecked = selectedModules.includes(item.id)
+                  const currentLevel: AccessLevel = (currentPerms[item.id] as AccessLevel) || 'NONE'
+
                   return (
-                    <label
+                    <div
                       key={item.id}
-                      className={`flex items-start gap-2.5 p-2 rounded-lg border cursor-pointer transition-all ${
-                        isChecked 
-                          ? 'bg-blue-50/70 border-blue-300 ring-1 ring-blue-300/40 text-blue-950' 
-                          : 'bg-slate-50/50 border-slate-200/80 hover:bg-slate-100 text-slate-700'
+                      className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 rounded-lg border transition-all ${
+                        currentLevel === 'EDIT'
+                          ? 'bg-emerald-50/60 border-emerald-300 text-emerald-950'
+                          : currentLevel === 'VIEW'
+                          ? 'bg-blue-50/60 border-blue-300 text-blue-950'
+                          : 'bg-slate-50/40 border-slate-200/80 text-slate-500 opacity-70 hover:opacity-100'
                       }`}
                     >
-                      <input
-                        type="checkbox"
-                        checked={isChecked}
-                        onChange={() => handleModuleToggle(item.id, isEdit)}
-                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer accent-blue-600 shrink-0"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-semibold leading-tight">{item.label}</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold leading-tight flex items-center gap-1.5">
+                          {currentLevel === 'EDIT' ? (
+                            <Edit3 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                          ) : currentLevel === 'VIEW' ? (
+                            <Eye className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                          ) : (
+                            <Lock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                          )}
+                          <span>{item.label}</span>
+                        </div>
                         <div className="text-[10px] text-slate-500 truncate mt-0.5">{item.desc}</div>
                       </div>
-                    </label>
+
+                      {/* 3-State Segmented Buttons */}
+                      <div className="flex bg-white/90 p-0.5 rounded-lg border border-slate-200/90 shrink-0 shadow-2xs self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuleLevel(item.id, 'NONE', isEdit)}
+                          className={`px-2 py-1 text-[10px] font-semibold rounded-md transition-all ${
+                            currentLevel === 'NONE'
+                              ? 'bg-slate-200 text-slate-800 shadow-2xs'
+                              : 'text-slate-400 hover:text-slate-700'
+                          }`}
+                        >
+                          ⚪ ปิด
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuleLevel(item.id, 'VIEW', isEdit)}
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                            currentLevel === 'VIEW'
+                              ? 'bg-blue-600 text-white shadow-2xs'
+                              : 'text-blue-700 hover:bg-blue-50'
+                          }`}
+                        >
+                          👁️ ดูอย่างเดียว
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetModuleLevel(item.id, 'EDIT', isEdit)}
+                          className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
+                            currentLevel === 'EDIT'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-emerald-700 hover:bg-emerald-50'
+                          }`}
+                        >
+                          ✏️ แก้ไขได้
+                        </button>
+                      </div>
+                    </div>
                   )
                 })}
               </div>
@@ -463,7 +548,7 @@ export default function UsersPage() {
             จัดการผู้ใช้งาน
           </h1>
           <p className="text-sm text-[#8B7355] mt-1 font-medium">
-            กำหนดสิทธิ์การเข้าถึงโมดูลของพนักงานแต่ละคนอย่างอิสระ ไม่จำกัดตามแผนก
+            กำหนดสิทธิ์การเข้าถึงโมดูลอย่างละเอียด: ดูได้อย่างเดียว (View Only) หรือ แก้ไข/บันทึกได้ (Can Edit)
           </p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
@@ -479,14 +564,14 @@ export default function UsersPage() {
 
           {/* Add User Modal */}
           <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-            <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[700px] max-h-[92vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-lg font-bold text-[#4A4238]">
                   <UserCheck className="w-5 h-5 text-[#D4AF37]" />
-                  เพิ่มพนักงานใหม่ & กำหนดสิทธิ์เข้าโมดูล
+                  เพิ่มพนักงานใหม่ & กำหนดระดับสิทธิ์ (ดูอย่างเดียว / แก้ไขได้)
                 </DialogTitle>
                 <DialogDescription>
-                  กรอกข้อมูลพนักงานและติ๊กเลือกโมดูลที่ต้องการให้พนักงานคนนี้สามารถใช้งานได้
+                  กรอกข้อมูลพนักงานและเลือกระดับสิทธิ์ของแต่ละโมดูลอย่างอิสระ
                 </DialogDescription>
               </DialogHeader>
 
@@ -524,8 +609,8 @@ export default function UsersPage() {
                   <p className="text-xs font-mono font-bold text-slate-800">{newUserPassword}</p>
                 </div>
 
-                {/* Module Checkbox Selector */}
-                {renderModulePicker(newUserSelectedModules, false, newUserTemplate)}
+                {/* Granular Permission Picker */}
+                {renderGranularPicker(newUserPerms, false, newUserTemplate)}
               </div>
 
               <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-slate-100">
@@ -543,11 +628,11 @@ export default function UsersPage() {
 
       {/* Edit User Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[650px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-[700px] max-h-[92vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg font-bold text-[#4A4238]">
               <UserCheck className="w-5 h-5 text-[#D4AF37]" />
-              แก้ไขข้อมูล & ปรับสิทธิ์โมดูลพนักงาน
+              แก้ไขข้อมูล & ปรับระดับสิทธิ์พนักงาน
             </DialogTitle>
             <DialogDescription>
               พนักงานรหัส: <strong className="text-slate-900">{editingUser?.employee_id}</strong>
@@ -589,8 +674,8 @@ export default function UsersPage() {
               />
             </div>
 
-            {/* Module Checkbox Selector */}
-            {renderModulePicker(editUserSelectedModules, true, editUserTemplate)}
+            {/* Granular Permission Picker */}
+            {renderGranularPicker(editUserPerms, true, editUserTemplate)}
           </div>
 
           <DialogFooter className="flex justify-between items-center sm:justify-between w-full pt-2 border-t border-slate-100">
@@ -636,7 +721,7 @@ export default function UsersPage() {
                 <tr>
                   <th className="px-4 py-3 font-bold">รหัสพนักงาน</th>
                   <th className="px-4 py-3 font-bold">ชื่อ-สกุล</th>
-                  <th className="px-4 py-3 font-bold">สิทธิ์โมดูลที่เข้าได้</th>
+                  <th className="px-4 py-3 font-bold">สิทธิ์โมดูลที่เข้าถึงได้</th>
                   <th className="px-4 py-3 font-bold">วันที่สร้าง</th>
                   <th className="px-4 py-3 font-bold text-right">จัดการ</th>
                 </tr>
@@ -658,7 +743,8 @@ export default function UsersPage() {
                 ) : (
                   filteredUsers.map((user) => {
                     const roleInfo = getRoleDisplay(user.role)
-                    const userModules = parseRoleToModules(user.role)
+                    const userPerms = parseRolePermissions(user.role)
+                    const entries = Object.entries(userPerms)
 
                     return (
                       <tr key={user.id} className="hover:bg-[#F8F6F0]/80 transition-colors">
@@ -674,27 +760,32 @@ export default function UsersPage() {
                               {roleInfo.label}
                             </Badge>
 
-                            {/* Popover to view full module list */}
-                            {userModules.length > 0 && user.role !== 'admin' && (
+                            {/* Popover to view full granular permission breakdown */}
+                            {entries.length > 0 && user.role !== 'admin' && (
                               <Popover>
                                 <PopoverTrigger className="text-[10px] text-blue-600 hover:text-blue-800 underline font-semibold flex items-center gap-0.5">
-                                  <span>ดูโมดูล ({userModules.length})</span>
+                                  <span>ดูรายละเอียด</span>
                                   <Info className="w-3 h-3" />
                                 </PopoverTrigger>
-                                <PopoverContent className="w-64 p-3 bg-white shadow-xl rounded-xl border border-slate-200 text-xs">
-                                  <div className="font-bold text-slate-800 mb-2 border-b pb-1">
-                                    โมดูลที่อนุญาต ({userModules.length}):
+                                <PopoverContent className="w-72 p-3 bg-white shadow-xl rounded-xl border border-slate-200 text-xs">
+                                  <div className="font-bold text-slate-800 mb-2 border-b pb-1 flex justify-between items-center">
+                                    <span>สิทธิ์การใช้งาน ({entries.length} โมดูล):</span>
                                   </div>
-                                  <div className="space-y-1 max-h-48 overflow-y-auto text-[11px] text-slate-600">
-                                    {userModules.map(mId => {
-                                      const found = ALL_MODULE_IDS.includes(mId)
-                                      return (
-                                        <div key={mId} className="flex items-center gap-1.5">
-                                          <Check className="w-3 h-3 text-emerald-600 shrink-0" />
-                                          <span>{mId}</span>
-                                        </div>
-                                      )
-                                    })}
+                                  <div className="space-y-1.5 max-h-56 overflow-y-auto text-[11px]">
+                                    {entries.map(([mId, lvl]) => (
+                                      <div key={mId} className="flex items-center justify-between gap-1.5 border-b border-slate-50 pb-1">
+                                        <span className="text-slate-700 font-medium truncate">{mId}</span>
+                                        {lvl === 'EDIT' ? (
+                                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                                            ✏️ แก้ไขได้
+                                          </span>
+                                        ) : (
+                                          <span className="text-blue-700 bg-blue-50 border border-blue-200 px-1.5 py-0.2 rounded text-[10px] font-bold">
+                                            👁️ ดูอย่างเดียว
+                                          </span>
+                                        )}
+                                      </div>
+                                    ))}
                                   </div>
                                 </PopoverContent>
                               </Popover>
@@ -708,7 +799,7 @@ export default function UsersPage() {
                           <Button 
                             variant="outline" 
                             size="sm" 
-                            className="h-7 text-xs border-slate-200 hover:bg-slate-100 text-slate-700" 
+                            className="h-7 text-xs border-slate-200 hover:bg-slate-100 text-slate-700 font-medium" 
                             onClick={() => handleEditClick(user)}
                           >
                             แก้ไขสิทธิ์

@@ -38,6 +38,7 @@ import { toast } from "sonner"
 import { getUsers } from '@/app/actions/users'
 import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
+import { canEditRoute } from "@/lib/permissions"
 import { TaskCalendar } from "@/components/ui/TaskCalendar"
 
 const supabase = createClient(
@@ -86,6 +87,8 @@ export default function PlannerPage() {
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserRole, setCurrentUserRole] = useState<string>('admin')
+  const canEdit = canEditRoute('/planner', currentUserRole)
 
   const [isDoneDialogOpen, setIsDoneDialogOpen] = useState(false)
   const [doneLotId, setDoneLotId] = useState<string | null>(null)
@@ -99,6 +102,12 @@ export default function PlannerPage() {
       if (user) {
         setCurrentUserId(user.id)
         setCurrentUser(user.email || 'Unknown User')
+        try {
+          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+          setCurrentUserRole(profile?.role || user.user_metadata?.role || 'admin')
+        } catch {
+          setCurrentUserRole(user.user_metadata?.role || 'admin')
+        }
       }
     }
     fetchUser()
@@ -625,7 +634,12 @@ export default function PlannerPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <CalendarDays className="w-8 h-8 text-yellow-500 shrink-0" />
-            CosmeFlow Planning: PD Master Plan
+            <span>CosmeFlow Planning: PD Master Plan</span>
+            {!canEdit && (
+              <span className="text-xs bg-blue-100 text-blue-800 border border-blue-200 px-2.5 py-1 rounded-full font-bold">
+                👁️ ดูอย่างเดียว (View Only)
+              </span>
+            )}
           </h1>
           <div className="text-sm text-[#8B7355] flex flex-col mt-2 font-medium space-y-1">
             <div>วางแผนการผลิตแม่บท, ควบคุมความพร้อม และติดตามกำหนดส่งมอบ FG</div>
@@ -659,19 +673,21 @@ export default function PlannerPage() {
             รีเฟรช
           </Button>
           <Button variant="outline" size="sm"><Download className="w-4 h-4 mr-2" /> Export</Button>
-          <Button onClick={() => {
-            setNewLot({
-              id: "", product_id: "", lot_number: "", target_quantity: "",
-              total_tanks: "", kg_per_tank: "", g_per_piece: "",
-              capacity_min: "", capacity_max: "", pcs_per_carton: "",
-              order_quantity: "", po_no: "", order_type: "MTS",
-              fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
-              mfg_date: "", exp_date: "", product_name: ""
-            })
-            setIsDialogOpen(true)
-          }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
-            <Plus className="w-4 h-4 mr-2" /> เพิ่มออเดอร์ใหม่ (Project)
-          </Button>
+          {canEdit && (
+            <Button onClick={() => {
+              setNewLot({
+                id: "", product_id: "", lot_number: "", target_quantity: "",
+                total_tanks: "", kg_per_tank: "", g_per_piece: "",
+                capacity_min: "", capacity_max: "", pcs_per_carton: "",
+                order_quantity: "", po_no: "", order_type: "MTS",
+                fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
+                mfg_date: "", exp_date: "", product_name: ""
+              })
+              setIsDialogOpen(true)
+            }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
+              <Plus className="w-4 h-4 mr-2" /> เพิ่มออเดอร์ใหม่ (Project)
+            </Button>
+          )}
         </div>
       </div>
 
@@ -1260,16 +1276,22 @@ export default function PlannerPage() {
                           ) : "-"}
                         </TableCell>
                         <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {activeTab !== "completed" && (
-                              <Button variant="outline" size="sm" className="h-8 px-3 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleMarkAsDoneClick(lot.id); }}>
-                                <CheckCircle2 className="w-4 h-4 mr-1.5" /> ปิดงาน
+                          {canEdit ? (
+                            <div className="flex justify-end gap-2">
+                              {activeTab !== "completed" && (
+                                <Button variant="outline" size="sm" className="h-8 px-3 text-emerald-600 border-emerald-200 bg-emerald-50 hover:bg-emerald-100 hover:text-emerald-700" onClick={(e) => { e.stopPropagation(); handleMarkAsDoneClick(lot.id); }}>
+                                  <CheckCircle2 className="w-4 h-4 mr-1.5" /> ปิดงาน
+                                </Button>
+                              )}
+                              <Button variant="outline" size="sm" className="h-8 px-3 text-slate-600 hover:text-slate-800 bg-white" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
+                                <Pencil className="w-4 h-4 mr-1.5" /> แก้ไข
                               </Button>
-                            )}
-                            <Button variant="outline" size="sm" className="h-8 px-3 text-slate-600 hover:text-slate-800 bg-white" onClick={(e) => { e.stopPropagation(); handleEditLot(lot); }}>
-                              <Pencil className="w-4 h-4 mr-1.5" /> แก้ไข
-                            </Button>
-                          </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 font-medium px-2 py-1 bg-slate-50 rounded border border-slate-200">
+                              ดูข้อมูล
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
 
@@ -1283,35 +1305,44 @@ export default function PlannerPage() {
                         return (
                           <TableRow key={log.id} className="bg-[#F8F6F0]/ hover:bg-slate-100/50">
                             <TableCell className="text-center">
+                              {canEdit ? (
                                 <Button variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteLog(log.id)}>
-                                    <Trash2 className="w-3.5 h-3.5" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
+                              ) : (
+                                <span className="text-slate-300">•</span>
+                              )}
                             </TableCell>
                             <TableCell colSpan={4} className="pl-8 py-2">
                               <div className="flex items-center gap-2 border-l-2 border-slate-300 pl-4 h-full py-1">
                                 <div className={cn("w-2 h-2 rounded-full", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                                 
-                                <Select value={log.process_id} onValueChange={(val) => handleUpdateLogDirect(log.id, "process_id", val)}>
-                                   <SelectTrigger className="h-7 text-xs w-[100px] border-none bg-transparent font-medium p-0 shadow-none focus:ring-0">
+                                {canEdit ? (
+                                  <Select value={log.process_id} onValueChange={(val) => handleUpdateLogDirect(log.id, "process_id", val)}>
+                                    <SelectTrigger className="h-7 text-xs w-[100px] border-none bg-transparent font-medium p-0 shadow-none focus:ring-0">
                                       <span className="line-clamp-2 break-words text-wrap">{process?.process_name || "เลือกงาน"}</span>
                                       <ChevronDown className="h-4 w-4 opacity-50" />
-                                   </SelectTrigger>
-                                   <SelectContent>
+                                    </SelectTrigger>
+                                    <SelectContent>
                                       {processes.filter(p => ALLOWED_PROCESSES.includes(p.process_name)).map(p => <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>)}
-                                   </SelectContent>
-                                </Select>
+                                    </SelectContent>
+                                  </Select>
+                                ) : (
+                                  <span className="text-xs font-semibold text-slate-700">{process?.process_name || "-"}</span>
+                                )}
 
                                 <span className="text-xs text-slate-500 ml-2">(Tanks</span>
-                                <Input type="number" className="w-12 h-6 text-xs px-1 text-center" value={log.tank_start || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_start", e.target.value)} />
+                                <Input disabled={!canEdit} type="number" className="w-12 h-6 text-xs px-1 text-center bg-white" value={log.tank_start || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_start", e.target.value)} />
                                 <span className="text-xs text-slate-500">-</span>
-                                <Input type="number" className="w-12 h-6 text-xs px-1 text-center" value={log.tank_end || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_end", e.target.value)} />
+                                <Input disabled={!canEdit} type="number" className="w-12 h-6 text-xs px-1 text-center bg-white" value={log.tank_end || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_end", e.target.value)} />
                                 <span className="text-xs text-slate-500">)</span>
                               </div>
                             </TableCell>
                             <TableCell className="py-2">
                               <Input 
+                                disabled={!canEdit}
                                 type="date" 
-                                className="h-8 text-xs w-[130px]" 
+                                className="h-8 text-xs w-[130px] bg-white" 
                                 value={log.activity_date || ""} 
                                 onChange={(e) => handleUpdateLogDirect(log.id, "activity_date", e.target.value)}
                               />

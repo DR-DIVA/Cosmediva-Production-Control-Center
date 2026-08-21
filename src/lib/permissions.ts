@@ -11,6 +11,8 @@ export interface AppModuleItem {
   }[]
 }
 
+export type AccessLevel = 'NONE' | 'VIEW' | 'EDIT'
+
 export const APP_MODULES: AppModuleItem[] = [
   {
     id: 'dashboard',
@@ -93,159 +95,303 @@ export const APP_MODULES: AppModuleItem[] = [
   },
 ]
 
-export const ROLE_TEMPLATES: Record<string, { label: string; modules: string[] }> = {
+export const ALL_MODULE_IDS = [
+  'dashboard', 'planner', 'incoming-rm', 'production_overview', 'production_weighing', 
+  'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 
+  'fg', 'purchase', 'maintenance', 'people', 'costing', 'master-data'
+]
+
+export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<string, 'VIEW' | 'EDIT'> }> = {
   admin: {
-    label: 'ผู้ดูแลระบบ (Admin - เข้าได้ทุกโมดูล)',
-    modules: [
-      'dashboard', 'planner', 'incoming-rm', 'production', 
-      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
-      'qc', 'issues', 'fg', 'purchase', 'maintenance', 'people', 'costing', 'master-data'
-    ]
+    label: '⭐ ผู้ดูแลระบบ (Admin - แก้ไขได้ทุกโมดูล)',
+    perms: ALL_MODULE_IDS.reduce((acc, m) => ({ ...acc, [m]: 'EDIT' }), {})
   },
   planner: {
-    label: 'ฝ่ายวางแผนผลิต (Planning)',
-    modules: [
-      'dashboard', 'planner', 'incoming-rm', 'production', 
-      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
-      'qc', 'fg', 'purchase', 'costing'
-    ]
-  },
-  production_mx: {
-    label: 'แผนกผสม (Production MX)',
-    modules: ['dashboard', 'incoming-rm', 'production', 'production_overview', 'production_weighing', 'production_mixing', 'issues']
-  },
-  production_pk: {
-    label: 'แผนกบรรจุและลงลัง (Production PK/POF)',
-    modules: ['dashboard', 'production', 'production_overview', 'production_packing', 'production_pof', 'issues']
-  },
-  qc: {
-    label: 'ฝ่ายควบคุมคุณภาพ (QC)',
-    modules: [
-      'dashboard', 'incoming-rm', 'production', 
-      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
-      'qc', 'issues'
-    ]
-  },
-  qa: {
-    label: 'ฝ่ายประกันคุณภาพ (QA)',
-    modules: [
-      'dashboard', 'incoming-rm', 'production', 
-      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
-      'qc', 'issues'
-    ]
+    label: '📋 ฝ่ายวางแผนผลิต (Planning)',
+    perms: {
+      dashboard: 'VIEW',
+      planner: 'EDIT',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'VIEW',
+      production_mixing: 'VIEW',
+      production_packing: 'VIEW',
+      production_pof: 'VIEW',
+      qc: 'VIEW',
+      issues: 'VIEW',
+      fg: 'EDIT',
+      purchase: 'VIEW',
+      costing: 'EDIT',
+      'master-data': 'VIEW'
+    }
   },
   ra: {
-    label: 'ฝ่ายขึ้นทะเบียน (Regulatory Affairs - RA)',
-    modules: ['dashboard', 'planner', 'incoming-rm', 'qc', 'issues', 'master-data']
+    label: '📑 ฝ่ายขึ้นทะเบียน (RA)',
+    perms: {
+      dashboard: 'VIEW',
+      planner: 'VIEW',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'VIEW',
+      production_mixing: 'VIEW',
+      production_packing: 'VIEW',
+      production_pof: 'VIEW',
+      qc: 'VIEW',
+      issues: 'VIEW',
+      'master-data': 'VIEW'
+    }
   },
   acc: {
-    label: 'ฝ่ายบัญชีและการเงิน (Accounting - ACC)',
-    modules: ['dashboard', 'planner', 'costing', 'purchase', 'fg', 'master-data']
+    label: '💰 ฝ่ายบัญชีและการเงิน (ACC)',
+    perms: {
+      dashboard: 'VIEW',
+      planner: 'VIEW',
+      costing: 'EDIT',
+      purchase: 'VIEW',
+      fg: 'VIEW',
+      'master-data': 'VIEW'
+    }
   },
   production: {
-    label: 'ฝ่ายผลิต (Production - ทุกสถานี)',
-    modules: [
-      'dashboard', 'incoming-rm', 'production', 
-      'production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof',
-      'qc', 'issues'
-    ]
+    label: '🏭 ฝ่ายผลิต (Production - ทุกสถานี)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'EDIT',
+      production_mixing: 'EDIT',
+      production_packing: 'EDIT',
+      production_pof: 'EDIT',
+      qc: 'VIEW',
+      issues: 'EDIT'
+    }
+  },
+  production_mx: {
+    label: '🥣 แผนกผสม (Production MX)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'EDIT',
+      production_mixing: 'EDIT',
+      issues: 'EDIT'
+    }
+  },
+  production_pk: {
+    label: '📦 แผนกบรรจุและลงลัง (Production PK/POF)',
+    perms: {
+      dashboard: 'VIEW',
+      production_overview: 'VIEW',
+      production_packing: 'EDIT',
+      production_pof: 'EDIT',
+      issues: 'EDIT'
+    }
+  },
+  qc: {
+    label: '🔬 ฝ่ายควบคุมคุณภาพ (QC)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'VIEW',
+      production_mixing: 'VIEW',
+      production_packing: 'VIEW',
+      production_pof: 'VIEW',
+      qc: 'EDIT',
+      issues: 'EDIT'
+    }
+  },
+  qa: {
+    label: '🛡️ ฝ่ายประกันคุณภาพ (QA)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'VIEW',
+      production_overview: 'VIEW',
+      production_weighing: 'VIEW',
+      production_mixing: 'VIEW',
+      production_packing: 'VIEW',
+      production_pof: 'VIEW',
+      qc: 'EDIT',
+      issues: 'EDIT'
+    }
   },
   warehouse_mmrm_bu: {
-    label: 'คลังวัตถุดิบ (MMRM / BU)',
-    modules: ['dashboard', 'incoming-rm', 'production', 'production_weighing']
+    label: '🏭 คลังวัตถุดิบ (MMRM / BU)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'EDIT',
+      production_weighing: 'VIEW'
+    }
   },
   warehouse_mmpm_fg: {
-    label: 'คลังบรรจุภัณฑ์และ FG (MMPM / FG)',
-    modules: ['dashboard', 'incoming-rm', 'fg']
+    label: '🏬 คลังบรรจุภัณฑ์และ FG (MMPM / FG)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'EDIT',
+      fg: 'EDIT'
+    }
   },
   purchase: {
-    label: 'ฝ่ายจัดซื้อ (Purchase)',
-    modules: ['dashboard', 'incoming-rm', 'purchase']
+    label: '🛒 ฝ่ายจัดซื้อ (Purchase)',
+    perms: {
+      dashboard: 'VIEW',
+      'incoming-rm': 'VIEW',
+      purchase: 'EDIT'
+    }
   },
   maintenance: {
-    label: 'ฝ่ายซ่อมบำรุง (Maintenance)',
-    modules: ['dashboard', 'maintenance']
+    label: '🔧 ฝ่ายซ่อมบำรุง (Maintenance)',
+    perms: {
+      dashboard: 'VIEW',
+      maintenance: 'EDIT'
+    }
   },
   people: {
-    label: 'ฝ่ายบุคคล (HR/People)',
-    modules: ['dashboard', 'people']
-  }
-}
-
-/**
- * Check whether a user with `userRole` has access to a specific route href or submodule href
- */
-export function hasAccessToRoute(href: string, userRole?: string | null): boolean {
-  if (!userRole) return false
-  if (userRole === 'admin') return true
-
-  let allowedList: string[] = []
-
-  if (userRole.startsWith('custom:')) {
-    allowedList = userRole.replace('custom:', '').split(',').map(s => s.trim()).filter(Boolean)
-  } else if (ROLE_TEMPLATES[userRole]) {
-    allowedList = ROLE_TEMPLATES[userRole].modules
-  } else {
-    // If standard role string, check if it directly matches legacy rules
-    return true
-  }
-
-  // Exact or prefix checks
-  if (href === '/dashboard' && allowedList.includes('dashboard')) return true
-  if (href === '/planner' && allowedList.includes('planner')) return true
-  if (href === '/incoming-rm' && allowedList.includes('incoming-rm')) return true
-  
-  if (href === '/my-tasks') {
-    return allowedList.includes('production') || allowedList.some(a => a.startsWith('production_'))
-  }
-  if (href === '/my-tasks/overview') {
-    return allowedList.includes('production') || allowedList.includes('production_overview')
-  }
-  if (href === '/my-tasks/weighing') {
-    return allowedList.includes('production') || allowedList.includes('production_weighing')
-  }
-  if (href === '/my-tasks/mixing') {
-    return allowedList.includes('production') || allowedList.includes('production_mixing')
-  }
-  if (href === '/my-tasks/packing') {
-    return allowedList.includes('production') || allowedList.includes('production_packing')
-  }
-  if (href === '/my-tasks/pof') {
-    return allowedList.includes('production') || allowedList.includes('production_pof')
-  }
-
-  if (href === '/qc-queue' && allowedList.includes('qc')) return true
-  if (href === '/issues' && allowedList.includes('issues')) return true
-  if (href === '/my-tasks/fg' && allowedList.includes('fg')) return true
-  if (href === '/purchase' && allowedList.includes('purchase')) return true
-  if (href === '/maintenance' && allowedList.includes('maintenance')) return true
-  if (href === '/people' && allowedList.includes('people')) return true
-  if (href.startsWith('/costing') && allowedList.includes('costing')) return true
-  if (href.startsWith('/master-data') && allowedList.includes('master-data')) return true
-
-  return false
-}
-
-/**
- * Get readable badges / description for a given user role
- */
-export function getRoleDisplay(role: string): { label: string; className: string; moduleCount?: number } {
-  if (role === 'admin') {
-    return { label: 'ผู้ดูแลระบบ (Admin)', className: 'bg-purple-100 text-purple-700 border-purple-200' }
-  }
-  if (role.startsWith('custom:')) {
-    const list = role.replace('custom:', '').split(',').map(s => s.trim()).filter(Boolean)
-    return { 
-      label: `สิทธิ์กำหนดเอง (${list.length} โมดูล)`, 
-      className: 'bg-blue-100 text-blue-700 border-blue-200 font-semibold',
-      moduleCount: list.length 
+    label: '👥 ฝ่ายบุคคล (People)',
+    perms: {
+      dashboard: 'VIEW',
+      people: 'EDIT'
     }
   }
+}
+
+/**
+ * Parse role string into module permissions map
+ */
+export function parseRolePermissions(roleString?: string | null): Record<string, 'VIEW' | 'EDIT'> {
+  if (!roleString) return {}
+  if (roleString === 'admin') {
+    return ALL_MODULE_IDS.reduce((acc, m) => ({ ...acc, [m]: 'EDIT' }), {})
+  }
+
+  if (roleString.startsWith('custom:')) {
+    const rawItems = roleString.replace('custom:', '').split(',').map(s => s.trim()).filter(Boolean)
+    const perms: Record<string, 'VIEW' | 'EDIT'> = {}
+
+    rawItems.forEach(item => {
+      if (item.includes(':')) {
+        const [mod, lvl] = item.split(':')
+        perms[mod] = lvl?.toUpperCase() === 'EDIT' ? 'EDIT' : 'VIEW'
+      } else {
+        // Legacy list without :view/:edit defaults to EDIT
+        perms[item] = 'EDIT'
+      }
+    })
+
+    // Expand parent 'production' to submodules if present
+    if (perms['production']) {
+      const lvl = perms['production']
+      if (!perms['production_overview']) perms['production_overview'] = lvl
+      if (!perms['production_weighing']) perms['production_weighing'] = lvl
+      if (!perms['production_mixing']) perms['production_mixing'] = lvl
+      if (!perms['production_packing']) perms['production_packing'] = lvl
+      if (!perms['production_pof']) perms['production_pof'] = lvl
+    }
+
+    return perms
+  }
+
+  if (ROLE_TEMPLATES[roleString]) {
+    return { ...ROLE_TEMPLATES[roleString].perms }
+  }
+
+  return {}
+}
+
+/**
+ * Format permissions map back into role string
+ */
+export function formatPermissionsToRole(perms: Record<string, 'VIEW' | 'EDIT'>): string {
+  const entries = Object.entries(perms).filter(([_, lvl]) => lvl === 'VIEW' || lvl === 'EDIT')
+  if (entries.length === 0) return 'custom:'
+
+  const allEdit = ALL_MODULE_IDS.every(m => perms[m] === 'EDIT')
+  if (allEdit) return 'admin'
+
+  const serialized = entries.map(([mod, lvl]) => `${mod}:${lvl.toLowerCase()}`).join(',')
+  return `custom:${serialized}`
+}
+
+/**
+ * Check access level for a given href or moduleId
+ */
+export function getRouteAccessLevel(href: string, userRole?: string | null): AccessLevel {
+  if (!userRole) return 'NONE'
+  if (userRole === 'admin') return 'EDIT'
+
+  const perms = parseRolePermissions(userRole)
+
+  // Map href to module key
+  let key = ''
+  if (href === '/dashboard') key = 'dashboard'
+  else if (href === '/planner') key = 'planner'
+  else if (href === '/incoming-rm') key = 'incoming-rm'
+  else if (href === '/my-tasks/overview') key = 'production_overview'
+  else if (href === '/my-tasks/weighing') key = 'production_weighing'
+  else if (href === '/my-tasks/mixing') key = 'production_mixing'
+  else if (href === '/my-tasks/packing') key = 'production_packing'
+  else if (href === '/my-tasks/pof') key = 'production_pof'
+  else if (href === '/my-tasks') {
+    // Parent production: return max level of any production submodule
+    const prodLevels = ['production_overview', 'production_weighing', 'production_mixing', 'production_packing', 'production_pof']
+      .map(k => perms[k])
+      .filter(Boolean)
+    if (prodLevels.includes('EDIT')) return 'EDIT'
+    if (prodLevels.includes('VIEW')) return 'VIEW'
+    return 'NONE'
+  }
+  else if (href === '/qc-queue') key = 'qc'
+  else if (href === '/issues') key = 'issues'
+  else if (href === '/my-tasks/fg') key = 'fg'
+  else if (href === '/purchase') key = 'purchase'
+  else if (href === '/maintenance') key = 'maintenance'
+  else if (href === '/people') key = 'people'
+  else if (href.startsWith('/costing')) key = 'costing'
+  else if (href.startsWith('/master-data')) key = 'master-data'
+
+  return perms[key] || 'NONE'
+}
+
+export function hasAccessToRoute(href: string, userRole?: string | null): boolean {
+  const lvl = getRouteAccessLevel(href, userRole)
+  return lvl === 'VIEW' || lvl === 'EDIT'
+}
+
+export function canEditRoute(href: string, userRole?: string | null): boolean {
+  return getRouteAccessLevel(href, userRole) === 'EDIT'
+}
+
+/**
+ * Get display info for a user role
+ */
+export function getRoleDisplay(role: string): { label: string; className: string; viewCount?: number; editCount?: number } {
+  if (role === 'admin') {
+    return { label: '⭐ ผู้ดูแลระบบ (Admin)', className: 'bg-purple-100 text-purple-700 border-purple-200 font-bold' }
+  }
+
+  if (role.startsWith('custom:')) {
+    const perms = parseRolePermissions(role)
+    const entries = Object.entries(perms)
+    const editCount = entries.filter(([_, l]) => l === 'EDIT').length
+    const viewCount = entries.filter(([_, l]) => l === 'VIEW').length
+
+    let text = `กำหนดเอง (${editCount} แก้ไข`
+    if (viewCount > 0) text += `, ${viewCount} ดู)`
+    else text += `)`
+
+    return {
+      label: text,
+      className: 'bg-blue-100 text-blue-800 border-blue-200 font-semibold',
+      editCount,
+      viewCount
+    }
+  }
+
   if (ROLE_TEMPLATES[role]) {
     const templateName = ROLE_TEMPLATES[role].label.split(' (')[0]
     return { 
       label: templateName, 
-      className: 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+      className: 'bg-emerald-100 text-emerald-800 border-emerald-200 font-medium' 
     }
   }
 
