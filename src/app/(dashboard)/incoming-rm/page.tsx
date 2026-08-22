@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { 
   Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, 
@@ -19,6 +20,11 @@ import {
   Scissors, Plus, X, TrendingUp, Layers, RefreshCw, ShieldCheck, CheckSquare, 
   Sparkles, Clock, ArrowUpRight
 } from 'lucide-react';
+import { 
+  DELAY_CATEGORIES, 
+  formatDelayRemark, 
+  parseDelayInfo 
+} from '@/lib/delayTracking';
 
 type RMItem = {
   id: string;
@@ -74,7 +80,17 @@ export default function RMControlCenterPage() {
   // Edit Modal State
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<RMItem | null>(null);
-  const [editForm, setEditForm] = useState({ po_no: '', supplier: '', rm_code: '', rm_name: '', quantity: 0, unit: '', eta_date: '' });
+  const [editForm, setEditForm] = useState({ 
+    po_no: '', 
+    supplier: '', 
+    rm_code: '', 
+    rm_name: '', 
+    quantity: 0, 
+    unit: '', 
+    eta_date: '',
+    edit_reason: '',
+    delay_category: 'SUPPLIER_PROD'
+  });
 
   // Split Modal State
   const [isSplitModalOpen, setIsSplitModalOpen] = useState(false);
@@ -453,6 +469,7 @@ export default function RMControlCenterPage() {
 
   const openEditModal = (item: RMItem) => {
     setEditingItem(item);
+    const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status);
     setEditForm({
       po_no: item.po_no || '',
       supplier: item.supplier || '',
@@ -460,30 +477,62 @@ export default function RMControlCenterPage() {
       rm_name: item.rm_name || '',
       quantity: item.quantity || 0,
       unit: item.unit || '',
-      eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : ''
+      eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : '',
+      edit_reason: dInfo.reason || '',
+      delay_category: dInfo.category || 'SUPPLIER_PROD'
     });
     setIsEditModalOpen(true);
   };
 
   const handleEditSubmit = async () => {
     if (!editingItem) return;
-    const { error } = await supabase.from('production_lot_rms').update({
+
+    if (!editForm.edit_reason.trim()) {
+      toast.error('กรุณาระบุเหตุผลการแก้ไข (จำเป็นต้องระบุ)');
+      return;
+    }
+
+    const originalEta = editingItem.eta_date || '';
+    const newEta = editForm.eta_date || '';
+    const isEtaChanged = originalEta !== newEta;
+
+    const formattedRemark = formatDelayRemark(editingItem.bottom_remark, {
+      originalEta: originalCommittedEta(editingItem),
+      revisedEta: newEta,
+      category: editForm.delay_category || 'OTHER',
+      reason: editForm.edit_reason.trim(),
+      updatedBy: currentUser || 'จัดซื้อ (Purchasing)'
+    });
+
+    const updatePayload: any = {
       po_no: editForm.po_no,
       supplier: editForm.supplier,
       rm_code: editForm.rm_code,
       rm_name: editForm.rm_name,
       quantity: editForm.quantity,
       unit: editForm.unit,
-      eta_date: editForm.eta_date || null
-    }).eq('id', editingItem.id);
+      eta_date: editForm.eta_date || null,
+      bottom_remark: formattedRemark
+    };
+
+    if (isEtaChanged) {
+      updatePayload.status = 'DELAYED';
+    }
+
+    const { error } = await supabase.from('production_lot_rms').update(updatePayload).eq('id', editingItem.id);
 
     if (error) {
-      toast.error('แก้ไขข้อมูลไม่สำเร็จ');
+      toast.error('แก้ไขข้อมูลไม่สำเร็จ: ' + error.message);
     } else {
-      toast.success('แก้ไขข้อมูลสำเร็จ');
+      toast.success('บันทึกการแก้ไขและสาเหตุเรียบร้อยแล้ว');
       setIsEditModalOpen(false);
       fetchItems();
     }
+  };
+
+  const originalCommittedEta = (item: RMItem) => {
+    const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status);
+    return dInfo.originalEta || item.eta_date || '';
   };
 
   const handleDelete = async (id: string) => {
@@ -1944,42 +1993,84 @@ export default function RMControlCenterPage() {
 
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[550px] bg-white rounded-2xl border border-[#D4AF37]/40 shadow-2xl">
           <DialogHeader>
-            <DialogTitle>แก้ไขข้อมูลนำเข้า (Purchasing Edit)</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-[#4A4238]">
+              <Edit className="w-4 h-4 text-[#D4AF37]" />
+              แก้ไขข้อมูลนำเข้า & ระบุเหตุผล (Purchasing Edit)
+            </DialogTitle>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">PO No.</Label>
-              <Input value={editForm.po_no} onChange={e => setEditForm({...editForm, po_no: e.target.value})} className="col-span-3" />
+          <div className="space-y-3.5 py-2 text-xs">
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">PO No.</Label>
+              <Input value={editForm.po_no} onChange={e => setEditForm({...editForm, po_no: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Supplier</Label>
-              <Input value={editForm.supplier} onChange={e => setEditForm({...editForm, supplier: e.target.value})} className="col-span-3" />
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">Supplier</Label>
+              <Input value={editForm.supplier} onChange={e => setEditForm({...editForm, supplier: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Code</Label>
-              <Input value={editForm.rm_code} onChange={e => setEditForm({...editForm, rm_code: e.target.value})} className="col-span-3" />
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">Code</Label>
+              <Input value={editForm.rm_code} onChange={e => setEditForm({...editForm, rm_code: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Name</Label>
-              <Input value={editForm.rm_name} onChange={e => setEditForm({...editForm, rm_name: e.target.value})} className="col-span-3" />
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">Name</Label>
+              <Input value={editForm.rm_name} onChange={e => setEditForm({...editForm, rm_name: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">Quantity</Label>
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">Quantity</Label>
               <div className="col-span-3 flex gap-2">
-                <Input type="number" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: Number(e.target.value)})} className="w-full" />
-                <Input value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})} className="w-24 placeholder:text-slate-400" placeholder="Unit" />
+                <Input type="number" value={editForm.quantity} onChange={e => setEditForm({...editForm, quantity: Number(e.target.value)})} className="w-full text-xs" />
+                <Input value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})} className="w-24 placeholder:text-slate-400 text-xs" placeholder="Unit" />
               </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label className="text-right">ETA Date</Label>
-              <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="col-span-3" />
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-rose-700">ETA Date</Label>
+              <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="col-span-3 text-xs font-mono font-bold text-rose-900 border-rose-300" />
+            </div>
+
+            {/* Mandatory Reason Section */}
+            <div className="border-t border-slate-100 pt-3 space-y-2.5">
+              <div className="grid grid-cols-4 items-center gap-3">
+                <Label className="text-right font-bold text-[#4A4238]">หมวดหมู่สาเหตุ:</Label>
+                <div className="col-span-3">
+                  <Select value={editForm.delay_category} onValueChange={(val) => setEditForm({...editForm, delay_category: val || 'SUPPLIER_PROD'})}>
+                    <SelectTrigger className="w-full text-xs bg-white">
+                      <SelectValue placeholder="เลือกหมวดหมู่สาเหตุ" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DELAY_CATEGORIES.map(cat => (
+                        <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                          {cat.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-4 items-start gap-3">
+                <Label className="text-right font-bold text-rose-700 pt-1.5">
+                  เหตุผลการแก้ไข *
+                </Label>
+                <div className="col-span-3 space-y-1">
+                  <Textarea
+                    rows={2}
+                    placeholder="กรุณาระบุเหตุผลการแก้ไข/สาเหตุการเลื่อนส่ง เพื่อบันทึกเป็นประวัติและ KPI คู่ค้า (จำเป็นต้องระบุ)..."
+                    value={editForm.edit_reason}
+                    onChange={e => setEditForm({...editForm, edit_reason: e.target.value})}
+                    className="text-xs bg-white border-amber-300 focus:border-amber-500"
+                  />
+                  <p className="text-[10px] text-slate-500">
+                    * ข้อมูลนี้จะเชื่อมโยงไปยังโมดูล CosmeFlow Purchase และ Dashboard Master Radar ทันที
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsEditModalOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleEditSubmit} className="bg-[#D4AF37] hover:bg-[#B3932F] text-white">บันทึกการแก้ไข</Button>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setIsEditModalOpen(false)} className="text-xs">ยกเลิก</Button>
+            <Button onClick={handleEditSubmit} className="bg-[#D4AF37] hover:bg-[#B3932F] text-white text-xs font-bold">บันทึกการแก้ไข</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
