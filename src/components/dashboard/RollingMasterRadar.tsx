@@ -617,34 +617,35 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                       </PopoverTrigger>
 
                                       <PopoverContent
-                                        className="w-72 p-3 bg-white border border-[#D4AF37]/35 shadow-2xl rounded-2xl z-50 text-xs text-[#4A4238]"
+                                        className="w-[360px] sm:w-[480px] max-w-[95vw] p-4 bg-white border border-[#D4AF37]/40 shadow-2xl rounded-2xl z-50 text-xs text-[#4A4238]"
                                         align="center"
                                       >
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                                          <div className="font-bold flex items-center gap-1.5 text-sm">
+                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                                          <div className="font-bold flex items-center gap-2 text-sm">
                                             <Icon className={`w-4 h-4 ${stream.color}`} />
                                             <span>{stream.shortLabel}</span>
+                                            <span className="text-xs font-bold text-slate-500">({items.length} รายการ)</span>
                                           </div>
-                                          <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
+                                          <span className="text-[11px] font-bold text-amber-900 bg-amber-100/80 border border-amber-200 px-2.5 py-0.5 rounded-full">
                                             {d.dayName} {d.dayNum} {d.monthName}
                                           </span>
                                         </div>
 
-                                        <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                                        <div className="space-y-2">
                                           {items.map((it, itIdx) => (
                                             <div
                                               key={it.id || itIdx}
-                                              className="p-2 rounded-xl bg-slate-50 border border-slate-200/70 space-y-1 hover:bg-amber-50/40 transition"
+                                              className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1 hover:bg-amber-50/50 transition"
                                             >
-                                              <div className="flex justify-between items-start gap-1">
-                                                <strong className="text-[#4A4238] font-bold text-xs">{it.title}</strong>
+                                              <div className="flex justify-between items-start gap-2">
+                                                <strong className="text-[#4A4238] font-bold text-xs leading-snug">{it.title}</strong>
                                                 {it.tag && (
-                                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100/90 px-1.5 py-0.2 rounded-md">
+                                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300/60 px-1.5 py-0.5 rounded-md shrink-0">
                                                     {it.tag}
                                                   </span>
                                                 )}
                                               </div>
-                                              <div className="text-[11px] text-slate-500">{it.subtitle}</div>
+                                              <div className="text-[11px] text-slate-600 leading-normal">{it.subtitle}</div>
                                               {it.lotId && onSelectLot && (
                                                 <button
                                                   type="button"
@@ -816,7 +817,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                       ไม่มีกำหนดการของเข้าในช่วง 14 วันนี้
                     </div>
                   ) : (
-                    <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto text-xs">
+                    <div className="divide-y divide-slate-100 text-xs">
                       {radarData.etaList.map((item, idx) => {
                         const etaD = parseISO(item.eta_date)
                         const isToday = isSameDay(etaD, baseDate)
