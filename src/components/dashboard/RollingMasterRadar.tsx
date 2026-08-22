@@ -28,6 +28,7 @@ import {
 } from 'lucide-react'
 import { format, addDays, isSameDay, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
+import { parseDelayInfo } from '@/lib/delayTracking'
 
 interface RollingMasterRadarProps {
   startDateStr?: string
@@ -178,21 +179,26 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
 
     // 1. Process ETA RM/PM
     radarData.etaList.forEach(item => {
-      const d = item.eta_date
-      if (map[d]) {
-        totalEta++
-        map[d].ETA.push({
-          id: item.id,
-          streamType: 'ETA',
-          date: d,
-          title: `${item.rm_code} (${item.quantity || 0} ${item.unit || ''})`,
-          subtitle: item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์',
-          tag: item.po_no ? `PO: ${item.po_no}` : undefined,
-          quantity: item.quantity,
-          status: item.status,
-          meta: item
-        })
-      }
+       const d = item.eta_date
+       if (map[d]) {
+         totalEta++
+         const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status)
+         const isRescheduled = dInfo.isDelayed && (dInfo.categoryLabel || dInfo.reason)
+
+         map[d].ETA.push({
+           id: item.id,
+           streamType: 'ETA',
+           date: d,
+           title: `${item.rm_code} (${item.quantity || 0} ${item.unit || ''})`,
+           subtitle: isRescheduled 
+             ? `⚠️ เลื่อนส่ง: ${dInfo.categoryLabel || 'แจ้งเลื่อน'} (${item.supplier || ''})` 
+             : (item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์'),
+           tag: item.po_no ? `PO: ${item.po_no}` : undefined,
+           quantity: item.quantity,
+           status: item.status,
+           meta: { ...item, delayInfo: dInfo }
+         })
+       }
     })
 
     // 2. Process Production Logs
