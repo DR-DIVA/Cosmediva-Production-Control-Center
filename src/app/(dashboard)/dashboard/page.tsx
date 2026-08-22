@@ -570,7 +570,7 @@ export default function DashboardPage() {
   const selectedLot = activeLots.find(l => l.id === selectedFilter)
 
   return (
-    <div className="p-8 space-y-6 max-w-[1400px] mx-auto bg-transparent min-h-screen pb-12 font-sans text-[#4A4238]">
+    <div className="p-3 sm:p-5 md:p-6 lg:p-8 space-y-6 max-w-[1400px] w-full mx-auto bg-transparent min-h-screen pb-12 font-sans text-[#4A4238]">
       
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4">

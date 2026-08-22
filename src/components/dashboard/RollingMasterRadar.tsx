@@ -456,7 +456,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             </div>
 
             {/* Stream Filter Pills */}
-            <div className="hidden sm:flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
+            <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
               <span className="text-[10px] font-bold text-slate-400 px-1.5">สายงาน:</span>
               {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'PACKING', 'FG_DUE'] as const).map(f => (
                 <button
@@ -477,7 +477,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         </div>
 
         {/* 14-Day Executive Summary Chips */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mt-4 pt-4 border-t border-slate-100">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mt-4 pt-4 border-t border-slate-100">
           <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-amber-600" />
