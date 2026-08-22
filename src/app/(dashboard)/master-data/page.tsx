@@ -67,7 +67,7 @@ export default function MasterDataPage() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 w-full max-w-full space-y-6 min-w-0">
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">ข้อมูลหลัก (Master Data)</h2>

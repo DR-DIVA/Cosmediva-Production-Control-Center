@@ -705,20 +705,20 @@ export default function RMControlCenterPage() {
   const unitLabel = mainTab === 'rm' ? 'KG' : 'PCS';
 
   return (
-    <div className="p-6 w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 w-full max-w-full mx-auto space-y-6 min-w-0">
         {/* Top Toggle for RM/PM */}
         <div className="flex justify-center mb-4">
-          <div className="bg-slate-100 p-1.5 rounded-2xl flex shadow-inner border border-slate-200">
+          <div className="bg-slate-100 p-1 rounded-2xl flex flex-wrap justify-center gap-1 shadow-inner border border-slate-200">
             <button 
               onClick={() => setMainTab('rm')}
-              className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${mainTab === 'rm' ? 'bg-[#2D2721] text-[#D4AF37] shadow-lg border border-[#D4AF37]/30' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-4 sm:px-8 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${mainTab === 'rm' ? 'bg-[#2D2721] text-[#D4AF37] shadow-lg border border-[#D4AF37]/30' : 'text-slate-500 hover:text-slate-800'}`}
             >
               <Package className="w-4 h-4" />
               วัตถุดิบ (Raw Material - RM)
             </button>
             <button 
               onClick={() => setMainTab('pm')}
-              className={`px-8 py-2.5 rounded-xl font-bold text-sm transition-all flex items-center gap-2 ${mainTab === 'pm' ? 'bg-[#2D2721] text-[#D4AF37] shadow-lg border border-[#D4AF37]/30' : 'text-slate-500 hover:text-slate-800'}`}
+              className={`px-4 sm:px-8 py-2 sm:py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center gap-2 ${mainTab === 'pm' ? 'bg-[#2D2721] text-[#D4AF37] shadow-lg border border-[#D4AF37]/30' : 'text-slate-500 hover:text-slate-800'}`}
             >
               <Box className="w-4 h-4" />
               บรรจุภัณฑ์ (Packaging - PM)

@@ -717,7 +717,7 @@ export default function QCQueuePage() {
     : '98.5';
 
   return (
-    <div className="p-6 w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 w-full max-w-full mx-auto space-y-6 min-w-0">
       {/* Header Card */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
@@ -749,65 +749,65 @@ export default function QCQueuePage() {
       </div>
 
       {/* 1. Executive Quality Assurance KPI Summary Bar */}
-      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
-            <ShieldCheck className="w-7 h-7 text-white" />
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <ShieldCheck className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
           </div>
           <div>
-            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+            <div className="text-[10px] sm:text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" /> Quality Assurance & Compliance Intelligence
             </div>
-            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+            <div className="text-base sm:text-lg md:text-xl font-black text-white mt-0.5">
               Executive Quality Control KPI
             </div>
-            <div className="text-xs text-stone-300 mt-0.5">
+            <div className="text-[11px] sm:text-xs text-stone-300 mt-0.5">
               ศูนย์กลางควบคุมมาตรฐานคุณภาพ • การตรวจวิเคราะห์แล็บ • และการตรวจปล่อยผ่าน (Batch Release)
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full xl:w-auto">
           {/* Total Pending Queue */}
-          <div className="bg-amber-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
-            <div className="text-[11px] text-amber-200 font-medium">คิวงานรอตรวจรวม</div>
-            <div className="text-2xl font-black text-amber-400">
+          <div className="bg-amber-500/15 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-amber-200 font-medium">คิวงานรอตรวจรวม</div>
+            <div className="text-xl sm:text-2xl font-black text-amber-400">
               {totalPendingQc} <span className="text-xs font-normal text-amber-200">งาน</span>
             </div>
-            <div className="text-[10px] text-amber-300 mt-0.5">(รอตรวจปล่อยผ่าน)</div>
+            <div className="text-[9px] sm:text-[10px] text-amber-300 mt-0.5">(รอตรวจปล่อยผ่าน)</div>
           </div>
 
           {/* Bulk Pending Hold */}
-          <div className="bg-indigo-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
-            <div className="text-[11px] text-indigo-200 font-medium">Bulk รอปล่อยถัง</div>
-            <div className="text-2xl font-black text-indigo-300">
+          <div className="bg-indigo-500/20 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-indigo-200 font-medium">Bulk รอปล่อยถัง</div>
+            <div className="text-xl sm:text-2xl font-black text-indigo-300">
               {globalQcStats.bulkPendingTanks} <span className="text-xs font-normal text-indigo-200">ถัง</span>
             </div>
-            <div className="text-[10px] text-indigo-300 mt-0.5">(รอผลแล็บเข้าบรรจุ)</div>
+            <div className="text-[9px] sm:text-[10px] text-indigo-300 mt-0.5">(รอผลแล็บเข้าบรรจุ)</div>
           </div>
 
           {/* FG Quarantine */}
-          <div className="bg-rose-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-rose-400/30 text-center">
-            <div className="text-[11px] text-rose-200 font-medium">FG กักกันรอ QC</div>
-            <div className="text-2xl font-black text-rose-400">
+          <div className="bg-rose-500/20 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-rose-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-rose-200 font-medium">FG กักกันรอ QC</div>
+            <div className="text-xl sm:text-2xl font-black text-rose-400">
               {globalQcStats.fgQuarantine} <span className="text-xs font-normal text-rose-200">รายการ</span>
             </div>
-            <div className="text-[10px] text-rose-300 mt-0.5">(Quarantine Hold)</div>
+            <div className="text-[9px] sm:text-[10px] text-rose-300 mt-0.5">(Quarantine Hold)</div>
           </div>
 
           {/* Quality Release Rate */}
-          <div className="bg-emerald-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
-            <div className="text-[11px] text-emerald-200 font-medium">อัตราผ่านการตรวจ (Release)</div>
-            <div className="text-2xl font-black text-emerald-400">
+          <div className="bg-emerald-500/20 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-emerald-200 font-medium">อัตราผ่านการตรวจ (Release)</div>
+            <div className="text-xl sm:text-2xl font-black text-emerald-400">
               {fpyRate}%
             </div>
-            <div className="text-[10px] text-emerald-300 mt-0.5">({totalPassedQc} รายการผ่าน QC)</div>
+            <div className="text-[9px] sm:text-[10px] text-emerald-300 mt-0.5">({totalPassedQc} รายการผ่าน QC)</div>
           </div>
         </div>
       </div>
 
       {/* 2. Four Interactive Quality Dimension Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Card 1: RM Inspection */}
         <Card 
           onClick={() => setActiveTab('rm')}

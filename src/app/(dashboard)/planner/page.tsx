@@ -628,9 +628,9 @@ export default function PlannerPage() {
   }
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="p-3 sm:p-5 md:p-6 space-y-6 max-w-[1600px] w-full mx-auto min-w-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 sm:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4 mb-2">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
             <CalendarDays className="w-8 h-8 text-yellow-500 shrink-0" />
@@ -692,59 +692,59 @@ export default function PlannerPage() {
       </div>
 
       {/* 1. Executive Master Planning KPI Summary Bar */}
-      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
-            <Layers className="w-7 h-7 text-white" />
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <Layers className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
           </div>
           <div>
-            <div className="text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+            <div className="text-[10px] sm:text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
               <TrendingUp className="w-3.5 h-3.5" /> Master Schedule & Capacity Intelligence
             </div>
-            <div className="text-lg md:text-xl font-black text-white mt-0.5">
+            <div className="text-base sm:text-lg md:text-xl font-black text-white mt-0.5">
               Executive Master Planning KPI
             </div>
-            <div className="text-xs text-stone-300 mt-0.5">
+            <div className="text-[11px] sm:text-xs text-stone-300 mt-0.5">
               ภาพรวมแผนการผลิต • ความจุการผลิต (Capacity) • และอัตราความตรงต่อเวลาตามแผน (OTIF)
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full xl:w-auto">
           {/* Total Master Lots */}
-          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
-            <div className="text-[11px] text-stone-300 font-medium">ล็อตการผลิตทั้งหมด</div>
-            <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
+          <div className="bg-white/10 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[10px] sm:text-[11px] text-stone-300 font-medium">ล็อตการผลิตทั้งหมด</div>
+            <div className="text-xl sm:text-2xl font-black text-[#D4AF37] tracking-tight">
               {totalLotsCount} <span className="text-xs font-normal text-stone-300">ล็อต</span>
             </div>
-            <div className="text-[10px] text-stone-400 mt-0.5">({uniqueSkusCount} SKU ไม่ซ้ำ)</div>
+            <div className="text-[9px] sm:text-[10px] text-stone-400 mt-0.5">({uniqueSkusCount} SKU ไม่ซ้ำ)</div>
           </div>
 
           {/* Target Production Volume */}
-          <div className="bg-emerald-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
-            <div className="text-[11px] text-emerald-200 font-medium">ยอดผลิตรวม (Target Units)</div>
-            <div className="text-2xl font-black text-emerald-400">
+          <div className="bg-emerald-500/15 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-emerald-200 font-medium">ยอดผลิตรวม (Target Units)</div>
+            <div className="text-xl sm:text-2xl font-black text-emerald-400">
               {totalTargetUnits.toLocaleString()} <span className="text-xs font-normal text-emerald-200">ชิ้น</span>
             </div>
-            <div className="text-[10px] text-emerald-300 mt-0.5">({totalBulksKg.toLocaleString()} kg Bulk)</div>
+            <div className="text-[9px] sm:text-[10px] text-emerald-300 mt-0.5">({totalBulksKg.toLocaleString()} kg Bulk)</div>
           </div>
 
           {/* OTIF Schedule Adherence */}
-          <div className="bg-blue-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
-            <div className="text-[11px] text-blue-200 font-medium">ตรงตามแผนงาน (On-Time)</div>
-            <div className="text-2xl font-black text-blue-300">
+          <div className="bg-blue-500/20 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-blue-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-blue-200 font-medium">ตรงตามแผนงาน (On-Time)</div>
+            <div className="text-xl sm:text-2xl font-black text-blue-300">
               {otifRate}%
             </div>
-            <div className="text-[10px] text-blue-300 mt-0.5">({onTimeTasksCount} คิวตรงเวลา)</div>
+            <div className="text-[9px] sm:text-[10px] text-blue-300 mt-0.5">({onTimeTasksCount} คิวตรงเวลา)</div>
           </div>
 
           {/* Process Progression */}
-          <div className="bg-indigo-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
-            <div className="text-[11px] text-indigo-200 font-medium">ความคืบหน้ารวม (Progress)</div>
-            <div className="text-2xl font-black text-indigo-300">
+          <div className="bg-indigo-500/20 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-indigo-400/30 text-center">
+            <div className="text-[10px] sm:text-[11px] text-indigo-200 font-medium">ความคืบหน้ารวม (Progress)</div>
+            <div className="text-xl sm:text-2xl font-black text-indigo-300">
               {progressPct}%
             </div>
-            <div className="text-[10px] text-indigo-300 mt-0.5">({doneTasksCount}/{totalTasksCount} งานเสร็จ)</div>
+            <div className="text-[9px] sm:text-[10px] text-indigo-300 mt-0.5">({doneTasksCount}/{totalTasksCount} งานเสร็จ)</div>
           </div>
         </div>
       </div>
@@ -752,7 +752,7 @@ export default function PlannerPage() {
       {/* 2. Four Planning Dimension KPI Cards */}
       {viewMode === 'list' ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Card 1: Master Lots */}
           <Card 
             onClick={() => setActiveTab('table')}
