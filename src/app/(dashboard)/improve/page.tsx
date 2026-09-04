@@ -75,12 +75,15 @@ export default function ImproveDashboardPage() {
           <Link href="/improve/gemba">
             <Button className="bg-[#D4AF37] hover:bg-[#c49f2e] text-[#2D2721] font-bold shadow-lg flex items-center gap-2 text-sm sm:text-base py-5 px-5">
               <Plus className="w-5 h-5" />
-              + เดิน Gemba / บันทึกใหม่
+              เดิน Gemba / บันทึกใหม่
             </Button>
           </Link>
           <Link href="/improve/observations">
-            <Button variant="outline" className="border-[#D4AF37]/50 text-white hover:bg-white/10 text-xs sm:text-sm">
-              รายการค้นพบทั้งหมด
+            <Button 
+              className="bg-white/15 hover:bg-white/25 text-white border-2 border-[#D4AF37] hover:border-white font-bold text-xs sm:text-sm py-5 px-4 shadow-sm transition flex items-center gap-1.5"
+            >
+              <FileText className="w-4 h-4 text-[#D4AF37]" />
+              <span className="text-white font-bold tracking-wide">รายการค้นพบทั้งหมด</span>
             </Button>
           </Link>
         </div>
