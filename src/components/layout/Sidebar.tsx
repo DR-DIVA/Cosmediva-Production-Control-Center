@@ -20,7 +20,8 @@ import {
   Menu, 
   ShoppingCart, 
   Users,
-  KeyRound
+  KeyRound,
+  TrendingUp
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
@@ -131,6 +132,20 @@ const routes = [
       { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'planner'] },
       { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'planner'] },
       { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'planner'] },
+    ]
+  },
+  {
+    label: 'CosmeFlow Improve',
+    subtitle: 'See Waste. Fix Process. Build Skill.',
+    icon: TrendingUp,
+    href: '/improve',
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'],
+    subRoutes: [
+      { label: 'ภาพรวม (Command Center)', href: '/improve', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'เดินตรวจหน้างาน (Gemba Walk)', href: '/improve/gemba', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'รายการค้นพบ (Observations)', href: '/improve/observations', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'โครงการไคเซ็น (Projects/PDCA)', href: '/improve/projects', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
     ]
   },
   {

@@ -88,6 +88,12 @@ export const APP_MODULES: AppModuleItem[] = [
     href: '/costing',
   },
   {
+    id: 'improve',
+    label: 'CosmeFlow Improve',
+    shortLabel: 'เพิ่มประสิทธิภาพ & ลดต้นทุน (OpEx)',
+    href: '/improve',
+  },
+  {
     id: 'master-data',
     label: 'ข้อมูลหลัก (Master Data)',
     shortLabel: 'ข้อมูลหลัก & ผู้ใช้งาน',
@@ -98,7 +104,7 @@ export const APP_MODULES: AppModuleItem[] = [
 export const ALL_MODULE_IDS = [
   'dashboard', 'planner', 'incoming-rm', 'production_overview', 'production_weighing', 
   'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 
-  'fg', 'purchase', 'maintenance', 'people', 'costing', 'master-data'
+  'fg', 'purchase', 'maintenance', 'people', 'costing', 'improve', 'master-data'
 ]
 
 export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<string, 'VIEW' | 'EDIT'> }> = {
@@ -122,6 +128,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       fg: 'EDIT',
       purchase: 'VIEW',
       costing: 'EDIT',
+      improve: 'EDIT',
       'master-data': 'VIEW'
     }
   },
@@ -138,6 +145,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_pof: 'VIEW',
       qc: 'VIEW',
       issues: 'VIEW',
+      improve: 'VIEW',
       'master-data': 'VIEW'
     }
   },
@@ -147,6 +155,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       dashboard: 'VIEW',
       planner: 'VIEW',
       costing: 'EDIT',
+      improve: 'EDIT',
       purchase: 'VIEW',
       fg: 'VIEW',
       'master-data': 'VIEW'
@@ -163,7 +172,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_packing: 'EDIT',
       production_pof: 'EDIT',
       qc: 'VIEW',
-      issues: 'EDIT'
+      issues: 'EDIT',
+      improve: 'EDIT'
     }
   },
   production_mx: {
@@ -174,7 +184,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_overview: 'VIEW',
       production_weighing: 'EDIT',
       production_mixing: 'EDIT',
-      issues: 'EDIT'
+      issues: 'EDIT',
+      improve: 'EDIT'
     }
   },
   production_pk: {
@@ -184,7 +195,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_overview: 'VIEW',
       production_packing: 'EDIT',
       production_pof: 'EDIT',
-      issues: 'EDIT'
+      issues: 'EDIT',
+      improve: 'EDIT'
     }
   },
   qc: {
@@ -198,7 +210,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_packing: 'VIEW',
       production_pof: 'VIEW',
       qc: 'EDIT',
-      issues: 'EDIT'
+      issues: 'EDIT',
+      improve: 'EDIT'
     }
   },
   qa: {
@@ -212,7 +225,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_packing: 'VIEW',
       production_pof: 'VIEW',
       qc: 'EDIT',
-      issues: 'EDIT'
+      issues: 'EDIT',
+      improve: 'EDIT'
     }
   },
   warehouse_mmrm_bu: {
@@ -347,6 +361,7 @@ export function getRouteAccessLevel(href: string, userRole?: string | null): Acc
   else if (href === '/maintenance') key = 'maintenance'
   else if (href === '/people') key = 'people'
   else if (href.startsWith('/costing')) key = 'costing'
+  else if (href.startsWith('/improve')) key = 'improve'
   else if (href.startsWith('/master-data')) key = 'master-data'
 
   return perms[key] || 'NONE'
