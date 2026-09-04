@@ -15,7 +15,8 @@ import {
   ArrowLeft,
   Layers,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -51,6 +52,19 @@ export default function GembaCapturePage() {
   
   // Voice Recording simulation state
   const [isRecording, setIsRecording] = useState(false);
+
+  // Dynamic creation state for Department, Line, Station
+  const [isAddingDept, setIsAddingDept] = useState(false);
+  const [newDeptName, setNewDeptName] = useState('');
+  const [isCreatingDept, setIsCreatingDept] = useState(false);
+
+  const [isAddingLine, setIsAddingLine] = useState(false);
+  const [newLineName, setNewLineName] = useState('');
+  const [isCreatingLine, setIsCreatingLine] = useState(false);
+
+  const [isAddingStation, setIsAddingStation] = useState(false);
+  const [newStationName, setNewStationName] = useState('');
+  const [isCreatingStation, setIsCreatingStation] = useState(false);
 
   useEffect(() => {
     fetchMasterData();
@@ -120,6 +134,92 @@ export default function GembaCapturePage() {
       }, 3500);
     } else {
       setIsRecording(false);
+    }
+  };
+
+  const handleCreateDept = async () => {
+    if (!newDeptName.trim()) return;
+    setIsCreatingDept(true);
+    try {
+      const res = await fetch('/api/improve/master', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'DEPARTMENT', name: newDeptName.trim() })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDepartments(prev => [...prev, json.data]);
+        setDepartmentId(json.data.id);
+        setIsAddingDept(false);
+        setNewDeptName('');
+        toast.success(`เพิ่มแผนก "${json.data.department_name}" สำเร็จ`);
+      } else {
+        toast.error(json.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsCreatingDept(false);
+    }
+  };
+
+  const handleCreateLine = async () => {
+    if (!newLineName.trim()) return;
+    setIsCreatingLine(true);
+    try {
+      const res = await fetch('/api/improve/master', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          type: 'LINE', 
+          name: newLineName.trim(),
+          department_id: departmentId || null
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setLines(prev => [...prev, json.data]);
+        setLineId(json.data.id);
+        setIsAddingLine(false);
+        setNewLineName('');
+        toast.success(`เพิ่มสายการผลิต "${json.data.line_name}" สำเร็จ`);
+      } else {
+        toast.error(json.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsCreatingLine(false);
+    }
+  };
+
+  const handleCreateStation = async () => {
+    if (!newStationName.trim()) return;
+    setIsCreatingStation(true);
+    try {
+      const res = await fetch('/api/improve/master', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          type: 'STATION', 
+          name: newStationName.trim(),
+          line_id: lineId || null
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        setStations(prev => [...prev, json.data]);
+        setStationId(json.data.id);
+        setIsAddingStation(false);
+        setNewStationName('');
+        toast.success(`เพิ่มสถานี "${json.data.station_name}" สำเร็จ`);
+      } else {
+        toast.error(json.error);
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsCreatingStation(false);
     }
   };
 
@@ -300,58 +400,209 @@ export default function GembaCapturePage() {
 
             {/* Location Hierarchy */}
             <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
-              <div className="text-xs font-bold text-slate-700 flex items-center gap-1">
-                <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> ตำแหน่งที่พบ (Location Hierarchy)
+              <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
+                <div className="flex items-center gap-1">
+                  <MapPin className="w-3.5 h-3.5 text-[#D4AF37]" /> ตำแหน่งที่พบ (Location Hierarchy)
+                </div>
+                <span className="text-[10px] text-slate-400 font-normal">
+                  * สามารถกดเพิ่มแผนก / ไลน์ / สถานีใหม่ได้ทันที
+                </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Department */}
                 <div>
-                  <Label className="text-[11px] text-slate-500">แผนก (Department)</Label>
-                  <select
-                    value={departmentId}
-                    onChange={(e) => {
-                      setDepartmentId(e.target.value);
-                      setLineId('');
-                      setStationId('');
-                    }}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
-                  >
-                    <option value="">-- เลือกแผนก --</option>
-                    {departments.map((d: any) => (
-                      <option key={d.id} value={d.id}>{d.department_name}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-[11px] text-slate-600 font-semibold">แผนก (Department)</Label>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddingDept(!isAddingDept); setNewDeptName(''); }}
+                      className="text-[11px] text-[#8B7355] hover:text-[#D4AF37] font-bold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" /> {isAddingDept ? 'เลือกจากรายการ' : '+ เพิ่มแผนกใหม่'}
+                    </button>
+                  </div>
+                  {isAddingDept ? (
+                    <div className="flex gap-1.5 animate-in fade-in duration-150">
+                      <Input
+                        value={newDeptName}
+                        onChange={(e) => setNewDeptName(e.target.value)}
+                        placeholder="พิมพ์ชื่อแผนกใหม่..."
+                        className="text-xs h-9 bg-white"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateDept(); } }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCreateDept}
+                        disabled={isCreatingDept || !newDeptName.trim()}
+                        className="bg-[#D4AF37] hover:bg-[#c49f2e] text-[#2D2721] h-9 text-xs font-bold shrink-0 px-3"
+                      >
+                        {isCreatingDept ? '...' : 'บันทึก'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setIsAddingDept(false); setNewDeptName(''); }}
+                        className="h-9 text-xs shrink-0"
+                      >
+                        ยกเลิก
+                      </Button>
+                    </div>
+                  ) : (
+                    <select
+                      value={departmentId}
+                      onChange={(e) => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          setIsAddingDept(true);
+                        } else {
+                          setDepartmentId(e.target.value);
+                          setLineId('');
+                          setStationId('');
+                        }
+                      }}
+                      className="w-full p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
+                    >
+                      <option value="">-- เลือกแผนก --</option>
+                      {departments.map((d: any) => (
+                        <option key={d.id} value={d.id}>{d.department_name}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="text-[#8B7355] font-bold bg-amber-50">
+                        + เพิ่มแผนกใหม่...
+                      </option>
+                    </select>
+                  )}
                 </div>
 
+                {/* 2. Line */}
                 <div>
-                  <Label className="text-[11px] text-slate-500">สายการผลิต (Line)</Label>
-                  <select
-                    value={lineId}
-                    onChange={(e) => {
-                      setLineId(e.target.value);
-                      setStationId('');
-                    }}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
-                  >
-                    <option value="">-- เลือกลายผลิต --</option>
-                    {filteredLines.map((l: any) => (
-                      <option key={l.id} value={l.id}>{l.line_name}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-[11px] text-slate-600 font-semibold">สายการผลิต (Line)</Label>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddingLine(!isAddingLine); setNewLineName(''); }}
+                      className="text-[11px] text-[#8B7355] hover:text-[#D4AF37] font-bold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" /> {isAddingLine ? 'เลือกจากรายการ' : '+ เพิ่มไลน์ใหม่'}
+                    </button>
+                  </div>
+                  {isAddingLine ? (
+                    <div className="flex gap-1.5 animate-in fade-in duration-150">
+                      <Input
+                        value={newLineName}
+                        onChange={(e) => setNewLineName(e.target.value)}
+                        placeholder="พิมพ์ชื่อไลน์ผลิตใหม่..."
+                        className="text-xs h-9 bg-white"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateLine(); } }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCreateLine}
+                        disabled={isCreatingLine || !newLineName.trim()}
+                        className="bg-[#D4AF37] hover:bg-[#c49f2e] text-[#2D2721] h-9 text-xs font-bold shrink-0 px-3"
+                      >
+                        {isCreatingLine ? '...' : 'บันทึก'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setIsAddingLine(false); setNewLineName(''); }}
+                        className="h-9 text-xs shrink-0"
+                      >
+                        ยกเลิก
+                      </Button>
+                    </div>
+                  ) : (
+                    <select
+                      value={lineId}
+                      onChange={(e) => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          setIsAddingLine(true);
+                        } else {
+                          setLineId(e.target.value);
+                          setStationId('');
+                        }
+                      }}
+                      className="w-full p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
+                    >
+                      <option value="">-- เลือกลายผลิต --</option>
+                      {filteredLines.map((l: any) => (
+                        <option key={l.id} value={l.id}>{l.line_name}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="text-[#8B7355] font-bold bg-amber-50">
+                        + เพิ่มไลน์ผลิตใหม่...
+                      </option>
+                    </select>
+                  )}
                 </div>
 
+                {/* 3. Station */}
                 <div className="sm:col-span-2">
-                  <Label className="text-[11px] text-slate-500">สถานีการทำงาน (Station)</Label>
-                  <select
-                    value={stationId}
-                    onChange={(e) => setStationId(e.target.value)}
-                    className="w-full mt-1 p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
-                  >
-                    <option value="">-- เลือกสถานี --</option>
-                    {filteredStations.map((s: any) => (
-                      <option key={s.id} value={s.id}>{s.station_name}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-[11px] text-slate-600 font-semibold">สถานีการทำงาน (Station)</Label>
+                    <button
+                      type="button"
+                      onClick={() => { setIsAddingStation(!isAddingStation); setNewStationName(''); }}
+                      className="text-[11px] text-[#8B7355] hover:text-[#D4AF37] font-bold flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" /> {isAddingStation ? 'เลือกจากรายการ' : '+ เพิ่มสถานีใหม่'}
+                    </button>
+                  </div>
+                  {isAddingStation ? (
+                    <div className="flex gap-1.5 animate-in fade-in duration-150">
+                      <Input
+                        value={newStationName}
+                        onChange={(e) => setNewStationName(e.target.value)}
+                        placeholder="พิมพ์ชื่อสถานีการทำงานใหม่..."
+                        className="text-xs h-9 bg-white"
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateStation(); } }}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={handleCreateStation}
+                        disabled={isCreatingStation || !newStationName.trim()}
+                        className="bg-[#D4AF37] hover:bg-[#c49f2e] text-[#2D2721] h-9 text-xs font-bold shrink-0 px-3"
+                      >
+                        {isCreatingStation ? '...' : 'บันทึก'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setIsAddingStation(false); setNewStationName(''); }}
+                        className="h-9 text-xs shrink-0"
+                      >
+                        ยกเลิก
+                      </Button>
+                    </div>
+                  ) : (
+                    <select
+                      value={stationId}
+                      onChange={(e) => {
+                        if (e.target.value === '__ADD_NEW__') {
+                          setIsAddingStation(true);
+                        } else {
+                          setStationId(e.target.value);
+                        }
+                      }}
+                      className="w-full p-2 rounded-lg border border-slate-300 text-xs bg-white text-slate-800"
+                    >
+                      <option value="">-- เลือกสถานี --</option>
+                      {filteredStations.map((s: any) => (
+                        <option key={s.id} value={s.id}>{s.station_name}</option>
+                      ))}
+                      <option value="__ADD_NEW__" className="text-[#8B7355] font-bold bg-amber-50">
+                        + เพิ่มสถานีใหม่...
+                      </option>
+                    </select>
+                  )}
                 </div>
               </div>
             </div>
