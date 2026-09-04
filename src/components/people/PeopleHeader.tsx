@@ -120,6 +120,7 @@ export function PeopleHeader({
     { id: 'dashboard', label: t.navHome, icon: '🏠' },
     { id: 'employees', label: t.navEmployees, icon: '👥' },
     { id: 'leave', label: t.navLeave, icon: '🏖️' },
+    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', icon: '⏰' },
     { id: 'approvals', label: t.navApprovals, icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
     { id: 'attendance', label: t.navAttendance, icon: '⏱️' },
     { id: 'exceptions', label: t.navExceptions, icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },

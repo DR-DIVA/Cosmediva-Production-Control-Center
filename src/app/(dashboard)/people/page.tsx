@@ -16,6 +16,7 @@ import { ApprovalsInboxView } from '@/components/people/ApprovalsInboxView';
 import { TimeAttendanceView } from '@/components/people/TimeAttendanceView';
 import { PolicyMasterView } from '@/components/people/PolicyMasterView';
 import { ReportsView } from '@/components/people/ReportsView';
+import { OtJobCostingView } from '@/components/people/OtJobCostingView';
 import { Language, TRANSLATIONS } from '@/lib/peopleTranslations';
 
 export default function PeoplePage() {
@@ -134,6 +135,10 @@ export default function PeoplePage() {
             showRequestModal={showRequestModal}
             setShowRequestModal={setShowRequestModal}
           />
+        )}
+
+        {activeTab === 'ot_costing' && (
+          <OtJobCostingView currentPersona={currentPersona} />
         )}
 
         {activeTab === 'approvals' && (
