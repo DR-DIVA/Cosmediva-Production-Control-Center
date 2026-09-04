@@ -77,6 +77,7 @@ const MODULE_GROUPS = [
     groupName: '⚙️ ระบบและการบริหาร (Management & Costing)',
     items: [
       { id: 'costing', label: 'CosmeFlow Costing', desc: 'คำนวณและติดตามต้นทุนการผลิต' },
+      { id: 'improve', label: 'CosmeFlow Improve', desc: 'เพิ่มประสิทธิภาพ ลดต้นทุน ไคเซ็น และ Gemba' },
       { id: 'maintenance', label: 'Maintenance', desc: 'ซ่อมบำรุงและบำรุงรักษาเครื่องจักร' },
       { id: 'people', label: 'People (บุคลากร)', desc: 'จัดการทีมงานและกำลังพล' },
       { id: 'master-data', label: 'Master Data & ผู้ใช้งาน', desc: 'ตั้งค่าระบบและจัดการสิทธิ์พนักงาน' },

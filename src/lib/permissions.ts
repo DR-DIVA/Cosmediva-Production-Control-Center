@@ -242,7 +242,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
     perms: {
       dashboard: 'VIEW',
       'incoming-rm': 'EDIT',
-      fg: 'EDIT'
+      fg: 'EDIT',
+      improve: 'VIEW'
     }
   },
   purchase: {
@@ -250,21 +251,24 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
     perms: {
       dashboard: 'VIEW',
       'incoming-rm': 'VIEW',
-      purchase: 'EDIT'
+      purchase: 'EDIT',
+      improve: 'VIEW'
     }
   },
   maintenance: {
     label: '🔧 ฝ่ายซ่อมบำรุง (Maintenance)',
     perms: {
       dashboard: 'VIEW',
-      maintenance: 'EDIT'
+      maintenance: 'EDIT',
+      improve: 'EDIT'
     }
   },
   people: {
     label: '👥 ฝ่ายบุคคล (People)',
     perms: {
       dashboard: 'VIEW',
-      people: 'EDIT'
+      people: 'EDIT',
+      improve: 'EDIT'
     }
   }
 }
