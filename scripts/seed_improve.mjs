@@ -313,30 +313,140 @@ async function runSeed() {
       ON CONFLICT (project_no) DO NOTHING
       RETURNING id INTO proj_id;
 
-      IF proj_id IS NOT NULL AND obs_id IS NOT NULL THEN
-        INSERT INTO improve_project_observations (project_id, observation_id)
-        VALUES (proj_id, obs_id)
-        ON CONFLICT DO NOTHING;
-
-        INSERT INTO improve_before_after (
+      IF proj_id IS NOT NULL THEN
+        -- 6. Standard Work & Digital OPL
+        INSERT INTO improve_standard_work (
           project_id,
-          metric_name,
-          unit,
-          before_value,
-          after_value,
-          higher_is_better,
-          improvement_pct,
-          notes
+          doc_no,
+          title,
+          doc_type,
+          department_id,
+          revision,
+          effective_date,
+          owner_name,
+          qa_approver_name,
+          status,
+          steps_summary,
+          critical_quality_points,
+          safety_points,
+          common_mistakes
         )
-        VALUES 
-          (proj_id, 'Cycle Time per Unit', 'วินาที', 12.00, 9.50, false, 20.83, 'ลดเวลาหยิบกล่องจาก 3.5 วิ เหลือ 1.0 วิ'),
-          (proj_id, 'Walking Distance per Shift', 'เมตร', 1200.00, 50.00, false, 95.83, 'พนักงานแทบไม่ต้องก้าวเท้าออกจากสเตชั่น'),
-          (proj_id, 'Hourly Output', 'ชิ้น/ชั่วโมง', 300.00, 362.00, true, 20.67, 'อัตราการไหลของงานสม่ำเสมอขึ้น')
+        VALUES (
+          proj_id,
+          'SOP-PKG-024',
+          'มาตรฐานการจัดวางพาเลทกล่องบรรจุภัณฑ์ & หยิบพับกล่องสเตชั่น 4 (Standard Cartoning Ergonomics)',
+          'SOP',
+          pkg_dept_id,
+          'Rev.02',
+          CURRENT_DATE,
+          'คุณสุรชัย (IE Specialist)',
+          'คุณพิมพา (QA Manager)',
+          'APPROVED',
+          '[
+            {"step": 1, "action": "ตรวจสอบป้ายล็อตกล่องบรรจุภัณฑ์เทียบกับ Batch Record", "time_sec": 5, "type": "VA"},
+            {"step": 2, "action": "จัดวางพาเลทกล่องไว้ฝั่งซ้ายของพนักงานในรัศมีเอื้อมมือ 40 ซม. ระดับความสูงเอว", "time_sec": 2, "type": "NNVA"},
+            {"step": 3, "action": "หยิบกล่องด้วยมือซ้าย กางขึ้นรูปและพับก้นกล่องในจังหวะเดียว (Single Motion)", "time_sec": 2.5, "type": "VA"},
+            {"step": 4, "action": "สวมขวดเซรั่มพร้อมใบแทรกเข้าสู่กล่องและพับฝาบน", "time_sec": 5, "type": "VA"}
+          ]'::jsonb,
+          'ตรวจเช็กการพิมพ์ Lot / EXP ที่กล่องทุก 15 นาที, ตรวจสอบรอยยับที่ลิ้นกล่อง',
+          'ห้ามเอื้อมยกกล่องเกินระดับหัวไหล่, จัดวางกล่องบนแท่นปรับระดับเพื่อป้องกันการปวดหลัง (Ergonomics)',
+          'วางกล่องไกลเกิน 60 ซม. ทำให้ต้องก้มตัว, พับกล่องก่อนบรรจุขวดทิ้งไว้หลายชิ้นทำให้กล่องยุบตัว'
+        )
+        ON CONFLICT (doc_no) DO NOTHING;
+
+        -- OPL (One Point Lesson)
+        INSERT INTO improve_opl (
+          opl_no,
+          topic,
+          why_important,
+          wrong_method_description,
+          correct_method_description,
+          stop_call_wait_rule,
+          status
+        )
+        VALUES (
+          'OPL-PKG-001',
+          'การจัดวางพาเลทกล่องบรรจุภัณฑ์แบบ Zero-Step (หยิบไม่ก้าวเท้า)',
+          'ลดระยะเดินและเวลาสูญเปล่าได้ 2.5 วินาที/ชิ้น ป้องกันความเมื่อยล้าและลดความเสี่ยงกล่องตกพื้นปนเปื้อน',
+          '❌ วิธีเดิมที่ผิด: วางพาเลทกล่องห่างจากโต๊ะบรรจุ 6 เมตร พนักงานต้องเดินไปหยิบกล่องครั้งละ 10-20 ชิ้น เสียเวลาเดิน 1,200 เมตรต่อกะ',
+          '✅ วิธีที่ถูกต้อง: เลื่อนแท่นวางกล่องติดชิดโต๊ะฝั่งซ้ายมือ สูงระดับเอว หยิบได้ทันทีใน 1 วินาที ไม่ต้องก้าวเท้าแม้แต่ก้าวเดียว',
+          'หากพบว่าพาเลทกล่องกีดขวางทางเดินฉุกเฉิน หรือความสูงเกินระดับสายตา ให้ หยุด-แจ้งหัวหน้างาน-รอจัดระเบียบ ทันที',
+          'APPROVED'
+        )
+        ON CONFLICT (opl_no) DO NOTHING;
+
+        -- Training Need
+        INSERT INTO improve_training_needs (
+          observation_id,
+          project_id,
+          training_topic,
+          target_department,
+          trainer_name,
+          target_date,
+          status
+        )
+        VALUES (
+          obs_id,
+          proj_id,
+          'อบรมเทคนิคการพับกล่องมือเดียวและการจัด Workstation Ergonomics (OPL-PKG-001)',
+          'ฝ่ายบรรจุภัณฑ์ (Packing)',
+          'คุณสุรชัย (IE Specialist)',
+          CURRENT_DATE + INTERVAL '7 days',
+          'IN_PROGRESS'
+        )
         ON CONFLICT DO NOTHING;
       END IF;
+
+      -- 7. Skills & Operator Skill Matrix (L0 to L4)
+      INSERT INTO improve_skills (skill_code, skill_name, department_id, category, description)
+      VALUES 
+        ('SKL-PKG-01', 'การขึ้นรูปและพับกล่องบรรจุภัณฑ์ (Cartoning & Folding)', pkg_dept_id, 'OPERATION', 'ทักษะการพับกล่องเดี่ยวรวดเร็ว ถูกต้องตามมาตรฐาน ไม่เกิดรอยยับหรือบุบ'),
+        ('SKL-PKG-02', 'การตั้งค่าและตรวจสอบเครื่องยิงล็อต Inkjet', pkg_dept_id, 'TECHNICAL', 'สามารถตั้งรหัส Lot / MFD / EXP บนเครื่อง CIJ และตรวจเช็กความคมชัดได้'),
+        ('SKL-PKG-03', 'การควบคุมเครื่องบรรจุกึ่งอัตโนมัติ (Semi-Auto Filling)', pkg_dept_id, 'MACHINE', 'การเดินเครื่อง คาลิเบรตน้ำหนักบรรจุ และการล้างทำความสะอาด Clean-in-Place'),
+        ('SKL-PKG-04', 'การตรวจสอบรอยปิดผนึกและชริ้งค์ฟิล์ม POF', pkg_dept_id, 'QUALITY', 'ทักษะการปรับอุณหภูมิอุโมงค์ความร้อน และการตรวจสอบฟองอากาศหรือรอยฉีกขาด'),
+        ('SKL-PKG-05', 'การระบุความสูญเปล่า 8 Wastes & ไคเซ็นหน้างาน', pkg_dept_id, 'LEAN_IE', 'ความเข้าใจในความสูญเปล่า 8 ประการ และสามารถเสนอแนะ Kaizen ผ่านระบบได้')
+      ON CONFLICT (skill_code) DO NOTHING;
+
+      -- Link Employees to Skills
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-001', 'สมชาย ใจมั่น', 'Packing', id, 'L3', 'L3', 'หัวหน้าแผนกบรรจุ', NOW(), 'ปฏิบัติงานได้ตามมาตรฐาน ชำนาญระดับสอนผู้อื่นได้บางส่วน'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-01'
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-002', 'วรรณา รักดี', 'Packing', id, 'L2', 'L3', 'หัวหน้าแผนกบรรจุ', NOW(), 'ทำงานได้ด้วยตัวเอง แต่ยังติดขัดเรื่องความเร็วเวลาเปลี่ยนกล่องไซส์ใหม่'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-01'
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-003', 'นรินทร์ ชัยชนะ', 'Packing', id, 'L1', 'L3', 'คุณสุรชัย (IE)', NOW(), 'พนักงานใหม่ เพิ่งผ่านการอบรมทฤษฎี ต้องการการประกบหน้างาน (OJT)'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-01'
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-004', 'กัลยาณี สดใส', 'Packing', id, 'L4', 'L3', 'คุณพิมพา (QA)', NOW(), 'ระดับผู้เชี่ยวชาญ (Master Trainer) สามารถสอนและออกข้อสอบวัดผลได้'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-01'
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-001', 'สมชาย ใจมั่น', 'Packing', id, 'L2', 'L3', 'หัวหน้าแผนกบรรจุ', NOW(), 'เปลี่ยนข้อความล็อตได้ แต่ยังแก้ปัญหารหัสจางหรือหัวพิมพ์ตันไม่คล่อง'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-02'
+      ON CONFLICT DO NOTHING;
+
+      INSERT INTO improve_employee_skills (employee_id, employee_name, department_name, skill_id, current_level, required_level, verified_by, verified_at, notes)
+      SELECT 
+        'EMP-004', 'กัลยาณี สดใส', 'Packing', id, 'L3', 'L3', 'หัวหน้าแผนกบรรจุ', NOW(), 'ตั้งค่าเครื่อง inkjet และปรับแต่ง nozzle ได้ตามมาตรฐาน'
+      FROM improve_skills WHERE skill_code = 'SKL-PKG-02'
+      ON CONFLICT DO NOTHING;
+
     END $$;
   `);
-  console.log('5. Pilot observation and project seeded successfully!');
+  console.log('5. Pilot observation, project, standard work, OPL, and skills seeded successfully!');
 
   await client.end();
   console.log('All improve seed operations completed!');

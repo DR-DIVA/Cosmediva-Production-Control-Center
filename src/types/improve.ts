@@ -219,3 +219,80 @@ export interface ImproveCostRate {
   version: number;
   notes?: string;
 }
+
+export interface ImproveStandardWork {
+  id: string;
+  project_id?: string;
+  doc_no: string;
+  title: string;
+  doc_type: 'SOP' | 'WI' | 'OPL' | 'CHECKLIST';
+  department_id?: string;
+  revision: string;
+  effective_date: string;
+  owner_name: string;
+  qa_approver_name?: string;
+  status: 'DRAFT' | 'PENDING_QA' | 'APPROVED' | 'OBSOLETE';
+  steps_summary?: Array<{ step: number; action: string; time_sec?: number; type?: 'VA' | 'NNVA' | 'WASTE' }>;
+  critical_quality_points?: string;
+  safety_points?: string;
+  common_mistakes?: string;
+  created_at: string;
+  departments?: { department_name: string; department_code: string };
+  opls?: ImproveOpl[];
+}
+
+export interface ImproveOpl {
+  id: string;
+  standard_work_id?: string;
+  opl_no: string;
+  topic: string;
+  why_important?: string;
+  wrong_method_description?: string;
+  wrong_method_image_url?: string;
+  correct_method_description?: string;
+  correct_method_image_url?: string;
+  stop_call_wait_rule?: string;
+  status: 'DRAFT' | 'APPROVED' | 'ARCHIVED';
+  created_at: string;
+}
+
+export interface ImproveSkill {
+  id: string;
+  skill_code: string;
+  skill_name: string;
+  department_id?: string;
+  category: 'OPERATION' | 'TECHNICAL' | 'MACHINE' | 'QUALITY' | 'LEAN_IE' | 'SAFETY';
+  description?: string;
+  is_active: boolean;
+  department_name?: string;
+}
+
+export interface ImproveEmployeeSkill {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  department_name?: string;
+  skill_id: string;
+  skill_code?: string;
+  skill_name?: string;
+  category?: string;
+  current_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
+  required_level: 'L0' | 'L1' | 'L2' | 'L3' | 'L4';
+  verified_by?: string;
+  verified_at?: string;
+  notes?: string;
+  updated_at: string;
+}
+
+export interface ImproveTrainingNeed {
+  id: string;
+  observation_id?: string;
+  project_id?: string;
+  training_topic: string;
+  target_department?: string;
+  trainer_name?: string;
+  target_date?: string;
+  completion_date?: string;
+  status: 'IDENTIFIED' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  created_at: string;
+}

@@ -142,10 +142,14 @@ const routes = [
     color: 'text-[#D4AF37]',
     allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'],
     subRoutes: [
-      { label: 'ภาพรวม (Command Center)', href: '/improve', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'ภาพรวม & Cost Tree (Command Center)', href: '/improve', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
       { label: 'เดินตรวจหน้างาน (Gemba Walk)', href: '/improve/gemba', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
-      { label: 'รายการค้นพบ (Observations)', href: '/improve/observations', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
-      { label: 'โครงการไคเซ็น (Projects/PDCA)', href: '/improve/projects', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'รายการค้นพบ & 5-Why (Observations)', href: '/improve/observations', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'โครงการไคเซ็น & ก่อน-หลัง (PDCA)', href: '/improve/projects', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'วิดีโอ Time Study (VA/Waste)', href: '/improve/time-study', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'มาตรฐานงาน & OPL (Standard Work)', href: '/improve/standard-work', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'ทักษะ & อบรม (Skill Matrix)', href: '/improve/skills', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
+      { label: 'วิเคราะห์ต้นทุนสูญเสีย (Cost of Loss)', href: '/improve/cost-loss', allowedRoles: ['admin', 'planner', 'acc', 'production', 'production_pk', 'production_mx', 'qa', 'qc'] },
     ]
   },
   {
