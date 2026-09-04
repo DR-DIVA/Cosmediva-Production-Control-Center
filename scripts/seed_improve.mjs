@@ -12,8 +12,8 @@ async function runSeed() {
   // 1. Sites
   await client.query(`
     INSERT INTO improve_sites (site_code, site_name, is_active)
-    VALUES ('SITE-01', 'โรงงานคอสเมดิวา ลาดกระบัง (Main Plant)', true)
-    ON CONFLICT (site_code) DO NOTHING;
+    VALUES ('SITE-01', 'CosmeDiva Factory', true)
+    ON CONFLICT (site_code) DO UPDATE SET site_name = 'CosmeDiva Factory';
   `);
   console.log('1. Site created');
 

@@ -265,7 +265,7 @@ export default function CostLossTreePage() {
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-slate-100">
-                      โรงงานคอสเมดิวา ลาดกระบัง (Main Plant Total Loss)
+                      CosmeDiva Factory
                     </h3>
                     <p className="text-xs text-slate-400">
                       ยอดรวมสูญเปล่าทั้งระบบโรงงาน
