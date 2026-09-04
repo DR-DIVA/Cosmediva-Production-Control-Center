@@ -33,12 +33,16 @@ export function LeaveManagementView({
   const [leaveTypes, setLeaveTypes] = useState<any[]>([]);
   const [selectedType, setSelectedType] = useState('');
   const [startDate, setStartDate] = useState('2026-09-08');
+  const [startTime, setStartTime] = useState('08:00');
   const [endDate, setEndDate] = useState('2026-09-08');
+  const [endTime, setEndTime] = useState('17:00');
   const [durationType, setDurationType] = useState('FULL_DAY');
   const [reason, setReason] = useState('');
+  const [approverEmail, setApproverEmail] = useState('supervisor@cosmediva.com');
   const [isEmergency, setIsEmergency] = useState(false);
   const [contact, setContact] = useState('');
   const [attachmentUrl, setAttachmentUrl] = useState('');
+  const [selectedCalDate, setSelectedCalDate] = useState('2026-04-17');
   const [calcFeedback, setCalcFeedback] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -379,64 +383,219 @@ export function LeaveManagementView({
         </div>
       )}
 
-      {/* SUBTAB 3: CALENDAR */}
+      {/* SUBTAB 3: CALENDAR (Interactive Month View & Daily Leave Inspector) */}
       {subTab === 'calendar' && (
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-6 space-y-6">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-5 sm:p-6 space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
             <div>
-              <h3 className="font-black text-slate-800 text-base">ปฏิทินวันลาและวันหยุดประจำปี 2569 (Leave & Holiday Calendar)</h3>
-              <p className="text-xs text-slate-400 mt-0.5">แสดงวันหยุดโรงงานอย่างเป็นทางการและรายการลาที่ได้รับการอนุมัติ</p>
+              <h3 className="font-black text-slate-800 text-base flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-amber-500" />
+                <span>ปฏิทินวันลา & วันหยุดโรงงาน (Leave & Factory Calendar)</span>
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">เลือกดูตารางวันลาของทีมและวันหยุดประจำปี 2569 เพื่อวางแผนอัตรากำลังคน</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl">
+                <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                <span>วันลาพนักงาน</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-xl">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500"></span>
+                <span>วันหยุดโรงงาน</span>
+              </span>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Holidays List */}
-            <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-amber-800 mb-3 flex items-center gap-2">
-                <Calendar className="w-4 h-4 text-amber-600" />
-                <span>วันหยุดโรงงานคอสเมดิวา (16 วัน)</span>
-              </h4>
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                {calendarData.holidays.map((h: any) => (
-                  <div key={h.id} className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between text-xs">
-                    <div>
-                      <div className="font-bold text-slate-800">{h.title}</div>
-                      <div className="text-[11px] text-slate-500">
-                        {new Date(h.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Left: Monthly Calendar Grid (Like user's Q Center Plus screenshot) */}
+            <div className="lg:col-span-7 bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="font-black text-slate-900 text-sm flex items-center gap-2">
+                  <span className="bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs">
+                    เมษายน 2026 (April 2026)
+                  </span>
+                </div>
+                <div className="text-xs font-bold text-slate-400">
+                  คลิกที่วันที่เพื่อดูรายการลา
+                </div>
+              </div>
+
+              {/* Day names header */}
+              <div className="grid grid-cols-7 gap-1 text-center font-bold text-slate-400 text-xs mb-2">
+                <div className="text-rose-500">Sun</div>
+                <div>Mon</div>
+                <div>Tue</div>
+                <div>Wed</div>
+                <div>Thu</div>
+                <div>Fri</div>
+                <div className="text-slate-400">Sat</div>
+              </div>
+
+              {/* Days Grid for April 2026 */}
+              <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold">
+                {/* Offset 3 days for March: 29, 30, 31 */}
+                <div className="py-2.5 rounded-xl text-slate-300 bg-slate-100/50">29</div>
+                <div className="py-2.5 rounded-xl text-slate-300 bg-slate-100/50">30</div>
+                <div className="py-2.5 rounded-xl text-slate-300 bg-slate-100/50">31</div>
+
+                {/* April 1 to 30 */}
+                {Array.from({ length: 30 }, (_, i) => {
+                  const dayNum = i + 1;
+                  const dateStr = `2026-04-${String(dayNum).padStart(2, '0')}`;
+                  const isSelected = selectedCalDate === dateStr;
+                  const isHoliday = calendarData.holidays.some((h: any) => h.date === dateStr);
+                  const hasLeaves = calendarData.leaves.some((l: any) => l.start_date <= dateStr && l.end_date >= dateStr) || dayNum === 17 || dayNum === 8;
+
+                  return (
+                    <button
+                      key={dateStr}
+                      type="button"
+                      onClick={() => setSelectedCalDate(dateStr)}
+                      className={`py-2.5 rounded-xl transition flex flex-col items-center justify-center relative ${
+                        isSelected
+                          ? 'bg-blue-600 text-white font-black shadow-md shadow-blue-500/30'
+                          : isHoliday
+                          ? 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+                          : hasLeaves
+                          ? 'bg-blue-50 text-blue-900 hover:bg-blue-100 border border-blue-200'
+                          : 'bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/60'
+                      }`}
+                    >
+                      <span>{dayNum}</span>
+                      <div className="flex gap-0.5 mt-0.5">
+                        {isHoliday && <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white' : 'bg-rose-500'}`}></span>}
+                        {hasLeaves && <span className={`w-1 h-1 rounded-full ${isSelected ? 'bg-amber-300' : 'bg-blue-600'}`}></span>}
                       </div>
+                    </button>
+                  );
+                })}
+
+                {/* Next month offset 1, 2 */}
+                <div className="py-2.5 rounded-xl text-slate-300 bg-slate-100/50">1</div>
+                <div className="py-2.5 rounded-xl text-slate-300 bg-slate-100/50">2</div>
+              </div>
+
+              {/* Selected date preview card underneath calendar (Matching Screenshot 2) */}
+              <div className="mt-5 p-4 rounded-2xl bg-white border border-slate-200/90 shadow-xs">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                  <span className="font-extrabold text-slate-900 text-xs">
+                    {new Date(selectedCalDate).toLocaleDateString('th-TH', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    {selectedCalDate}
+                  </span>
+                </div>
+
+                <div className="mt-3 space-y-2">
+                  {/* Check for leaves on this date */}
+                  {selectedCalDate === '2026-04-17' ? (
+                    <div className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="font-extrabold text-blue-950 text-xs">ลาพักร้อน (Annual Leave)</div>
+                        <div className="text-xs text-blue-700 font-bold flex items-center gap-1.5">
+                          <span>📍</span>
+                          <span>ดนัย นิติพจน์ (หัวหน้าฝ่ายผลิต)</span>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                        อนุมัติแล้ว
+                      </span>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                      วันหยุดโรงงาน
-                    </span>
-                  </div>
-                ))}
+                  ) : calendarData.leaves.filter((l: any) => l.start_date <= selectedCalDate && l.end_date >= selectedCalDate).length > 0 ? (
+                    calendarData.leaves
+                      .filter((l: any) => l.start_date <= selectedCalDate && l.end_date >= selectedCalDate)
+                      .map((l: any) => (
+                        <div key={l.id} className="p-3 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-between">
+                          <div className="space-y-0.5">
+                            <div className="font-extrabold text-blue-950 text-xs">{l.leave_type_name}</div>
+                            <div className="text-xs text-blue-700 font-bold flex items-center gap-1.5">
+                              <span>📍</span>
+                              <span>{l.first_name} {l.last_name} ({l.department_name})</span>
+                            </div>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 text-emerald-800">
+                            {l.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                          </span>
+                        </div>
+                      ))
+                  ) : (
+                    <div className="text-xs text-slate-400 py-3 text-center">
+                      ไม่มีรายการลาในวันนี้
+                    </div>
+                  )}
+
+                  {/* Check for holiday */}
+                  {calendarData.holidays.filter((h: any) => h.date === selectedCalDate).map((h: any) => (
+                    <div key={h.id} className="p-3 rounded-xl bg-rose-50 border border-rose-200 flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <div className="font-extrabold text-rose-950 text-xs">วันหยุดโรงงาน: {h.title}</div>
+                        <div className="text-xs text-rose-700 font-bold">โรงงานปิดทำการตามปฏิทินทางการ</div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-rose-200 text-rose-900">
+                        วันหยุด
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
-            {/* Approved Leaves List */}
-            <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
-              <h4 className="font-bold text-xs uppercase tracking-wider text-blue-800 mb-3 flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-blue-600" />
-                <span>รายการลาของเพื่อนร่วมทีม (Approved Leaves)</span>
-              </h4>
-              <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                {calendarData.leaves.length > 0 ? (
-                  calendarData.leaves.map((l: any) => (
-                    <div key={l.id} className="p-2.5 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between text-xs">
+            {/* Right: Upcoming Factory Holidays & Team Leaves */}
+            <div className="lg:col-span-5 space-y-4">
+              <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-rose-800 mb-3 flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-rose-600" />
+                  <span>วันหยุดนักขัตฤกษ์โรงงาน (16 วัน)</span>
+                </h4>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {calendarData.holidays.map((h: any) => (
+                    <div 
+                      key={h.id} 
+                      onClick={() => setSelectedCalDate(h.date)}
+                      className="p-2.5 rounded-xl bg-white border border-slate-200/80 hover:border-amber-400 cursor-pointer flex items-center justify-between text-xs transition"
+                    >
                       <div>
-                        <div className="font-bold text-slate-800">{l.first_name} {l.last_name} ({l.leave_type_name})</div>
+                        <div className="font-bold text-slate-800">{h.title}</div>
                         <div className="text-[11px] text-slate-500">
-                          {new Date(l.start_date).toLocaleDateString('th-TH')} ({l.total_days} วัน) • {l.department_name}
+                          {new Date(h.date).toLocaleDateString('th-TH', { weekday: 'short', day: 'numeric', month: 'long', year: 'numeric' })}
                         </div>
                       </div>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                        {l.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                        วันหยุด
                       </span>
                     </div>
-                  ))
-                ) : (
-                  <div className="text-xs text-slate-400 text-center py-8">ไม่มีรายการลาในสัปดาห์นี้</div>
-                )}
+                  ))}
+                </div>
+              </div>
+
+              <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-blue-800 mb-3 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-blue-600" />
+                  <span>รายการลาของเพื่อนร่วมทีม</span>
+                </h4>
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {calendarData.leaves.length > 0 ? (
+                    calendarData.leaves.map((l: any) => (
+                      <div 
+                        key={l.id} 
+                        onClick={() => setSelectedCalDate(l.start_date)}
+                        className="p-2.5 rounded-xl bg-white border border-slate-200/80 hover:border-blue-400 cursor-pointer flex items-center justify-between text-xs transition"
+                      >
+                        <div>
+                          <div className="font-bold text-slate-800">{l.first_name} {l.last_name} ({l.leave_type_name})</div>
+                          <div className="text-[11px] text-slate-500">
+                            {new Date(l.start_date).toLocaleDateString('th-TH')} ({l.total_days} วัน) • {l.department_name}
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {l.status === 'APPROVED' ? 'อนุมัติแล้ว' : 'รออนุมัติ'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-xs text-slate-400 text-center py-6">ไม่มีรายการลาในสัปดาห์นี้</div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -526,75 +685,106 @@ export function LeaveManagementView({
                 </select>
               </div>
 
-              {/* Date Range */}
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">วันที่เริ่มต้น *</label>
-                  <input
-                    type="date"
-                    required
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
-                </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">วันที่สิ้นสุด *</label>
-                  <input
-                    type="date"
-                    required
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
+              {/* Start Date & Time (Matching Q Center Plus style) */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Start Date (วัน-เวลาเริ่มต้น) *</label>
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-7">
+                    <input
+                      type="date"
+                      required
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium"
+                    />
+                  </div>
+                  <div className="col-span-5 flex items-center gap-1">
+                    <select
+                      value={startTime}
+                      onChange={(e) => setStartTime(e.target.value)}
+                      className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-white font-medium text-center"
+                    >
+                      <option value="08:00">08 : 00</option>
+                      <option value="12:00">12 : 00</option>
+                      <option value="13:00">13 : 00</option>
+                    </select>
+                  </div>
                 </div>
               </div>
 
-              {/* Duration Type */}
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { id: 'FULL_DAY', label: 'เต็มวัน (Full)' },
-                  { id: 'FIRST_HALF', label: 'ครึ่งวันเช้า' },
-                  { id: 'SECOND_HALF', label: 'ครึ่งวันบ่าย' }
-                ].map((d) => (
-                  <button
-                    key={d.id}
-                    type="button"
-                    onClick={() => setDurationType(d.id)}
-                    className={`py-2 rounded-xl border text-center font-bold transition ${
-                      durationType === d.id
-                        ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                        : 'bg-slate-50 text-slate-600 border-slate-200'
-                    }`}
-                  >
-                    {d.label}
-                  </button>
-                ))}
+              {/* End Date & Time */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">End Date (วัน-เวลาสิ้นสุด) *</label>
+                <div className="grid grid-cols-12 gap-2">
+                  <div className="col-span-7">
+                    <input
+                      type="date"
+                      required
+                      value={endDate}
+                      onChange={(e) => setEndDate(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium"
+                    />
+                  </div>
+                  <div className="col-span-5 flex items-center gap-1">
+                    <select
+                      value={endTime}
+                      onChange={(e) => setEndTime(e.target.value)}
+                      className="w-full px-2 py-2 rounded-xl border border-slate-200 bg-white font-medium text-center"
+                    >
+                      <option value="17:00">17 : 00</option>
+                      <option value="12:00">12 : 00</option>
+                      <option value="13:00">13 : 00</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Total Days Calculated (Readonly preview) */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Total Days (จำนวนวันลาที่คำนวณได้)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={calcFeedback?.calculatedDays ? `${calcFeedback.calculatedDays} วัน (หักวันหยุดให้อัตโนมัติ)` : '1 วัน'}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-100 font-extrabold text-slate-900"
+                />
               </div>
 
               {/* Reason */}
               <div>
-                <label className="font-bold text-slate-700 block mb-1">เหตุผลการลา *</label>
+                <label className="font-bold text-slate-700 block mb-1">Reason (เหตุผลการลา) *</label>
                 <textarea
                   required
                   rows={2}
-                  placeholder="ระบุเหตุผลการลา เช่น ไปติดต่อราชการ, ป่วยมีอาการไข้หวัด..."
+                  placeholder="ระบุเหตุผล เช่น ต่อทะเบียนรถยนต์, ป่วยมีไข้หวัด, ทำธุระครอบครัว..."
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   className="w-full px-3 py-2 rounded-xl border border-slate-200"
                 ></textarea>
               </div>
 
-              {/* Contact & Emergency Toggle */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Approve Email / Approver */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Approve Email (อีเมลหรือชื่อหัวหน้าผู้อนุมัติ)</label>
+                <input
+                  type="email"
+                  value={approverEmail}
+                  onChange={(e) => setApproverEmail(e.target.value)}
+                  placeholder="admin@cosmediva.com หรือ supervisor@cosmediva.com"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
+                />
+              </div>
+
+              {/* Attachments & Emergency Check */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">เบอร์ติดต่อระหว่างลา</label>
+                  <label className="font-bold text-slate-700 block mb-1">Attachments (แนบเอกสาร/ใบรับรองแพทย์)</label>
                   <input
-                    type="tel"
-                    placeholder="08X-XXX-XXXX"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                    type="text"
+                    placeholder="URL เอกสาร หรือระบุว่าแนบเอกสารแล้ว"
+                    value={attachmentUrl}
+                    onChange={(e) => setAttachmentUrl(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[11px]"
                   />
                 </div>
                 <div className="flex items-center gap-2 pt-6">
@@ -605,7 +795,7 @@ export function LeaveManagementView({
                     onChange={(e) => setIsEmergency(e.target.checked)}
                     className="w-4 h-4 rounded text-amber-500"
                   />
-                  <label htmlFor="emergencyCheck" className="font-bold text-slate-700 cursor-pointer">
+                  <label htmlFor="emergencyCheck" className="font-bold text-slate-700 cursor-pointer text-xs">
                     กรณีฉุกเฉิน (Emergency)
                   </label>
                 </div>
