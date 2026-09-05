@@ -136,20 +136,17 @@ export function OtEFormModal({ isOpen, onClose, data }: OtEFormModalProps) {
               {/* TOP HEADER: Logo & Title */}
               <div className="border-b-2 border-black flex items-stretch">
                 {/* Logo Box */}
-                <div className="w-44 border-r-2 border-black p-2 flex flex-col items-center justify-center shrink-0">
-                  <div className="w-14 h-12 flex items-center justify-center">
-                    {/* Cosmediva Hexagonal Ribbon Logo */}
-                    <svg viewBox="0 0 100 80" className="w-full h-full" fill="none" stroke="black" strokeWidth="6">
-                      <polygon points="50,5 90,25 90,65 50,85 10,65 10,25" strokeWidth="5" />
-                      <path d="M30,30 L50,18 L70,30 L70,55 L50,67 L30,55 Z" strokeWidth="4" />
-                      <line x1="10" y1="25" x2="50" y2="45" strokeWidth="4" />
-                      <line x1="90" y1="25" x2="50" y2="45" strokeWidth="4" />
-                      <line x1="50" y1="85" x2="50" y2="45" strokeWidth="4" />
-                    </svg>
+                <div className="w-48 border-r-2 border-black p-2 flex flex-col items-center justify-center shrink-0 bg-white">
+                  <div className="h-14 flex items-center justify-center py-0.5">
+                    {/* Official Cosmediva Logo from www.cosmediva.co.th */}
+                    <img
+                      src="/cosmediva-logo.png"
+                      alt="Cosmediva Official Logo"
+                      className="h-full w-auto object-contain max-w-[150px]"
+                    />
                   </div>
-                  <div className="font-extrabold tracking-wider text-[11px] mt-1 font-mono uppercase">COSMEDIVA</div>
                   <div className="w-full border-t border-black my-1"></div>
-                  <div className="text-[10.5px] font-bold tracking-tight">ฝ่ายทรัพยากรบุคคล</div>
+                  <div className="text-[10.5px] font-bold tracking-tight text-center">ฝ่ายทรัพยากรบุคคล</div>
                 </div>
 
                 {/* Form Title */}
