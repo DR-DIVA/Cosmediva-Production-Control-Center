@@ -5,10 +5,11 @@ import {
   Clock, DollarSign, Package, AlertTriangle, CheckCircle2, 
   TrendingDown, TrendingUp, Users, Plus, Filter, Sparkles,
   ArrowRight, ShieldAlert, BarChart3, ChevronRight, Calculator,
-  Search, X, Check, Trash2, UserCheck
+  Search, X, Check, Trash2, UserCheck, Printer, FileText
 } from 'lucide-react';
 import { Persona } from './PeopleHeader';
 import { toast } from 'sonner';
+import { OtEFormModal, OtEFormData } from './OtEFormModal';
 
 interface EmployeeOption {
   id: string;
@@ -85,12 +86,17 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
   const [otRequests, setOtRequests] = useState([
     {
       id: 'OT-2026-0908-01',
+      submissionDate: '2026-09-08',
+      division: 'PD (ฝ่ายผลิต)',
+      department: 'PK (แผนกบรรจุและแพ๊กกิ้ง)',
       lotNumber: 'JHD-309',
-      productName: 'Diva Serum 50ml',
+      productName: 'Diva Intensive Brightening Serum 50ml',
       line: 'Packing Line 2',
       requestedBy: 'ดนัย นิติพจน์ (Foreman)',
       otDate: '2026-09-08',
       timeSlot: '17:00 - 20:00 (3.0 ชม.)',
+      target: 'เร่งบรรจุ Lot JHD-309 ให้ทันกำหนดส่งมอบลูกค้า 16:00 น. วันพรุ่งนี้',
+      reason: 'เร่งบรรจุให้ทันกำหนดส่งมอบลูกค้า',
       plannedHeadcount: 15,
       actualHeadcount: 13,
       plannedHours: 45,
@@ -99,20 +105,25 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       actualCost: 3950,
       status: 'APPROVED_EXECUTED',
       participants: [
-        { code: 'PK-BJP518', name: 'น.ส.เบ็ญจพร พูลสวัสดิ์', rate: 68.06, hours: 3.0, cost: 204.18, status: 'Present' },
-        { code: 'PK-SNT012', name: 'นายสุนทร มีโชค', rate: 68.06, hours: 3.0, cost: 204.18, status: 'Present' },
-        { code: 'PK-WCH044', name: 'นายวิชัย รุ่งเรือง', rate: 75.50, hours: 3.0, cost: 226.50, status: 'Present' },
-        { code: 'PK-KMN089', name: 'น.ส.กมลทิพย์ แสนสุข', rate: 68.06, hours: 0, cost: 0, status: 'Absent' }
+        { code: 'PK-BJP518', name: 'น.ส.เบ็ญจพร พูลสวัสดิ์', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
+        { code: 'PK-SNT012', name: 'นายสุนทร มีโชค', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
+        { code: 'PK-WCH044', name: 'นายวิชัย รุ่งเรือง', rate: 75.50, hours: 3.0, cost: 226.50, position: 'พนักงานบรรจุ', status: 'Present' },
+        { code: 'PK-KMN089', name: 'น.ส.กมลทิพย์ แสนสุข', rate: 68.06, hours: 0, cost: 0, position: 'พนักงานบรรจุ', status: 'Absent' }
       ]
     },
     {
       id: 'OT-2026-0908-02',
+      submissionDate: '2026-09-08',
+      division: 'PD (ฝ่ายผลิต)',
+      department: 'PK (แผนกบรรจุและแพ๊กกิ้ง)',
       lotNumber: 'JHD-318',
-      productName: 'Diva Day Cream 30g',
+      productName: 'Diva Youth Defense Day Cream 30g',
       line: 'Packing Line 1',
       requestedBy: 'สมควร มั่นคง (Foreman)',
       otDate: '2026-09-08',
       timeSlot: '17:00 - 21:00 (4.0 ชม.)',
+      target: 'บรรจุ Diva Day Cream 30g ตามยอดสั่งซื้อ 45,000 ชิ้น',
+      reason: 'เร่งผลิตตามคำสั่งซื้อด่วน',
       plannedHeadcount: 14,
       actualHeadcount: 14,
       plannedHours: 56,
@@ -126,14 +137,22 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
   // Form State for new OT request
   const [formData, setFormData] = useState({
-    lotNumber: 'JHD-309',
-    line: 'Packing Line 2',
-    otDate: '2026-09-09',
+    submissionDate: new Date().toISOString().slice(0, 10),
+    division: 'PD (ฝ่ายผลิต)',
+    department: 'MX (แผนกผสม)',
+    productName: 'NAWANNA',
+    lotNumber: 'JHD-318',
+    otDate: new Date().toISOString().slice(0, 10),
     startTime: '17:00',
-    endTime: '20:00',
-    reason: 'เร่งบรรจุ Lot JHD-309 ให้ทันกำหนดส่งมอบลูกค้า 16:00 น. วันพรุ่งนี้',
-    selectedWorkersCount: 12
+    endTime: '19:00',
+    target: 'แช่+ผสม JHD-318 LOT 009/26 71-75/52',
+    reason: 'แช่+ผสม',
+    selectedWorkersCount: 1
   });
+
+  // E-Form Modal State
+  const [eformModalOpen, setEformModalOpen] = useState(false);
+  const [eformData, setEformData] = useState<OtEFormData | null>(null);
 
   // Employee Selection State
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
@@ -176,7 +195,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       if (diffMin <= 0) diffMin += 24 * 60;
       return Math.round((diffMin / 60) * 10) / 10;
     } catch {
-      return 3;
+      return 2;
     }
   };
 
@@ -215,6 +234,65 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
     });
   };
 
+  const handleOpenEFormFromRequest = (ot: any) => {
+    const hours = ot.plannedHours && ot.plannedHeadcount ? Math.round((ot.plannedHours / ot.plannedHeadcount) * 10) / 10 : 2;
+    setEformData({
+      id: ot.id,
+      submissionDate: ot.submissionDate || ot.otDate,
+      division: ot.division || 'PD (ฝ่ายผลิต)',
+      department: ot.department || ot.line || 'MX (แผนกผสม)',
+      productName: ot.productName || 'NAWANNA',
+      jobCode: ot.lotNumber || 'JHD-318',
+      otDate: ot.otDate,
+      startTime: ot.timeSlot ? ot.timeSlot.slice(0, 5) : '17:00',
+      endTime: ot.timeSlot ? ot.timeSlot.slice(8, 13) : '19:00',
+      hours: hours,
+      target: ot.target || ot.reason || 'ปฏิบัติงานตามคำสั่งผลิต',
+      reason: ot.reason || 'ทำงานล่วงเวลาตามแผนผลิต',
+      requestedBy: ot.requestedBy,
+      supervisorApprover: ot.requestedBy,
+      hrApprover: 'ฝ่ายทรัพยากรบุคคล',
+      directorApprover: 'ผู้อำนวยการโรงงาน',
+      participants: ot.participants && ot.participants.length > 0 
+        ? ot.participants.map((p: any) => ({
+            code: p.code,
+            name: p.name,
+            hours: p.hours || hours,
+            position: p.position || ot.department || 'พนักงาน',
+            note: p.note || ''
+          }))
+        : []
+    });
+    setEformModalOpen(true);
+  };
+
+  const handlePreviewEFormFromForm = () => {
+    const hours = calculateOtHours(formData.startTime, formData.endTime);
+    setEformData({
+      submissionDate: formData.submissionDate,
+      division: formData.division,
+      department: formData.department,
+      productName: formData.productName,
+      jobCode: formData.lotNumber,
+      otDate: formData.otDate,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      hours: hours,
+      target: formData.target,
+      reason: formData.reason,
+      requestedBy: `${currentPersona.name} (${currentPersona.role})`,
+      supervisorApprover: `${currentPersona.name}`,
+      participants: selectedEmployees.map(emp => ({
+        code: emp.employee_code,
+        name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
+        hours: hours,
+        position: emp.work_area_name || emp.department_name || formData.department,
+        note: ''
+      }))
+    });
+    setEformModalOpen(true);
+  };
+
   const handleCreateOtRequest = (e: React.FormEvent) => {
     e.preventDefault();
     const count = selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount;
@@ -223,9 +301,14 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
     const newReq = {
       id: `OT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(otRequests.length + 1).padStart(2, '0')}`,
+      submissionDate: formData.submissionDate,
+      division: formData.division,
+      department: formData.department,
       lotNumber: formData.lotNumber,
-      productName: formData.lotNumber === 'JHD-309' ? 'Diva Serum 50ml' : formData.lotNumber === 'JHD-318' ? 'Diva Day Cream 30g' : 'Diva Body Lotion 200ml',
-      line: formData.lotNumber === 'JHD-309' ? 'Packing Line 2' : formData.lotNumber === 'JHD-318' ? 'Packing Line 1' : 'Mixing Room 3',
+      productName: formData.productName,
+      line: formData.department,
+      target: formData.target,
+      reason: formData.reason,
       requestedBy: `${currentPersona.name} (${currentPersona.role})`,
       otDate: formData.otDate,
       timeSlot: `${formData.startTime} - ${formData.endTime} (${hours} ชม.)`,
@@ -242,13 +325,41 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
         rate: 68.06,
         hours: hours,
         cost: Math.round(hours * 68.06 * 100) / 100,
+        position: emp.work_area_name || emp.department_name || formData.department,
         status: 'Scheduled'
       }))
     };
 
     setOtRequests([newReq, ...otRequests]);
-    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} (${count} คน) เรียบร้อยแล้ว (ประมาณการ ฿${estCost.toLocaleString()})`);
+    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} (${count} คน) เรียบร้อยแล้ว`);
     setShowRequestModal(false);
+
+    // Prompt user with E-Form directly
+    setEformData({
+      id: newReq.id,
+      submissionDate: newReq.submissionDate,
+      division: newReq.division,
+      department: newReq.department,
+      productName: newReq.productName,
+      jobCode: newReq.lotNumber,
+      otDate: newReq.otDate,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      hours: hours,
+      target: newReq.target,
+      reason: newReq.reason,
+      requestedBy: newReq.requestedBy,
+      supervisorApprover: currentPersona.name,
+      hrApprover: 'ฝ่ายทรัพยากรบุคคล',
+      directorApprover: 'ผู้อำนวยการโรงงาน',
+      participants: newReq.participants.map(p => ({
+        code: p.code,
+        name: p.name,
+        hours: p.hours,
+        position: p.position
+      }))
+    });
+    setEformModalOpen(true);
   };
 
   const currentLotData = lots.find(l => l.lotNumber === selectedLot) || lots[0];
@@ -538,13 +649,25 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   </div>
                 </div>
 
-                <span className={`px-3 py-1 rounded-full text-xs font-black ${
-                  ot.status === 'APPROVED_EXECUTED'
-                    ? 'bg-emerald-100 text-emerald-800'
-                    : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {ot.status === 'APPROVED_EXECUTED' ? 'อนุมัติ & ปฏิบัติงานแล้ว' : 'รอผู้จัดการอนุมัติ'}
-                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEFormFromRequest(ot)}
+                    className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-amber-100 hover:text-amber-950 text-slate-700 font-bold text-xs flex items-center gap-1.5 transition border border-slate-200 cursor-pointer"
+                    title="เปิดดูและพิมพ์เอกสารใบขอทำงานล่วงเวลา (E-Form)"
+                  >
+                    <Printer className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ใบขอ OT (E-Form)</span>
+                  </button>
+
+                  <span className={`px-3 py-1 rounded-full text-xs font-black ${
+                    ot.status === 'APPROVED_EXECUTED'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {ot.status === 'APPROVED_EXECUTED' ? 'อนุมัติ & ปฏิบัติงานแล้ว' : 'รอผู้จัดการอนุมัติ'}
+                  </span>
+                </div>
               </div>
 
               {/* Comparison Plan vs Actual */}
@@ -607,22 +730,80 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
             </div>
 
             <form onSubmit={handleCreateOtRequest} className="py-4 space-y-4 text-xs">
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">คำสั่งผลิต / ล็อตงาน (Production Lot) *</label>
-                <select
-                  value={formData.lotNumber}
-                  onChange={(e) => setFormData({ ...formData, lotNumber: e.target.value })}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 font-bold text-slate-800"
-                >
-                  <option value="JHD-309">JHD-309 — Diva Serum 50ml (Packing Line 2)</option>
-                  <option value="JHD-318">JHD-318 — Diva Day Cream 30g (Packing Line 1)</option>
-                  <option value="JHD-317">JHD-317 — Diva Body Lotion 200ml (Mixing Room 3)</option>
-                </select>
+              {/* Row 1: Submission Date, Division, Department */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">วันที่ยื่นคำขอ *</label>
+                  <input
+                    type="date"
+                    required
+                    value={formData.submissionDate}
+                    onChange={(e) => setFormData({ ...formData, submissionDate: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">ฝ่าย *</label>
+                  <select
+                    value={formData.division}
+                    onChange={(e) => setFormData({ ...formData, division: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium"
+                  >
+                    <option value="PD (ฝ่ายผลิต)">PD (ฝ่ายผลิต)</option>
+                    <option value="MM (ฝ่ายบริหารคลังสินค้า)">MM (ฝ่ายบริหารคลังสินค้า)</option>
+                    <option value="QC (ฝ่ายควบคุมคุณภาพ)">QC (ฝ่ายควบคุมคุณภาพ)</option>
+                    <option value="RD (ฝ่ายวิจัยและพัฒนา)">RD (ฝ่ายวิจัยและพัฒนา)</option>
+                    <option value="EN (ฝ่ายวิศวกรรม/ซ่อมบำรุง)">EN (ฝ่ายวิศวกรรม/ซ่อมบำรุง)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">แผนก *</label>
+                  <select
+                    value={formData.department}
+                    onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-medium"
+                  >
+                    <option value="MX (แผนกผสม)">MX (แผนกผสม)</option>
+                    <option value="PK (แผนกบรรจุและแพ๊กกิ้ง)">PK (แผนกบรรจุและแพ๊กกิ้ง)</option>
+                    <option value="MM-RM/Bulk (คลังวัตถุดิบและบัลค์)">MM-RM/Bulk (คลังวัตถุดิบและบัลค์)</option>
+                    <option value="MM-PM/FG (คลังบรรจุภัณฑ์และสำเร็จรูป)">MM-PM/FG (คลังบรรจุภัณฑ์และสำเร็จรูป)</option>
+                    <option value="QC Lab">QC Lab</option>
+                    <option value="RD Lab">RD Lab</option>
+                    <option value="BEC ผลิตสบู่">BEC ผลิตสบู่</option>
+                  </select>
+                </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Row 2: Product Name, Job Code / Lot No. */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">วันที่ทำ OT *</label>
+                  <label className="font-bold text-slate-700 block mb-1">ผลิตภัณฑ์ (Product Name) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น NAWANNA, Diva Serum 50ml"
+                    value={formData.productName}
+                    onChange={(e) => setFormData({ ...formData, productName: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-bold text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">รหัสงาน / คำสั่งผลิต (Job Code) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น JHD-318, JHD-309"
+                    value={formData.lotNumber}
+                    onChange={(e) => setFormData({ ...formData, lotNumber: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white font-mono font-bold text-slate-800"
+                  />
+                </div>
+              </div>
+
+              {/* Row 3: OT Date, Times, Hours, Headcount */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="font-bold text-slate-700 block mb-1">วันที่ขอทำ OT *</label>
                   <input
                     type="date"
                     required
@@ -631,28 +812,6 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200"
                   />
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">
-                    จำนวนคนที่จะขอ (คน) *
-                    {selectedEmployees.length > 0 && (
-                      <span className="ml-1.5 text-[10px] text-amber-700 font-bold">
-                        (ซิงค์จากที่เลือก {selectedEmployees.length} คน)
-                      </span>
-                    )}
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    required
-                    value={selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount}
-                    onChange={(e) => setFormData({ ...formData, selectedWorkersCount: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold bg-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="font-bold text-slate-700 block mb-1">เวลาเริ่ม OT</label>
                   <input
@@ -671,6 +830,38 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                     className="w-full px-3 py-2 rounded-xl border border-slate-200"
                   />
                 </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">จำนวนชั่วโมง</label>
+                  <div className="px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-black text-amber-700 text-center">
+                    {calculateOtHours(formData.startTime, formData.endTime)} ชม.
+                  </div>
+                </div>
+              </div>
+
+              {/* Row 4: Reason and Target */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">เหตุผลในการขอ *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น แช่+ผสม, เร่งงานบรรจุให้ทันกำหนดส่งมอบ"
+                    value={formData.reason}
+                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-slate-700 block mb-1">Target (เป้าหมายงาน) *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="เช่น แช่+ผสม JHD-318 LOT 009/26 71-75/52"
+                    value={formData.target}
+                    onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
+                  />
+                </div>
               </div>
 
               {/* EMPLOYEE SEARCH & SELECTOR SECTION */}
@@ -678,7 +869,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                 <div className="flex items-center justify-between">
                   <label className="font-bold text-slate-800 flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-amber-600" />
-                    <span>ระบุรายชื่อพนักงานที่จะทำ OT *</span>
+                    <span>ระบุรายชื่อพนักงานที่จะทำ OT (สูงสุด 30 คน) *</span>
                     <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-black border border-amber-200">
                       เลือกแล้ว {selectedEmployees.length} คน
                     </span>
@@ -690,7 +881,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                         setSelectedEmployees([]);
                         setFormData(prev => ({ ...prev, selectedWorkersCount: 1 }));
                       }}
-                      className="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1"
+                      className="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3 h-3" />
                       <span>ล้างที่เลือก</span>
@@ -717,7 +908,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                       <button
                         type="button"
                         onClick={() => setEmpSearch('')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1 cursor-pointer"
                       >
                         ✕
                       </button>
@@ -739,7 +930,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                                 setSelectedEmployees(next);
                                 setFormData(prev => ({ ...prev, selectedWorkersCount: next.length }));
                               }}
-                              className="text-amber-700 hover:text-amber-900 hover:underline"
+                              className="text-amber-700 hover:text-amber-900 hover:underline cursor-pointer"
                             >
                               + เลือกทั้งหมด ({filteredEmployees.length})
                             </button>
@@ -748,7 +939,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                           <button
                             type="button"
                             onClick={() => setIsDropdownOpen(false)}
-                            className="text-slate-500 hover:text-slate-700"
+                            className="text-slate-500 hover:text-slate-700 cursor-pointer"
                           >
                             ปิด
                           </button>
@@ -819,7 +1010,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                         <button
                           type="button"
                           onClick={() => removeEmployee(emp.id)}
-                          className="text-amber-700 hover:text-rose-600 hover:bg-rose-50 rounded-full p-0.5 ml-0.5 transition"
+                          className="text-amber-700 hover:text-rose-600 hover:bg-rose-50 rounded-full p-0.5 ml-0.5 transition cursor-pointer"
                           title="ลบออก"
                         >
                           ✕
@@ -832,18 +1023,6 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                     ยังไม่ได้เลือกพนักงาน (คีย์ค้นหารหัสหรือชื่อด้านบนแล้วคลิกเลือกรายชื่อที่ต้องการได้เลยค่ะ)
                   </div>
                 )}
-              </div>
-
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">เหตุผลและความจำเป็น *</label>
-                <textarea
-                  required
-                  rows={2}
-                  value={formData.reason}
-                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                  placeholder="ระบุเหตุผล เช่น เร่งงานส่งมอบด่วนตามแผน..."
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                ></textarea>
               </div>
 
               {/* Financial Preview Box */}
@@ -863,24 +1042,46 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
                 <button
                   type="button"
-                  onClick={() => setShowRequestModal(false)}
-                  className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold"
+                  onClick={handlePreviewEFormFromForm}
+                  className="px-4 py-2 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-bold flex items-center gap-1.5 transition cursor-pointer"
+                  title="ดูตัวอย่างเอกสารใบขอ OT รูปแบบมาตรฐาน A4 ก่อนส่ง"
                 >
-                  ยกเลิก
+                  <FileText className="w-4 h-4 text-amber-800" />
+                  <span>ดูตัวอย่างใบขอ OT (Preview E-Form)</span>
                 </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/20"
-                >
-                  ส่งขออนุมัติผู้จัดการ (Submit OT)
-                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowRequestModal(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black shadow-md shadow-amber-500/20 flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>ส่งขออนุมัติ & พิมพ์ E-Form (Submit OT)</span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
+      )}
+
+      {/* E-FORM PRINTABLE MODAL */}
+      {eformData && (
+        <OtEFormModal
+          isOpen={eformModalOpen}
+          onClose={() => setEformModalOpen(false)}
+          data={eformData}
+        />
       )}
     </div>
   );
