@@ -29,6 +29,9 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
   const [departments, setDepartments] = useState<any[]>([]);
   const [workAreas, setWorkAreas] = useState<any[]>([]);
   const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   const orgDivisions = React.useMemo(() => {
     const map = new Map<string, { code: string; name: string; totalEmployees: number; depts: any[] }>();
@@ -121,6 +124,61 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
       }
     } catch (err) {
       toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    }
+  };
+
+  const handleUpdateEmployee = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editFormData.first_name || !editFormData.last_name) {
+      toast.error('กรุณากรอกชื่อและนามสกุล');
+      return;
+    }
+
+    try {
+      setIsSaving(true);
+      const res = await fetch('/api/people/employees', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: editFormData.id,
+          prefix: editFormData.prefix,
+          first_name: editFormData.first_name,
+          last_name: editFormData.last_name,
+          nickname: editFormData.nickname,
+          phone: editFormData.phone,
+          email: editFormData.email,
+          department_id: editFormData.department_id || null,
+          work_area_id: editFormData.work_area_id || null,
+          employment_type: editFormData.employment_type,
+          employment_status: editFormData.employment_status,
+          system_role: editFormData.system_role,
+          work_location: editFormData.work_location,
+          preferred_language: editFormData.preferred_language,
+          hire_date: editFormData.hire_date ? editFormData.hire_date.split('T')[0] : undefined
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`อัปเดตข้อมูล ${editFormData.first_name} ${editFormData.last_name} เรียบร้อยแล้ว`);
+        setIsEditing(false);
+        const deptObj = departments.find(d => d.id === editFormData.department_id);
+        const areaObj = workAreas.find(w => w.id === editFormData.work_area_id);
+        const updated = {
+          ...selectedEmp,
+          ...editFormData,
+          department_name: deptObj ? deptObj.department_name : selectedEmp?.department_name,
+          department_code: deptObj ? deptObj.department_code : selectedEmp?.department_code,
+          work_area_name: areaObj ? areaObj.work_area_name : selectedEmp?.work_area_name
+        };
+        setSelectedEmp(updated);
+        fetchEmployees();
+      } else {
+        toast.error(json.error || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+      }
+    } catch (err) {
+      toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -488,20 +546,43 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
                         <button
-                          onClick={() => setSelectedEmp(emp)}
+                          onClick={() => {
+                            setSelectedEmp(emp);
+                            setEditFormData({
+                              ...emp,
+                              hire_date: emp.hire_date ? emp.hire_date.split('T')[0] : ''
+                            });
+                            setIsEditing(false);
+                          }}
                           className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-600 hover:text-amber-600 transition"
                           title="ดูโปรไฟล์ 360"
                         >
                           <Eye className="w-3.5 h-3.5" />
                         </button>
                         {(currentPersona.role.includes('HR') || currentPersona.role === 'Admin') && (
-                          <button
-                            onClick={() => handleSoftDelete(emp)}
-                            className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
-                            title="ระงับสถานะ (Soft Delete)"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                          <>
+                            <button
+                              onClick={() => {
+                                setSelectedEmp(emp);
+                                setEditFormData({
+                                  ...emp,
+                                  hire_date: emp.hire_date ? emp.hire_date.split('T')[0] : ''
+                                });
+                                setIsEditing(true);
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-amber-50 text-slate-600 hover:text-amber-600 transition cursor-pointer"
+                              title="แก้ไขข้อมูลพนักงาน"
+                            >
+                              <Edit3 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleSoftDelete(emp)}
+                              className="p-1.5 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition"
+                              title="ระงับสถานะ (Soft Delete)"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -551,53 +632,294 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
           <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-start justify-between pb-4 border-b border-slate-100">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white font-black text-lg flex items-center justify-center">
-                  {selectedEmp.first_name.slice(0, 1)}
+                <div className="w-12 h-12 rounded-2xl bg-amber-500 text-white font-black text-lg flex items-center justify-center shrink-0 shadow-md shadow-amber-500/20">
+                  {selectedEmp.first_name ? selectedEmp.first_name.slice(0, 1) : 'U'}
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-slate-900">
-                    {selectedEmp.prefix} {selectedEmp.first_name} {selectedEmp.last_name}
+                  <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+                    <span>{selectedEmp.prefix} {selectedEmp.first_name} {selectedEmp.last_name}</span>
+                    {selectedEmp.nickname && (
+                      <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                        ({selectedEmp.nickname})
+                      </span>
+                    )}
                   </h3>
-                  <p className="text-xs text-slate-500 font-mono">{selectedEmp.employee_code} • {selectedEmp.system_role}</p>
+                  <p className="text-xs text-slate-500 font-mono">
+                    {selectedEmp.employee_code} • <span className="font-semibold text-slate-700">{selectedEmp.system_role}</span>
+                  </p>
                 </div>
               </div>
-              <button onClick={() => setSelectedEmp(null)} className="p-1 rounded-lg hover:bg-slate-100 text-slate-400">
+              <button
+                onClick={() => { setSelectedEmp(null); setIsEditing(false); }}
+                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition"
+              >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="py-4 space-y-4 text-xs">
-              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
-                <div className="font-bold text-slate-700">ข้อมูลการทำงาน (Employment)</div>
-                <div className="grid grid-cols-2 gap-2 text-slate-600">
-                  <div>แผนก: <strong className="text-slate-800">{selectedEmp.department_name}</strong></div>
-                  <div>พื้นที่ปฏิบัติงาน: <strong className="text-slate-800">{selectedEmp.work_area_name || 'สำนักงาน'}</strong></div>
-                  <div>ประเภทการจ้าง: <strong className="text-slate-800">{selectedEmp.employment_type}</strong></div>
-                  <div>สถานะ: <strong className="text-emerald-700">{selectedEmp.employment_status}</strong></div>
-                  <div>หัวหน้างาน: <strong className="text-slate-800">{selectedEmp.supervisor_first_name ? `${selectedEmp.supervisor_first_name} ${selectedEmp.supervisor_last_name}` : '-'}</strong></div>
-                  <div>วันที่เริ่มงาน: <strong className="text-slate-800">{new Date(selectedEmp.hire_date).toLocaleDateString('th-TH')}</strong></div>
+            {isEditing ? (
+              <form onSubmit={handleUpdateEmployee} className="py-4 space-y-4 text-xs">
+                {/* Personal Information */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <User className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ข้อมูลส่วนตัว (Personal Info)</span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2.5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">คำนำหน้า</label>
+                      <select
+                        value={editFormData.prefix || 'นาย'}
+                        onChange={(e) => setEditFormData({ ...editFormData, prefix: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="นาย">นาย</option>
+                        <option value="นาง">นาง</option>
+                        <option value="น.ส.">น.ส.</option>
+                        <option value="ดร.">ดร.</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">ชื่อจริง *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editFormData.first_name || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, first_name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">นามสกุล *</label>
+                      <input
+                        type="text"
+                        required
+                        value={editFormData.last_name || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, last_name: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:border-amber-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">ชื่อเล่น</label>
+                      <input
+                        type="text"
+                        value={editFormData.nickname || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, nickname: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
 
-              <div className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
-                <div className="font-bold text-slate-700">ข้อมูลติดต่อ (Contact)</div>
-                <div className="grid grid-cols-2 gap-2 text-slate-600">
-                  <div>อีเมล: <strong className="text-slate-800">{selectedEmp.email || '-'}</strong></div>
-                  <div>เบอร์โทร: <strong className="text-slate-800">{selectedEmp.phone || '-'}</strong></div>
-                  <div>ภาษาใช้งาน: <strong className="text-slate-800">{selectedEmp.preferred_language || 'th'}</strong></div>
-                  <div>สถานที่: <strong className="text-slate-800">{selectedEmp.work_location || 'Cosmediva Navanakorn'}</strong></div>
+                {/* Employment Details */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Building className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ข้อมูลการทำงาน (Employment Details)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">แผนก (Department)</label>
+                      <select
+                        value={editFormData.department_id || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, department_id: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="">-- เลือกแผนก --</option>
+                        {departments.map((d: any) => (
+                          <option key={d.id} value={d.id}>{d.department_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">พื้นที่ปฏิบัติงาน (Work Area)</label>
+                      <select
+                        value={editFormData.work_area_id || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, work_area_id: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="">-- เลือกพื้นที่ปฏิบัติงาน --</option>
+                        {workAreas.map((w: any) => (
+                          <option key={w.id} value={w.id}>{w.work_area_name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">ประเภทการจ้าง</label>
+                      <select
+                        value={editFormData.employment_type || 'Monthly'}
+                        onChange={(e) => setEditFormData({ ...editFormData, employment_type: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="Monthly">พนักงานรายเดือน (Monthly)</option>
+                        <option value="Daily">พนักงานรายวัน (Daily)</option>
+                        <option value="Contract">สัญญาจ้าง (Contract)</option>
+                        <option value="Outsource">เอาต์ซอร์ส (Outsource)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">สถานะพนักงาน</label>
+                      <select
+                        value={editFormData.employment_status || 'Permanent'}
+                        onChange={(e) => setEditFormData({ ...editFormData, employment_status: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="Permanent">บรรจุแล้ว (Permanent)</option>
+                        <option value="Probation">ทดลองงาน (Probation)</option>
+                        <option value="Resigned">ลาออกแล้ว (Resigned)</option>
+                        <option value="Suspended">พักงาน (Suspended)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">สิทธิ์ในระบบ (System Role)</label>
+                      <select
+                        value={editFormData.system_role || 'Employee'}
+                        onChange={(e) => setEditFormData({ ...editFormData, system_role: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      >
+                        <option value="Employee">Employee (พนักงานทั่วไป)</option>
+                        <option value="Supervisor">Supervisor (หัวหน้างาน)</option>
+                        <option value="Manager">Manager (ผู้จัดการฝ่าย)</option>
+                        <option value="HR Officer">HR Officer (เจ้าหน้าที่บุคคล)</option>
+                        <option value="HR Manager">HR Manager (ผู้จัดการฝ่ายบุคคล)</option>
+                        <option value="Executive">Executive (คณะผู้บริหาร)</option>
+                        <option value="Admin">Admin (ผู้ดูแลระบบ)</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">วันที่เริ่มงาน (Hire Date)</label>
+                      <input
+                        type="date"
+                        value={editFormData.hire_date ? editFormData.hire_date.split('T')[0] : ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, hire_date: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
 
-            <div className="pt-3 border-t border-slate-100 flex justify-end">
-              <button
-                onClick={() => setSelectedEmp(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold"
-              >
-                ปิด
-              </button>
-            </div>
+                {/* Contact & Location */}
+                <div className="bg-slate-50 p-3.5 rounded-2xl space-y-3">
+                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-amber-600" />
+                    <span>ข้อมูลติดต่อและสถานที่ (Contact & Location)</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">เบอร์โทรศัพท์</label>
+                      <input
+                        type="tel"
+                        placeholder="081-xxx-xxxx"
+                        value={editFormData.phone || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, phone: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">อีเมล</label>
+                      <input
+                        type="email"
+                        placeholder="user@cosmediva.com"
+                        value={editFormData.email || ''}
+                        onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="text-[11px] font-semibold text-slate-600 block mb-1">สถานที่ปฏิบัติงาน (Location)</label>
+                      <input
+                        type="text"
+                        value={editFormData.work_location || 'โรงงานคอสเมดิวา ปทุมธานี'}
+                        onChange={(e) => setEditFormData({ ...editFormData, work_location: e.target.value })}
+                        className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Buttons */}
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(false)}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-sm shadow-amber-500/20 transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isSaving ? (
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>กำลังบันทึก...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Check className="w-3.5 h-3.5" />
+                        <span>บันทึกการแก้ไข</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="py-4 space-y-4 text-xs">
+                  <div className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
+                    <div className="font-bold text-slate-700">ข้อมูลการทำงาน (Employment)</div>
+                    <div className="grid grid-cols-2 gap-2 text-slate-600">
+                      <div>แผนก: <strong className="text-slate-800">{selectedEmp.department_name || '-'}</strong></div>
+                      <div>พื้นที่ปฏิบัติงาน: <strong className="text-slate-800">{selectedEmp.work_area_name || 'สำนักงาน'}</strong></div>
+                      <div>ประเภทการจ้าง: <strong className="text-slate-800">{selectedEmp.employment_type}</strong></div>
+                      <div>สถานะ: <strong className="text-emerald-700">{selectedEmp.employment_status || 'Permanent'}</strong></div>
+                      <div>หัวหน้างาน: <strong className="text-slate-800">{selectedEmp.supervisor_first_name ? `${selectedEmp.supervisor_first_name} ${selectedEmp.supervisor_last_name}` : '-'}</strong></div>
+                      <div>วันที่เริ่มงาน: <strong className="text-slate-800">{selectedEmp.hire_date ? new Date(selectedEmp.hire_date).toLocaleDateString('th-TH') : '-'}</strong></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-3.5 rounded-2xl space-y-2">
+                    <div className="font-bold text-slate-700">ข้อมูลติดต่อ (Contact)</div>
+                    <div className="grid grid-cols-2 gap-2 text-slate-600">
+                      <div>อีเมล: <strong className="text-slate-800">{selectedEmp.email || '-'}</strong></div>
+                      <div>เบอร์โทร: <strong className="text-slate-800">{selectedEmp.phone || '-'}</strong></div>
+                      <div>ภาษาใช้งาน: <strong className="text-slate-800">{selectedEmp.preferred_language || 'th'}</strong></div>
+                      <div>สถานที่: <strong className="text-slate-800">{selectedEmp.work_location || 'โรงงานคอสเมดิวา ปทุมธานี'}</strong></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <button
+                    onClick={() => { setSelectedEmp(null); setIsEditing(false); }}
+                    className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition cursor-pointer"
+                  >
+                    ปิด
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setEditFormData({
+                        ...selectedEmp,
+                        hire_date: selectedEmp.hire_date ? selectedEmp.hire_date.split('T')[0] : ''
+                      });
+                      setIsEditing(true);
+                    }}
+                    className="px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-black flex items-center gap-1.5 shadow-sm shadow-amber-500/20 transition active:scale-95 cursor-pointer"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>แก้ไขข้อมูล</span>
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

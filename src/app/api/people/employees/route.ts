@@ -267,7 +267,7 @@ export async function PUT(request: Request) {
       'prefix', 'first_name', 'last_name', 'nickname', 'phone', 'email',
       'department_id', 'work_area_id', 'position_id', 'supervisor_id',
       'job_level', 'employment_type', 'employment_status', 'system_role',
-      'work_location', 'preferred_language'
+      'work_location', 'preferred_language', 'hire_date'
     ];
 
     for (const col of allowedCols) {
