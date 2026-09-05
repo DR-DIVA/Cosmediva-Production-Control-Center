@@ -76,6 +76,23 @@ export async function GET(request: Request) {
 
     const { rows } = await queryPeople(query, params);
 
+    // Sensitive Field Masking (PDPA & Role-based Privacy)
+    // If caller is Employee, mask personal phone and email of other employees
+    const callerRole = searchParams.get('caller_role');
+    const callerId = searchParams.get('caller_id');
+    const isHrOrAdmin = callerRole === 'HR Officer' || callerRole === 'HR Manager' || callerRole === 'Admin' || !callerRole;
+
+    const sanitizedRows = rows.map((emp) => {
+      if (isHrOrAdmin || emp.id === callerId) {
+        return emp;
+      }
+      return {
+        ...emp,
+        phone: emp.phone ? emp.phone.replace(/(\d{3})\d{3,4}(\d{3,4})/, '$1-***-$2') : '***-***-****',
+        email: emp.email ? emp.email.replace(/(.{2})(.*)(@.*)/, '$1***$3') : '***@***.***'
+      };
+    });
+
     // Get total count
     let countQuery = `SELECT COUNT(*) FROM employees e WHERE e.deleted_at IS NULL`;
     const countParams: any[] = [];
@@ -107,7 +124,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       success: true,
-      data: rows,
+      data: sanitizedRows,
       total,
       filters: {
         departments: depts.rows,

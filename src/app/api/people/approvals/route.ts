@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryPeople, withTransaction } from '@/lib/peopleDb';
+import { emitDomainEvent } from '@/lib/events/domainEvents';
 
 export async function GET(request: Request) {
   try {
@@ -62,8 +63,6 @@ export async function GET(request: Request) {
       idx++;
     }
 
-    // Role-based filtering:
-    // If specific approverId provided:
     if (approverId) {
       query += ` AND (ar.assigned_approver_id = $${idx} OR (ar.assigned_approver_id IS NULL AND ar.assigned_role = $${idx + 1}))`;
       params.push(approverId, role.toUpperCase());
@@ -75,7 +74,6 @@ export async function GET(request: Request) {
     const { rows } = await queryPeople(query, params);
 
     // Enrich each item with Team Headcount Impact context
-    // E.g. scheduled today in same department/work area, currently on leave
     const enriched = await Promise.all(rows.map(async (row) => {
       let teamScheduled = 10;
       let teamOnLeave = 1;
@@ -90,7 +88,6 @@ export async function GET(request: Request) {
         `, [row.department_id]);
         teamScheduled = parseInt(teamStats.rows[0]?.total_team || '10');
 
-        // Check who is on leave on start_date
         const leaveStats = await queryPeople(`
           SELECT COUNT(*) as on_leave 
           FROM leave_requests lr
@@ -112,7 +109,7 @@ export async function GET(request: Request) {
           teamScheduled,
           teamOnLeave,
           availableAfterApproval: availableAfter,
-          minimumRequired: Math.ceil(teamScheduled * 0.7) // future threshold
+          minimumRequired: Math.ceil(teamScheduled * 0.7)
         },
         balanceBefore,
         balanceAfter
@@ -133,7 +130,7 @@ export async function POST(request: Request) {
       approval_request_id,
       action, // 'APPROVE' or 'REJECT'
       comment,
-      actor_id, // current logged-in employee/user id
+      actor_id,
       actor_role = 'Supervisor'
     } = body;
 
@@ -145,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     const result = await withTransaction(async (client) => {
-      // 1. Fetch current approval request
+      // 1. Fetch current approval request WITH PESSIMISTIC LOCK (FOR UPDATE) to prevent race condition
       const arRes = await client.query(`
         SELECT ar.*, lr.id as leave_id, lr.employee_id, lr.leave_type_id, lr.total_days, lr.status as leave_status, lr.start_date, lr.end_date, lr.request_number,
                e.first_name, e.last_name, e.manager_id, lt.name_th as leave_type_name
@@ -153,7 +150,8 @@ export async function POST(request: Request) {
         JOIN leave_requests lr ON ar.reference_id = lr.id
         JOIN employees e ON lr.employee_id = e.id
         JOIN leave_types lt ON lr.leave_type_id = lt.id
-        WHERE ar.id = $1;
+        WHERE ar.id = $1
+        FOR UPDATE;
       `, [approval_request_id]);
 
       if (arRes.rows.length === 0) {
@@ -166,6 +164,17 @@ export async function POST(request: Request) {
       }
 
       const totalDays = parseFloat(ar.total_days);
+
+      // Lock current balance
+      const balRes = await client.query(`
+        SELECT * FROM leave_balances 
+        WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026
+        FOR UPDATE;
+      `, [ar.employee_id, ar.leave_type_id]);
+
+      const curBalance = balRes.rows[0];
+      const availableBefore = curBalance ? parseFloat(curBalance.available) : 0;
+      const takenBefore = curBalance ? parseFloat(curBalance.taken) : 0;
 
       if (action === 'REJECT') {
         if (!comment) {
@@ -206,12 +215,24 @@ export async function POST(request: Request) {
           VALUES ($1, 'คำขอลาถูกปฏิเสธ (' || $2 || ')', 'คำขอลา ' || $3 || ' ได้รับการปฏิเสธ: ' || $4, 'LEAVE_REJECTED', '/people/leave');
         `, [ar.employee_id, ar.request_number, ar.leave_type_name, comment]);
 
+        // Mark associated Action Items as COMPLETED
+        await client.query(`
+          UPDATE action_items 
+          SET status = 'COMPLETED', completed_at = NOW() 
+          WHERE related_entity_type = 'leave_requests' AND related_entity_id = $1;
+        `, [ar.leave_id]);
+
+        // Emit domain event
+        await emitDomainEvent('leave.rejected', 'leave_requests', ar.leave_id, {
+          request_number: ar.request_number,
+          employee_id: ar.employee_id,
+          rejected_by: actor_id,
+          reason: comment
+        });
+
         return { status: 'REJECTED', message: 'ปฏิเสธคำขอลาเรียบร้อยแล้ว' };
 
       } else if (action === 'APPROVE') {
-        // Multi-step check:
-        // If step 1 and totalDays > 2 days -> route to Manager (Step 2)
-        // Unless already Manager or HR
         const needsManagerApproval = ar.step_number === 1 && totalDays > 2.0 && actor_role === 'Supervisor';
 
         if (needsManagerApproval) {
@@ -242,6 +263,14 @@ export async function POST(request: Request) {
               request_type, reference_id, step_number, assigned_approver_id, assigned_role, status
             ) VALUES ('LEAVE', $1, 2, $2, 'MANAGER', 'PENDING');
           `, [ar.leave_id, nextApproverId]);
+
+          // Update Action Item to assign Manager
+          await client.query(`
+            UPDATE action_items 
+            SET assigned_to_user = $1, assigned_to_role = 'Manager', 
+                title = 'อนุมัติคำขอลา (ระดับผู้จัดการ): ' || $2, updated_at = NOW()
+            WHERE related_entity_type = 'leave_requests' AND related_entity_id = $3 AND status = 'PENDING';
+          `, [nextApproverId, ar.request_number, ar.leave_id]);
 
           // Append approval_logs
           await client.query(`
@@ -275,16 +304,18 @@ export async function POST(request: Request) {
             WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
           `, [totalDays, ar.employee_id, ar.leave_type_id]);
 
-          // Record in leave_transactions ledger!
+          // Record in leave_transactions ledger with REAL balance_before and balance_after!
           await client.query(`
             INSERT INTO leave_transactions (
               employee_id, leave_type_id, transaction_type, amount, balance_before, balance_after, reference_id, reason, created_by
             ) VALUES (
-              $1, $2, 'USAGE', $3 * -1, 0, 0, $4, 'อนุมัติคำขอลา ' || $5 || ' วันที่ ' || $6 || ' ถึง ' || $7, $8
+              $1, $2, 'USAGE', $3 * -1, $4, $5, $6, 'อนุมัติคำขอลา ' || $7 || ' วันที่ ' || $8 || ' ถึง ' || $9, $10
             );
           `, [
-            ar.employee_id, ar.leave_type_id, totalDays, ar.leave_id,
-            ar.leave_type_name, ar.start_date, ar.end_date, actor_id || null
+            ar.employee_id, ar.leave_type_id, totalDays,
+            availableBefore + totalDays, // balance before submission
+            availableBefore, // current available after approved deduction
+            ar.leave_id, ar.leave_type_name, ar.start_date, ar.end_date, actor_id || null
           ]);
 
           // Mark leave request as APPROVED
@@ -294,6 +325,26 @@ export async function POST(request: Request) {
             WHERE id = $2;
           `, [actor_id || null, ar.leave_id]);
 
+          // Update attendance_daily for the leave period so calendar and dashboard reflect LEAVE immediately!
+          const dCur = new Date(ar.start_date);
+          const dLast = new Date(ar.end_date);
+          while (dCur <= dLast) {
+            const dateStr = dCur.toISOString().split('T')[0];
+            await client.query(`
+              INSERT INTO attendance_daily (
+                employee_id, employee_code, work_date, attendance_status, leave_request_id,
+                has_exception, exception_resolved, updated_at
+              ) VALUES ($1, (SELECT employee_code FROM employees WHERE id = $1), $2, 'Leave', $3, FALSE, TRUE, NOW())
+              ON CONFLICT (employee_id, work_date) DO UPDATE SET
+                attendance_status = 'Leave',
+                leave_request_id = EXCLUDED.leave_request_id,
+                has_exception = FALSE,
+                exception_resolved = TRUE,
+                updated_at = NOW();
+            `, [ar.employee_id, dateStr, ar.leave_id]);
+            dCur.setDate(dCur.getDate() + 1);
+          }
+
           // Append to approval_logs
           await client.query(`
             INSERT INTO approval_logs (
@@ -301,11 +352,28 @@ export async function POST(request: Request) {
             ) VALUES ('LEAVE', $1, $2, $3, 'APPROVED', $4, 'APPROVED', $5);
           `, [ar.leave_id, ar.step_number, actor_id || null, ar.leave_status, comment || 'อนุมัติสมบูรณ์']);
 
+          // Close related Action Items
+          await client.query(`
+            UPDATE action_items 
+            SET status = 'COMPLETED', completed_at = NOW() 
+            WHERE related_entity_type = 'leave_requests' AND related_entity_id = $1;
+          `, [ar.leave_id]);
+
           // Notify employee
           await client.query(`
             INSERT INTO notifications (recipient_id, title, message, notification_type, link_url)
             VALUES ($1, 'คำขอลาได้รับการอนุมัติแล้ว (' || $2 || ')', 'คำขอลา ' || $3 || ' วันที่ ' || $4 || ' ได้รับการอนุมัติแล้ว', 'LEAVE_APPROVED', '/people/leave');
           `, [ar.employee_id, ar.request_number, ar.leave_type_name, ar.start_date]);
+
+          // Emit domain event
+          await emitDomainEvent('leave.approved', 'leave_requests', ar.leave_id, {
+            request_number: ar.request_number,
+            employee_id: ar.employee_id,
+            approved_by: actor_id,
+            total_days: totalDays,
+            start_date: ar.start_date,
+            end_date: ar.end_date
+          });
 
           return { status: 'APPROVED', message: 'อนุมัติคำขอลาเรียบร้อยแล้ว ยอดสิทธิ์ได้รับการปรับปรุงลง Ledger ทันที' };
         }
@@ -316,6 +384,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error processing approval:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }

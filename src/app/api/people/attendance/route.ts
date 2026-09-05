@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { queryPeople, withTransaction } from '@/lib/peopleDb';
+import { calculateDailyAttendance } from '@/lib/attendanceEngine';
+import { emitDomainEvent } from '@/lib/events/domainEvents';
 
 export async function GET(request: Request) {
   try {
@@ -107,14 +109,71 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { action, punches, date = '2026-09-05', fileName = 'IMPORT_PUNCH.csv' } = body;
+    const {
+      action,
+      punches,
+      date = '2026-09-05',
+      fileName = 'IMPORT_PUNCH.csv',
+      actor_id,
+      validate_only = false,
+      auto_calculate = true
+    } = body;
 
-    // Action: 'IMPORT_PUNCHES'
+    // Action 1: Execute Pure Attendance Calculation Engine
+    if (action === 'CALCULATE_ATTENDANCE') {
+      const calcResult = await calculateDailyAttendance(date, actor_id);
+      return NextResponse.json({
+        success: true,
+        message: `ประมวลผลการลงเวลาสำเร็จ: มาทำงาน ${calcResult.present} คน, สาย ${calcResult.late} คน, ลา ${calcResult.leave} คน, ขาดงาน ${calcResult.absent} คน, สแกนไม่ครบ ${calcResult.missingPunch} คน`,
+        data: calcResult
+      });
+    }
+
+    // Action 2: Import Raw Punches (CSV / Biometric Device) with pre-validation & transaction
     if (action === 'IMPORT_PUNCHES' && Array.isArray(punches)) {
+      if (punches.length === 0) {
+        return NextResponse.json({ success: false, error: 'ไม่พบรายการข้อมูลบันทึกเวลาที่ส่งมา' }, { status: 400 });
+      }
+
+      // Pre-validation step
+      const validationErrors: Array<{ row: number; employee_code: string; error: string }> = [];
+      const emps = await queryPeople(`SELECT id, employee_code FROM employees WHERE deleted_at IS NULL`);
+      const empCodeMap = new Map(emps.rows.map((e: any) => [e.employee_code.toUpperCase(), e.id]));
+
+      for (let i = 0; i < punches.length; i++) {
+        const p = punches[i];
+        const code = String(p.employee_code || '').trim().toUpperCase();
+        if (!code) {
+          validationErrors.push({ row: i + 1, employee_code: '', error: 'ไม่พบรหัสพนักงาน' });
+        } else if (!empCodeMap.has(code)) {
+          validationErrors.push({ row: i + 1, employee_code: code, error: `รหัสพนักงาน ${code} ไม่พบในระบบ Master` });
+        }
+
+        if (!p.punch_datetime || isNaN(new Date(p.punch_datetime).getTime())) {
+          validationErrors.push({ row: i + 1, employee_code: code, error: 'รูปแบบเวลาบันทึก (punch_datetime) ไม่ถูกต้อง' });
+        }
+      }
+
+      if (validate_only) {
+        return NextResponse.json({
+          success: validationErrors.length === 0,
+          valid: validationErrors.length === 0,
+          totalRecords: punches.length,
+          errors: validationErrors
+        });
+      }
+
+      if (validationErrors.length > 0 && body.atomic === true) {
+        return NextResponse.json({
+          success: false,
+          error: `พบข้อผิดพลาดก่อนบันทึกข้อมูล ${validationErrors.length} รายการ การนำเข้าถูกยกเลิก (Rollback)`,
+          errors: validationErrors
+        }, { status: 400 });
+      }
+
       const batchNumber = `BATCH-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
       const result = await withTransaction(async (client) => {
-        // Create batch record
         const bRes = await client.query(`
           INSERT INTO attendance_import_batches (batch_number, source_type, total_records, file_name)
           VALUES ($1, 'CSV', $2, $3) RETURNING id;
@@ -124,44 +183,59 @@ export async function POST(request: Request) {
         let successCount = 0;
         let errorCount = 0;
 
-        // Fetch employee lookup
-        const emps = await client.query(`SELECT id, employee_code FROM employees WHERE deleted_at IS NULL`);
-        const empCodeMap = new Map(emps.rows.map((e: any) => [e.employee_code.toUpperCase(), e.id]));
-
-        // Insert raw punches
         for (const p of punches) {
           const empCode = String(p.employee_code || '').trim().toUpperCase();
           const empId = empCodeMap.get(empCode);
           const punchTime = p.punch_datetime;
           const punchType = p.punch_type || 'AUTO';
 
-          if (empCode && punchTime) {
+          if (empCode && punchTime && empId) {
             await client.query(`
               INSERT INTO attendance_raw_logs (batch_id, employee_code, employee_id, punch_datetime, punch_type, source, original_raw_text)
               VALUES ($1, $2, $3, $4, $5, 'IMPORT_CSV', $6);
-            `, [batchId, empCode, empId || null, punchTime, punchType, JSON.stringify(p)]);
+            `, [batchId, empCode, empId, punchTime, punchType, JSON.stringify(p)]);
             successCount++;
           } else {
             errorCount++;
           }
         }
 
-        // Update batch count
         await client.query(`
           UPDATE attendance_import_batches 
           SET success_records = $1, error_records = $2 
           WHERE id = $3;
         `, [successCount, errorCount, batchId]);
 
-        return { batchNumber, successCount, errorCount };
+        await emitDomainEvent('attendance.imported', 'attendance_import_batches', batchId, {
+          batch_number: batchNumber,
+          total_records: punches.length,
+          success_records: successCount,
+          error_records: errorCount,
+          file_name: fileName
+        });
+
+        return { batchId, batchNumber, successCount, errorCount };
       });
 
-      return NextResponse.json({ success: true, message: `นำเข้าข้อมูลดิบสำเร็จ ${result.successCount} รายการ`, data: result });
+      // Auto trigger Calculation Engine if requested
+      let calcResult = null;
+      if (auto_calculate && result.successCount > 0) {
+        calcResult = await calculateDailyAttendance(date, actor_id);
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: `นำเข้าข้อมูลดิบสำเร็จ ${result.successCount} รายการ (พบข้อผิดพลาด ${result.errorCount} รายการ)`,
+        data: {
+          ...result,
+          calculation: calcResult
+        }
+      });
     }
 
     return NextResponse.json({ success: false, error: 'Invalid action or payload' }, { status: 400 });
   } catch (error: any) {
-    console.error('Error importing attendance:', error);
+    console.error('Error handling attendance POST:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

@@ -83,6 +83,35 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
     fetchExceptions();
   }, [date, statusFilter, deptFilter, excFilter]);
 
+  const handleCreateCaseFromException = async (ex: any) => {
+    try {
+      const res = await fetch('/api/people/cases', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'CREATE_CASE',
+          case_type: 'Attendance',
+          employee_id: ex.employee_id,
+          department_id: ex.department_id,
+          source_type: 'EXCEPTION',
+          source_id: ex.id,
+          severity: ex.severity || 'MEDIUM',
+          priority: ex.severity === 'HIGH' ? 'HIGH' : 'MEDIUM',
+          summary: `สอบสวนกรณี ${ex.exception_type}: ${ex.first_name} ${ex.last_name}`,
+          description: `เปิดสำนวนเคสจากความผิดปกติการลงเวลา: ${ex.description} วันที่ ${ex.work_date}`
+        })
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`เปิดเคสสอบสวน ${json.data.case_number} เรียบร้อยแล้ว`);
+      } else {
+        toast.error(json.error || 'เกิดข้อผิดพลาด');
+      }
+    } catch (e) {
+      toast.error('ไม่สามารถเปิดเคสได้');
+    }
+  };
+
   const handleResolveException = async (excId: string, action: string) => {
     try {
       const res = await fetch('/api/people/exceptions', {
@@ -459,6 +488,13 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
                               >
                                 แก้เวลา
                               </button>
+                              <button
+                                onClick={() => handleCreateCaseFromException(ex)}
+                                className="px-2.5 py-1 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-[11px] transition"
+                                title="เปิดเคสสอบสวนความผิดปกติและรวบรวมพยานหลักฐาน"
+                              >
+                                เปิดเคส
+                              </button>
                             </div>
                           )}
                         </td>
@@ -503,10 +539,31 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
           <div className="flex items-center justify-between pt-2">
             <span className="text-xs text-slate-500 font-mono">ตัวอย่าง: BATCH-20260905-01 (130 records processed)</span>
             <button
-              onClick={() => toast.success('ระบบจำลองการประมวลผลข้อมูลสแกน 134 รายการเรียบร้อยแล้ว')}
-              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20"
+              onClick={async () => {
+                try {
+                  toast.loading('กำลังรัน Attendance Engine คำนวณเวลาและตรวจจับ Exception...');
+                  const res = await fetch('/api/people/attendance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'CALCULATE_ATTENDANCE', date })
+                  });
+                  const json = await res.json();
+                  toast.dismiss();
+                  if (json.success) {
+                    toast.success(json.message);
+                    fetchAttendance();
+                    fetchExceptions();
+                  } else {
+                    toast.error(json.error || 'เกิดข้อผิดพลาด');
+                  }
+                } catch (e) {
+                  toast.dismiss();
+                  toast.error('ไม่สามารถเชื่อมต่อ Attendance Engine ได้');
+                }
+              }}
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition"
             >
-              ทดสอบประมวลผลข้อมูลนำเข้า (Run Calculation Engine)
+              ประมวลผลข้อมูลลงเวลาจริง (Run Attendance Engine)
             </button>
           </div>
         </div>

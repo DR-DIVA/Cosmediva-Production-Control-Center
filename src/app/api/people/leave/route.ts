@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { queryPeople, withTransaction } from '@/lib/peopleDb';
+import { emitDomainEvent } from '@/lib/events/domainEvents';
 
 export async function GET(request: Request) {
   try {
@@ -11,7 +12,6 @@ export async function GET(request: Request) {
     const view = searchParams.get('view') || 'requests'; // requests, balances, calendar, ledger, policies
 
     if (view === 'balances' && employeeId) {
-      // Return 360 balances for employee
       const { rows } = await queryPeople(`
         SELECT 
           lb.*,
@@ -66,7 +66,6 @@ export async function GET(request: Request) {
     }
 
     if (view === 'calendar') {
-      // Leave events + Holidays
       const holidays = await queryPeople(`
         SELECT 
           id, holiday_name as title, holiday_date as date, 
@@ -182,7 +181,7 @@ export async function POST(request: Request) {
       leave_type_id,
       start_date,
       end_date,
-      duration_type = 'FULL_DAY', // FULL_DAY, FIRST_HALF, SECOND_HALF, HOURLY
+      duration_type = 'FULL_DAY',
       start_time,
       end_time,
       reason,
@@ -263,25 +262,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // 4. Pre-validation checks:
-    // A) Overlap check with existing requests
-    const overlapRes = await queryPeople(`
-      SELECT id, request_number, start_date, end_date, status 
-      FROM leave_requests 
-      WHERE employee_id = $1 
-        AND status IN ('SUBMITTED', 'PENDING_SUPERVISOR', 'PENDING_MANAGER', 'PENDING_HR', 'APPROVED')
-        AND NOT (end_date < $2 OR start_date > $3);
-    `, [employee_id, start_date, end_date]);
-
-    if (overlapRes.rows.length > 0) {
-      const ov = overlapRes.rows[0];
-      return NextResponse.json({
-        success: false,
-        error: `วันที่ขอลาซ้ำซ้อนกับคำขอเดิม (${ov.request_number}: ${new Date(ov.start_date).toLocaleDateString('th-TH')} - ${new Date(ov.end_date).toLocaleDateString('th-TH')})`
-      }, { status: 400 });
-    }
-
-    // B) Minimum Notice Days
+    // Minimum Notice Days
     if (!is_emergency && policy.minimum_notice_days > 0) {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
@@ -295,7 +276,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // C) Consecutive Days limit
+    // Consecutive Days limit
     if (calculatedDays > policy.max_consecutive_days) {
       return NextResponse.json({
         success: false,
@@ -303,7 +284,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // D) Attachment requirement check
+    // Attachment requirement check
     if (policy.attachment_required && calculatedDays >= policy.attachment_required_after_days && !attachment_url) {
       return NextResponse.json({
         success: false,
@@ -311,45 +292,61 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // E) Balance sufficient check
-    const balRes = await queryPeople(`
-      SELECT * FROM leave_balances 
-      WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026;
-    `, [employee_id, leave_type_id]);
-
-    const balance = balRes.rows[0];
-    const available = balance ? parseFloat(balance.available) : 0;
-
-    if (policy.paid_unpaid === 'PAID' && !policy.allow_negative_balance && calculatedDays > available) {
-      return NextResponse.json({
-        success: false,
-        error: `วันลาคงเหลือไม่เพียงพอ (คงเหลือ: ${available} วัน, คำขอ: ${calculatedDays} วัน)`
-      }, { status: 400 });
-    }
-
     if (validate_only) {
+      const balCheck = await queryPeople(`
+        SELECT available FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026;
+      `, [employee_id, leave_type_id]);
+      const avail = parseFloat(balCheck.rows[0]?.available || '0');
       return NextResponse.json({
         success: true,
         valid: true,
         calculatedDays,
-        availableBefore: available,
-        availableAfter: available - calculatedDays
+        availableBefore: avail,
+        availableAfter: avail - calculatedDays
       });
     }
 
-    // 5. Submit Transaction
+    // 4. Submit Transaction with Pessimistic Row Lock & Overlap Check inside Transaction
     const requestNumber = `LR-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
 
     const result = await withTransaction(async (client) => {
+      // Lock employee record to serialize concurrent leave submissions
+      await client.query(`SELECT id FROM employees WHERE id = $1 FOR UPDATE;`, [employee_id]);
+
+      // A) Overlap check inside transaction with row locks
+      const overlapRes = await client.query(`
+        SELECT id, request_number, start_date, end_date, status 
+        FROM leave_requests 
+        WHERE employee_id = $1 
+          AND status IN ('SUBMITTED', 'PENDING_SUPERVISOR', 'PENDING_MANAGER', 'PENDING_HR', 'APPROVED')
+          AND NOT (end_date < $2 OR start_date > $3);
+      `, [employee_id, start_date, end_date]);
+
+      if (overlapRes.rows.length > 0) {
+        const ov = overlapRes.rows[0];
+        throw new Error(`วันที่ขอลาซ้ำซ้อนกับคำขอเดิม (${ov.request_number}: ${new Date(ov.start_date).toLocaleDateString('th-TH')} - ${new Date(ov.end_date).toLocaleDateString('th-TH')})`);
+      }
+
+      // B) Lock and verify leave balance inside transaction
+      const balRes = await client.query(`
+        SELECT * FROM leave_balances 
+        WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026
+        FOR UPDATE;
+      `, [employee_id, leave_type_id]);
+
+      const balance = balRes.rows[0];
+      const availableBefore = balance ? parseFloat(balance.available) : 0;
+
+      if (policy.paid_unpaid === 'PAID' && !policy.allow_negative_balance && calculatedDays > availableBefore) {
+        throw new Error(`วันลาคงเหลือไม่เพียงพอ (คงเหลือ: ${availableBefore} วัน, คำขอ: ${calculatedDays} วัน)`);
+      }
+
       // Determine initial approval stage:
-      // If employee has supervisor -> PENDING_SUPERVISOR
-      // If > 2 days -> standard workflow will route Supervisor -> Manager
       let initialStatus = 'PENDING_SUPERVISOR';
       let approverId = employee.supervisor_id || employee.manager_id;
       let approverRole = 'SUPERVISOR';
 
       if (!approverId) {
-        // If employee is top manager/supervisor, route to HR Manager
         const hrMgr = await client.query(`SELECT id FROM employees WHERE system_role = 'HR Manager' LIMIT 1`);
         approverId = hrMgr.rows[0]?.id || null;
         initialStatus = 'PENDING_HR';
@@ -379,6 +376,7 @@ export async function POST(request: Request) {
       const leaveReq = reqRes.rows[0];
 
       // Update balance: pending +, available -
+      const availableAfter = availableBefore - calculatedDays;
       if (balance) {
         await client.query(`
           UPDATE leave_balances 
@@ -414,6 +412,30 @@ export async function POST(request: Request) {
           start_date,
           calculatedDays
         ]);
+
+        // Create Action Item for approver inbox
+        await client.query(`
+          INSERT INTO action_items (
+            action_type, title, description, priority, assigned_to_user, assigned_to_role, related_entity_type, related_entity_id, status, source
+          ) VALUES (
+            'LEAVE_APPROVAL',
+            $1,
+            $2,
+            'MEDIUM',
+            $3,
+            $4,
+            'leave_requests',
+            $5,
+            'PENDING',
+            'LEAVE_ENGINE'
+          );
+        `, [
+          `อนุมัติคำขอลา: ${requestNumber} (${employee.first_name} ${employee.last_name})`,
+          `${employee.first_name} ยื่นขอลา ${policy.name_th} (${calculatedDays} วัน)`,
+          approverId,
+          approverRole,
+          leaveReq.id
+        ]);
       }
 
       // Append to approval_logs
@@ -422,6 +444,17 @@ export async function POST(request: Request) {
           request_type, reference_id, step_number, actor_id, action, previous_status, new_status, comment
         ) VALUES ('LEAVE', $1, 1, $2, 'SUBMITTED', 'DRAFT', $3, 'ยื่นคำขอลาผ่านระบบ');
       `, [leaveReq.id, employee_id, initialStatus]);
+
+      // Emit domain event
+      await emitDomainEvent('leave.requested', 'leave_requests', leaveReq.id, {
+        request_number: requestNumber,
+        employee_id,
+        leave_type_id,
+        start_date,
+        end_date,
+        total_days: calculatedDays,
+        approver_id: approverId
+      });
 
       return leaveReq;
     });
@@ -434,7 +467,7 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('Error submitting leave:', error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 400 });
   }
 }
 
@@ -448,7 +481,7 @@ export async function PATCH(request: Request) {
     }
 
     const result = await withTransaction(async (client) => {
-      const curReq = await client.query(`SELECT * FROM leave_requests WHERE id = $1`, [id]);
+      const curReq = await client.query(`SELECT * FROM leave_requests WHERE id = $1 FOR UPDATE`, [id]);
       if (curReq.rows.length === 0) {
         throw new Error('ไม่พบข้อมูลคำขอลา');
       }
@@ -461,24 +494,39 @@ export async function PATCH(request: Request) {
       const prevStatus = lr.status;
       const days = parseFloat(lr.total_days);
 
+      // Lock current balance
+      const balRes = await client.query(`
+        SELECT * FROM leave_balances 
+        WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026
+        FOR UPDATE;
+      `, [lr.employee_id, lr.leave_type_id]);
+
+      const balance = balRes.rows[0];
+      const availableBefore = balance ? parseFloat(balance.available) : 0;
+      const availableAfter = availableBefore + days;
+
       // Restore balance
       if (prevStatus === 'APPROVED') {
-        // Taken was added, so subtract taken and add available
         await client.query(`
           UPDATE leave_balances 
           SET taken = GREATEST(0, taken - $1), available = available + $1, updated_at = NOW()
           WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
         `, [days, lr.employee_id, lr.leave_type_id]);
 
-        // Ledger record
+        // Ledger record with real balance_before and balance_after
         await client.query(`
           INSERT INTO leave_transactions (
             employee_id, leave_type_id, transaction_type, amount, balance_before, balance_after, reference_id, reason
-          ) VALUES ($1, $2, 'CANCEL_RESTORE', $3, 0, 0, $4, 'ยกเลิกคำขอลาที่อนุมัติแล้ว และคืนสิทธิ์วันลา');
-        `, [lr.employee_id, lr.leave_type_id, days, lr.id]);
+          ) VALUES ($1, $2, 'CANCEL_RESTORE', $3, $4, $5, $6, 'ยกเลิกคำขอลาที่อนุมัติแล้ว และคืนสิทธิ์วันลา');
+        `, [lr.employee_id, lr.leave_type_id, days, availableBefore, availableAfter, lr.id]);
+
+        // Revert attendance_daily for the leave dates
+        await client.query(`
+          DELETE FROM attendance_daily 
+          WHERE employee_id = $1 AND leave_request_id = $2 AND attendance_status = 'Leave';
+        `, [lr.employee_id, lr.id]);
 
       } else if (prevStatus.startsWith('PENDING') || prevStatus === 'SUBMITTED') {
-        // Pending was added, so subtract pending and add available
         await client.query(`
           UPDATE leave_balances 
           SET pending = GREATEST(0, pending - $1), available = available + $1, updated_at = NOW()
@@ -498,12 +546,27 @@ export async function PATCH(request: Request) {
         UPDATE approval_requests SET status = 'CANCELLED', action_taken_at = NOW() WHERE reference_id = $1 AND status = 'PENDING';
       `, [id]);
 
+      // Close associated Action Items
+      await client.query(`
+        UPDATE action_items 
+        SET status = 'DISMISSED', completed_at = NOW() 
+        WHERE related_entity_type = 'leave_requests' AND related_entity_id = $1 AND status = 'PENDING';
+      `, [id]);
+
       // Append to approval_logs
       await client.query(`
         INSERT INTO approval_logs (
           request_type, reference_id, step_number, actor_id, action, previous_status, new_status, comment
         ) VALUES ('LEAVE', $1, 1, $2, 'CANCELLED', $3, 'CANCELLED', $4);
       `, [id, lr.employee_id, prevStatus, reason]);
+
+      // Emit domain event
+      await emitDomainEvent('leave.cancelled', 'leave_requests', id, {
+        request_number: lr.request_number,
+        employee_id: lr.employee_id,
+        total_days: days,
+        reason
+      });
 
       return updated.rows[0];
     });
