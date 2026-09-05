@@ -170,7 +170,7 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
             }`}
           >
             <Building className="w-3.5 h-3.5" />
-            <span>🏢 โครงสร้างองค์กร (14 ฝ่าย / 18 แผนก)</span>
+            <span>🏢 โครงสร้างองค์กร ({departments.length} แผนก)</span>
           </button>
         </div>
 
