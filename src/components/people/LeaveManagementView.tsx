@@ -545,7 +545,7 @@ export function LeaveManagementView({
               <div className="border border-slate-100 rounded-2xl p-4 bg-slate-50/50">
                 <h4 className="font-bold text-xs uppercase tracking-wider text-rose-800 mb-3 flex items-center gap-2">
                   <Calendar className="w-4 h-4 text-rose-600" />
-                  <span>วันหยุดนักขัตฤกษ์โรงงาน (16 วัน)</span>
+                  <span>วันหยุดนักขัตฤกษ์โรงงาน ({calendarData.holidays?.length || 13} วัน)</span>
                 </h4>
                 <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                   {calendarData.holidays.map((h: any) => (
