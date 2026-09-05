@@ -21,6 +21,12 @@ interface EmployeeOption {
   work_area_name?: string;
 }
 
+export interface SelectedEmployeeItem extends EmployeeOption {
+  hours: number;
+  startTime: string;
+  endTime: string;
+}
+
 interface OtJobCostingViewProps {
   currentPersona: Persona;
 }
@@ -202,7 +208,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
   // Employee Selection State
   const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<SelectedEmployeeItem[]>([]);
   const [empSearch, setEmpSearch] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -259,13 +265,19 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
   }, [employees, empSearch]);
 
   const toggleEmployee = (emp: EmployeeOption) => {
+    const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
     setSelectedEmployees(prev => {
       const exists = prev.some(p => p.id === emp.id || p.employee_code === emp.employee_code);
-      let next: EmployeeOption[];
+      let next: SelectedEmployeeItem[];
       if (exists) {
         next = prev.filter(p => p.id !== emp.id && p.employee_code !== emp.employee_code);
       } else {
-        next = [...prev, emp];
+        next = [...prev, {
+          ...emp,
+          hours: defaultHours,
+          startTime: formData.startTime,
+          endTime: formData.endTime
+        }];
       }
       setFormData(f => ({ ...f, selectedWorkersCount: Math.max(1, next.length) }));
       return next;
@@ -279,6 +291,44 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       return next;
     });
   };
+
+  const updateEmployeeHours = (empId: string, hours: number) => {
+    setSelectedEmployees(prev => prev.map(emp => {
+      if (emp.id === empId) {
+        return { ...emp, hours: Math.max(0.5, Math.min(12, hours)) };
+      }
+      return emp;
+    }));
+  };
+
+  const updateEmployeeTime = (empId: string, startTime: string, endTime: string) => {
+    const hours = calculateOtHours(startTime, endTime);
+    setSelectedEmployees(prev => prev.map(emp => {
+      if (emp.id === empId) {
+        return { ...emp, startTime, endTime, hours };
+      }
+      return emp;
+    }));
+  };
+
+  const syncAllTimesToDefault = () => {
+    const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
+    setSelectedEmployees(prev => prev.map(emp => ({
+      ...emp,
+      startTime: formData.startTime,
+      endTime: formData.endTime,
+      hours: defaultHours
+    })));
+    toast.success(`ปรับเวลาทุกคนเป็น ${formData.startTime} - ${formData.endTime} (${defaultHours} ชม.) เรียบร้อยแล้ว`);
+  };
+
+  const totalSelectedHours = useMemo(() => {
+    const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
+    if (selectedEmployees.length === 0) {
+      return formData.selectedWorkersCount * defaultHours;
+    }
+    return Math.round(selectedEmployees.reduce((sum, e) => sum + (e.hours || defaultHours), 0) * 10) / 10;
+  }, [selectedEmployees, formData.selectedWorkersCount, formData.startTime, formData.endTime]);
 
   const handleApproveOt = (otId: string) => {
     const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
@@ -343,7 +393,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
   };
 
   const handlePreviewEFormFromForm = () => {
-    const hours = calculateOtHours(formData.startTime, formData.endTime);
+    const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
     setEformData({
       submissionDate: formData.submissionDate,
       division: formData.division,
@@ -353,18 +403,23 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       otDate: formData.otDate,
       startTime: formData.startTime,
       endTime: formData.endTime,
-      hours: hours,
+      hours: defaultHours,
       target: formData.target,
       reason: formData.reason,
       requestedBy: `${currentPersona.name} (${currentPersona.role})`,
       supervisorApprover: `${currentPersona.name}`,
-      participants: selectedEmployees.map(emp => ({
-        code: emp.employee_code,
-        name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
-        hours: hours,
-        position: emp.work_area_name || emp.department_name || formData.department,
-        note: ''
-      }))
+      participants: selectedEmployees.map(emp => {
+        const empHours = emp.hours || defaultHours;
+        const isCustomTime = emp.startTime !== formData.startTime || emp.endTime !== formData.endTime;
+        return {
+          code: emp.employee_code,
+          name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
+          hours: empHours,
+          timeSlot: isCustomTime ? `${emp.startTime} - ${emp.endTime}` : undefined,
+          position: emp.work_area_name || emp.department_name || formData.department,
+          note: ''
+        };
+      })
     });
     setEformModalOpen(true);
   };
@@ -372,8 +427,9 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
   const handleCreateOtRequest = (e: React.FormEvent) => {
     e.preventDefault();
     const count = selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount;
-    const hours = calculateOtHours(formData.startTime, formData.endTime);
-    const estCost = Math.round(count * hours * 70);
+    const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
+    const plannedHours = totalSelectedHours;
+    const estCost = Math.round(plannedHours * 70);
 
     const newReq = {
       id: `OT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(otRequests.length + 1).padStart(2, '0')}`,
@@ -387,29 +443,34 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       reason: formData.reason,
       requestedBy: `${currentPersona.name} (${currentPersona.role})`,
       otDate: formData.otDate,
-      timeSlot: `${formData.startTime} - ${formData.endTime} (${hours} ชม.)`,
+      timeSlot: `${formData.startTime} - ${formData.endTime} (${defaultHours} ชม.)`,
       plannedHeadcount: count,
       actualHeadcount: count,
-      plannedHours: count * hours,
-      actualHours: count * hours,
+      plannedHours: plannedHours,
+      actualHours: plannedHours,
       estimatedCost: estCost,
       actualCost: estCost,
       status: 'PENDING_APPROVAL',
       approvedBy: '',
       approvedAt: '',
-      participants: selectedEmployees.map(emp => ({
-        code: emp.employee_code,
-        name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
-        rate: 68.06,
-        hours: hours,
-        cost: Math.round(hours * 68.06 * 100) / 100,
-        position: emp.work_area_name || emp.department_name || formData.department,
-        status: 'Scheduled'
-      }))
+      participants: selectedEmployees.map(emp => {
+        const empHours = emp.hours || defaultHours;
+        const isCustomTime = emp.startTime !== formData.startTime || emp.endTime !== formData.endTime;
+        return {
+          code: emp.employee_code,
+          name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
+          rate: 68.06,
+          hours: empHours,
+          timeSlot: isCustomTime ? `${emp.startTime} - ${emp.endTime}` : `${formData.startTime} - ${formData.endTime}`,
+          cost: Math.round(empHours * 68.06 * 100) / 100,
+          position: emp.work_area_name || emp.department_name || formData.department,
+          status: 'Scheduled'
+        };
+      })
     };
 
     setOtRequests([newReq, ...otRequests]);
-    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} (${count} คน) เรียบร้อยแล้ว`);
+    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} (${count} คน • ${plannedHours} ชม.) เรียบร้อยแล้ว`);
     setShowRequestModal(false);
 
     // Prompt user with E-Form directly
@@ -423,19 +484,25 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       otDate: newReq.otDate,
       startTime: formData.startTime,
       endTime: formData.endTime,
-      hours: hours,
+      hours: defaultHours,
       target: newReq.target,
       reason: newReq.reason,
       requestedBy: newReq.requestedBy,
       supervisorApprover: currentPersona.name,
       hrApprover: 'ฝ่ายทรัพยากรบุคคล',
       directorApprover: 'ผู้อำนวยการโรงงาน',
-      participants: newReq.participants.map(p => ({
-        code: p.code,
-        name: p.name,
-        hours: p.hours,
-        position: p.position
-      }))
+      participants: selectedEmployees.map(emp => {
+        const empHours = emp.hours || defaultHours;
+        const isCustomTime = emp.startTime !== formData.startTime || emp.endTime !== formData.endTime;
+        return {
+          code: emp.employee_code,
+          name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
+          hours: empHours,
+          timeSlot: isCustomTime ? `${emp.startTime} - ${emp.endTime}` : undefined,
+          position: emp.work_area_name || emp.department_name || formData.department,
+          note: ''
+        };
+      })
     });
     setEformModalOpen(true);
   };
@@ -1090,7 +1157,15 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                             <button
                               type="button"
                               onClick={() => {
-                                const newToAdd = filteredEmployees.filter(fe => !selectedEmployees.some(se => se.id === fe.id));
+                                const defaultHours = calculateOtHours(formData.startTime, formData.endTime);
+                                const newToAdd = filteredEmployees
+                                  .filter(fe => !selectedEmployees.some(se => se.id === fe.id || se.employee_code === fe.employee_code))
+                                  .map(fe => ({
+                                    ...fe,
+                                    hours: defaultHours,
+                                    startTime: formData.startTime,
+                                    endTime: formData.endTime
+                                  }));
                                 const next = [...selectedEmployees, ...newToAdd];
                                 setSelectedEmployees(next);
                                 setFormData(prev => ({ ...prev, selectedWorkersCount: next.length }));
@@ -1159,32 +1234,94 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   )}
                 </div>
 
-                {/* Selected Chips */}
+                {/* Selected Employees with Individual Time Controls */}
                 {selectedEmployees.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
-                    {selectedEmployees.map((emp) => (
-                      <div
-                        key={emp.id}
-                        className="flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-2 py-1 rounded-lg text-xs"
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[11px] text-slate-600 px-1 pt-1">
+                      <span className="font-bold">
+                        รายชื่อพนักงานที่เลือก ({selectedEmployees.length} คน • รวม {totalSelectedHours} ชม.)
+                      </span>
+                      <button
+                        type="button"
+                        onClick={syncAllTimesToDefault}
+                        className="text-amber-800 hover:text-amber-950 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                        title="ปรับเวลาของทุกคนให้เท่ากับเวลาเริ่ม-เลิกหลักของกะ"
                       >
-                        <span className="font-mono font-bold text-[10px] bg-amber-200/70 px-1 py-0.5 rounded text-amber-950">
-                          {emp.employee_code}
-                        </span>
-                        <span className="font-bold">{emp.first_name} {emp.last_name?.slice(0, 1)}.</span>
-                        {emp.nickname && <span className="text-amber-700/80 text-[10px]">({emp.nickname})</span>}
-                        <button
-                          type="button"
-                          onClick={() => removeEmployee(emp.id)}
-                          className="text-amber-700 hover:text-rose-600 hover:bg-rose-50 rounded-full p-0.5 ml-0.5 transition cursor-pointer"
-                          title="ลบออก"
+                        <span>↺ ปรับทุกคนเป็น {formData.startTime} - {formData.endTime}</span>
+                      </button>
+                    </div>
+
+                    <div className="max-h-60 overflow-y-auto space-y-1.5 p-1.5 bg-white rounded-2xl border border-slate-200 divide-y divide-slate-100">
+                      {selectedEmployees.map((emp, idx) => (
+                        <div
+                          key={emp.id}
+                          className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2 hover:bg-slate-50/80 rounded-xl transition"
                         >
-                          ✕
-                        </button>
-                      </div>
-                    ))}
+                          {/* Col 1: Employee info */}
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-[10px] font-bold text-slate-400 w-5 shrink-0 text-center">
+                              #{idx + 1}
+                            </span>
+                            <span className="font-mono font-bold text-[10px] bg-amber-100 border border-amber-200 px-1.5 py-0.5 rounded text-amber-950 shrink-0">
+                              {emp.employee_code}
+                            </span>
+                            <div className="truncate">
+                              <span className="font-bold text-slate-900">{emp.first_name} {emp.last_name}</span>
+                              {emp.nickname && <span className="text-slate-500 ml-1">({emp.nickname})</span>}
+                              <span className="text-[10px] text-slate-400 ml-1.5 hidden sm:inline">• {emp.department_name || formData.department}</span>
+                            </div>
+                          </div>
+
+                          {/* Col 2: Individual Time Controls */}
+                          <div className="flex items-center justify-end gap-2 shrink-0">
+                            <div className="flex items-center gap-1 bg-slate-50 px-2 py-1 rounded-xl border border-slate-200 shadow-2xs">
+                              <Clock className="w-3 h-3 text-slate-400 shrink-0" />
+                              <input
+                                type="time"
+                                value={emp.startTime}
+                                onChange={(e) => updateEmployeeTime(emp.id, e.target.value, emp.endTime)}
+                                className="font-mono text-[11px] text-slate-800 bg-transparent focus:outline-none"
+                                title="เวลาเริ่ม OT ของพนักงานคนนี้"
+                              />
+                              <span className="text-slate-400 text-[10px]">-</span>
+                              <input
+                                type="time"
+                                value={emp.endTime}
+                                onChange={(e) => updateEmployeeTime(emp.id, emp.startTime, e.target.value)}
+                                className="font-mono text-[11px] text-slate-800 bg-transparent focus:outline-none"
+                                title="เวลาเลิก OT ของพนักงานคนนี้"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-1 bg-amber-50 border border-amber-200 px-1.5 py-1 rounded-xl">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0.5"
+                                max="12"
+                                value={emp.hours}
+                                onChange={(e) => updateEmployeeHours(emp.id, parseFloat(e.target.value) || 0)}
+                                className="w-10 text-center font-black text-amber-950 bg-white rounded border border-amber-300 text-xs py-0.5 focus:outline-none"
+                                title="จำนวนชั่วโมง OT"
+                              />
+                              <span className="text-[10px] text-amber-900 font-bold">ชม.</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => removeEmployee(emp.id)}
+                              className="text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg p-1.5 transition cursor-pointer"
+                              title="ลบพนักงานคนนี้ออก"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
-                  <div className="text-[11px] text-slate-400 p-2.5 text-center bg-white rounded-xl border border-dashed border-slate-200">
+                  <div className="text-[11px] text-slate-400 p-3 text-center bg-white rounded-xl border border-dashed border-slate-200">
                     ยังไม่ได้เลือกพนักงาน (คีย์ค้นหารหัสหรือชื่อด้านบนแล้วคลิกเลือกรายชื่อที่ต้องการได้เลยค่ะ)
                   </div>
                 )}
@@ -1192,18 +1329,20 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
               {/* Financial Preview Box */}
               <div className="p-3.5 rounded-2xl bg-amber-50 border border-amber-200 text-xs">
-                <div className="font-bold text-amber-950 flex items-center gap-1.5">
-                  <Calculator className="w-4 h-4 text-amber-600" />
-                  <span>ประมาณการต้นทุนค่าแรง OT ล่วงหน้า (Pre-Approval Cost Estimate)</span>
+                <div className="font-bold text-amber-950 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Calculator className="w-4 h-4 text-amber-600" />
+                    <span>ประมาณการต้นทุนค่าแรง OT ล่วงหน้า (Pre-Approval Cost Estimate)</span>
+                  </div>
+                  <span className="text-amber-900 font-bold bg-amber-200/70 border border-amber-300 px-2 py-0.5 rounded text-[11px]">
+                    รวม {totalSelectedHours} ชม.
+                  </span>
                 </div>
-                <div className="text-amber-800 mt-1">
-                  คำนวณจาก {selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount} คน × {calculateOtHours(formData.startTime, formData.endTime)} ชั่วโมง = <strong>฿{(
-                    (selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount) * 
-                    calculateOtHours(formData.startTime, formData.endTime) * 70
-                  ).toLocaleString()} บาท</strong>
+                <div className="text-amber-900 mt-1.5">
+                  คำนวณจาก {selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount} คน • ยอดรวม {totalSelectedHours} ชั่วโมง = <strong className="text-amber-950 text-sm">฿{(totalSelectedHours * 70).toLocaleString()} บาท</strong>
                 </div>
                 <div className="text-[11px] text-amber-700 mt-0.5">
-                  เมื่อได้รับการอนุมัติและพนักงานสแกนนิ้วเลิกงานจริง ระบบจะคิดต้นทุนจริงตามนาทีที่สแกนออก
+                  คิดประมาณการเฉลี่ย ฿70/ชม. (เมื่อพนักงานสแกนนิ้วเลิกงานจริง ระบบจะคำนวณต้นทุนจริงตามนาทีที่สแกนออกและฐานค่าจ้างของแต่ละคน)
                 </div>
               </div>
 

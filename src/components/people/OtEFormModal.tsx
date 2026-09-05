@@ -24,6 +24,7 @@ export interface OtEFormData {
     code?: string;
     name: string;
     hours?: number | string;
+    timeSlot?: string;
     position?: string;
     note?: string;
   }>;
@@ -283,7 +284,7 @@ export function OtEFormModal({ isOpen, onClose, data }: OtEFormModalProps) {
 
                       {/* 5. หมายเหตุ */}
                       <td className="px-1 py-0 text-left text-[10px] overflow-hidden whitespace-nowrap">
-                        {p?.note || ''}
+                        {p?.timeSlot ? `เวลา ${p.timeSlot}${p.note ? ` • ${p.note}` : ''}` : (p?.note || '')}
                       </td>
                     </tr>
                   ))}
