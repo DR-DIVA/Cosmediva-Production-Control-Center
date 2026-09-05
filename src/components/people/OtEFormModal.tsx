@@ -222,23 +222,25 @@ export function OtEFormModal({ isOpen, onClose, data }: OtEFormModalProps) {
 
                 {/* Line 4 */}
                 <div className="flex flex-wrap items-baseline justify-between gap-y-1">
-                  <div className="flex items-baseline flex-1 min-w-[200px]">
+                  <div className="flex items-baseline flex-1 min-w-[240px]">
                     <span className="font-bold shrink-0">เหตุผลในการขอ</span>
                     <span className="flex-1 border-b border-dotted border-black px-2 font-bold">
                       {data.reason}
                     </span>
                   </div>
-                  <div className="flex items-baseline w-48 mx-2">
+                  <div className="flex items-baseline w-48 ml-4">
                     <span className="font-bold shrink-0">จำนวนชั่วโมง</span>
                     <span className="flex-1 border-b border-dotted border-black px-2 font-bold text-center">
                       {data.hours} ชม.
                     </span>
                   </div>
-                  <div className="flex items-baseline flex-1 min-w-[180px]">
-                    <span className="font-bold shrink-0">Target</span>
-                    <span className="flex-1 border-b border-dotted border-black px-2 font-bold text-left text-[11px]">
-                      {data.target || '-'}
-                    </span>
+                </div>
+
+                {/* Line 5: Target */}
+                <div className="flex items-start gap-1">
+                  <span className="font-bold shrink-0 pt-0.5">Target</span>
+                  <div className="flex-1 border-b border-dotted border-black px-2 font-bold text-left text-[11px] whitespace-pre-wrap leading-relaxed">
+                    {data.target || '-'}
                   </div>
                 </div>
               </div>

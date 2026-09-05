@@ -997,30 +997,36 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                 </div>
               </div>
 
-              {/* Row 4: Reason and Target */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">เหตุผลในการขอ *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น แช่+ผสม, เร่งงานบรรจุให้ทันกำหนดส่งมอบ"
-                    value={formData.reason}
-                    onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
+              {/* Row 4: Reason */}
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">เหตุผลในการขอ *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="เช่น แช่+ผสม, เร่งงานบรรจุให้ทันกำหนดส่งมอบ, เคลียร์งานค้างกะ"
+                  value={formData.reason}
+                  onChange={(e) => setFormData({ ...formData, reason: e.target.value })}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none"
+                />
+              </div>
+
+              {/* Row 5: Target (เป้าหมายงาน) - Dedicated 3-line box */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <span className="text-amber-600">🎯</span>
+                    <span>Target (เป้าหมายงาน) *</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400">ระบุชิ้นงาน ปริมาณ หรือขั้นตอนเป้าหมาย</span>
                 </div>
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Target (เป้าหมายงาน) *</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="เช่น แช่+ผสม JHD-318 LOT 009/26 71-75/52"
-                    value={formData.target}
-                    onChange={(e) => setFormData({ ...formData, target: e.target.value })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200"
-                  />
-                </div>
+                <textarea
+                  rows={3}
+                  required
+                  placeholder="ระบุเป้าหมายงานที่ต้องการทำให้สำเร็จ เช่น&#10;1. แช่+ผสม JHD-318 LOT 009/26 71-75/52&#10;2. เร่งบรรจุให้ได้ยอด 45,000 ชิ้น ตามแผนส่งมอบ"
+                  value={formData.target}
+                  onChange={(e) => setFormData({ ...formData, target: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-xs leading-relaxed focus:ring-2 focus:ring-amber-500 focus:outline-none placeholder:text-slate-400 resize-none font-medium"
+                />
               </div>
 
               {/* EMPLOYEE SEARCH & SELECTOR SECTION */}
