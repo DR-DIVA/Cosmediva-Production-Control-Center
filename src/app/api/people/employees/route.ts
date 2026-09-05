@@ -133,7 +133,36 @@ export async function GET(request: Request) {
       GROUP BY d.id, d.department_code, d.department_name, div.division_code, div.division_name
       ORDER BY employee_count DESC, d.department_name ASC
     `);
-    const areas = await queryPeople(`SELECT id, work_area_code, work_area_name, department_id FROM work_areas WHERE is_active = TRUE ORDER BY work_area_name`);
+    const areas = await queryPeople(`
+      SELECT id, work_area_code, work_area_name, department_id 
+      FROM work_areas 
+      WHERE is_active = TRUE 
+      ORDER BY 
+        CASE 
+          WHEN work_area_name = 'ห้อง MX 1' THEN 1
+          WHEN work_area_name = 'ห้อง MX 2' THEN 2
+          WHEN work_area_name = 'ห้อง MX 3' THEN 3
+          WHEN work_area_name = 'ห้อง MX 4' THEN 4
+          WHEN work_area_name = 'ห้อง MX 5' THEN 5
+          WHEN work_area_name = 'ห้อง MX 6' THEN 6
+          WHEN work_area_name = 'ห้อง PK-O1' THEN 7
+          WHEN work_area_name = 'ห้อง PK-O2' THEN 8
+          WHEN work_area_name = 'ห้อง PK-O3' THEN 9
+          WHEN work_area_name = 'ห้อง PK-O4' THEN 10
+          WHEN work_area_name = 'ห้อง PK-ลงลัง' THEN 11
+          WHEN work_area_name = 'ห้องชั่งสาร' THEN 12
+          WHEN work_area_name = 'คลัง RM/Bulk' THEN 13
+          WHEN work_area_name = 'คลัง PM/FG' THEN 14
+          WHEN work_area_name = 'RD Lab' THEN 15
+          WHEN work_area_name = 'QC Lab' THEN 16
+          WHEN work_area_name = 'Office 1' THEN 17
+          WHEN work_area_name = 'Office 2' THEN 18
+          WHEN work_area_name = 'Office 3' THEN 19
+          WHEN work_area_name = 'Office ฝ่ายผลิต' THEN 20
+          WHEN work_area_name = 'BEC ผลิตสบู่' THEN 21
+          ELSE 99
+        END, work_area_name ASC
+    `);
     const roles = ['Employee', 'Supervisor', 'Manager', 'HR Officer', 'HR Manager', 'Executive', 'Admin'];
 
     return NextResponse.json({
