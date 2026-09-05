@@ -37,12 +37,12 @@ export const DEFAULT_APPROVERS: ApproverOption[] = [
     email: 'chompoonuch@cosmediva.co.th'
   },
   {
-    id: 'mgr-pdt-id',
-    employee_code: 'PDT-MGR001',
-    name: 'คุณสมบูรณ์ คุมฝ่ายผลิต',
-    role: 'ผู้อำนวยการฝ่ายปฏิบัติการ (Production Manager)',
-    department: 'ฝ่ายปฏิบัติการผลิต (Operations)',
-    email: 'somboon@cosmediva.co.th'
+    id: 'pk-bjp-id',
+    employee_code: 'PK-BJP518',
+    name: 'คุณเบ็ญจพร พูลสวัสดิ์',
+    role: 'หัวหน้าแผนกบรรจุ (Packing Head)',
+    department: 'ฝ่ายผลิต แผนกบรรจุ PK',
+    email: 'benjaporn@cosmediva.co.th'
   },
   {
     id: 'hr-ans-id',

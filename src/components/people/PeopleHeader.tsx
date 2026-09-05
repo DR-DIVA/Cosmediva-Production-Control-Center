@@ -47,14 +47,14 @@ export const DEMO_PERSONAS: Persona[] = [
     description: 'ผู้อำนวยการโรงงาน - อนุมัติคำขอ OT / วันลา, ตรวจสอบความพร้อมสายการผลิตหน้างาน'
   },
   {
-    id: 'mgr-pdt-id',
-    name: 'คุณสมบูรณ์ คุมฝ่ายผลิต',
-    nickname: 'คุณบูรณ์',
-    code: 'PDT-MGR001',
-    role: 'Manager',
-    dept: 'ฝ่ายปฏิบัติการผลิต (Operations)',
-    avatarColor: 'bg-indigo-600',
-    description: 'ผู้อำนวยการฝ่ายปฏิบัติการ - อนุมัติแผน OT, ติดตามต้นทุนค่าแรง Job Costing ต่อล็อต'
+    id: 'exec-id',
+    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
+    nickname: 'ดร.ชมพู่',
+    code: 'PDT-CPS001',
+    role: 'กรรมการผู้จัดการ',
+    dept: 'ฝ่ายบริหารสูงสุด',
+    avatarColor: 'bg-slate-800',
+    description: 'กรรมการผู้จัดการ - แดชบอร์ดสรุปความพร้อมโรงงาน, อัตรากำลังพล, กำไร-ขาดทุนต้นทุนแรงงาน'
   },
   {
     id: 'wh-mgr-id',
@@ -67,34 +67,54 @@ export const DEMO_PERSONAS: Persona[] = [
     description: 'ผู้จัดการคลังสินค้า - ควบคุมกำลังคนคลัง RM/PM/FG, อนุมัติการทำงานล่วงเวลา'
   },
   {
+    id: 'qa-mgr-id',
+    name: 'คุณบรรเจิด พึ่งกระจ่าง',
+    nickname: 'คุณบรรเจิด',
+    code: 'QA-BUP1677',
+    role: 'QA Manager',
+    dept: 'ฝ่ายประกันคุณภาพ (QA)',
+    avatarColor: 'bg-emerald-700',
+    description: 'ผู้จัดการฝ่ายประกันคุณภาพ - ควบคุมมาตรฐาน GMP/ISO, ตรวจสอบเอกสารคุณภาพ'
+  },
+  {
+    id: 'rd-mgr-id',
+    name: 'คุณสิดาพันธ์ คชรินทร์',
+    nickname: 'คุณสิดาพันธ์',
+    code: 'RD-SIK1895',
+    role: 'R&D Manager',
+    dept: 'ฝ่ายวิจัยและพัฒนาสูตร (R&D)',
+    avatarColor: 'bg-indigo-600',
+    description: 'ผู้จัดการฝ่ายวิจัยและพัฒนาผลิตภัณฑ์ - พัฒนาสูตรเครื่องสำอาง, ทดสอบความคงตัว'
+  },
+  {
+    id: 'qc-head-id',
+    name: 'คุณฐิติกาญจน์ มากราย',
+    nickname: 'คุณฐิติ',
+    code: 'QC-TTM181',
+    role: 'QC Head',
+    dept: 'ฝ่ายควบคุมคุณภาพ (QC)',
+    avatarColor: 'bg-cyan-600',
+    description: 'หัวหน้าแผนกควบคุมคุณภาพ - ตรวจสอบคุณภาพผลิตภัณฑ์และวัตถุดิบ'
+  },
+  {
+    id: 'mx-sup-id',
+    name: 'คุณกิตติศักดิ์ จิระพนาวัลย์',
+    nickname: 'คุณกิตติศักดิ์',
+    code: 'MX-KTJ620',
+    role: 'Mixing Supervisor',
+    dept: 'ฝ่ายผลิต แผนกผสม (MX)',
+    avatarColor: 'bg-orange-600',
+    description: 'หัวหน้าห้องผสม - ควบคุมการผลิตบัลค์ครีมและเซรั่ม, จัดกำลังคนหน้างาน'
+  },
+  {
     id: 'emp-pk-id',
     name: 'น.ส.เบ็ญจพร พูลสวัสดิ์',
     nickname: 'เบ็ญ',
     code: 'PK-BJP518',
-    role: 'Employee',
-    dept: 'แผนกบรรจุและแพ็กกิ้ง (Packing)',
+    role: 'Packing Supervisor',
+    dept: 'ฝ่ายผลิต แผนกบรรจุ (PK)',
     avatarColor: 'bg-emerald-600',
-    description: 'พนักงานสายผลิต - ดูประวัติสแกนนิ้ว, ยื่นใบลา, ดูรายการทำงานล่วงเวลา'
-  },
-  {
-    id: 'exec-id',
-    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
-    nickname: 'ดร.ชมพู่',
-    code: 'PDT-CPS001',
-    role: 'กรรมการผู้จัดการ',
-    dept: 'ฝ่ายบริหารสูงสุด',
-    avatarColor: 'bg-slate-800',
-    description: 'กรรมการผู้จัดการ - แดชบอร์ดสรุปความพร้อมโรงงาน, อัตรากำลังพล, กำไร-ขาดทุนต้นทุนแรงงาน'
-  },
-  {
-    id: 'admin-id',
-    name: 'คุณสิทธิชัย ผู้ดูแลระบบ',
-    nickname: 'แอดมิน',
-    code: 'EMP-ADM001',
-    role: 'Admin',
-    dept: 'สำนักพัฒนาระบบ (System Admin)',
-    avatarColor: 'bg-rose-600',
-    description: 'ผู้ดูแลระบบสูงสุด - ตั้งค่าระบบ, จัดการสิทธิ์การเข้าถึงข้อมูล'
+    description: 'หัวหน้าแผนกบรรจุ - ดูประวัติสแกนนิ้ว, ยื่นคำขอลา/OT, ดูแลทีมบรรจุสินค้า'
   }
 ];
 

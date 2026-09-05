@@ -152,13 +152,13 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       estimatedCost: 4800,
       actualCost: 3950,
       status: 'APPROVED_EXECUTED',
-      approvedBy: 'คุณสมบูรณ์ คุมฝ่ายผลิต (Manager)',
+      approvedBy: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์ (ผู้อำนวยการโรงงาน)',
       approvedAt: '16:30 น.',
       participants: [
-        { code: 'PK-BJP518', name: 'น.ส.เบ็ญจพร พูลสวัสดิ์', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
-        { code: 'PK-SNT012', name: 'นายสุนทร มีโชค', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
-        { code: 'PK-WCH044', name: 'นายวิชัย รุ่งเรือง', rate: 75.50, hours: 3.0, cost: 226.50, position: 'พนักงานบรรจุ', status: 'Present' },
-        { code: 'PK-KMN089', name: 'น.ส.กมลทิพย์ แสนสุข', rate: 68.06, hours: 0, cost: 0, position: 'พนักงานบรรจุ', status: 'Absent' }
+        { code: 'PK-BJP518', name: 'น.ส.เบ็ญจพร พูลสวัสดิ์', rate: 68.06, hours: 3.0, cost: 204.18, position: 'หัวหน้าแผนกบรรจุ', status: 'Present' },
+        { code: 'PK-PIT266', name: 'คุณพิมพ์วรีย์ เติมสายทอง', rate: 68.06, hours: 3.0, cost: 204.18, position: 'หัวหน้าห้องบรรจุ', status: 'Present' },
+        { code: 'PK-WNR486', name: 'คุณวนิดา เรืองศิลป์', rate: 75.50, hours: 3.0, cost: 226.50, position: 'หัวหน้าห้องบรรจุ', status: 'Present' },
+        { code: 'PK-WIC1784', name: 'น.ส.วิลาวัลย์ เชื้อปรีชา', rate: 68.06, hours: 0, cost: 0, position: 'พนักงานบรรจุ', status: 'Absent' }
       ]
     },
     {
@@ -831,15 +831,15 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                     </span>
                     <div>
                       <div className="font-bold text-amber-900">
-                        ขั้นตอนอนุมัติ: รอการพิจารณาจากผู้จัดการฝ่ายผลิต
+                        ขั้นตอนอนุมัติ: รอการพิจารณาจากผู้อำนวยการโรงงาน
                       </div>
                       <div className="text-[11px] text-amber-800">
-                        ระบบส่งแจ้งเตือนไปยัง <strong>คุณสมบูรณ์ คุมฝ่ายผลิต (Manager)</strong> และ <strong>ดร.ภญ. ชมพูนุช (Supervisor)</strong> เรียบร้อยแล้ว
+                        ระบบส่งแจ้งเตือนไปยัง <strong>ดร.ภญ. ชมพูนุช แสวงศักดิ์ (ผู้อำนวยการโรงงาน)</strong> เรียบร้อยแล้ว
                       </div>
                     </div>
                   </div>
 
-                  {['Supervisor', 'Manager', 'Executive', 'Admin', 'HR Manager'].includes(currentPersona.role) ? (
+                  {['Supervisor', 'Manager', 'Executive', 'Admin', 'HR Manager', 'ผู้อำนวยการโรงงาน', 'กรรมการผู้จัดการ'].includes(currentPersona.role) ? (
                     <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
                       <button
                         type="button"
@@ -863,7 +863,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   ) : (
                     <div className="text-[11px] text-amber-900 bg-white/90 px-3 py-1.5 rounded-xl border border-amber-200 font-medium self-end md:self-auto flex items-center gap-1.5">
                       <span>💡</span>
-                      <span>ทดสอบอนุมัติ: สลับ Persona ที่มุมขวาบนเป็น <strong>คุณสมบูรณ์ (Manager)</strong> หรือ <strong>ดร.ชมพู่ (Supervisor)</strong></span>
+                      <span>ทดสอบอนุมัติ: สลับ Persona ที่มุมขวาบนเป็น <strong>ดร.ชมพู่ (ผู้อำนวยการโรงงาน)</strong> หรือ <strong>คุณเอนก (HR Manager)</strong></span>
                     </div>
                   )}
                 </div>
