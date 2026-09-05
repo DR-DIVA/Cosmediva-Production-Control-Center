@@ -13,7 +13,8 @@ import {
   AlertTriangle,
   Flame,
   Clock,
-  Printer
+  Printer,
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +22,7 @@ import Link from 'next/link'
 import { MaintenanceMachine } from '@/types/maintenance'
 import { getMachines } from '@/app/actions/maintenance'
 import MachineQRBadge from '@/components/maintenance/MachineQRBadge'
+import AddMachineModal from '@/components/maintenance/AddMachineModal'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 export default function MachinesMasterPage() {
@@ -31,6 +33,7 @@ export default function MachinesMasterPage() {
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [qrMachine, setQrMachine] = useState<MaintenanceMachine | null>(null)
+  const [isAddMachineOpen, setIsAddMachineOpen] = useState(false)
 
   const fetchMachines = async () => {
     setIsLoading(true)
@@ -150,6 +153,15 @@ export default function MachinesMasterPage() {
             <Printer className="w-3.5 h-3.5 text-[#D4AF37]" />
             <span>พิมพ์ป้าย QR ทั้งหมด ({machines.length})</span>
           </Button>
+
+          <Button
+            type="button"
+            onClick={() => setIsAddMachineOpen(true)}
+            className="h-10 px-3.5 rounded-xl text-xs font-extrabold bg-[#D4AF37] hover:bg-amber-600 text-stone-950 shadow-sm flex items-center gap-1.5"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>+ เพิ่มเครื่องจักรใหม่</span>
+          </Button>
         </div>
       </div>
 
@@ -255,6 +267,13 @@ export default function MachinesMasterPage() {
           </DialogContent>
         </Dialog>
       )}
+
+      {/* Add Machine Modal */}
+      <AddMachineModal
+        isOpen={isAddMachineOpen}
+        onClose={() => setIsAddMachineOpen(false)}
+        onSuccess={fetchMachines}
+      />
     </div>
   )
 }

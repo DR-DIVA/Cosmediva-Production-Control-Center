@@ -76,6 +76,65 @@ export async function getMachines(filters?: {
 }
 
 /**
+ * Create a new machine in Machine Master
+ */
+export async function createMachine(payload: {
+  machine_code: string
+  machine_name: string
+  category: string
+  department_name?: string
+  production_area?: string
+  line?: string
+  criticality?: 'A' | 'B' | 'C'
+  manufacturer?: string
+  model?: string
+  serial_number?: string
+  hourly_downtime_cost?: number
+  maintenance_instruction?: string
+}) {
+  const supabase = createAdminClient()
+
+  const code = payload.machine_code.trim().toUpperCase()
+  const { data: existing } = await supabase
+    .from('maintenance_machines')
+    .select('id')
+    .eq('machine_code', code)
+    .maybeSingle()
+
+  if (existing) {
+    return { success: false, error: `รหัสเครื่องจักร ${code} มีอยู่ในระบบแล้ว` }
+  }
+
+  const { data, error } = await supabase
+    .from('maintenance_machines')
+    .insert({
+      machine_code: code,
+      machine_name: payload.machine_name.trim(),
+      category: payload.category || 'Other',
+      department_name: payload.department_name || 'ฝ่ายผลิต (Production)',
+      production_area: payload.production_area || '',
+      line: payload.line || '',
+      criticality: payload.criticality || 'B',
+      status: 'Running',
+      manufacturer: payload.manufacturer || '',
+      model: payload.model || '',
+      serial_number: payload.serial_number || '',
+      hourly_downtime_cost: payload.hourly_downtime_cost || 5000,
+      maintenance_instruction: payload.maintenance_instruction || ''
+    })
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  return { success: true, data }
+}
+
+/**
  * Get complete Machine 360° Profile
  */
 export async function getMachine360(machineCode: string) {
