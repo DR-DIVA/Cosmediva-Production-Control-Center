@@ -1,13 +1,114 @@
 'use client'
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
   Calendar, Clock, Plus, Filter, AlertTriangle, CheckCircle2, 
   XCircle, Ban, FileText, ChevronRight, Check, X, Sparkles, 
-  Info, AlertCircle, RefreshCw
+  Info, AlertCircle, RefreshCw, Camera, Image, Upload, 
+  Trash2, Eye, UserCheck, Search, ShieldCheck
 } from 'lucide-react';
 import { Persona } from './PeopleHeader';
 import { toast } from 'sonner';
+
+export interface UploadedAttachment {
+  id: string;
+  name: string;
+  url: string;
+  size: string;
+  type: 'camera' | 'upload';
+}
+
+export interface ApproverOption {
+  id: string;
+  employee_code: string;
+  name: string;
+  role: string;
+  department: string;
+  email?: string;
+}
+
+export const DEFAULT_APPROVERS: ApproverOption[] = [
+  {
+    id: 'sup-cps-id',
+    employee_code: 'PDT-CPS001',
+    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
+    role: 'ผู้อำนวยการโรงงาน (Factory Director)',
+    department: 'ฝ่ายบริหารโรงงาน',
+    email: 'chompoonuch@cosmediva.co.th'
+  },
+  {
+    id: 'mgr-pdt-id',
+    employee_code: 'PDT-MGR001',
+    name: 'คุณสมบูรณ์ คุมฝ่ายผลิต',
+    role: 'ผู้อำนวยการฝ่ายปฏิบัติการ (Production Manager)',
+    department: 'ฝ่ายปฏิบัติการผลิต (Operations)',
+    email: 'somboon@cosmediva.co.th'
+  },
+  {
+    id: 'hr-ans-id',
+    employee_code: 'HR-ANS1886',
+    name: 'คุณเอนก ศรีสุรินทร์',
+    role: 'ผู้จัดการฝ่ายบริหารทรัพยากรบุคคล (HR Manager)',
+    department: 'ฝ่ายทรัพยากรบุคคล (Human Resources)',
+    email: 'anek@cosmediva.co.th'
+  },
+  {
+    id: 'wh-sab-id',
+    employee_code: 'MM-SAB1931',
+    name: 'คุณศราวุฒิ บุตรพรม',
+    role: 'ผู้จัดการคลังสินค้า (Warehouse Manager)',
+    department: 'ฝ่ายบริหารคลังสินค้า MM-PM/FG',
+    email: 'sarawut@cosmediva.co.th'
+  },
+  {
+    id: 'pk-pit-id',
+    employee_code: 'PK-PIT266',
+    name: 'คุณพิมพ์วรีย์ เติมสายทอง',
+    role: 'หัวหน้าห้องบรรจุ (Packing Supervisor)',
+    department: 'ฝ่ายผลิต แผนกบรรจุและแพ๊กกิ้ง PK',
+    email: 'pimwaree@cosmediva.co.th'
+  },
+  {
+    id: 'mx-ktj-id',
+    employee_code: 'MX-KTJ620',
+    name: 'คุณกิตติศักดิ์ จิระพนาวัลย์',
+    role: 'หัวหน้าห้องผสม (Mixing Supervisor)',
+    department: 'ฝ่ายผลิต แผนกผสม MX',
+    email: 'kittisak@cosmediva.co.th'
+  },
+  {
+    id: 'qc-ttm-id',
+    employee_code: 'QC-TTM181',
+    name: 'คุณฐิติกาญจน์ มากราย',
+    role: 'หัวหน้าแผนกควบคุมคุณภาพ (QC Head)',
+    department: 'ฝ่ายควบคุมคุณภาพ (Quality Control)',
+    email: 'thitikarn@cosmediva.co.th'
+  },
+  {
+    id: 'qa-bup-id',
+    employee_code: 'QA-BUP1677',
+    name: 'คุณบรรเจิด พึ่งกระจ่าง',
+    role: 'ผู้จัดการฝ่ายประกันคุณภาพ (QA Manager)',
+    department: 'ฝ่ายประกันคุณภาพ (Quality Assurance)',
+    email: 'banjerd@cosmediva.co.th'
+  },
+  {
+    id: 'rd-sik-id',
+    employee_code: 'RD-SIK1895',
+    name: 'คุณสิดาพันธ์ คชรินทร์',
+    role: 'ผู้จัดการฝ่ายวิจัยและพัฒนาผลิตภัณฑ์ (R&D Manager)',
+    department: 'ฝ่ายวิจัยและพัฒนาสูตร (R&D)',
+    email: 'sidapan@cosmediva.co.th'
+  },
+  {
+    id: 'exec-id',
+    employee_code: 'PDT-CPS001',
+    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
+    role: 'กรรมการผู้จัดการ (Managing Director)',
+    department: 'ฝ่ายบริหารสูงสุด',
+    email: 'chompoonuch@cosmediva.co.th'
+  }
+];
 
 interface LeaveManagementViewProps {
   currentPersona: Persona;
@@ -45,6 +146,85 @@ export function LeaveManagementView({
   const [selectedCalDate, setSelectedCalDate] = useState('2026-04-17');
   const [calcFeedback, setCalcFeedback] = useState<any | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  // New states for Camera, File Attachments, and Approver Selection
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [selectedApproverId, setSelectedApproverId] = useState<string>('sup-cps-id');
+  const [approverSearch, setApproverSearch] = useState('');
+  const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  // Approver auto-selection based on persona department
+  useEffect(() => {
+    const dept = currentPersona?.dept || '';
+    if (dept === 'MM') {
+      setSelectedApproverId('wh-sab-id');
+    } else if (dept === 'HR') {
+      setSelectedApproverId('hr-ans-id');
+    } else if (dept === 'PK') {
+      setSelectedApproverId('pk-pit-id');
+    } else if (dept === 'MX') {
+      setSelectedApproverId('mx-ktj-id');
+    } else if (dept === 'QC') {
+      setSelectedApproverId('qc-ttm-id');
+    } else if (dept === 'QA') {
+      setSelectedApproverId('qa-bup-id');
+    } else if (dept === 'RD') {
+      setSelectedApproverId('rd-sik-id');
+    } else {
+      setSelectedApproverId('sup-cps-id');
+    }
+  }, [currentPersona]);
+
+  const selectedApprover = useMemo(() => {
+    return DEFAULT_APPROVERS.find(a => a.id === selectedApproverId || a.employee_code === selectedApproverId) || DEFAULT_APPROVERS[0];
+  }, [selectedApproverId]);
+
+  const filteredApprovers = useMemo(() => {
+    if (!approverSearch.trim()) return DEFAULT_APPROVERS;
+    const q = approverSearch.toLowerCase();
+    return DEFAULT_APPROVERS.filter(a =>
+      a.name.toLowerCase().includes(q) ||
+      a.role.toLowerCase().includes(q) ||
+      a.department.toLowerCase().includes(q) ||
+      a.employee_code.toLowerCase().includes(q)
+    );
+  }, [approverSearch]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'camera' | 'upload') => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    Array.from(files).forEach((file) => {
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error(`ไฟล์ ${file.name} มีขนาดเกิน 8MB`);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        const base64 = ev.target?.result as string;
+        if (base64) {
+          const newAtt: UploadedAttachment = {
+            id: `att_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+            name: file.name || (type === 'camera' ? `ภาพถ่าย_${new Date().toLocaleTimeString('th-TH')}.jpg` : 'เอกสารแนบ'),
+            url: base64,
+            size: `${(file.size / 1024).toFixed(1)} KB`,
+            type
+          };
+          setAttachments(prev => [...prev, newAtt]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  };
 
   // Fetch data
   const fetchLeaveData = async () => {
@@ -154,6 +334,18 @@ export function LeaveManagementView({
         return;
       }
 
+      // Serialize attachments into JSON if present
+      let finalAttachmentPayload = attachmentUrl;
+      if (attachments.length > 0) {
+        finalAttachmentPayload = JSON.stringify(attachments.map(a => ({
+          id: a.id,
+          name: a.name,
+          url: a.url,
+          size: a.size,
+          type: a.type
+        })));
+      }
+
       const res = await fetch('/api/people/leave', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -166,15 +358,18 @@ export function LeaveManagementView({
           reason,
           is_emergency: isEmergency,
           contact_during_leave: contact,
-          attachment_url: attachmentUrl
+          attachment_url: finalAttachmentPayload,
+          approver_id: selectedApprover?.employee_code || selectedApprover?.id
         })
       });
 
       const json = await res.json();
       if (json.success) {
-        toast.success(json.message || 'ยื่นคำขอลาสำเร็จ');
+        toast.success(json.message || 'ยื่นคำขอลาสำเร็จ และส่งแจ้งเตือนเข้า Inbox หัวหน้าแล้ว');
         setShowRequestModal(false);
         setReason('');
+        setAttachments([]);
+        setAttachmentUrl('');
         fetchLeaveData();
       } else {
         toast.error(json.error || 'ไม่สามารถยื่นคำขอลาได้');
@@ -763,41 +958,195 @@ export function LeaveManagementView({
                 ></textarea>
               </div>
 
-              {/* Approve Email / Approver */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">Approve Email (อีเมลหรือชื่อหัวหน้าผู้อนุมัติ)</label>
-                <input
-                  type="email"
-                  value={approverEmail}
-                  onChange={(e) => setApproverEmail(e.target.value)}
-                  placeholder="admin@cosmediva.com หรือ supervisor@cosmediva.com"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 font-medium text-slate-700"
-                />
+              {/* Approver Selection (หัวหน้างานผู้อนุมัติ) */}
+              <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80 space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                    <UserCheck className="w-4 h-4 text-indigo-600" />
+                    <span>หัวหน้างานผู้อนุมัติ (Supervisor / Manager) *</span>
+                  </label>
+                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                    ส่งตรงเข้า Approvals Inbox อัตโนมัติ
+                  </span>
+                </div>
+
+                <div className="relative">
+                  <select
+                    value={selectedApproverId}
+                    onChange={(e) => setSelectedApproverId(e.target.value)}
+                    className="w-full pl-3 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 text-xs shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 appearance-none"
+                  >
+                    {DEFAULT_APPROVERS.map((appr) => (
+                      <option key={appr.id} value={appr.id}>
+                        {appr.name} — {appr.role} ({appr.department})
+                      </option>
+                    ))}
+                  </select>
+                  <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-slate-400">
+                    <ChevronRight className="w-4 h-4 rotate-90" />
+                  </div>
+                </div>
+
+                {/* Selected Approver Info Card */}
+                {selectedApprover && (
+                  <div className="flex items-center gap-3 p-2.5 rounded-xl bg-white border border-slate-200/60 shadow-xs text-xs">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 to-amber-300 text-slate-950 font-bold flex items-center justify-center shrink-0 shadow-xs">
+                      {selectedApprover.name.slice(0, 2)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-bold text-slate-900 truncate flex items-center gap-1.5">
+                        <span>{selectedApprover.name}</span>
+                        <span className="text-[10px] font-normal px-1.5 py-0.5 rounded bg-slate-100 text-slate-600">
+                          {selectedApprover.employee_code}
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-500 truncate">
+                        {selectedApprover.role} • {selectedApprover.department}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                  <Info className="w-3 h-3 text-slate-400 shrink-0" />
+                  <span>พนักงานไม่ต้องจำอีเมล ระบบจะส่งรายการคำขอนี้เข้าศูนย์อนุมัติคำขอ (Approvals Inbox) ของหัวหน้างานโดยตรง</span>
+                </div>
               </div>
 
-              {/* Attachments & Emergency Check */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                <div>
-                  <label className="font-bold text-slate-700 block mb-1">Attachments (แนบเอกสาร/ใบรับรองแพทย์)</label>
-                  <input
-                    type="text"
-                    placeholder="URL เอกสาร หรือระบุว่าแนบเอกสารแล้ว"
-                    value={attachmentUrl}
-                    onChange={(e) => setAttachmentUrl(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-[11px]"
-                  />
+              {/* Attachments & Live Camera */}
+              <div className="bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <label className="font-bold text-slate-800 text-xs flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-amber-600" />
+                      <span>แนบภาพถ่ายเหตุการณ์ / ใบรับรองแพทย์ (Evidence / Medical Certificate)</span>
+                    </label>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      รองรับภาพถ่าย: รถเสีย, เกิดอุบัติเหตุ, ใบรับรองแพทย์ รพ., เอกสารงานศพ หรือภาพถ่ายหลักฐานเหตุจำเป็น
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    {attachments.length} ไฟล์
+                  </span>
                 </div>
-                <div className="flex items-center gap-2 pt-6">
-                  <input
-                    type="checkbox"
-                    id="emergencyCheck"
-                    checked={isEmergency}
-                    onChange={(e) => setIsEmergency(e.target.checked)}
-                    className="w-4 h-4 rounded text-amber-500"
-                  />
-                  <label htmlFor="emergencyCheck" className="font-bold text-slate-700 cursor-pointer text-xs">
-                    กรณีฉุกเฉิน (Emergency)
-                  </label>
+
+                {/* Hidden input elements */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e, 'camera')}
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e, 'upload')}
+                />
+
+                {/* Upload / Camera Action Buttons */}
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300 font-bold text-xs transition-colors shadow-xs active:scale-[0.98]"
+                  >
+                    <Camera className="w-4 h-4 text-amber-600" />
+                    <span>ถ่ายภาพเหตุการณ์ (กล้อง)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 font-bold text-xs transition-colors shadow-xs active:scale-[0.98]"
+                  >
+                    <Upload className="w-4 h-4 text-slate-600" />
+                    <span>เลือกรูปภาพ / ไฟล์เอกสาร</span>
+                  </button>
+                </div>
+
+                {/* Attachments preview list */}
+                {attachments.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+                    {attachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="relative group bg-white p-2 rounded-xl border border-slate-200 shadow-xs flex flex-col"
+                      >
+                        <div className="relative w-full h-24 rounded-lg overflow-hidden bg-slate-100 mb-1.5">
+                          {att.url.startsWith('data:image') || att.url.includes('.jpg') || att.url.includes('.png') ? (
+                            <img
+                              src={att.url}
+                              alt={att.name}
+                              className="w-full h-full object-cover cursor-pointer transition-transform group-hover:scale-105"
+                              onClick={() => setPreviewModalImage(att.url)}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                              <FileText className="w-8 h-8" />
+                            </div>
+                          )}
+                          <div className="absolute top-1 left-1">
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${
+                              att.type === 'camera' ? 'bg-amber-500 text-slate-950' : 'bg-slate-800 text-white'
+                            }`}>
+                              {att.type === 'camera' ? '📷 ภาพถ่ายสด' : '📁 ไฟล์แนบ'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[11px]">
+                          <div className="truncate font-medium text-slate-700 flex-1 pr-1" title={att.name}>
+                            {att.name}
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => setPreviewModalImage(att.url)}
+                              className="p-1 text-slate-500 hover:text-indigo-600 rounded hover:bg-slate-100"
+                              title="ดูภาพขยาย"
+                            >
+                              <Eye className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => removeAttachment(att.id)}
+                              className="p-1 text-rose-500 hover:text-rose-700 rounded hover:bg-rose-50"
+                              title="ลบรูปนี้"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                        <span className="text-[9px] text-slate-400 mt-0.5">{att.size}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Optional Emergency Checkbox */}
+                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="emergencyCheck"
+                      checked={isEmergency}
+                      onChange={(e) => setIsEmergency(e.target.checked)}
+                      className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500 border-slate-300"
+                    />
+                    <label htmlFor="emergencyCheck" className="font-bold text-slate-700 cursor-pointer text-xs flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <span>แจ้งเป็นกรณีฉุกเฉิน / ลาด่วน (Emergency Leave)</span>
+                    </label>
+                  </div>
+                  <span className="text-[10px] text-slate-400">
+                    {isEmergency ? '🔔 แจ้งเตือนด่วน' : 'ปกติ'}
+                  </span>
                 </div>
               </div>
 
@@ -850,6 +1199,32 @@ export function LeaveManagementView({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox Image Preview Modal */}
+      {previewModalImage && (
+        <div 
+          className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewModalImage(null)}
+        >
+          <div 
+            className="relative max-w-3xl max-h-[90vh] bg-white rounded-2xl overflow-hidden shadow-2xl p-2"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setPreviewModalImage(null)}
+              className="absolute top-4 right-4 z-10 w-8 h-8 rounded-full bg-slate-900/70 text-white hover:bg-slate-950 flex items-center justify-center shadow-md transition-all cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <img
+              src={previewModalImage}
+              alt="หลักฐานประกอบการลา"
+              className="max-h-[85vh] w-auto max-w-full object-contain rounded-xl"
+            />
           </div>
         </div>
       )}

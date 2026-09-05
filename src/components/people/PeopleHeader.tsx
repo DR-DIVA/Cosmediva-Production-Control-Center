@@ -41,8 +41,8 @@ export const DEMO_PERSONAS: Persona[] = [
     name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
     nickname: 'ดร.ชมพู่',
     code: 'PDT-CPS001',
-    role: 'Supervisor',
-    dept: 'ฝ่ายบริหาร / โรงงาน (Production)',
+    role: 'ผู้อำนวยการโรงงาน',
+    dept: 'ฝ่ายบริหารโรงงาน',
     avatarColor: 'bg-amber-600',
     description: 'ผู้อำนวยการโรงงาน - อนุมัติคำขอ OT / วันลา, ตรวจสอบความพร้อมสายการผลิตหน้างาน'
   },
@@ -78,11 +78,11 @@ export const DEMO_PERSONAS: Persona[] = [
   },
   {
     id: 'exec-id',
-    name: 'ดร.เอกชัย เกียรติบำรุงกิจ',
-    nickname: 'ดร.เอก',
-    code: 'EXEC-001',
-    role: 'Executive',
-    dept: 'คณะผู้บริหาร (Executive)',
+    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
+    nickname: 'ดร.ชมพู่',
+    code: 'PDT-CPS001',
+    role: 'กรรมการผู้จัดการ',
+    dept: 'ฝ่ายบริหารสูงสุด',
     avatarColor: 'bg-slate-800',
     description: 'กรรมการผู้จัดการ - แดชบอร์ดสรุปความพร้อมโรงงาน, อัตรากำลังพล, กำไร-ขาดทุนต้นทุนแรงงาน'
   },
@@ -226,13 +226,13 @@ export function PeopleHeader({
                 <div className="max-h-80 overflow-y-auto py-1">
                   {DEMO_PERSONAS.map(p => (
                     <button
-                      key={p.code}
+                      key={p.id}
                       onClick={() => {
                         onSelectPersona(p);
                         setShowPersonaMenu(false);
                       }}
                       className={`w-full text-left px-4 py-2.5 flex items-start gap-3 hover:bg-amber-50/60 transition ${
-                        currentPersona.code === p.code ? 'bg-amber-50/90 font-medium' : ''
+                        currentPersona.id === p.id ? 'bg-amber-50/90 font-medium' : ''
                       }`}
                     >
                       <div className={`w-8 h-8 rounded-lg ${p.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0 mt-0.5`}>

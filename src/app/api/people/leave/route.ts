@@ -189,6 +189,7 @@ export async function POST(request: Request) {
       contact_during_leave,
       is_emergency = false,
       attachment_url,
+      approver_id,
       validate_only = false
     } = body;
 
@@ -344,11 +345,32 @@ export async function POST(request: Request) {
 
       // Determine initial approval stage:
       let initialStatus = 'PENDING_SUPERVISOR';
-      let approverId = employee.supervisor_id || employee.manager_id;
+      let approverId: string | null = null;
       let approverRole = 'SUPERVISOR';
 
+      if (approver_id) {
+        try {
+          const directAppr = await client.query(`
+            SELECT id, first_name, last_name, system_role 
+            FROM employees 
+            WHERE (id::text = $1 OR employee_code = $1) AND deleted_at IS NULL 
+            LIMIT 1
+          `, [approver_id]);
+          if (directAppr.rows.length > 0) {
+            approverId = directAppr.rows[0].id;
+            approverRole = directAppr.rows[0].system_role === 'HR Manager' ? 'HR_MANAGER' : 'SUPERVISOR';
+          }
+        } catch (e) {
+          // ignore error and fallback
+        }
+      }
+
       if (!approverId) {
-        const hrMgr = await client.query(`SELECT id FROM employees WHERE system_role = 'HR Manager' LIMIT 1`);
+        approverId = employee.supervisor_id || employee.manager_id;
+      }
+
+      if (!approverId) {
+        const hrMgr = await client.query(`SELECT id FROM employees WHERE system_role = 'HR Manager' AND deleted_at IS NULL LIMIT 1`);
         approverId = hrMgr.rows[0]?.id || null;
         initialStatus = 'PENDING_HR';
         approverRole = 'HR_MANAGER';
