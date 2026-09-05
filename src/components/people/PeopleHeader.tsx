@@ -118,6 +118,37 @@ export const DEMO_PERSONAS: Persona[] = [
   }
 ];
 
+export function isManagerLevel(persona?: Persona | null): boolean {
+  if (!persona) return false;
+  const role = (persona.role || '').toLowerCase();
+  const dept = (persona.dept || '').toLowerCase();
+  const desc = (persona.description || '').toLowerCase();
+
+  const managerKeywords = [
+    'manager',
+    'ผู้จัดการ',
+    'ผู้อำนวยการ',
+    'กรรมการ',
+    'director',
+    'executive',
+    'managing',
+    'admin',
+    'gm',
+    'vp',
+    'ceo',
+    'coo',
+    'md'
+  ];
+
+  const hasManagerKeyword = managerKeywords.some(kw => 
+    role.includes(kw) || dept.includes(kw) || desc.includes(kw)
+  );
+
+  const isExecutiveDept = dept.includes('บริหารสูงสุด') || dept.includes('บริหารโรงงาน');
+
+  return hasManagerKeyword || isExecutiveDept;
+}
+
 interface PeopleHeaderProps {
   currentPersona: Persona;
   onSelectPersona: (persona: Persona) => void;
@@ -143,12 +174,18 @@ export function PeopleHeader({
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
 
+  const isManager = isManagerLevel(currentPersona);
+
   // Row 1: Core Daily Operations
   const row1Tabs = [
     { id: 'dashboard', label: t.navHome, icon: '🏠' },
     { id: 'employees', label: t.navEmployees, icon: '👥' },
     { id: 'leave', label: t.navLeave, icon: '🏖️' },
-    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', icon: '⏰' },
+    { 
+      id: 'ot_costing', 
+      label: isManager ? 'OT & วิเคราะห์ต้นทุน (Costing)' : 'คำขอและอนุมัติ OT', 
+      icon: isManager ? '🧮' : '⏰' 
+    },
     { id: 'approvals', label: t.navApprovals, icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
     { id: 'attendance', label: t.navAttendance, icon: '⏱️' },
   ];

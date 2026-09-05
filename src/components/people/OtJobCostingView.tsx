@@ -7,7 +7,7 @@ import {
   ArrowRight, ShieldAlert, BarChart3, ChevronRight, Calculator,
   Search, X, Check, Trash2, UserCheck, Printer, FileText
 } from 'lucide-react';
-import { Persona } from './PeopleHeader';
+import { Persona, isManagerLevel } from './PeopleHeader';
 import { toast } from 'sonner';
 import { OtEFormModal, OtEFormData } from './OtEFormModal';
 
@@ -58,9 +58,16 @@ export interface OtRequestItem {
 }
 
 export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
+  const isManager = useMemo(() => isManagerLevel(currentPersona), [currentPersona]);
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [selectedLot, setSelectedLot] = useState('JHD-309');
-  const [subTab, setSubTab] = useState<'job_costing' | 'requests'>('job_costing');
+  const [subTab, setSubTab] = useState<'job_costing' | 'requests'>(() => isManagerLevel(currentPersona) ? 'job_costing' : 'requests');
+
+  useEffect(() => {
+    if (!isManager && subTab === 'job_costing') {
+      setSubTab('requests');
+    }
+  }, [isManager, subTab]);
 
   // Sample Lot Financial Data
   const lots = [
@@ -546,18 +553,20 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
       {/* 2. Subtabs Navigation */}
       <div className="flex items-center gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs text-xs font-bold w-fit">
-        <button
-          onClick={() => setSubTab('job_costing')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
-            subTab === 'job_costing' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Calculator className="w-4 h-4" />
-          <span>วิเคราะห์ต้นทุน & กำไรขาดทุนต่องาน (Job Costing P&L)</span>
-        </button>
+        {isManager && (
+          <button
+            onClick={() => setSubTab('job_costing')}
+            className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
+              subTab === 'job_costing' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Calculator className="w-4 h-4" />
+            <span>วิเคราะห์ต้นทุน & กำไรขาดทุนต่องาน (Job Costing P&L)</span>
+          </button>
+        )}
         <button
           onClick={() => setSubTab('requests')}
-          className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+          className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 cursor-pointer ${
             subTab === 'requests' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'text-slate-600 hover:text-slate-900'
           }`}
         >
@@ -568,7 +577,26 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
 
       {/* SUBTAB 1: JOB COSTING & PROFIT/LOSS ANALYSIS */}
       {subTab === 'job_costing' && (
-        <div className="space-y-6">
+        !isManager ? (
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-8 sm:p-12 text-center space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h4 className="font-black text-slate-800 text-lg">จำกัดการเข้าถึงเฉพาะระดับผู้จัดการ (Manager Only)</h4>
+              <p className="text-xs text-slate-500 max-w-md mx-auto leading-relaxed">
+                เมนูวิเคราะห์ต้นทุนการผลิต (Job Costing P&L) และผลกำไรขาดทุนของล็อตการผลิต สงวนสิทธิ์การเข้าถึงสำหรับผู้จัดการฝ่าย (Manager) และฝ่ายบริหารโรงงานเท่านั้น
+              </p>
+            </div>
+            <button
+              onClick={() => setSubTab('requests')}
+              className="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-xs transition active:scale-95 cursor-pointer shadow-md shadow-amber-500/20"
+            >
+              ไปยังหน้ารายการขอและอนุมัติ OT
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
           {/* Select Lot to Inspect */}
           <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
@@ -774,6 +802,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
             </div>
           </div>
         </div>
+        )
       )}
 
       {/* SUBTAB 2: OT REQUESTS LIST WITH PLAN VS ACTUAL */}

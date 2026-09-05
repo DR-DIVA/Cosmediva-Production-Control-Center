@@ -136,12 +136,12 @@ const routes = [
     icon: Calculator,
     href: '/costing',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'planner'],
+    allowedRoles: ['admin', 'manager', 'planner'],
     subRoutes: [
-      { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'planner'] },
-      { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'planner'] },
-      { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'planner'] },
-      { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'planner'] },
+      { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'manager', 'planner'] },
+      { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'manager', 'planner'] },
+      { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'manager', 'planner'] },
+      { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'manager', 'planner'] },
     ]
   },
   {
