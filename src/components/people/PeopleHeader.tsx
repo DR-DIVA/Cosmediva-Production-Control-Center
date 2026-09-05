@@ -18,23 +18,23 @@ export interface Persona {
 export const DEMO_PERSONAS: Persona[] = [
   {
     id: 'hr-mgr-id',
-    name: 'คุณกุลธิดา บริหารบุคคล',
-    nickname: 'คุณกุล',
-    code: 'HR-MGR001',
+    name: 'คุณเอนก ศรีสุรินทร์',
+    nickname: 'คุณเอนก',
+    code: 'HR-ANS1886',
     role: 'HR Manager',
     dept: 'ฝ่ายทรัพยากรบุคคล (HR)',
     avatarColor: 'bg-purple-600',
-    description: 'ผู้จัดการฝ่ายบุคคล - จัดการนโยบาย, ดูแลภาพรวม, อนุมัติพิเศษ'
+    description: 'ผู้จัดการฝ่ายบริหารทรัพยากรบุคคล - บริหารนโยบาย, อนุมัติสิทธิ์, ดูแลภาพรวมกำลังคนโรงงาน'
   },
   {
     id: 'hr-off-id',
-    name: 'คุณกิตติชัย ตรวจเวลา',
-    nickname: 'บอย',
-    code: 'HR-OFF001',
+    name: 'คุณฉัตรกมล ดีสว่าง',
+    nickname: 'คุณฉัตร',
+    code: 'HR-CHD1668',
     role: 'HR Officer',
     dept: 'ฝ่ายทรัพยากรบุคคล (HR)',
     avatarColor: 'bg-blue-600',
-    description: 'เจ้าหน้าที่บุคคล - ตรวจสอบ Attendance Exception, แก้ไขเวลา, จัดการ Master'
+    description: 'เจ้าหน้าที่ฝ่ายบริหารทรัพยากรบุคคล - ตรวจสอบข้อยกเว้นสแกนนิ้ว, ปรับปรุงเวลา, ทะเบียนพนักงาน'
   },
   {
     id: 'sup-pdt-id',
@@ -42,9 +42,9 @@ export const DEMO_PERSONAS: Persona[] = [
     nickname: 'ดร.ชมพู่',
     code: 'PDT-CPS001',
     role: 'Supervisor',
-    dept: 'ฝ่ายผลิต (Production)',
+    dept: 'ฝ่ายบริหาร / โรงงาน (Production)',
     avatarColor: 'bg-amber-600',
-    description: 'หัวหน้างานสายผลิต - อนุมัติวันลาทีม, ดูความพร้อมกำลังคนหน้างาน'
+    description: 'ผู้อำนวยการโรงงาน - อนุมัติคำขอ OT / วันลา, ตรวจสอบความพร้อมสายการผลิตหน้างาน'
   },
   {
     id: 'mgr-pdt-id',
@@ -52,9 +52,19 @@ export const DEMO_PERSONAS: Persona[] = [
     nickname: 'คุณบูรณ์',
     code: 'PDT-MGR001',
     role: 'Manager',
-    dept: 'ฝ่ายผลิต (Production)',
+    dept: 'ฝ่ายปฏิบัติการผลิต (Operations)',
     avatarColor: 'bg-indigo-600',
-    description: 'ผู้จัดการฝ่ายผลิต - อนุมัติลาระดับสอง, ดูภาพรวมกำลังคนฝ่าย'
+    description: 'ผู้อำนวยการฝ่ายปฏิบัติการ - อนุมัติแผน OT, ติดตามต้นทุนค่าแรง Job Costing ต่อล็อต'
+  },
+  {
+    id: 'wh-mgr-id',
+    name: 'คุณศราวุฒิ บุตรพรม',
+    nickname: 'คุณวุฒิ',
+    code: 'MM-SAB1931',
+    role: 'Warehouse Manager',
+    dept: 'ฝ่ายบริหารคลังสินค้า (MM)',
+    avatarColor: 'bg-teal-600',
+    description: 'ผู้จัดการคลังสินค้า - ควบคุมกำลังคนคลัง RM/PM/FG, อนุมัติการทำงานล่วงเวลา'
   },
   {
     id: 'emp-pk-id',
@@ -64,7 +74,7 @@ export const DEMO_PERSONAS: Persona[] = [
     role: 'Employee',
     dept: 'แผนกบรรจุและแพ็กกิ้ง (Packing)',
     avatarColor: 'bg-emerald-600',
-    description: 'พนักงานสายผลิต - ดูวันลา, ขอยื่นใบลา, ดูเวลาทำงานบนมือถือ'
+    description: 'พนักงานสายผลิต - ดูประวัติสแกนนิ้ว, ยื่นใบลา, ดูรายการทำงานล่วงเวลา'
   },
   {
     id: 'exec-id',
@@ -74,7 +84,7 @@ export const DEMO_PERSONAS: Persona[] = [
     role: 'Executive',
     dept: 'คณะผู้บริหาร (Executive)',
     avatarColor: 'bg-slate-800',
-    description: 'ผู้บริหารระดับสูง - แดชบอร์ดความพร้อมโรงงานและอัตราการมาทำงาน'
+    description: 'กรรมการผู้จัดการ - แดชบอร์ดสรุปความพร้อมโรงงาน, อัตรากำลังพล, กำไร-ขาดทุนต้นทุนแรงงาน'
   },
   {
     id: 'admin-id',
@@ -84,7 +94,7 @@ export const DEMO_PERSONAS: Persona[] = [
     role: 'Admin',
     dept: 'สำนักพัฒนาระบบ (System Admin)',
     avatarColor: 'bg-rose-600',
-    description: 'ผู้ดูแลระบบสูงสุด - ตั้งค่าระบบ, สิทธิ์ RBAC'
+    description: 'ผู้ดูแลระบบสูงสุด - ตั้งค่าระบบ, จัดการสิทธิ์การเข้าถึงข้อมูล'
   }
 ];
 
