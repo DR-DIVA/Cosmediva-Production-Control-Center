@@ -106,11 +106,21 @@ const routes = [
   },
   {
     label: 'CosmeFlow Maintenance',
-    subtitle: 'Keep Every Machine Running at Its Best.',
+    subtitle: 'แจ้งไว • ซ่อมไว • รู้ประวัติ • ลด Downtime',
     icon: Settings,
     href: '/maintenance',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin']
+    allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'],
+    subRoutes: [
+      { label: 'ภาพรวมระบบ (Overview)', href: '/maintenance', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🚨 แจ้งเครื่องเสียด่วน (Report)', href: '/maintenance/report', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🔧 โหมดช่างซ่อม (Technician)', href: '/maintenance/technician', allowedRoles: ['admin', 'maintenance'] },
+      { label: '📋 บอร์ดงานซ่อม (Kanban)', href: '/maintenance/work-orders', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🏭 ทะเบียนเครื่องจักร (Machines 360°)', href: '/maintenance/machines', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '📦 คลังอะไหล่ (Spare Parts)', href: '/maintenance/spare-parts', allowedRoles: ['admin', 'maintenance', 'planner', 'warehouse_mmrm_bu', 'purchase'] },
+      { label: '📊 แดชบอร์ด & KPI', href: '/maintenance/dashboard', allowedRoles: ['admin', 'maintenance', 'planner'] },
+      { label: '🔍 ค้นหาประวัติ (Search)', href: '/maintenance/search', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+    ]
   },
   {
     label: 'CosmeFlow People',
