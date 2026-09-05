@@ -17,6 +17,8 @@ import { TimeAttendanceView } from '@/components/people/TimeAttendanceView';
 import { PolicyMasterView } from '@/components/people/PolicyMasterView';
 import { ReportsView } from '@/components/people/ReportsView';
 import { OtJobCostingView } from '@/components/people/OtJobCostingView';
+import { CasesManagementView } from '@/components/people/CasesManagementView';
+import { AiWorkforceRegistryView } from '@/components/people/AiWorkforceRegistryView';
 import { Language, TRANSLATIONS } from '@/lib/peopleTranslations';
 
 export default function PeoplePage() {
@@ -145,12 +147,20 @@ export default function PeoplePage() {
           <ApprovalsInboxView currentPersona={currentPersona} />
         )}
 
+        {activeTab === 'cases' && (
+          <CasesManagementView currentPersona={currentPersona} />
+        )}
+
         {activeTab === 'attendance' && (
           <TimeAttendanceView currentPersona={currentPersona} initialTab="daily" />
         )}
 
         {activeTab === 'exceptions' && (
           <TimeAttendanceView currentPersona={currentPersona} initialTab="exceptions" />
+        )}
+
+        {activeTab === 'ai_workforce' && (
+          <AiWorkforceRegistryView currentPersona={currentPersona} />
         )}
 
         {activeTab === 'policies' && (

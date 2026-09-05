@@ -7,6 +7,7 @@ import {
   FileDown, ShieldCheck, ChevronRight, Activity, Zap
 } from 'lucide-react';
 import { Persona } from './PeopleHeader';
+import { ActionItemsWidget } from './ActionItemsWidget';
 import { Language, TRANSLATIONS } from '@/lib/peopleTranslations';
 
 interface HrDashboardViewProps {
@@ -74,6 +75,9 @@ export function HrDashboardView({
           </button>
         </div>
       </div>
+
+      {/* Action Items Inbox (Layer 7: What Needs Your Attention?) */}
+      <ActionItemsWidget currentPersona={currentPersona} onNavigateTab={onNavigateTab} />
 
       {/* 2. Top Metric Cards (KPI) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">

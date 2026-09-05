@@ -1,59 +1,149 @@
-# แผนงานระบบวิเคราะห์ต้นทุนและกำไรต่อ Lot (Lot Profitability Analysis Dashboard)
+# Implementation Plan — AI Workforce Ready Architecture (CosmeFlow People V1 Addendum)
 
-เอกสารนี้สรุปแผนงานและวิธีคำนวณต้นทุน/กำไรสุทธิต่อการผลิต 1 Lot เพื่อนำไปแสดงในหน้า Dashboard โดยจะรวบรวมข้อมูลต้นทุนวัตถุดิบ, ค่าแรง, ค่าโสหุ้ย, และต้นทุนของเสีย
+Redesign CosmeFlow People V1 to establish a future-proof, 8-layer **HR Operating System + AI Workforce Platform** without expanding current V1 execution scope beyond disciplined boundaries.
 
-## เป้าหมาย
-สร้างหน้า Dashboard รวมต้นทุนการผลิต (`/costing`) ที่สามารถแสดงกำไรและผลประกอบการของแต่ละ Lot แบบสรุปให้ผู้บริหารและบัญชีดูได้ในหน้าเดียว
+## User Review Required
 
-## คำถามที่ต้องยืนยันจากผู้ใช้ (Open Questions)
 > [!IMPORTANT]
-> **การคำนวณยอดขาย (Revenue)**
-> ปัจจุบันในระบบยังไม่มีการเก็บ "ราคาขาย" (Selling Price) ของสินค้าแต่ละตัว เพื่อที่จะหากำไร-ขาดทุนสุทธิ เราจำเป็นต้องรู้รายรับจาก Lot นั้นๆ
-> 
-> **คำถาม:** ให้เพิ่มช่อง "ราคาขายต่อชิ้น" เข้าไปในหน้าผูกสูตรต้นทุน (BOM) ด้วยเลยไหมคะ? เพื่อให้ระบบคำนวณ รายรับ = (จำนวนชิ้นดี * ราคาขาย) และ กำไร = รายรับ - ต้นทุนรวม
-
-> [!NOTE]
-> **เวลาที่ใช้คำนวณค่าแรงและโสหุ้ย**
-> **คำถาม:** ในการคิดค่าแรง เราควรใช้ **"เวลามาตรฐาน"** (เช่น กำหนดว่าแผนกผสมต้องใช้เวลา 2 ชั่วโมงเป๊ะๆ ตามสูตร) หรือ **"เวลาทำงานจริง"** (ที่พนักงานกด Start/Stop ในหน้างาน) คะ?
-> *(ข้อเสนอแนะ: ระบบตอนนี้เก็บเวลาที่พนักงานกดปุ่มเริ่ม/เสร็จงานไว้แล้ว หากนำเวลาจริงมาคูณกับเรทค่าแรงรายชั่วโมง จะสะท้อนต้นทุนที่เกิดขึ้นจริงได้แม่นยำกว่าค่ะ)*
-
-## การเปลี่ยนแปลงที่จะเกิดขึ้น (Proposed Changes)
+> **Disciplined Scope Boundary**: In strict adherence to Section 41 & 46 of the prompt:
+> - No fake chatbot or fake AI recommendations will be implemented.
+> - All 16 AI-ready and Case Management tables will be created in PostgreSQL on Supabase.
+> - Case Management and Action Items will be actively wired to **real V1 operational flows** (Attendance Exceptions, Missing Punch, Pending Leave Approvals).
+> - Domain Event emission will be integrated directly into Leave and Attendance APIs.
+> - An "AI Workforce Registry & Digital Workers" overview will be added to the HR/Admin view with clear "AI Workforce — Planned (Phase 8)" status badges.
 
 ---
 
-### การปรับปรุงฐานข้อมูล (Database)
+## Proposed Architectural Layers (8-Layer Design)
 
-#### [MODIFY] ตาราง `product_bom`
-- เพิ่มคอลัมน์ `selling_price` (ราคาขายต่อชิ้น) เพื่อเก็บราคามาตรฐานของสินค้านั้นๆ
-
----
-
-### การปรับปรุงโค้ดหลังบ้าน (Backend)
-
-#### [MODIFY] [actions/costing.ts](file:///C:/Users/hp/Dropbox/AI%20AGENT/Antigravity/Update%20PD%20Daily%20Status/cosmediva-os/src/app/actions/costing.ts)
-- สร้างฟังก์ชัน `calculateLotCost(lot_id)` สำหรับคำนวณต้นทุนเมื่อจบ Lot:
-  - **ต้นทุนวัตถุดิบ (Material Cost):** `จำนวนผลิตได้จริง` * `ต้นทุนเนื้อ+แพคเกจจิ้งต่อชิ้น (จาก BOM)`
-  - **ค่าแรง & โสหุ้ย (Labor & OH):** เวลาที่ใช้จริงแต่ละแผนก (จาก `production_logs`) * `เรทค่าแรง/โสหุ้ย ต่อชั่วโมง`
-  - **ต้นทุนของเสีย (Defect Cost):** รวมมูลค่าจากรายการของเสียในตาราง `defect_logs`
-  - **ต้นทุนรวมทั้งหมด (Total Cost):** นำ 3 ต้นทุนด้านบนมาบวกกัน
-  - บันทึกผลลัพธ์ลงตาราง `lot_costing`
-- สร้างฟังก์ชันดึงข้อมูลสรุป เพื่อเอาไปโชว์ในกราฟและตาราง
+1. **Layer 1 — System of Record**: PostgreSQL (Supabase) storing Employees, Org, Leave, Attendance, Schedules, Policies.
+2. **Layer 2 — Workflow Engine**: Approval Matrix, Routing, Escalation, Reminders.
+3. **Layer 3 — Rule Engine**: Deterministic calculation (Leave accrual, pre-validation, attendance exceptions). AI never overrides this.
+4. **Layer 4 — Case Management**: `hr_cases`, `case_evidence`, `case_comments`, `case_actions` for investigating exceptions.
+5. **Layer 5 — AI Workforce Registry**: `ai_agents`, `ai_agent_permissions`, `ai_agent_versions`, `ai_jobs`, `ai_job_runs`, `ai_tasks`, `ai_recommendations`, `ai_activity_logs`.
+6. **Layer 6 — Human Decision**: `human_approvals` (Level 0: Observe, Level 1: Recommend, Level 2: Prepare, Level 3: Execute after Approval). Prohibited autonomous actions enforced.
+7. **Layer 7 — Execution & Action Items**: `action_items` ("What Needs Your Attention?").
+8. **Layer 8 — Audit & Evidence**: `domain_events` + append-only audit trail.
 
 ---
 
-### การปรับปรุงหน้าจอ (Frontend)
+## Proposed Changes
 
-#### [MODIFY] [costing/page.tsx](file:///C:/Users/hp/Dropbox/AI%20AGENT/Antigravity/Update%20PD%20Daily%20Status/cosmediva-os/src/app/(dashboard)/costing/page.tsx)
-- เปลี่ยนจากหน้าว่างๆ "อยู่ระหว่างการพัฒนา" เป็นหน้าจอ Dashboard จริงๆ
-- **ส่วนบน (KPIs):** แสดงผลรวมกำไรเฉลี่ย, มูลค่าของเสียรวมทั้งหมด, และจำนวน Lot ที่ผลิตเสร็จ
-- **ตารางสรุปแต่ละ Lot:**
-  - คอลัมน์: Lot No., สินค้า, ยอดผลิต, รายรับ, ต้นทุนวัตถุดิบ, ค่าแรง, โสหุ้ย, ของเสีย, ต้นทุนรวม, กำไรสุทธิ
-  - มีปุ่ม "คำนวณต้นทุนใหม่ (Recalculate)" กรณีที่มีการแก้ราคาของเสียหรือแก้เวลาการทำงาน
+### 1. Database Migration & Schema Expansion
 
-#### [MODIFY] [costing/bom/page.tsx](file:///C:/Users/hp/Dropbox/AI%20AGENT/Antigravity/Update%20PD%20Daily%20Status/cosmediva-os/src/app/(dashboard)/costing/bom/page.tsx)
-- เพิ่มช่องกรอก "ราคาขายต่อชิ้น" เพื่อให้ฝ่ายบัญชีระบุราคาได้พร้อมๆ กับการผูกสูตรต้นทุน
+#### [NEW] `scripts/migrate_ai_workforce.js`
+Creates all 16 future-ready tables with foreign keys, indexes, and constraints:
+- `hr_cases` (with auto-generated case numbers e.g. `CASE-2026-001`)
+- `case_evidence`
+- `case_comments`
+- `case_actions`
+- `action_items`
+- `domain_events`
+- `ai_agents`
+- `ai_agent_permissions`
+- `ai_agent_versions`
+- `ai_jobs`
+- `ai_job_runs`
+- `ai_tasks`
+- `ai_recommendations`
+- `ai_activity_logs`
+- `human_approvals`
+- `document_drafts`
 
-## การตรวจสอบ (Verification Plan)
-- ทดสอบกรอก ราคาขาย และ ต้นทุนวัตถุดิบ ในหน้า BOM
-- ทดสอบไปกดแจ้งของเสียและหยอดราคา
-- กลับมาที่หน้า Dashboard กดปุ่ม "คำนวณต้นทุน" และเช็คตัวเลขว่าคำนวณ `รายรับ - ต้นทุนรวม = กำไร` ได้อย่างถูกต้องและแม่นยำ
+#### [NEW] `scripts/seed_ai_workforce.js`
+Seeds:
+- 6 Initial Digital Workers:
+  1. `AI HR Officer` (`AGENT-HR-01`)
+  2. `AI Attendance Officer` (`AGENT-ATT-01`)
+  3. `AI Leave Coordinator` (`AGENT-LEAVE-01`)
+  4. `AI Workforce Analyst` (`AGENT-WF-01`)
+  5. `AI Compliance Assistant` (`AGENT-COMP-01`)
+  6. `AI People Analyst` (`AGENT-PEOPLE-01`)
+- Specific granular permissions reflecting **Least Privilege** (e.g. Attendance Officer can READ attendance, CREATE hr_case, but PROHIBITED from modifying payroll or raw attendance).
+- Initial AI Job Definitions (`DAILY_ATTENDANCE_REVIEW`, `LEAVE_VALIDATION`, `TRAINING_EXPIRY_CHECK`, etc.).
+- Active V1 Action Items & Initial HR Case for existing factory attendance exceptions (demonstrating Case Management for real missing punches).
+
+---
+
+### 2. Domain Event & Case Engine Library
+
+#### [NEW] `src/lib/events/domainEvents.ts`
+Reliable database-backed event emitter:
+- Function `emitDomainEvent(eventName, entityType, entityId, payload, correlationId)`
+- Records to `domain_events`.
+
+#### [NEW] `src/lib/cases/caseService.ts`
+- Functions to create, update, and fetch `hr_cases`, attach evidence, add comments, and generate `action_items`.
+
+---
+
+### 3. API Integrations
+
+#### [MODIFY] `src/app/api/people/leave/route.ts`
+- Emit `leave.requested` when request is created.
+- Emit `leave.approved` / `leave.rejected` on status updates.
+- Create/update `action_items` for supervisors.
+
+#### [MODIFY] `src/app/api/people/attendance/route.ts`
+- Emit `attendance.imported` and `attendance.exception.created`.
+- Auto-generate Action Items for unresolved exceptions.
+
+#### [NEW] `src/app/api/people/cases/route.ts` & `src/app/api/people/actions/route.ts`
+- REST APIs to query and manage HR cases and Action Items.
+
+#### [NEW] `src/app/api/people/ai-workforce/route.ts`
+- Read-only registry view of Digital Workers, their missions, permissions, and active versions.
+
+---
+
+### 4. UI Enhancements (Modular HR Command Center)
+
+#### [NEW] `src/components/people/ActionItemsWidget.tsx`
+- "What Needs Your Attention?" widget on Dashboard:
+  - Pending leave approvals
+  - Attendance corrections
+  - Active HR cases
+
+#### [NEW] `src/components/people/CasesManagementView.tsx`
+- Dedicated tab to manage HR Cases (investigate missing punches, attendance exceptions, attach evidence, log comments).
+
+#### [NEW] `src/components/people/AiWorkforceRegistryView.tsx`
+- Clean admin tab showing the 6 registered Digital Workers, their roles, missions, permission scopes, and "Planned (Phase 8)" badges with zero fake execution.
+
+#### [MODIFY] `src/components/people/PeopleHeader.tsx` & `src/app/(dashboard)/people/page.tsx`
+- Integrate Action Items and Cases tabs.
+
+---
+
+### 5. Documentation Deliverables
+
+#### [NEW] `AI_WORKFORCE_ARCHITECTURE.md`
+Comprehensive blueprint covering:
+- AI Agent Model (Digital Workers)
+- Permission Model & Least Privilege
+- Human-in-the-Loop Levels (0 to 3 + High-Risk Prohibitions)
+- Case Management & Evidence Pack Architecture
+- Event-Driven Architecture
+- Data Privacy, Redaction Layer & Auditing
+
+#### [NEW] `DATABASE_SCHEMA.md`
+Complete ERD and table relationship documentation covering all 8 layers.
+
+---
+
+## Verification Plan
+
+### Automated Verification
+1. Run `node scripts/migrate_ai_workforce.js` and verify all 16 tables exist.
+2. Run `node scripts/seed_ai_workforce.js` and verify 6 AI agents, permissions, sample case, and action items are seeded.
+3. Run `cmd.exe /c "npm run build"` to verify 100% Next.js TypeScript compilation and routing.
+4. Execute test script `node scripts/test_ai_workforce.js` verifying:
+   - Domain events are written to `domain_events`.
+   - Action Items can be fetched and completed.
+   - HR Cases can have evidence and comments attached.
+   - AI permissions block high-risk actions.
+
+### Manual Verification
+- Open `/people` in browser:
+  - Check HR Manager persona: Verify Action Items ("What Needs Your Attention?") and Cases Management tab.
+  - Verify AI Workforce Registry tab renders all 6 Digital Workers with clear "Planned" status.

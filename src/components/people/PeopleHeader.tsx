@@ -122,8 +122,10 @@ export function PeopleHeader({
     { id: 'leave', label: t.navLeave, icon: '🏖️' },
     { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', icon: '⏰' },
     { id: 'approvals', label: t.navApprovals, icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
+    { id: 'cases', label: 'เคส & หลักฐาน (Cases)', icon: '📁', restricted: ['Employee'] },
     { id: 'attendance', label: t.navAttendance, icon: '⏱️' },
     { id: 'exceptions', label: t.navExceptions, icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },
+    { id: 'ai_workforce', label: 'AI Workforce', icon: '🤖', restricted: ['Employee'] },
     { id: 'policies', label: t.navPolicies, icon: '⚙️', restricted: ['Employee'] },
     { id: 'reports', label: t.navReports, icon: '📊' },
   ].filter(tab => !tab.restricted || !tab.restricted.includes(currentPersona.role));
