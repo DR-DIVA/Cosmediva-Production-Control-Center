@@ -60,6 +60,7 @@ export async function GET(request: Request) {
           lt.is_paid
         FROM leave_policies lp
         JOIN leave_types lt ON lp.leave_type_id = lt.id
+        WHERE lt.is_active = TRUE
         ORDER BY lt.sort_order ASC, lt.name_th ASC;
       `);
       return NextResponse.json({ success: true, data: rows });
