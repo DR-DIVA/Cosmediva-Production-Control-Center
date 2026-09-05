@@ -1,13 +1,24 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Clock, DollarSign, Package, AlertTriangle, CheckCircle2, 
   TrendingDown, TrendingUp, Users, Plus, Filter, Sparkles,
-  ArrowRight, ShieldAlert, BarChart3, ChevronRight, Calculator
+  ArrowRight, ShieldAlert, BarChart3, ChevronRight, Calculator,
+  Search, X, Check, Trash2, UserCheck
 } from 'lucide-react';
 import { Persona } from './PeopleHeader';
 import { toast } from 'sonner';
+
+interface EmployeeOption {
+  id: string;
+  employee_code: string;
+  first_name: string;
+  last_name: string;
+  nickname?: string;
+  department_name?: string;
+  work_area_name?: string;
+}
 
 interface OtJobCostingViewProps {
   currentPersona: Persona;
@@ -124,10 +135,119 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
     selectedWorkersCount: 12
   });
 
+  // Employee Selection State
+  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
+  const [selectedEmployees, setSelectedEmployees] = useState<EmployeeOption[]>([]);
+  const [empSearch, setEmpSearch] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function fetchEmployees() {
+      try {
+        const res = await fetch('/api/people/employees?limit=300');
+        const json = await res.json();
+        if (json.success && Array.isArray(json.data)) {
+          setEmployees(json.data);
+        }
+      } catch (err) {
+        console.error('Failed to load employees for OT selector:', err);
+      }
+    }
+    fetchEmployees();
+  }, []);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const calculateOtHours = (start: string, end: string) => {
+    try {
+      const [sh, sm] = start.split(':').map(Number);
+      const [eh, em] = end.split(':').map(Number);
+      let diffMin = (eh * 60 + em) - (sh * 60 + sm);
+      if (diffMin <= 0) diffMin += 24 * 60;
+      return Math.round((diffMin / 60) * 10) / 10;
+    } catch {
+      return 3;
+    }
+  };
+
+  const filteredEmployees = useMemo(() => {
+    if (!empSearch.trim()) return employees;
+    const q = empSearch.toLowerCase().trim();
+    return employees.filter(e => 
+      e.employee_code?.toLowerCase().includes(q) ||
+      e.first_name?.toLowerCase().includes(q) ||
+      e.last_name?.toLowerCase().includes(q) ||
+      (e.nickname && e.nickname.toLowerCase().includes(q)) ||
+      (e.department_name && e.department_name.toLowerCase().includes(q)) ||
+      (e.work_area_name && e.work_area_name.toLowerCase().includes(q))
+    );
+  }, [employees, empSearch]);
+
+  const toggleEmployee = (emp: EmployeeOption) => {
+    setSelectedEmployees(prev => {
+      const exists = prev.some(p => p.id === emp.id || p.employee_code === emp.employee_code);
+      let next: EmployeeOption[];
+      if (exists) {
+        next = prev.filter(p => p.id !== emp.id && p.employee_code !== emp.employee_code);
+      } else {
+        next = [...prev, emp];
+      }
+      setFormData(f => ({ ...f, selectedWorkersCount: Math.max(1, next.length) }));
+      return next;
+    });
+  };
+
+  const removeEmployee = (empId: string) => {
+    setSelectedEmployees(prev => {
+      const next = prev.filter(p => p.id !== empId);
+      setFormData(f => ({ ...f, selectedWorkersCount: Math.max(1, next.length) }));
+      return next;
+    });
+  };
+
   const handleCreateOtRequest = (e: React.FormEvent) => {
     e.preventDefault();
-    const estCost = formData.selectedWorkersCount * 3 * 70; // rough approx 70 THB/hr OT
-    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} เรียบร้อยแล้ว (ประมาณการ ฿${estCost.toLocaleString()})`);
+    const count = selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount;
+    const hours = calculateOtHours(formData.startTime, formData.endTime);
+    const estCost = Math.round(count * hours * 70);
+
+    const newReq = {
+      id: `OT-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(otRequests.length + 1).padStart(2, '0')}`,
+      lotNumber: formData.lotNumber,
+      productName: formData.lotNumber === 'JHD-309' ? 'Diva Serum 50ml' : formData.lotNumber === 'JHD-318' ? 'Diva Day Cream 30g' : 'Diva Body Lotion 200ml',
+      line: formData.lotNumber === 'JHD-309' ? 'Packing Line 2' : formData.lotNumber === 'JHD-318' ? 'Packing Line 1' : 'Mixing Room 3',
+      requestedBy: `${currentPersona.name} (${currentPersona.role})`,
+      otDate: formData.otDate,
+      timeSlot: `${formData.startTime} - ${formData.endTime} (${hours} ชม.)`,
+      plannedHeadcount: count,
+      actualHeadcount: count,
+      plannedHours: count * hours,
+      actualHours: count * hours,
+      estimatedCost: estCost,
+      actualCost: estCost,
+      status: 'PENDING_APPROVAL',
+      participants: selectedEmployees.map(emp => ({
+        code: emp.employee_code,
+        name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
+        rate: 68.06,
+        hours: hours,
+        cost: Math.round(hours * 68.06 * 100) / 100,
+        status: 'Scheduled'
+      }))
+    };
+
+    setOtRequests([newReq, ...otRequests]);
+    toast.success(`เปิดคำขอ OT สำหรับ Lot ${formData.lotNumber} (${count} คน) เรียบร้อยแล้ว (ประมาณการ ฿${estCost.toLocaleString()})`);
     setShowRequestModal(false);
   };
 
@@ -475,7 +595,7 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       {/* MODAL: CREATE OT REQUEST */}
       {showRequestModal && (
         <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-3xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <div>
                 <h3 className="font-extrabold text-base text-slate-900">เปิดคำขอทำงานล่วงเวลา (OT Request Form)</h3>
@@ -512,15 +632,22 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   />
                 </div>
                 <div>
-                  <label className="font-bold text-slate-700 block mb-1">จำนวนคนที่จะขอ (คน) *</label>
+                  <label className="font-bold text-slate-700 block mb-1">
+                    จำนวนคนที่จะขอ (คน) *
+                    {selectedEmployees.length > 0 && (
+                      <span className="ml-1.5 text-[10px] text-amber-700 font-bold">
+                        (ซิงค์จากที่เลือก {selectedEmployees.length} คน)
+                      </span>
+                    )}
+                  </label>
                   <input
                     type="number"
                     min="1"
                     max="50"
                     required
-                    value={formData.selectedWorkersCount}
+                    value={selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount}
                     onChange={(e) => setFormData({ ...formData, selectedWorkersCount: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 font-bold bg-white"
                   />
                 </div>
               </div>
@@ -546,6 +673,167 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                 </div>
               </div>
 
+              {/* EMPLOYEE SEARCH & SELECTOR SECTION */}
+              <div ref={dropdownRef} className="space-y-2 border border-slate-200 rounded-2xl p-3 bg-slate-50/60">
+                <div className="flex items-center justify-between">
+                  <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-amber-600" />
+                    <span>ระบุรายชื่อพนักงานที่จะทำ OT *</span>
+                    <span className="text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded-full font-black border border-amber-200">
+                      เลือกแล้ว {selectedEmployees.length} คน
+                    </span>
+                  </label>
+                  {selectedEmployees.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedEmployees([]);
+                        setFormData(prev => ({ ...prev, selectedWorkersCount: 1 }));
+                      }}
+                      className="text-[11px] text-rose-600 hover:text-rose-700 font-bold flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      <span>ล้างที่เลือก</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* Search Input */}
+                <div className="relative">
+                  <div className="relative">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      placeholder="พิมพ์ค้นหาด้วยรหัส, ชื่อ-นามสกุล, ชื่อเล่น หรือ แผนก..."
+                      value={empSearch}
+                      onChange={(e) => {
+                        setEmpSearch(e.target.value);
+                        setIsDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsDropdownOpen(true)}
+                      className="w-full pl-9 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white text-xs focus:ring-2 focus:ring-amber-500 focus:outline-none placeholder:text-slate-400"
+                    />
+                    {empSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setEmpSearch('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs p-1"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Dropdown list */}
+                  {isDropdownOpen && (
+                    <div className="absolute left-0 right-0 top-full mt-1.5 bg-white rounded-2xl shadow-xl border border-slate-200 z-40 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                      <div className="p-2 bg-slate-50 sticky top-0 z-10 flex items-center justify-between text-[11px] text-slate-600 font-bold border-b border-slate-100">
+                        <span>ผลการค้นหา {filteredEmployees.length} คน</span>
+                        <div className="flex items-center gap-2">
+                          {filteredEmployees.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newToAdd = filteredEmployees.filter(fe => !selectedEmployees.some(se => se.id === fe.id));
+                                const next = [...selectedEmployees, ...newToAdd];
+                                setSelectedEmployees(next);
+                                setFormData(prev => ({ ...prev, selectedWorkersCount: next.length }));
+                              }}
+                              className="text-amber-700 hover:text-amber-900 hover:underline"
+                            >
+                              + เลือกทั้งหมด ({filteredEmployees.length})
+                            </button>
+                          )}
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={() => setIsDropdownOpen(false)}
+                            className="text-slate-500 hover:text-slate-700"
+                          >
+                            ปิด
+                          </button>
+                        </div>
+                      </div>
+
+                      {filteredEmployees.length === 0 ? (
+                        <div className="p-4 text-center text-slate-400 text-xs">
+                          ไม่พบข้อมูลพนักงานที่ตรงกับคำค้นหา
+                        </div>
+                      ) : (
+                        filteredEmployees.slice(0, 50).map(emp => {
+                          const isSelected = selectedEmployees.some(se => se.id === emp.id || se.employee_code === emp.employee_code);
+                          return (
+                            <div
+                              key={emp.id}
+                              onClick={() => toggleEmployee(emp)}
+                              className={`p-2.5 flex items-center justify-between hover:bg-amber-50/70 cursor-pointer transition ${
+                                isSelected ? 'bg-amber-50/90' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => {}}
+                                  className="rounded border-slate-300 text-amber-600 focus:ring-amber-500 pointer-events-none"
+                                />
+                                <div>
+                                  <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                                    <span className="font-mono text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                      {emp.employee_code}
+                                    </span>
+                                    <span>{emp.first_name} {emp.last_name}</span>
+                                    {emp.nickname && <span className="text-slate-400 font-normal">({emp.nickname})</span>}
+                                  </div>
+                                  <div className="text-[10px] text-slate-500">
+                                    {emp.department_name || 'ไม่ระบุแผนก'} {emp.work_area_name ? `• ${emp.work_area_name}` : ''}
+                                  </div>
+                                </div>
+                              </div>
+                              <span className={`text-[11px] font-bold px-2 py-0.5 rounded-lg ${
+                                isSelected ? 'bg-amber-200/80 text-amber-900' : 'bg-slate-100 text-slate-600'
+                              }`}>
+                                {isSelected ? 'เลือกแล้ว ✓' : '+ เลือก'}
+                              </span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Chips */}
+                {selectedEmployees.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto p-2 bg-white rounded-xl border border-slate-200">
+                    {selectedEmployees.map((emp) => (
+                      <div
+                        key={emp.id}
+                        className="flex items-center gap-1.5 bg-amber-50 text-amber-900 border border-amber-200 px-2 py-1 rounded-lg text-xs"
+                      >
+                        <span className="font-mono font-bold text-[10px] bg-amber-200/70 px-1 py-0.5 rounded text-amber-950">
+                          {emp.employee_code}
+                        </span>
+                        <span className="font-bold">{emp.first_name} {emp.last_name?.slice(0, 1)}.</span>
+                        {emp.nickname && <span className="text-amber-700/80 text-[10px]">({emp.nickname})</span>}
+                        <button
+                          type="button"
+                          onClick={() => removeEmployee(emp.id)}
+                          className="text-amber-700 hover:text-rose-600 hover:bg-rose-50 rounded-full p-0.5 ml-0.5 transition"
+                          title="ลบออก"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-slate-400 p-2.5 text-center bg-white rounded-xl border border-dashed border-slate-200">
+                    ยังไม่ได้เลือกพนักงาน (คีย์ค้นหารหัสหรือชื่อด้านบนแล้วคลิกเลือกรายชื่อที่ต้องการได้เลยค่ะ)
+                  </div>
+                )}
+              </div>
+
               <div>
                 <label className="font-bold text-slate-700 block mb-1">เหตุผลและความจำเป็น *</label>
                 <textarea
@@ -565,7 +853,10 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   <span>ประมาณการต้นทุนค่าแรง OT ล่วงหน้า (Pre-Approval Cost Estimate)</span>
                 </div>
                 <div className="text-amber-800 mt-1">
-                  คำนวณจาก {formData.selectedWorkersCount} คน × 3 ชั่วโมง = <strong>฿{(formData.selectedWorkersCount * 3 * 70).toLocaleString()} บาท</strong>
+                  คำนวณจาก {selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount} คน × {calculateOtHours(formData.startTime, formData.endTime)} ชั่วโมง = <strong>฿{(
+                    (selectedEmployees.length > 0 ? selectedEmployees.length : formData.selectedWorkersCount) * 
+                    calculateOtHours(formData.startTime, formData.endTime) * 70
+                  ).toLocaleString()} บาท</strong>
                 </div>
                 <div className="text-[11px] text-amber-700 mt-0.5">
                   เมื่อได้รับการอนุมัติและพนักงานสแกนนิ้วเลิกงานจริง ระบบจะคิดต้นทุนจริงตามนาทีที่สแกนออก
