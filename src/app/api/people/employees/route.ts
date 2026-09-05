@@ -100,6 +100,18 @@ export async function GET(request: Request) {
       idx++;
     }
 
+    const isApprover = searchParams.get('is_approver') === 'true';
+    if (isApprover) {
+      query += ` AND (
+        e.system_role IN ('Supervisor', 'Manager', 'Executive', 'HR Manager', 'Admin')
+        OR p.position_name LIKE '%ผู้จัดการ%'
+        OR p.position_name LIKE '%หัวหน้า%'
+        OR p.position_name LIKE '%ผู้อำนวยการ%'
+        OR p.position_name LIKE '%Manager%'
+        OR p.position_name LIKE '%Supervisor%'
+      )`;
+    }
+
     query += ` ORDER BY e.employee_code ASC LIMIT $${idx} OFFSET $${idx + 1}`;
     params.push(limit, offset);
 

@@ -32,17 +32,9 @@ export const DEFAULT_APPROVERS: ApproverOption[] = [
     id: 'sup-cps-id',
     employee_code: 'PDT-CPS001',
     name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
-    role: 'ผู้อำนวยการโรงงาน (Factory Director)',
-    department: 'ฝ่ายบริหารโรงงาน',
+    role: 'ผู้อำนวยการโรงงาน (Factory Director) & กรรมการผู้จัดการ',
+    department: 'ฝ่ายบริหารโรงงาน / ฝ่ายบริหารสูงสุด',
     email: 'chompoonuch@cosmediva.co.th'
-  },
-  {
-    id: 'pk-bjp-id',
-    employee_code: 'PK-BJP518',
-    name: 'คุณเบ็ญจพร พูลสวัสดิ์',
-    role: 'หัวหน้าแผนกบรรจุ (Packing Head)',
-    department: 'ฝ่ายผลิต แผนกบรรจุ PK',
-    email: 'benjaporn@cosmediva.co.th'
   },
   {
     id: 'hr-ans-id',
@@ -53,36 +45,20 @@ export const DEFAULT_APPROVERS: ApproverOption[] = [
     email: 'anek@cosmediva.co.th'
   },
   {
-    id: 'wh-sab-id',
-    employee_code: 'MM-SAB1931',
-    name: 'คุณศราวุฒิ บุตรพรม',
-    role: 'ผู้จัดการคลังสินค้า (Warehouse Manager)',
-    department: 'ฝ่ายบริหารคลังสินค้า MM-PM/FG',
-    email: 'sarawut@cosmediva.co.th'
+    id: 'acc-nvr-id',
+    employee_code: 'ACC-NVR665',
+    name: 'คุณนิวาริน รัตนงามแสง',
+    role: 'ผู้จัดการสายงานบริหารองค์กรและสนับสนุนธุรกิจ',
+    department: 'ฝ่ายบัญชีและการเงิน (Accounting & Finance)',
+    email: 'niwarin@cosmediva.co.th'
   },
   {
-    id: 'pk-pit-id',
-    employee_code: 'PK-PIT266',
-    name: 'คุณพิมพ์วรีย์ เติมสายทอง',
-    role: 'หัวหน้าห้องบรรจุ (Packing Supervisor)',
-    department: 'ฝ่ายผลิต แผนกบรรจุและแพ๊กกิ้ง PK',
-    email: 'pimwaree@cosmediva.co.th'
-  },
-  {
-    id: 'mx-ktj-id',
-    employee_code: 'MX-KTJ620',
-    name: 'คุณกิตติศักดิ์ จิระพนาวัลย์',
-    role: 'หัวหน้าห้องผสม (Mixing Supervisor)',
-    department: 'ฝ่ายผลิต แผนกผสม MX',
-    email: 'kittisak@cosmediva.co.th'
-  },
-  {
-    id: 'qc-ttm-id',
-    employee_code: 'QC-TTM181',
-    name: 'คุณฐิติกาญจน์ มากราย',
-    role: 'หัวหน้าแผนกควบคุมคุณภาพ (QC Head)',
-    department: 'ฝ่ายควบคุมคุณภาพ (Quality Control)',
-    email: 'thitikarn@cosmediva.co.th'
+    id: 'pdd-kat-id',
+    employee_code: 'PDD-KAT952',
+    name: 'คุณกมลพรรณ ตันเส็ง',
+    role: 'หัวหน้าฝ่ายสร้างสรรค์และออกแบบผลิตภัณฑ์',
+    department: 'ฝ่ายพัฒนาผลิตภัณฑ์ (Product Development)',
+    email: 'kamonpan@cosmediva.co.th'
   },
   {
     id: 'qa-bup-id',
@@ -93,6 +69,30 @@ export const DEFAULT_APPROVERS: ApproverOption[] = [
     email: 'banjerd@cosmediva.co.th'
   },
   {
+    id: 'pk-bjp-id',
+    employee_code: 'PK-BJP518',
+    name: 'คุณเบ็ญจพร พูลสวัสดิ์',
+    role: 'หัวหน้าแผนกบรรจุ (Packing Head / Supervisor)',
+    department: 'ฝ่ายผลิต แผนกบรรจุและแพ๊กกิ้ง PK',
+    email: 'benjaporn@cosmediva.co.th'
+  },
+  {
+    id: 'ra-wab-id',
+    employee_code: 'RA-WAB1103',
+    name: 'คุณวราภรณ์ บ่อเพทาย',
+    role: 'หัวหน้าฝ่ายขึ้นทะเบียนและกฎหมาย (RA Head)',
+    department: 'ฝ่ายขึ้นทะเบียนและเอกสาร (Regulatory Affairs)',
+    email: 'waraporn@cosmediva.co.th'
+  },
+  {
+    id: 'wh-sab-id',
+    employee_code: 'MM-SAB1931',
+    name: 'คุณศราวุฒิ บุตรพรม',
+    role: 'ผู้จัดการคลังสินค้า (Warehouse Manager)',
+    department: 'ฝ่ายบริหารคลังสินค้า MM-PM/FG',
+    email: 'sarawut@cosmediva.co.th'
+  },
+  {
     id: 'rd-sik-id',
     employee_code: 'RD-SIK1895',
     name: 'คุณสิดาพันธ์ คชรินทร์',
@@ -101,12 +101,52 @@ export const DEFAULT_APPROVERS: ApproverOption[] = [
     email: 'sidapan@cosmediva.co.th'
   },
   {
-    id: 'exec-id',
-    employee_code: 'PDT-CPS001',
-    name: 'ดร.ภญ. ชมพูนุช แสวงศักดิ์',
-    role: 'กรรมการผู้จัดการ (Managing Director)',
-    department: 'ฝ่ายบริหารสูงสุด',
-    email: 'chompoonuch@cosmediva.co.th'
+    id: 'qc-ttm-id',
+    employee_code: 'QC-TTM181',
+    name: 'คุณฐิติกาญจน์ มากราย',
+    role: 'หัวหน้าแผนกควบคุมคุณภาพ (QC Head)',
+    department: 'ฝ่ายควบคุมคุณภาพ (Quality Control)',
+    email: 'thitikarn@cosmediva.co.th'
+  },
+  {
+    id: 'mx-ktj-id',
+    employee_code: 'MX-KTJ620',
+    name: 'คุณกิตติศักดิ์ จิระพนาวัลย์',
+    role: 'หัวหน้าห้องผสม (Mixing Supervisor)',
+    department: 'ฝ่ายผลิต แผนกผสม MX',
+    email: 'kittisak@cosmediva.co.th'
+  },
+  {
+    id: 'mm-cys-id',
+    employee_code: 'MM-CYS026',
+    name: 'คุณชญาดา สังข์สำรวม',
+    role: 'หัวหน้าแผนกคลังวัตถุดิบ (Raw Material Supervisor)',
+    department: 'ฝ่ายบริหารคลังสินค้าวัตถุดิบและบัลค์ MM-RM/Bulk',
+    email: 'chayada@cosmediva.co.th'
+  },
+  {
+    id: 'acc-npp-id',
+    employee_code: 'ACC-NPP1900',
+    name: 'คุณนิภาพร โพนศรี',
+    role: 'หัวหน้าแผนกบัญชีต้นทุน (Cost Accounting Supervisor)',
+    department: 'ฝ่ายบัญชีและการเงิน (Accounting & Finance)',
+    email: 'nipaporn@cosmediva.co.th'
+  },
+  {
+    id: 'bec-tam-id',
+    employee_code: 'BEC-TAM1903',
+    name: 'คุณธันชนก มังกร',
+    role: 'หัวหน้าฝ่ายผลิตและแพ๊กสบู่ (Supervisor)',
+    department: 'ฝ่ายผลิต แผนกผลิตและแพ๊กสบู่',
+    email: 'thanchanok@cosmediva.co.th'
+  },
+  {
+    id: 'sm-nap-id',
+    employee_code: 'SM-NAP1896',
+    name: 'คุณณฐวรันธร พานทอง',
+    role: 'หัวหน้าแผนกขาย (Sales Head)',
+    department: 'ฝ่ายขายและการตลาด (Sales & Marketing)',
+    email: 'nathawaranthon@cosmediva.co.th'
   }
 ];
 
@@ -149,6 +189,7 @@ export function LeaveManagementView({
 
   // New states for Camera, File Attachments, and Approver Selection
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([]);
+  const [approverList, setApproverList] = useState<ApproverOption[]>(DEFAULT_APPROVERS);
   const [selectedApproverId, setSelectedApproverId] = useState<string>('sup-cps-id');
   const [approverSearch, setApproverSearch] = useState('');
   const [previewModalImage, setPreviewModalImage] = useState<string | null>(null);
@@ -158,39 +199,45 @@ export function LeaveManagementView({
   // Approver auto-selection based on persona department
   useEffect(() => {
     const dept = currentPersona?.dept || '';
-    if (dept === 'MM') {
-      setSelectedApproverId('wh-sab-id');
-    } else if (dept === 'HR') {
-      setSelectedApproverId('hr-ans-id');
-    } else if (dept === 'PK') {
-      setSelectedApproverId('pk-pit-id');
-    } else if (dept === 'MX') {
-      setSelectedApproverId('mx-ktj-id');
-    } else if (dept === 'QC') {
-      setSelectedApproverId('qc-ttm-id');
-    } else if (dept === 'QA') {
-      setSelectedApproverId('qa-bup-id');
-    } else if (dept === 'RD') {
-      setSelectedApproverId('rd-sik-id');
+    if (dept === 'MM' || dept.includes('คลัง')) {
+      setSelectedApproverId('wh-sab-id'); // คุณศราวุฒิ
+    } else if (dept === 'HR' || dept.includes('บุคคล')) {
+      setSelectedApproverId('hr-ans-id'); // คุณเอนก
+    } else if (dept === 'PK' || dept.includes('บรรจุ')) {
+      setSelectedApproverId('pk-bjp-id'); // คุณเบ็ญจพร
+    } else if (dept === 'MX' || dept.includes('ผสม')) {
+      setSelectedApproverId('mx-ktj-id'); // คุณกิตติศักดิ์
+    } else if (dept === 'QC' || dept.includes('คุณภาพ')) {
+      setSelectedApproverId('qc-ttm-id'); // คุณฐิติกาญจน์
+    } else if (dept === 'QA' || dept.includes('ประกัน')) {
+      setSelectedApproverId('qa-bup-id'); // คุณบรรเจิด
+    } else if (dept === 'RD' || dept.includes('วิจัย')) {
+      setSelectedApproverId('rd-sik-id'); // คุณสิดาพันธ์
+    } else if (dept === 'RA' || dept.includes('ทะเบียน')) {
+      setSelectedApproverId('ra-wab-id'); // คุณวราภรณ์
+    } else if (dept.includes('บัญชี')) {
+      setSelectedApproverId('acc-nvr-id'); // คุณนิวาริน
+    } else if (dept.includes('พัฒนาผลิตภัณฑ์')) {
+      setSelectedApproverId('pdd-kat-id'); // คุณกมลพรรณ
     } else {
-      setSelectedApproverId('sup-cps-id');
+      setSelectedApproverId('sup-cps-id'); // ดร.ภญ. ชมพูนุช
     }
   }, [currentPersona]);
 
   const selectedApprover = useMemo(() => {
-    return DEFAULT_APPROVERS.find(a => a.id === selectedApproverId || a.employee_code === selectedApproverId) || DEFAULT_APPROVERS[0];
-  }, [selectedApproverId]);
+    return approverList.find(a => a.id === selectedApproverId || a.employee_code === selectedApproverId) || approverList[0];
+  }, [selectedApproverId, approverList]);
 
   const filteredApprovers = useMemo(() => {
-    if (!approverSearch.trim()) return DEFAULT_APPROVERS;
+    if (!approverSearch.trim()) return approverList;
     const q = approverSearch.toLowerCase();
-    return DEFAULT_APPROVERS.filter(a =>
+    return approverList.filter(a =>
       a.name.toLowerCase().includes(q) ||
       a.role.toLowerCase().includes(q) ||
       a.department.toLowerCase().includes(q) ||
       a.employee_code.toLowerCase().includes(q)
     );
-  }, [approverSearch]);
+  }, [approverSearch, approverList]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'camera' | 'upload') => {
     const files = e.target.files;
@@ -268,6 +315,25 @@ export function LeaveManagementView({
         if (pJson.data.length > 0 && !selectedType) {
           setSelectedType(pJson.data[0].leave_type_id);
         }
+      }
+
+      // Fetch dynamic active supervisors / managers from DB
+      try {
+        const apprRes = await fetch('/api/people/employees?is_approver=true&limit=100');
+        const apprJson = await apprRes.json();
+        if (apprJson.data && apprJson.data.length > 0) {
+          const mapped: ApproverOption[] = apprJson.data.map((e: any) => ({
+            id: e.id,
+            employee_code: e.employee_code,
+            name: `คุณ${e.first_name} ${e.last_name}`,
+            role: e.position_name || e.system_role,
+            department: e.department_name || '',
+            email: e.email || `${e.employee_code.toLowerCase()}@cosmediva.co.th`
+          }));
+          setApproverList(mapped);
+        }
+      } catch (e) {
+        // fallback to DEFAULT_APPROVERS
       }
     } catch (err) {
       console.error(err);
@@ -977,7 +1043,7 @@ export function LeaveManagementView({
                     onChange={(e) => setSelectedApproverId(e.target.value)}
                     className="w-full pl-3 pr-8 py-2.5 rounded-xl border border-slate-200 bg-white font-medium text-slate-800 text-xs shadow-sm focus:ring-2 focus:ring-amber-500 focus:border-amber-500 appearance-none"
                   >
-                    {DEFAULT_APPROVERS.map((appr) => (
+                    {approverList.map((appr) => (
                       <option key={appr.id} value={appr.id}>
                         {appr.name} — {appr.role} ({appr.department})
                       </option>
