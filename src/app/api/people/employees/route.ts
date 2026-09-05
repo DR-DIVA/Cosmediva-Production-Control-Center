@@ -24,7 +24,22 @@ export async function GET(request: Request) {
         p.job_level as position_level,
         s.first_name as supervisor_first_name,
         s.last_name as supervisor_last_name,
-        s.employee_code as supervisor_code
+        s.employee_code as supervisor_code,
+        CASE 
+          WHEN e.hire_date IS NOT NULL THEN (CURRENT_DATE - e.hire_date::date)
+          ELSE NULL 
+        END as days_employed,
+        CASE 
+          WHEN e.employment_status = 'Probation' THEN
+            CASE
+              WHEN (CURRENT_DATE - e.hire_date::date) < 30 THEN '<30 วัน'
+              WHEN (CURRENT_DATE - e.hire_date::date) < 60 THEN '<60 วัน'
+              WHEN (CURRENT_DATE - e.hire_date::date) < 90 THEN '<90 วัน'
+              WHEN (CURRENT_DATE - e.hire_date::date) < 119 THEN '<119 วัน'
+              ELSE '≥119 วัน'
+            END
+          ELSE NULL
+        END as probation_bracket
       FROM employees e
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN work_areas w ON e.work_area_id = w.id
@@ -60,9 +75,23 @@ export async function GET(request: Request) {
     }
 
     if (status) {
-      query += ` AND e.employment_status = $${idx}`;
-      params.push(status);
-      idx++;
+      if (status === 'Probation') {
+        query += ` AND e.employment_status = 'Probation'`;
+      } else if (status === 'Probation_lt30') {
+        query += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) < 30`;
+      } else if (status === 'Probation_lt60') {
+        query += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 30 AND (CURRENT_DATE - e.hire_date::date) < 60`;
+      } else if (status === 'Probation_lt90') {
+        query += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 60 AND (CURRENT_DATE - e.hire_date::date) < 90`;
+      } else if (status === 'Probation_lt119') {
+        query += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 90 AND (CURRENT_DATE - e.hire_date::date) < 119`;
+      } else if (status === 'Probation_gte119') {
+        query += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 119`;
+      } else {
+        query += ` AND e.employment_status = $${idx}`;
+        params.push(status);
+        idx++;
+      }
     }
 
     if (role) {
@@ -108,9 +137,38 @@ export async function GET(request: Request) {
       countParams.push(departmentId);
       cIdx++;
     }
+    if (workAreaId) {
+      countQuery += ` AND e.work_area_id = $${cIdx}`;
+      countParams.push(workAreaId);
+      cIdx++;
+    }
     if (employmentType) {
       countQuery += ` AND e.employment_type = $${cIdx}`;
       countParams.push(employmentType);
+      cIdx++;
+    }
+    if (status) {
+      if (status === 'Probation') {
+        countQuery += ` AND e.employment_status = 'Probation'`;
+      } else if (status === 'Probation_lt30') {
+        countQuery += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) < 30`;
+      } else if (status === 'Probation_lt60') {
+        countQuery += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 30 AND (CURRENT_DATE - e.hire_date::date) < 60`;
+      } else if (status === 'Probation_lt90') {
+        countQuery += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 60 AND (CURRENT_DATE - e.hire_date::date) < 90`;
+      } else if (status === 'Probation_lt119') {
+        countQuery += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 90 AND (CURRENT_DATE - e.hire_date::date) < 119`;
+      } else if (status === 'Probation_gte119') {
+        countQuery += ` AND e.employment_status = 'Probation' AND (CURRENT_DATE - e.hire_date::date) >= 119`;
+      } else {
+        countQuery += ` AND e.employment_status = $${cIdx}`;
+        countParams.push(status);
+        cIdx++;
+      }
+    }
+    if (role) {
+      countQuery += ` AND e.system_role = $${cIdx}`;
+      countParams.push(role);
       cIdx++;
     }
 
@@ -163,6 +221,20 @@ export async function GET(request: Request) {
           ELSE 99
         END, work_area_name ASC
     `);
+
+    const probationCountsRes = await queryPeople(`
+      SELECT 
+        COUNT(CASE WHEN (CURRENT_DATE - hire_date::date) < 30 THEN 1 END)::int as lt30,
+        COUNT(CASE WHEN (CURRENT_DATE - hire_date::date) >= 30 AND (CURRENT_DATE - hire_date::date) < 60 THEN 1 END)::int as lt60,
+        COUNT(CASE WHEN (CURRENT_DATE - hire_date::date) >= 60 AND (CURRENT_DATE - hire_date::date) < 90 THEN 1 END)::int as lt90,
+        COUNT(CASE WHEN (CURRENT_DATE - hire_date::date) >= 90 AND (CURRENT_DATE - hire_date::date) < 119 THEN 1 END)::int as lt119,
+        COUNT(CASE WHEN (CURRENT_DATE - hire_date::date) >= 119 THEN 1 END)::int as gte119,
+        COUNT(*)::int as total
+      FROM employees
+      WHERE deleted_at IS NULL AND employment_status = 'Probation'
+    `);
+    const probationCounts = probationCountsRes.rows[0] || { lt30: 0, lt60: 0, lt90: 0, lt119: 0, gte119: 0, total: 0 };
+
     const roles = ['Employee', 'Supervisor', 'Manager', 'HR Officer', 'HR Manager', 'Executive', 'Admin'];
 
     return NextResponse.json({
@@ -172,6 +244,7 @@ export async function GET(request: Request) {
       filters: {
         departments: depts.rows,
         workAreas: areas.rows,
+        probationCounts,
         roles
       }
     });

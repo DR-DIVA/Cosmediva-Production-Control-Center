@@ -22,6 +22,21 @@ export async function GET(request: Request) {
           e.system_role as "สิทธิ์ในระบบ",
           e.employment_type as "ประเภทการจ้าง",
           e.employment_status as "สถานะ",
+          CASE 
+            WHEN e.hire_date IS NOT NULL THEN (CURRENT_DATE - e.hire_date::date)
+            ELSE NULL 
+          END as "อายุงาน (วัน)",
+          CASE 
+            WHEN e.employment_status = 'Probation' THEN
+              CASE
+                WHEN (CURRENT_DATE - e.hire_date::date) < 30 THEN '<30 วัน'
+                WHEN (CURRENT_DATE - e.hire_date::date) < 60 THEN '<60 วัน (30-59 วัน)'
+                WHEN (CURRENT_DATE - e.hire_date::date) < 90 THEN '<90 วัน (60-89 วัน)'
+                WHEN (CURRENT_DATE - e.hire_date::date) < 119 THEN '<119 วัน (90-118 วัน)'
+                ELSE '≥119 วัน (ครบกำหนด)'
+              END
+            ELSE '-'
+          END as "ช่วงทดลองงาน",
           e.hire_date as "วันที่เริ่มงาน",
           e.email as "อีเมล",
           e.phone as "เบอร์โทรศัพท์"

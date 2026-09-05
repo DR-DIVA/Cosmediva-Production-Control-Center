@@ -28,6 +28,7 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [workAreas, setWorkAreas] = useState<any[]>([]);
+  const [probationCounts, setProbationCounts] = useState<any>({ lt30: 0, lt60: 0, lt90: 0, lt119: 0, gte119: 0, total: 0 });
   const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editFormData, setEditFormData] = useState<any>({});
@@ -84,6 +85,7 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
         setTotal(json.total);
         if (json.filters?.departments) setDepartments(json.filters.departments);
         if (json.filters?.workAreas) setWorkAreas(json.filters.workAreas);
+        if (json.filters?.probationCounts) setProbationCounts(json.filters.probationCounts);
       }
     } catch (err: any) {
       toast.error('ไม่สามารถโหลดข้อมูลพนักงานได้');
@@ -436,7 +438,15 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
         >
           <option value="">สถานะทั้งหมด</option>
           <option value="Permanent">บรรจุแล้ว (Permanent)</option>
-          <option value="Probation">ทดลองงาน (Probation)</option>
+          <optgroup label="── สถานะทดลองงาน (Probation) ──">
+            <option value="Probation">ทดลองงานทั้งหมด ({probationCounts.total || 0})</option>
+            <option value="Probation_lt30">ทดลองงาน &lt; 30 วัน ({probationCounts.lt30 || 0})</option>
+            <option value="Probation_lt60">ทดลองงาน &lt; 60 วัน (30-59 วัน) ({probationCounts.lt60 || 0})</option>
+            <option value="Probation_lt90">ทดลองงาน &lt; 90 วัน (60-89 วัน) ({probationCounts.lt90 || 0})</option>
+            <option value="Probation_lt119">ทดลองงาน &lt; 119 วัน (90-118 วัน) ({probationCounts.lt119 || 0})</option>
+            <option value="Probation_gte119">ทดลองงาน ≥ 119 วัน (ครบกำหนด) ({probationCounts.gte119 || 0})</option>
+          </optgroup>
+          <option value="Contract">สัญญาจ้าง (Contract)</option>
           <option value="Active">ปฏิบัติงานปกติ (Active)</option>
         </select>
 
@@ -538,10 +548,37 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
                         {emp.system_role}
                       </span>
                     </td>
-                    <td className="py-3 px-3 text-center">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800">
-                        {emp.employment_status || 'Permanent'}
-                      </span>
+                    <td className="py-3 px-3 text-center whitespace-nowrap">
+                      {emp.employment_status === 'Probation' ? (
+                        <div className="inline-flex flex-col items-center">
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            emp.probation_bracket === '<30 วัน' ? 'bg-sky-50 text-sky-700 border-sky-200' :
+                            emp.probation_bracket === '<60 วัน' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            emp.probation_bracket === '<90 วัน' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                            emp.probation_bracket === '<119 วัน' ? 'bg-orange-50 text-orange-700 border-orange-200' :
+                            'bg-rose-50 text-rose-700 border-rose-200'
+                          }`}>
+                            ทดลองงาน {emp.probation_bracket || ''}
+                          </span>
+                          {emp.days_employed !== null && emp.days_employed !== undefined && (
+                            <span className="text-[9px] text-slate-400 mt-0.5 font-medium">
+                              อายุงาน {emp.days_employed} วัน
+                            </span>
+                          )}
+                        </div>
+                      ) : emp.employment_status === 'Contract' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          สัญญาจ้าง
+                        </span>
+                      ) : emp.employment_status === 'Resigned' ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                          ลาออกแล้ว
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          บรรจุแล้ว
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       <div className="flex items-center justify-center gap-1">
@@ -878,10 +915,27 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
                     <div className="grid grid-cols-2 gap-2 text-slate-600">
                       <div>แผนก: <strong className="text-slate-800">{selectedEmp.department_name || '-'}</strong></div>
                       <div>พื้นที่ปฏิบัติงาน: <strong className="text-slate-800">{selectedEmp.work_area_name || 'สำนักงาน'}</strong></div>
-                      <div>ประเภทการจ้าง: <strong className="text-slate-800">{selectedEmp.employment_type}</strong></div>
-                      <div>สถานะ: <strong className="text-emerald-700">{selectedEmp.employment_status || 'Permanent'}</strong></div>
+                      <div>
+                        สถานะ: {selectedEmp.employment_status === 'Probation' ? (
+                          <span className={`font-bold ${selectedEmp.probation_bracket === '≥119 วัน' ? 'text-rose-600' : 'text-amber-700'}`}>
+                            ทดลองงาน ({selectedEmp.probation_bracket || 'Probation'})
+                          </span>
+                        ) : (
+                          <strong className="text-emerald-700">{selectedEmp.employment_status || 'Permanent'}</strong>
+                        )}
+                      </div>
                       <div>หัวหน้างาน: <strong className="text-slate-800">{selectedEmp.supervisor_first_name ? `${selectedEmp.supervisor_first_name} ${selectedEmp.supervisor_last_name}` : '-'}</strong></div>
                       <div>วันที่เริ่มงาน: <strong className="text-slate-800">{selectedEmp.hire_date ? new Date(selectedEmp.hire_date).toLocaleDateString('th-TH') : '-'}</strong></div>
+                      {selectedEmp.employment_status === 'Probation' && (
+                        <div>
+                          อายุงานปัจจุบัน: <strong className="text-slate-800">{selectedEmp.days_employed !== null && selectedEmp.days_employed !== undefined ? `${selectedEmp.days_employed} วัน` : '-'}</strong>
+                          {selectedEmp.days_employed !== null && selectedEmp.days_employed !== undefined && selectedEmp.days_employed < 119 && (
+                            <span className="text-[10px] text-amber-700 block font-medium">
+                              (เหลือเวลาประเมินอีก {119 - selectedEmp.days_employed} วัน ก่อนครบกำหนด 119 วัน)
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
 
