@@ -1,10 +1,7 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { 
-  Users, Bell, Globe, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, 
-  ShieldAlert, UserCheck, Calendar, Sparkles, Building2, Clock, Check, Grid
-} from 'lucide-react';
+import React, { useState } from 'react';
+import { Users, Bell, ChevronDown, Sparkles } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/peopleTranslations';
 
 export interface Persona {
@@ -115,62 +112,51 @@ export function PeopleHeader({
   const t = TRANSLATIONS[lang];
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
-  const [showAllTabsMenu, setShowAllTabsMenu] = useState(false);
 
-  const tabsContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  // Row 1: Core Daily Operations
+  const row1Tabs = [
+    { id: 'dashboard', label: t.navHome, icon: '🏠' },
+    { id: 'employees', label: t.navEmployees, icon: '👥' },
+    { id: 'leave', label: t.navLeave, icon: '🏖️' },
+    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', icon: '⏰' },
+    { id: 'approvals', label: t.navApprovals, icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
+    { id: 'attendance', label: t.navAttendance, icon: '⏱️' },
+  ];
 
-  const tabs = [
-    { id: 'dashboard', label: t.navHome, shortLabel: 'หน้าแรก', icon: '🏠' },
-    { id: 'employees', label: t.navEmployees, shortLabel: 'พนักงาน', icon: '👥' },
-    { id: 'leave', label: t.navLeave, shortLabel: 'การลา', icon: '🏖️' },
-    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', shortLabel: 'OT & ต้นทุน', icon: '⏰' },
-    { id: 'approvals', label: t.navApprovals, shortLabel: 'อนุมัติ', icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
-    { id: 'cases', label: 'เคส & หลักฐาน (Cases)', shortLabel: 'เคสงาน', icon: '📁', restricted: ['Employee'] },
-    { id: 'attendance', label: t.navAttendance, shortLabel: 'เวลาทำงาน', icon: '⏱️' },
-    { id: 'exceptions', label: t.navExceptions, shortLabel: 'ข้อยกเว้น', icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },
-    { id: 'ai_workforce', label: 'AI Workforce', shortLabel: 'AI งาน', icon: '🤖', restricted: ['Employee'] },
-    { id: 'policies', label: t.navPolicies, shortLabel: 'นโยบาย', icon: '⚙️', restricted: ['Employee'] },
-    { id: 'reports', label: t.navReports, shortLabel: 'รายงาน', icon: '📊' },
+  // Row 2: Management, Oversight & Intelligence
+  const row2Tabs = [
+    { id: 'exceptions', label: t.navExceptions, icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },
+    { id: 'cases', label: 'เคส & หลักฐาน (Cases)', icon: '📁', restricted: ['Employee'] },
+    { id: 'ai_workforce', label: 'AI Workforce', icon: '🤖', restricted: ['Employee'] },
+    { id: 'policies', label: t.navPolicies, icon: '⚙️', restricted: ['Employee'] },
+    { id: 'reports', label: t.navReports, icon: '📊' },
   ].filter(tab => !tab.restricted || !tab.restricted.includes(currentPersona.role));
 
-  const checkScroll = useCallback(() => {
-    if (tabsContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = tabsContainerRef.current;
-      setCanScrollLeft(scrollLeft > 6);
-      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
-    }
-  }, []);
-
-  useEffect(() => {
-    checkScroll();
-    const el = tabsContainerRef.current;
-    if (el) {
-      el.addEventListener('scroll', checkScroll, { passive: true });
-      window.addEventListener('resize', checkScroll);
-      return () => {
-        el.removeEventListener('scroll', checkScroll);
-        window.removeEventListener('resize', checkScroll);
-      };
-    }
-  }, [checkScroll, tabs.length]);
-
-  // When active tab changes, smoothly scroll the active tab into view
-  useEffect(() => {
-    if (tabsContainerRef.current) {
-      const activeBtn = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTab}"]`) as HTMLElement;
-      if (activeBtn) {
-        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-      }
-    }
-  }, [activeTab]);
-
-  const handleScroll = (direction: 'left' | 'right') => {
-    if (tabsContainerRef.current) {
-      const offset = direction === 'left' ? -240 : 240;
-      tabsContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
-    }
+  const renderTabButton = (tab: { id: string; label: string; icon: string; badge?: number }) => {
+    const isActive = activeTab === tab.id;
+    return (
+      <button
+        key={tab.id}
+        onClick={() => onSelectTab(tab.id)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+          isActive
+            ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+            : 'bg-white hover:bg-amber-50/80 text-slate-700 hover:text-amber-800 border border-slate-200/80 hover:border-amber-300/80 shadow-2xs'
+        }`}
+      >
+        <span className="text-sm">{tab.icon}</span>
+        <span>{tab.label}</span>
+        {tab.badge !== undefined && tab.badge > 0 && (
+          <span
+            className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+              isActive ? 'bg-white text-amber-700' : 'bg-amber-100 text-amber-800'
+            }`}
+          >
+            {tab.badge}
+          </span>
+        )}
+      </button>
+    );
   };
 
   return (
@@ -320,118 +306,24 @@ export function PeopleHeader({
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs Bar with Full Responsive Controls & Smooth Scroll */}
-      <div className="relative bg-slate-50/75 border-t border-slate-200/80 group">
-        {/* Left Scroll Button & Fade Mask */}
-        {canScrollLeft && (
-          <>
-            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-slate-100 via-slate-100/90 to-transparent z-10" />
-            <button
-              type="button"
-              onClick={() => handleScroll('left')}
-              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-300 transition-all active:scale-95 cursor-pointer"
-              title="เลื่อนเมนูไปทางซ้าย"
-              aria-label="Scroll left"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-          </>
-        )}
-
-        {/* Tab List */}
-        <div
-          ref={tabsContainerRef}
-          className="px-3 sm:px-6 py-2 flex items-center gap-1.5 overflow-x-auto scroll-smooth tabs-scrollbar select-none"
-        >
-          {tabs.map(tab => {
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                data-tab-id={tab.id}
-                onClick={() => onSelectTab(tab.id)}
-                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
-                  isActive
-                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30 scale-[1.02]'
-                    : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
-                }`}
-              >
-                <span className="text-sm">{tab.icon}</span>
-                <span className="hidden sm:inline">{tab.label}</span>
-                <span className="sm:hidden">{tab.shortLabel}</span>
-                {tab.badge !== undefined && tab.badge > 0 && (
-                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                    isActive ? 'bg-white text-amber-700' : 'bg-amber-100 text-amber-800'
-                  }`}>
-                    {tab.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-
-          {/* Quick Jump Dropdown Menu (Direct access to all tabs) */}
-          <div className="relative shrink-0 ml-1">
-            <button
-              type="button"
-              onClick={() => setShowAllTabsMenu(!showAllTabsMenu)}
-              className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-amber-700 hover:bg-amber-50 border border-dashed border-slate-300 hover:border-amber-300 transition whitespace-nowrap cursor-pointer"
-              title="ดูเมนูทั้งหมด (All Tabs Menu)"
-            >
-              <Grid className="w-3.5 h-3.5 text-slate-500" />
-              <span className="hidden md:inline text-[11px]">ทั้งหมด</span>
-              <ChevronDown className="w-3 h-3 text-slate-400" />
-            </button>
-
-            {/* Dropdown Menu for Direct Tab Jumping */}
-            {showAllTabsMenu && (
-              <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 divide-y divide-slate-100">
-                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                  เมนูทั้งหมด ({tabs.length} เมนู)
-                </div>
-                <div className="max-h-72 overflow-y-auto py-1">
-                  {tabs.map(tab => (
-                    <button
-                      key={tab.id}
-                      onClick={() => {
-                        onSelectTab(tab.id);
-                        setShowAllTabsMenu(false);
-                      }}
-                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between hover:bg-amber-50/70 transition text-xs cursor-pointer ${
-                        activeTab === tab.id ? 'bg-amber-50 font-bold text-amber-900' : 'text-slate-700'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span>{tab.icon}</span>
-                        <span>{tab.label}</span>
-                      </div>
-                      {tab.badge !== undefined && tab.badge > 0 && (
-                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
-                          {tab.badge}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+      {/* Navigation Sub-Tabs Bar: 2 Clear Rows (Zero Scrollbar, Fully Legible) */}
+      <div className="bg-slate-50/90 border-t border-slate-200/80 p-2.5 sm:p-3 sm:px-6 space-y-2">
+        {/* Row 1: Core Daily Operations */}
+        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-200/70 px-2 py-0.5 rounded-md hidden md:inline-flex shrink-0">
+            ระบบงานหลัก
+          </span>
+          {row1Tabs.map(renderTabButton)}
         </div>
 
-        {/* Right Scroll Button & Fade Mask */}
-        {canScrollRight && (
-          <>
-            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-100 via-slate-100/90 to-transparent z-10" />
-            <button
-              type="button"
-              onClick={() => handleScroll('right')}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-300 transition-all active:scale-95 cursor-pointer animate-pulse"
-              title="เลื่อนเมนูไปทางขวา"
-              aria-label="Scroll right"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </>
+        {/* Row 2: Management, Oversight & Intelligence */}
+        {row2Tabs.length > 0 && (
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 pt-1.5 border-t border-slate-200/60">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider bg-slate-200/70 px-2 py-0.5 rounded-md hidden md:inline-flex shrink-0">
+              ควบคุม &amp; วิเคราะห์
+            </span>
+            {row2Tabs.map(renderTabButton)}
+          </div>
         )}
       </div>
     </div>
