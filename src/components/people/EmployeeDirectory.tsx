@@ -834,7 +834,7 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
                       <label className="text-[11px] font-semibold text-slate-600 block mb-1">สถานที่ปฏิบัติงาน (Location)</label>
                       <input
                         type="text"
-                        value={editFormData.work_location || 'โรงงานคอสเมดิวา ปทุมธานี'}
+                        value={editFormData.work_location || (editFormData.employee_code?.startsWith('BEC') ? 'โรงงานบีคอสแล็ป ส่วนงานผลิตสบู่' : 'โรงงานคอสเมดิวา สำนักงานใหญ่')}
                         onChange={(e) => setEditFormData({ ...editFormData, work_location: e.target.value })}
                         className="w-full px-2.5 py-1.5 rounded-xl border border-slate-200 bg-white text-xs font-semibold"
                       />
@@ -891,7 +891,7 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
                       <div>อีเมล: <strong className="text-slate-800">{selectedEmp.email || '-'}</strong></div>
                       <div>เบอร์โทร: <strong className="text-slate-800">{selectedEmp.phone || '-'}</strong></div>
                       <div>ภาษาใช้งาน: <strong className="text-slate-800">{selectedEmp.preferred_language || 'th'}</strong></div>
-                      <div>สถานที่: <strong className="text-slate-800">{selectedEmp.work_location || 'โรงงานคอสเมดิวา ปทุมธานี'}</strong></div>
+                      <div>สถานที่: <strong className="text-slate-800">{selectedEmp.work_location || (selectedEmp.employee_code?.startsWith('BEC') ? 'โรงงานบีคอสแล็ป ส่วนงานผลิตสบู่' : 'โรงงานคอสเมดิวา สำนักงานใหญ่')}</strong></div>
                     </div>
                   </div>
                 </div>
