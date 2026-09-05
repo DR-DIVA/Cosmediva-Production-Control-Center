@@ -29,7 +29,7 @@ export async function GET(request: Request) {
       JOIN employees e ON ae.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
       LEFT JOIN work_areas w ON e.work_area_id = w.id
-      WHERE ae.work_date = $1 AND ae.is_resolved = $2
+      WHERE ae.work_date = $1 AND ae.is_resolved = $2 AND e.deleted_at IS NULL AND e.is_active = TRUE
     `;
     const params: any[] = [date, isResolved];
     let idx = 3;
@@ -61,18 +61,19 @@ export async function GET(request: Request) {
       FROM attendance_adjustments adj
       JOIN employees e ON adj.employee_id = e.id
       LEFT JOIN departments d ON e.department_id = d.id
-      WHERE adj.work_date = $1
+      WHERE adj.work_date = $1 AND e.deleted_at IS NULL AND e.is_active = TRUE
       ORDER BY adj.created_at DESC;
     `, [date]);
 
     // Breakdown stats
     const breakdownRes = await queryPeople(`
       SELECT 
-        exception_type,
+        ae.exception_type,
         COUNT(*) as count
-      FROM attendance_exceptions
-      WHERE work_date = $1 AND is_resolved = FALSE
-      GROUP BY exception_type;
+      FROM attendance_exceptions ae
+      JOIN employees e ON ae.employee_id = e.id
+      WHERE ae.work_date = $1 AND ae.is_resolved = FALSE AND e.deleted_at IS NULL AND e.is_active = TRUE
+      GROUP BY ae.exception_type;
     `, [date]);
 
     const breakdown = {

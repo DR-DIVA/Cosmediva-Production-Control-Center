@@ -358,6 +358,22 @@ export async function PUT(request: Request) {
 
     if (updates.is_soft_delete) {
       await queryPeople('UPDATE employees SET deleted_at = NOW(), is_active = FALSE WHERE id = $1', [id]);
+      await queryPeople(`
+        UPDATE attendance_exceptions 
+        SET is_resolved = TRUE, 
+            resolution_action = 'EMPLOYEE_RESIGNED_DELETED',
+            resolved_at = NOW()
+        WHERE employee_id = $1 AND is_resolved = FALSE;
+      `, [id]);
+      await queryPeople(`
+        UPDATE action_items 
+        SET status = 'CANCELLED', completed_at = NOW() 
+        WHERE (related_entity_type = 'attendance_exceptions' AND related_entity_id IN (
+          SELECT id FROM attendance_exceptions WHERE employee_id = $1
+        )) OR (related_entity_type = 'attendance_adjustments' AND related_entity_id IN (
+          SELECT id FROM attendance_adjustments WHERE employee_id = $1
+        ));
+      `, [id]);
       return NextResponse.json({ success: true, message: 'Soft deleted employee successfully' });
     }
 

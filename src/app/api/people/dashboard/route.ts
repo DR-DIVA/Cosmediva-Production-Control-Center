@@ -20,7 +20,7 @@ export async function GET(request: Request) {
         COUNT(DISTINCT CASE WHEN ad.attendance_status IN ('Missing Clock In', 'Missing Clock Out', 'Missing Punch') THEN e.id END) as missing_punch_today
       FROM employees e
       LEFT JOIN attendance_daily ad ON e.id = ad.employee_id AND ad.work_date = $1
-      WHERE e.deleted_at IS NULL;
+      WHERE e.deleted_at IS NULL AND e.is_active = TRUE;
     `, [date]);
 
     const kpi = kpiRes.rows[0];
@@ -39,8 +39,9 @@ export async function GET(request: Request) {
     // Unresolved exceptions count
     const exceptionsRes = await queryPeople(`
       SELECT COUNT(*) as exc_count 
-      FROM attendance_exceptions 
-      WHERE work_date = $1 AND is_resolved = FALSE;
+      FROM attendance_exceptions ae
+      JOIN employees e ON ae.employee_id = e.id
+      WHERE ae.work_date = $1 AND ae.is_resolved = FALSE AND e.deleted_at IS NULL AND e.is_active = TRUE;
     `, [date]);
     const unresolvedExceptionsCount = parseInt(exceptionsRes.rows[0]?.exc_count || '0');
 
@@ -57,7 +58,7 @@ export async function GET(request: Request) {
         COUNT(CASE WHEN ad.attendance_status = 'Late' THEN 1 END) as late,
         ROUND((COUNT(CASE WHEN ad.attendance_status IN ('Present', 'Late') THEN 1 END)::numeric / GREATEST(1, COUNT(e.id))::numeric) * 100, 1) as attendance_rate
       FROM departments d
-      JOIN employees e ON d.id = e.department_id AND e.deleted_at IS NULL
+      JOIN employees e ON d.id = e.department_id AND e.deleted_at IS NULL AND e.is_active = TRUE
       LEFT JOIN attendance_daily ad ON e.id = ad.employee_id AND ad.work_date = $1
       WHERE d.is_active = TRUE
       GROUP BY d.id, d.department_code, d.department_name
@@ -77,7 +78,7 @@ export async function GET(request: Request) {
         COUNT(CASE WHEN ad.attendance_status = 'Leave' THEN 1 END) as on_leave,
         COUNT(CASE WHEN ad.attendance_status = 'Absent' THEN 1 END) as absent
       FROM work_areas w
-      LEFT JOIN employees e ON w.id = e.work_area_id AND e.deleted_at IS NULL
+      LEFT JOIN employees e ON w.id = e.work_area_id AND e.deleted_at IS NULL AND e.is_active = TRUE
       LEFT JOIN attendance_daily ad ON e.id = ad.employee_id AND ad.work_date = $1
       WHERE w.is_active = TRUE
       GROUP BY w.id, w.work_area_code, w.work_area_name, w.area_type, w.critical_skill_needed

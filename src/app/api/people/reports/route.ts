@@ -78,7 +78,7 @@ export async function GET(request: Request) {
         JOIN employees e ON ad.employee_id = e.id
         LEFT JOIN departments d ON e.department_id = d.id
         LEFT JOIN work_areas w ON e.work_area_id = w.id
-        WHERE ad.work_date = $1
+        WHERE ad.work_date = $1 AND e.deleted_at IS NULL AND e.is_active = TRUE
         ORDER BY ad.late_minutes DESC, e.employee_code ASC;
       `, [date]);
 
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
         JOIN employees e ON lb.employee_id = e.id
         JOIN leave_types lt ON lb.leave_type_id = lt.id
         LEFT JOIN departments d ON e.department_id = d.id
-        WHERE lb.year = 2026 AND e.deleted_at IS NULL
+        WHERE lb.year = 2026 AND e.deleted_at IS NULL AND e.is_active = TRUE
         ORDER BY e.employee_code ASC, lt.name_th ASC;
       `);
 
@@ -140,7 +140,7 @@ export async function GET(request: Request) {
         FROM attendance_exceptions ae
         JOIN employees e ON ae.employee_id = e.id
         LEFT JOIN departments d ON e.department_id = d.id
-        WHERE ae.work_date = $1
+        WHERE ae.work_date = $1 AND e.deleted_at IS NULL AND e.is_active = TRUE
         ORDER BY ae.severity DESC;
       `, [date]);
 

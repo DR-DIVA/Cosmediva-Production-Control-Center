@@ -35,7 +35,7 @@ export async function GET(request: Request) {
       LEFT JOIN work_areas w ON e.work_area_id = w.id
       LEFT JOIN positions pos ON e.position_id = pos.id
       LEFT JOIN shifts s ON ad.shift_id = s.id
-      WHERE ad.work_date = $1
+      WHERE ad.work_date = $1 AND e.deleted_at IS NULL AND e.is_active = TRUE
     `;
     const params: any[] = [date];
     let idx = 2;
@@ -70,18 +70,19 @@ export async function GET(request: Request) {
     const statsRes = await queryPeople(`
       SELECT 
         COUNT(*) as total_scheduled,
-        COUNT(CASE WHEN attendance_status = 'Present' THEN 1 END) as total_present,
-        COUNT(CASE WHEN attendance_status = 'Late' THEN 1 END) as total_late,
-        COUNT(CASE WHEN late_rule_category = 'LATE_LE_15' THEN 1 END) as total_late_le15,
-        COUNT(CASE WHEN late_rule_category = 'LATE_GT_15' THEN 1 END) as total_late_gt15,
-        COALESCE(SUM(late_points), 0)::int as total_late_points,
-        COALESCE(SUM(unpaid_leave_hours), 0)::numeric as total_unpaid_leave_hours,
-        COUNT(CASE WHEN attendance_status = 'Leave' THEN 1 END) as total_leave,
-        COUNT(CASE WHEN attendance_status = 'Absent' THEN 1 END) as total_absent,
-        COUNT(CASE WHEN attendance_status IN ('Missing Clock In', 'Missing Clock Out', 'Missing Punch') THEN 1 END) as total_missing,
-        COUNT(CASE WHEN has_exception = TRUE THEN 1 END) as total_exceptions
-      FROM attendance_daily 
-      WHERE work_date = $1;
+        COUNT(CASE WHEN ad.attendance_status = 'Present' THEN 1 END) as total_present,
+        COUNT(CASE WHEN ad.attendance_status = 'Late' THEN 1 END) as total_late,
+        COUNT(CASE WHEN ad.late_rule_category = 'LATE_LE_15' THEN 1 END) as total_late_le15,
+        COUNT(CASE WHEN ad.late_rule_category = 'LATE_GT_15' THEN 1 END) as total_late_gt15,
+        COALESCE(SUM(ad.late_points), 0)::int as total_late_points,
+        COALESCE(SUM(ad.unpaid_leave_hours), 0)::numeric as total_unpaid_leave_hours,
+        COUNT(CASE WHEN ad.attendance_status = 'Leave' THEN 1 END) as total_leave,
+        COUNT(CASE WHEN ad.attendance_status = 'Absent' THEN 1 END) as total_absent,
+        COUNT(CASE WHEN ad.attendance_status IN ('Missing Clock In', 'Missing Clock Out', 'Missing Punch') THEN 1 END) as total_missing,
+        COUNT(CASE WHEN ad.has_exception = TRUE THEN 1 END) as total_exceptions
+      FROM attendance_daily ad
+      JOIN employees e ON ad.employee_id = e.id
+      WHERE ad.work_date = $1 AND e.deleted_at IS NULL AND e.is_active = TRUE;
     `, [date]);
 
     const stats = statsRes.rows[0] || {
