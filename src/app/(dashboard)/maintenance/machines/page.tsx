@@ -51,6 +51,59 @@ export default function MachinesMasterPage() {
     fetchMachines()
   }, [categoryFilter, statusFilter, criticalityFilter])
 
+  const handleBulkPrint = () => {
+    if (machines.length === 0) return
+    const printWindow = window.open('', '', 'width=900,height=800')
+    if (!printWindow) return
+
+    const badgesHtml = machines.map(m => {
+      const reportUrl = `${window.location.origin}/maintenance/report/${m.machine_code}`
+      const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=6&data=${encodeURIComponent(reportUrl)}`
+      return `
+        <div class="badge-card">
+          <div class="header">CosmeFlow Maintenance • Asset QR</div>
+          <div class="title">${m.machine_code}</div>
+          <div class="subtitle">${m.machine_name}<br/><b>${m.production_area || m.department_name || ''}</b></div>
+          <img class="qr-img" src="${qrImageUrl}" alt="QR" />
+          <div class="emergency">🚨 สแกนแจ้งเครื่องเสีย (≤ 60 วินาที)</div>
+          <div class="footer">สแกนดูประวัติเครื่องจักร & Maintenance 360°</div>
+        </div>
+      `
+    }).join('')
+
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>พิมพ์ป้าย QR เครื่องจักรทั้งหมด - CosmeFlow</title>
+          <style>
+            body { font-family: sans-serif; margin: 20px; background: #fff; }
+            .grid-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+            .badge-card { border: 2.5px solid #222; border-radius: 14px; padding: 18px; text-align: center; page-break-inside: avoid; background: #fff; }
+            .header { font-size: 11px; font-weight: bold; letter-spacing: 1px; color: #666; text-transform: uppercase; margin-bottom: 2px; }
+            .title { font-size: 26px; font-weight: 900; margin: 4px 0; color: #111; }
+            .subtitle { font-size: 12px; color: #444; margin-bottom: 12px; line-height: 1.3; min-height: 32px; }
+            .qr-img { width: 170px; height: 170px; margin: 0 auto; display: block; }
+            .emergency { color: #dc2626; font-size: 12px; font-weight: bold; margin-top: 10px; }
+            .footer { margin-top: 8px; font-size: 11px; font-weight: bold; background: #f3f4f6; padding: 6px; border-radius: 6px; color: #374151; }
+            @media print {
+              body { margin: 10mm; }
+              .grid-container { gap: 15mm; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="grid-container">
+            ${badgesHtml}
+          </div>
+          <script>
+            window.onload = function() { window.print(); }
+          </script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   const categories = ['all', 'Mixing', 'Filling', 'Capping', 'Labeling', 'Utility']
 
   return (
@@ -89,17 +142,14 @@ export default function MachinesMasterPage() {
             ))}
           </select>
 
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="h-10 px-3 rounded-xl text-xs font-bold bg-stone-50 border border-stone-200 text-stone-700"
+          <Button
+            type="button"
+            onClick={handleBulkPrint}
+            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-[#2A2521] hover:bg-stone-800 text-white shadow-sm flex items-center gap-1.5"
           >
-            <option value="all">ทุกสถานะ</option>
-            <option value="Running">🟢 Running (พร้อมเดินเครื่อง)</option>
-            <option value="Breakdown">🔴 Breakdown (เครื่องเสีย)</option>
-            <option value="Under Repair">🟡 Under Repair (กำลังซ่อม)</option>
-            <option value="Waiting Part">🟠 Waiting Part (รออะไหล่)</option>
-          </select>
+            <Printer className="w-3.5 h-3.5 text-[#D4AF37]" />
+            <span>พิมพ์ป้าย QR ทั้งหมด ({machines.length})</span>
+          </Button>
         </div>
       </div>
 
