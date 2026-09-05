@@ -16,7 +16,7 @@ interface TimeAttendanceViewProps {
 
 export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: TimeAttendanceViewProps) {
   const [subTab, setSubTab] = useState<'daily' | 'exceptions' | 'import'>(initialTab);
-  const [date, setDate] = useState('2026-09-05');
+  const [date, setDate] = useState('2026-08-25');
   const [attendanceList, setAttendanceList] = useState<any[]>([]);
   const [stats, setStats] = useState<any>({});
   const [exceptions, setExceptions] = useState<any[]>([]);
@@ -225,8 +225,8 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
           </button>
         </div>
 
-        {/* Date Selector */}
-        <div className="flex items-center gap-2">
+        {/* Date Selector & Presets */}
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-slate-500">วันที่:</span>
           <input
             type="date"
@@ -234,6 +234,32 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
             onChange={(e) => setDate(e.target.value)}
             className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50"
           />
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setDate('2026-08-25')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${date === '2026-08-25' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+            >
+              25 ส.ค. 69 (ล่าสุด)
+            </button>
+            <button
+              onClick={() => setDate('2026-08-24')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${date === '2026-08-24' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+            >
+              24 ส.ค. 69
+            </button>
+            <button
+              onClick={() => setDate('2026-07-31')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${date === '2026-07-31' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+            >
+              31 ก.ค. 69
+            </button>
+            <button
+              onClick={() => setDate('2026-09-05')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${date === '2026-09-05' ? 'bg-amber-500 text-slate-950 shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'}`}
+            >
+              วันนี้ (05 ก.ย.)
+            </button>
+          </div>
         </div>
       </div>
 
@@ -241,37 +267,44 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
       {subTab === 'daily' && (
         <div className="space-y-4">
           {/* Quick Stats Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-            <div className="bg-white p-3.5 rounded-2xl border border-slate-200 text-center">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            <div className="bg-white p-3 rounded-2xl border border-slate-200 text-center">
               <span className="text-[11px] text-slate-400 font-bold block">กำหนดเข้ากะ</span>
-              <span className="text-xl font-black text-slate-800">{stats.scheduled || 0}</span>
+              <span className="text-lg font-black text-slate-800">{stats.scheduled || 0}</span>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-emerald-200 bg-emerald-50/20 text-center">
-              <span className="text-[11px] text-emerald-700 font-bold block">มาทำงาน</span>
-              <span className="text-xl font-black text-emerald-600">{stats.present || 0}</span>
+            <div className="bg-white p-3 rounded-2xl border border-emerald-200 bg-emerald-50/20 text-center">
+              <span className="text-[11px] text-emerald-700 font-bold block">ตรงเวลา</span>
+              <span className="text-lg font-black text-emerald-600">{stats.present || 0}</span>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-amber-200 bg-amber-50/20 text-center">
-              <span className="text-[11px] text-amber-700 font-bold block">มาสาย (Late)</span>
-              <span className="text-xl font-black text-amber-600">{stats.late || 0}</span>
+            <div className="bg-white p-3 rounded-2xl border border-amber-200 bg-amber-50/20 text-center">
+              <span className="text-[11px] text-amber-700 font-bold block">สาย ≤15น. (1 แต้ม)</span>
+              <span className="text-lg font-black text-amber-600">{stats.lateLe15 ?? stats.late ?? 0}</span>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-blue-200 bg-blue-50/20 text-center">
-              <span className="text-[11px] text-blue-700 font-bold block">ลางาน (Leave)</span>
-              <span className="text-xl font-black text-blue-600">{stats.leave || 0}</span>
+            <div className="bg-white p-3 rounded-2xl border border-orange-200 bg-orange-50/20 text-center">
+              <span className="text-[11px] text-orange-700 font-bold block">สาย &gt;15น. (ตัด 2 ชม.)</span>
+              <span className="text-lg font-black text-orange-600">{stats.lateGt15 || 0}</span>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-rose-200 bg-rose-50/20 text-center">
+            <div className="bg-white p-3 rounded-2xl border border-rose-200 bg-rose-50/20 text-center">
               <span className="text-[11px] text-rose-700 font-bold block">ขาดงาน (Absent)</span>
-              <span className="text-xl font-black text-rose-600">{stats.absent || 0}</span>
+              <span className="text-lg font-black text-rose-600">{stats.absent || 0}</span>
             </div>
-            <div className="bg-white p-3.5 rounded-2xl border border-purple-200 bg-purple-50/20 text-center">
-              <span className="text-[11px] text-purple-700 font-bold block">ลืมสแกนนิ้ว</span>
-              <span className="text-xl font-black text-purple-600">{stats.missing || 0}</span>
+            <div className="bg-white p-3 rounded-2xl border border-purple-200 bg-purple-50/20 text-center">
+              <span className="text-[11px] text-purple-700 font-bold block">ไม่สแกนนิ้ว</span>
+              <span className="text-lg font-black text-purple-600">{stats.missing || 0}</span>
+            </div>
+            <div className="bg-white p-3 rounded-2xl border border-red-300 bg-red-50/30 text-center">
+              <span className="text-[11px] text-red-700 font-bold block">รวมตัดลากิจ (ชม.)</span>
+              <span className="text-lg font-black text-red-600">{stats.unpaidHours || 0} ชม.</span>
             </div>
           </div>
 
           {/* Attendance Table */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
             <div className="p-4 sm:px-6 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-extrabold text-slate-800 text-sm">รายการลงเวลาปฏิบัติงานจริง (Actual Punches)</h3>
+              <div>
+                <h3 className="font-extrabold text-slate-800 text-sm">รายการลงเวลาปฏิบัติงานจริง (Actual Punches)</h3>
+                <span className="text-[11px] text-slate-400">กฎสาย: ≤15 นาทีตัด 1 แต้ม (ครบ 4 แต้มตัด 2 ชม.) | &gt;15 นาทีตัดลากิจไม่รับค่าจ้าง 2 ชม. ทันที</span>
+              </div>
               <a
                 href={`/api/people/reports?type=DAILY_ATTENDANCE&date=${date}&format=csv`}
                 download
@@ -289,18 +322,21 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
                     <th className="py-3 px-4">รหัสพนักงาน</th>
                     <th className="py-3 px-4">ชื่อ - นามสกุล</th>
                     <th className="py-3 px-4">แผนก / สายงาน</th>
-                    <th className="py-3 px-3 text-center">เวลากำหนด</th>
-                    <th className="py-3 px-3 text-center">เวลาเข้า (In)</th>
-                    <th className="py-3 px-3 text-center">เวลาออก (Out)</th>
-                    <th className="py-3 px-3 text-center">สาย (นาที)</th>
-                    <th className="py-3 px-3 text-center">สถานะ</th>
-                    <th className="py-3 px-4 text-center">จัดการ</th>
+                    <th className="py-3 px-2 text-center">เวลากำหนด</th>
+                    <th className="py-3 px-2 text-center">เวลาเข้า (In)</th>
+                    <th className="py-3 px-2 text-center">เวลาออก (Out)</th>
+                    <th className="py-3 px-2 text-center">สาย (นาที)</th>
+                    <th className="py-3 px-3 text-center">เกณฑ์สาย & แต้มสะสม</th>
+                    <th className="py-3 px-2 text-center">ตัดชั่วโมง</th>
+                    <th className="py-3 px-2 text-center">ชม. ทำงาน</th>
+                    <th className="py-3 px-2 text-center">สถานะ</th>
+                    <th className="py-3 px-3 text-center">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-slate-400">
+                      <td colSpan={12} className="py-8 text-center text-slate-400">
                         กำลังโหลดข้อมูลเวลา...
                       </td>
                     </tr>
@@ -311,11 +347,13 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
                       const status = att.attendance_status;
 
                       let badge = 'bg-slate-100 text-slate-700';
-                      if (status === 'Present') badge = 'bg-emerald-100 text-emerald-800';
-                      else if (status === 'Late') badge = 'bg-amber-100 text-amber-800';
-                      else if (status === 'Leave') badge = 'bg-blue-100 text-blue-800';
-                      else if (status === 'Absent') badge = 'bg-rose-100 text-rose-800';
-                      else if (status.includes('Missing')) badge = 'bg-purple-100 text-purple-800';
+                      if (status === 'Present') badge = 'bg-emerald-100 text-emerald-800 border border-emerald-200';
+                      else if (status === 'Late') badge = 'bg-amber-100 text-amber-800 border border-amber-200';
+                      else if (status === 'Leave') badge = 'bg-blue-100 text-blue-800 border border-blue-200';
+                      else if (status === 'Absent') badge = 'bg-rose-100 text-rose-800 border border-rose-200';
+                      else if (status.includes('Missing')) badge = 'bg-purple-100 text-purple-800 border border-purple-200';
+                      else if (status === 'Holiday') badge = 'bg-sky-100 text-sky-800 border border-sky-200';
+                      else if (status === 'Weekly Off') badge = 'bg-slate-100 text-slate-600';
 
                       return (
                         <tr key={att.id} className="hover:bg-slate-50 transition">
@@ -325,27 +363,57 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
                             {att.nickname && <span className="text-slate-400 font-normal ml-1">({att.nickname})</span>}
                           </td>
                           <td className="py-3 px-4 text-slate-600">{att.department_name}</td>
-                          <td className="py-3 px-3 text-center text-slate-500 font-mono">08:00 - 17:00</td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">{clockIn}</td>
-                          <td className="py-3 px-3 text-center font-mono font-bold text-slate-700">{clockOut}</td>
-                          <td className={`py-3 px-3 text-center font-bold ${att.late_minutes > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                          <td className="py-3 px-2 text-center text-slate-500 font-mono text-[11px]">08:00 - 17:00</td>
+                          <td className={`py-3 px-2 text-center font-mono font-bold ${att.actual_in ? 'text-slate-800' : 'text-slate-300'}`}>{clockIn}</td>
+                          <td className={`py-3 px-2 text-center font-mono font-bold ${att.actual_out ? 'text-slate-800' : 'text-slate-300'}`}>{clockOut}</td>
+                          <td className={`py-3 px-2 text-center font-bold ${att.late_minutes > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
                             {att.late_minutes > 0 ? `${att.late_minutes} น.` : '-'}
                           </td>
                           <td className="py-3 px-3 text-center">
+                            {att.late_rule_category === 'LATE_LE_15' ? (
+                              <div className="inline-flex flex-col items-center">
+                                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                  +1 แต้ม
+                                </span>
+                                <span className="text-[9px] text-slate-400 mt-0.5">
+                                  สะสม {att.accumulated_late_points || 1}/4
+                                </span>
+                              </div>
+                            ) : att.late_rule_category === 'LATE_GT_15' ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                สายเกิน 15 น.
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-center font-bold">
+                            {Number(att.unpaid_leave_hours) > 0 ? (
+                              <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-red-100 text-red-800 border border-red-300" title={att.penalty_notes}>
+                                -{att.unpaid_leave_hours} ชม.
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-2 text-center font-mono font-semibold text-slate-700">
+                            {att.normal_hours ? `${att.normal_hours} ชม.` : (att.worked_minutes ? `${(att.worked_minutes / 60).toFixed(2)} ชม.` : '0 ชม.')}
+                          </td>
+                          <td className="py-3 px-2 text-center">
                             <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${badge}`}>
                               {status}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-3 px-3 text-center">
                             {(status.includes('Missing') || status === 'Absent' || status === 'Late') && (
                               <button
                                 onClick={() => {
                                   setCorrectionTarget(att);
                                   setShowCorrectionModal(true);
                                 }}
-                                className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-bold transition"
+                                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-bold transition"
                               >
-                                ขอปรับเวลา
+                                ปรับเวลา
                               </button>
                             )}
                           </td>
@@ -354,7 +422,7 @@ export function TimeAttendanceView({ currentPersona, initialTab = 'daily' }: Tim
                     })
                   ) : (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-slate-400">
+                      <td colSpan={12} className="py-8 text-center text-slate-400">
                         ไม่มีข้อมูลการลงเวลาสำหรับวันที่เลือก
                       </td>
                     </tr>

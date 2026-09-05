@@ -72,6 +72,10 @@ export async function GET(request: Request) {
         COUNT(*) as total_scheduled,
         COUNT(CASE WHEN attendance_status = 'Present' THEN 1 END) as total_present,
         COUNT(CASE WHEN attendance_status = 'Late' THEN 1 END) as total_late,
+        COUNT(CASE WHEN late_rule_category = 'LATE_LE_15' THEN 1 END) as total_late_le15,
+        COUNT(CASE WHEN late_rule_category = 'LATE_GT_15' THEN 1 END) as total_late_gt15,
+        COALESCE(SUM(late_points), 0)::int as total_late_points,
+        COALESCE(SUM(unpaid_leave_hours), 0)::numeric as total_unpaid_leave_hours,
         COUNT(CASE WHEN attendance_status = 'Leave' THEN 1 END) as total_leave,
         COUNT(CASE WHEN attendance_status = 'Absent' THEN 1 END) as total_absent,
         COUNT(CASE WHEN attendance_status IN ('Missing Clock In', 'Missing Clock Out', 'Missing Punch') THEN 1 END) as total_missing,
@@ -81,7 +85,8 @@ export async function GET(request: Request) {
     `, [date]);
 
     const stats = statsRes.rows[0] || {
-      total_scheduled: 0, total_present: 0, total_late: 0, total_leave: 0, total_absent: 0, total_missing: 0, total_exceptions: 0
+      total_scheduled: 0, total_present: 0, total_late: 0, total_late_le15: 0, total_late_gt15: 0,
+      total_late_points: 0, total_unpaid_leave_hours: 0, total_leave: 0, total_absent: 0, total_missing: 0, total_exceptions: 0
     };
 
     return NextResponse.json({
@@ -91,6 +96,10 @@ export async function GET(request: Request) {
         scheduled: parseInt(stats.total_scheduled || '0'),
         present: parseInt(stats.total_present || '0'),
         late: parseInt(stats.total_late || '0'),
+        lateLe15: parseInt(stats.total_late_le15 || '0'),
+        lateGt15: parseInt(stats.total_late_gt15 || '0'),
+        latePoints: parseInt(stats.total_late_points || '0'),
+        unpaidHours: parseFloat(stats.total_unpaid_leave_hours || '0'),
         leave: parseInt(stats.total_leave || '0'),
         absent: parseInt(stats.total_absent || '0'),
         missing: parseInt(stats.total_missing || '0'),

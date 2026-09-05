@@ -104,6 +104,12 @@ export async function calculateDailyAttendance(
       let actualIn: Date | null = null;
       let actualOut: Date | null = null;
       let lateMinutes = 0;
+      let latePoints = 0;
+      let unpaidLeaveHours = 0;
+      let lateRuleCategory = 'ON_TIME';
+      let penaltyNotes: string | null = null;
+      let normalHours = 8.00;
+      let accumPts = 0;
       let earlyLeaveMinutes = 0;
       let workedMinutes = 0;
       let hasException = false;
@@ -160,14 +166,43 @@ export async function calculateDailyAttendance(
           workedMinutes = Math.max(0, totalDurationMin - (schedule.break_minutes || 60));
 
           const plannedStartDt = new Date(`${date}T${defaultStart}+07:00`);
-          const graceCutoff = new Date(plannedStartDt.getTime() + gracePeriodMinutes * 60000);
 
-          if (actualIn > graceCutoff) {
+          if (actualIn.getTime() > plannedStartDt.getTime()) {
             attendanceStatus = 'Late';
             lateMinutes = Math.floor((actualIn.getTime() - plannedStartDt.getTime()) / (1000 * 60));
             hasException = true;
             exceptionTypes.push('LATE');
             countLate++;
+
+            if (lateMinutes <= 15) {
+              // กรณีที่ 1: สายไม่เกิน 15 นาที (08:01 - 08:15)
+              // ตัด 1 แต้ม และสายครบ 4 แต้ม ตัดลากิจไม่รับค่าจ้าง 2 ชม.
+              latePoints = 1;
+              lateRuleCategory = 'LATE_LE_15';
+              const prevPointsRes = await client.query(`
+                SELECT COALESCE(SUM(late_points), 0)::int as total_pts
+                FROM attendance_daily
+                WHERE employee_id = $1 AND work_date < $2 AND work_date >= ($2::date - INTERVAL '60 days');
+              `, [emp.id, date]);
+              const prevPts = parseInt(prevPointsRes.rows[0]?.total_pts || '0');
+              accumPts = prevPts + 1;
+
+              if (accumPts % 4 === 0) {
+                unpaidLeaveHours = 2.00;
+                penaltyNotes = `สายไม่เกิน 15 นาที (ครั้งที่ ${accumPts} สะสมครบ 4 แต้ม) -> ตัดลากิจไม่รับค่าจ้าง 2 ชม.`;
+                normalHours = 6.00;
+              } else {
+                penaltyNotes = `สายไม่เกิน 15 นาที (${lateMinutes} นาที) ตัด 1 แต้ม [สะสมแต้มที่ ${accumPts}/4]`;
+                normalHours = 8.00;
+              }
+            } else {
+              // กรณีที่ 2: สายเกิน 15 นาที (สแกนหลัง 08:15 น.)
+              // ตัดลากิจไม่รับค่าจ้าง 2 ชม. ทันที
+              lateRuleCategory = 'LATE_GT_15';
+              unpaidLeaveHours = 2.00;
+              penaltyNotes = `สแกนหลัง 08:15 น. (สาย ${lateMinutes} นาที) -> ตัดลากิจไม่รับค่าจ้าง 2 ชม. ทันที`;
+              normalHours = 6.00;
+            }
           } else {
             attendanceStatus = 'Present';
             countPresent++;
@@ -180,7 +215,9 @@ export async function calculateDailyAttendance(
         INSERT INTO attendance_daily (
           employee_id, employee_code, work_date, schedule_id, shift_id,
           planned_start, planned_end, actual_in, actual_out,
-          late_minutes, early_leave_minutes, worked_minutes, normal_hours,
+          late_minutes, late_points, unpaid_leave_hours, late_rule_category,
+          accumulated_late_points, penalty_notes,
+          early_leave_minutes, worked_minutes, normal_hours,
           attendance_status, leave_request_id,
           has_exception, exception_types, exception_resolved, updated_at
         ) VALUES (
@@ -188,12 +225,19 @@ export async function calculateDailyAttendance(
           $6, $7, $8, $9,
           $10, $11, $12, $13,
           $14, $15,
-          $16, $17, $18, NOW()
+          $16, $17, $18,
+          $19, $20,
+          $21, $22, $23, NOW()
         )
         ON CONFLICT (employee_id, work_date) DO UPDATE SET
           actual_in = EXCLUDED.actual_in,
           actual_out = EXCLUDED.actual_out,
           late_minutes = EXCLUDED.late_minutes,
+          late_points = EXCLUDED.late_points,
+          unpaid_leave_hours = EXCLUDED.unpaid_leave_hours,
+          late_rule_category = EXCLUDED.late_rule_category,
+          accumulated_late_points = EXCLUDED.accumulated_late_points,
+          penalty_notes = EXCLUDED.penalty_notes,
           worked_minutes = EXCLUDED.worked_minutes,
           normal_hours = EXCLUDED.normal_hours,
           attendance_status = EXCLUDED.attendance_status,
@@ -214,9 +258,14 @@ export async function calculateDailyAttendance(
         actualIn ? actualIn.toISOString() : null,
         actualOut ? actualOut.toISOString() : null,
         lateMinutes,
+        latePoints,
+        unpaidLeaveHours,
+        lateRuleCategory,
+        accumPts,
+        penaltyNotes,
         earlyLeaveMinutes,
         workedMinutes,
-        (workedMinutes / 60).toFixed(2),
+        normalHours.toFixed(2),
         attendanceStatus,
         leaveRequestId,
         hasException,
@@ -228,16 +277,20 @@ export async function calculateDailyAttendance(
 
       if (hasException) {
         for (const excType of exceptionTypes) {
-          const severity = excType === 'ABSENT' ? 'HIGH' : 'MEDIUM';
+          let severity = excType === 'ABSENT' ? 'HIGH' : 'MEDIUM';
           let description = `ความผิดปกติของการลงเวลา: ${excType}`;
           if (excType === 'LATE') {
-            description = `พนักงานเข้างานสาย ${lateMinutes} นาที (เกิน Grace Period ${gracePeriodMinutes} นาที)`;
+            if (lateRuleCategory === 'LATE_GT_15' || unpaidLeaveHours > 0) {
+              severity = 'HIGH';
+            }
+            description = penaltyNotes || `พนักงานเข้างานสาย ${lateMinutes} นาที`;
           } else if (excType === 'MISSING_CLOCK_OUT') {
             description = `มีบันทึกเวลาเข้าแต่ไม่มีเวลาสแกนออก (Missing Punch Out)`;
           } else if (excType === 'MISSING_CLOCK_IN') {
             description = `มีบันทึกเวลาออกแต่ไม่มีเวลาสแกนเข้า (Missing Punch In)`;
           } else if (excType === 'ABSENT') {
-            description = `ไม่พบการสแกนนิ้วเข้างานและไม่มีใบลาที่ได้รับการอนุมัติ`;
+            severity = 'HIGH';
+            description = `ขาดงาน: ไม่พบการสแกนนิ้วเข้างานและไม่มีใบลาที่ได้รับการอนุมัติ (Unapproved Absence)`;
           }
 
           const excRes = await client.query(`
