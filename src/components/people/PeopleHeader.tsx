@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { 
-  Users, Bell, Globe, ChevronDown, CheckCircle2, AlertTriangle, 
-  ShieldAlert, UserCheck, Calendar, Sparkles, Building2, Clock, Check
+  Users, Bell, Globe, ChevronDown, ChevronLeft, ChevronRight, CheckCircle2, AlertTriangle, 
+  ShieldAlert, UserCheck, Calendar, Sparkles, Building2, Clock, Check, Grid
 } from 'lucide-react';
 import { Language, TRANSLATIONS } from '@/lib/peopleTranslations';
 
@@ -115,72 +115,115 @@ export function PeopleHeader({
   const t = TRANSLATIONS[lang];
   const [showPersonaMenu, setShowPersonaMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
+  const [showAllTabsMenu, setShowAllTabsMenu] = useState(false);
+
+  const tabsContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
 
   const tabs = [
-    { id: 'dashboard', label: t.navHome, icon: '🏠' },
-    { id: 'employees', label: t.navEmployees, icon: '👥' },
-    { id: 'leave', label: t.navLeave, icon: '🏖️' },
-    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', icon: '⏰' },
-    { id: 'approvals', label: t.navApprovals, icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
-    { id: 'cases', label: 'เคส & หลักฐาน (Cases)', icon: '📁', restricted: ['Employee'] },
-    { id: 'attendance', label: t.navAttendance, icon: '⏱️' },
-    { id: 'exceptions', label: t.navExceptions, icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },
-    { id: 'ai_workforce', label: 'AI Workforce', icon: '🤖', restricted: ['Employee'] },
-    { id: 'policies', label: t.navPolicies, icon: '⚙️', restricted: ['Employee'] },
-    { id: 'reports', label: t.navReports, icon: '📊' },
+    { id: 'dashboard', label: t.navHome, shortLabel: 'หน้าแรก', icon: '🏠' },
+    { id: 'employees', label: t.navEmployees, shortLabel: 'พนักงาน', icon: '👥' },
+    { id: 'leave', label: t.navLeave, shortLabel: 'การลา', icon: '🏖️' },
+    { id: 'ot_costing', label: 'OT & ต้นทุนงาน (Costing)', shortLabel: 'OT & ต้นทุน', icon: '⏰' },
+    { id: 'approvals', label: t.navApprovals, shortLabel: 'อนุมัติ', icon: '✍️', badge: currentPersona.role.includes('Supervisor') || currentPersona.role.includes('Manager') || currentPersona.role.includes('HR') ? 2 : undefined },
+    { id: 'cases', label: 'เคส & หลักฐาน (Cases)', shortLabel: 'เคสงาน', icon: '📁', restricted: ['Employee'] },
+    { id: 'attendance', label: t.navAttendance, shortLabel: 'เวลาทำงาน', icon: '⏱️' },
+    { id: 'exceptions', label: t.navExceptions, shortLabel: 'ข้อยกเว้น', icon: '⚠️', badge: currentPersona.role.includes('HR') ? 6 : undefined },
+    { id: 'ai_workforce', label: 'AI Workforce', shortLabel: 'AI งาน', icon: '🤖', restricted: ['Employee'] },
+    { id: 'policies', label: t.navPolicies, shortLabel: 'นโยบาย', icon: '⚙️', restricted: ['Employee'] },
+    { id: 'reports', label: t.navReports, shortLabel: 'รายงาน', icon: '📊' },
   ].filter(tab => !tab.restricted || !tab.restricted.includes(currentPersona.role));
+
+  const checkScroll = useCallback(() => {
+    if (tabsContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tabsContainerRef.current;
+      setCanScrollLeft(scrollLeft > 6);
+      setCanScrollRight(scrollLeft + clientWidth < scrollWidth - 6);
+    }
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    const el = tabsContainerRef.current;
+    if (el) {
+      el.addEventListener('scroll', checkScroll, { passive: true });
+      window.addEventListener('resize', checkScroll);
+      return () => {
+        el.removeEventListener('scroll', checkScroll);
+        window.removeEventListener('resize', checkScroll);
+      };
+    }
+  }, [checkScroll, tabs.length]);
+
+  // When active tab changes, smoothly scroll the active tab into view
+  useEffect(() => {
+    if (tabsContainerRef.current) {
+      const activeBtn = tabsContainerRef.current.querySelector(`[data-tab-id="${activeTab}"]`) as HTMLElement;
+      if (activeBtn) {
+        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+      }
+    }
+  }, [activeTab]);
+
+  const handleScroll = (direction: 'left' | 'right') => {
+    if (tabsContainerRef.current) {
+      const offset = direction === 'left' ? -240 : 240;
+      tabsContainerRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+    }
+  };
 
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 mb-5 overflow-hidden">
       {/* Top Bar */}
-      <div className="p-4 sm:px-6 sm:py-4 bg-gradient-to-r from-amber-50/50 via-white to-amber-50/30 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-3.5 sm:p-5 sm:px-6 bg-gradient-to-r from-amber-50/50 via-white to-amber-50/30 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
         {/* Branding & Tagline */}
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
-            <Users className="w-6 h-6" />
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 flex items-center justify-center text-white shadow-md shadow-amber-500/20 shrink-0">
+            <Users className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-xl sm:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-2xl font-black text-slate-800 tracking-tight flex items-center gap-1.5 sm:gap-2">
                 CosmeFlow <span className="text-amber-600">People</span>
               </h1>
-              <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300/60">
+              <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full border border-amber-300/60">
                 V1 Production
               </span>
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {t.tagline}
+            <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5 flex items-center gap-1.5 truncate">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"></span>
+              <span className="truncate">{t.tagline}</span>
             </p>
           </div>
         </div>
 
         {/* Right Controls: Quick Persona Switcher + Language + Notification */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-1.5 sm:gap-3">
           {/* Persona Switcher for easy testing */}
           <div className="relative">
             <button
               onClick={() => setShowPersonaMenu(!showPersonaMenu)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition text-left"
+              className="flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 transition text-left"
               title="สลับบทบาทผู้ใช้เพื่อทดสอบระบบ (Interactive Demo Persona)"
             >
-              <div className={`w-7 h-7 rounded-lg ${currentPersona.avatarColor} text-white flex items-center justify-center text-xs font-bold`}>
+              <div className={`w-6 h-6 sm:w-7 sm:h-7 rounded-lg ${currentPersona.avatarColor} text-white flex items-center justify-center text-xs font-bold shrink-0`}>
                 {currentPersona.name.slice(0, 1)}
               </div>
-              <div className="hidden sm:block">
-                <div className="text-xs font-bold text-slate-800 leading-tight">
-                  {currentPersona.nickname} ({currentPersona.code})
+              <div className="block">
+                <div className="text-[11px] sm:text-xs font-bold text-slate-800 leading-tight truncate max-w-[110px] sm:max-w-none">
+                  {currentPersona.nickname} <span className="hidden sm:inline">({currentPersona.code})</span>
                 </div>
-                <div className="text-[10px] text-amber-700 font-semibold leading-tight">
+                <div className="text-[9px] sm:text-[10px] text-amber-700 font-semibold leading-tight">
                   {currentPersona.role}
                 </div>
               </div>
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
             </button>
 
             {/* Persona Dropdown Menu */}
             {showPersonaMenu && (
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 divide-y divide-slate-100">
+              <div className="absolute right-0 mt-2 w-[calc(100vw-2.5rem)] max-w-xs sm:w-80 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 divide-y divide-slate-100">
                 <div className="px-4 py-2 text-xs font-bold text-slate-400 uppercase tracking-wider">
                   สลับบทบาททดสอบ (Demo Personas)
                 </div>
@@ -215,13 +258,13 @@ export function PeopleHeader({
           </div>
 
           {/* Language Selector */}
-          <div className="flex items-center rounded-xl bg-slate-100 p-1 text-xs font-semibold">
+          <div className="flex items-center rounded-xl bg-slate-100 p-0.5 sm:p-1 text-xs font-semibold">
             {(['th', 'en', 'my'] as Language[]).map(l => (
               <button
                 key={l}
                 onClick={() => onSelectLang(l)}
-                className={`px-2 py-1 rounded-lg uppercase transition text-[11px] ${
-                  lang === l ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                className={`px-1.5 sm:px-2 py-1 rounded-lg uppercase transition text-[10px] sm:text-[11px] ${
+                  lang === l ? 'bg-white text-slate-900 shadow-xs font-bold' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {l}
@@ -233,7 +276,7 @@ export function PeopleHeader({
           <div className="relative">
             <button
               onClick={() => setShowNotifMenu(!showNotifMenu)}
-              className="p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 transition relative"
+              className="p-2 sm:p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-600 transition relative"
             >
               <Bell className="w-4 h-4" />
               {notificationCount > 0 && (
@@ -267,41 +310,129 @@ export function PeopleHeader({
           {onRequestLeaveClick && (
             <button
               onClick={onRequestLeaveClick}
-              className="hidden sm:flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition active:scale-95"
+              className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white font-bold text-xs shadow-md shadow-amber-500/20 transition active:scale-95"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>{t.requestLeave}</span>
+              <span className="hidden sm:inline">{t.requestLeave}</span>
+              <span className="sm:hidden">ยื่นลา</span>
             </button>
           )}
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="px-4 sm:px-6 bg-slate-50/60 border-t border-slate-100 flex items-center gap-1 overflow-x-auto no-scrollbar py-2">
-        {tabs.map(tab => {
-          const isActive = activeTab === tab.id;
-          return (
+      {/* Navigation Sub-Tabs Bar with Full Responsive Controls & Smooth Scroll */}
+      <div className="relative bg-slate-50/75 border-t border-slate-200/80 group">
+        {/* Left Scroll Button & Fade Mask */}
+        {canScrollLeft && (
+          <>
+            <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-10 bg-gradient-to-r from-slate-100 via-slate-100/90 to-transparent z-10" />
             <button
-              key={tab.id}
-              onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition shrink-0 whitespace-nowrap ${
-                isActive
-                  ? 'bg-amber-500 text-white shadow-xs shadow-amber-500/30'
-                  : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
-              }`}
+              type="button"
+              onClick={() => handleScroll('left')}
+              className="absolute left-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-300 transition-all active:scale-95 cursor-pointer"
+              title="เลื่อนเมนูไปทางซ้าย"
+              aria-label="Scroll left"
             >
-              <span>{tab.icon}</span>
-              <span>{tab.label}</span>
-              {tab.badge !== undefined && tab.badge > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                  isActive ? 'bg-white text-amber-700' : 'bg-amber-100 text-amber-800'
-                }`}>
-                  {tab.badge}
-                </span>
-              )}
+              <ChevronLeft className="w-4 h-4" />
             </button>
-          );
-        })}
+          </>
+        )}
+
+        {/* Tab List */}
+        <div
+          ref={tabsContainerRef}
+          className="px-3 sm:px-6 py-2 flex items-center gap-1.5 overflow-x-auto scroll-smooth tabs-scrollbar select-none"
+        >
+          {tabs.map(tab => {
+            const isActive = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                data-tab-id={tab.id}
+                onClick={() => onSelectTab(tab.id)}
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30 scale-[1.02]'
+                    : 'text-slate-600 hover:bg-slate-200/70 hover:text-slate-900'
+                }`}
+              >
+                <span className="text-sm">{tab.icon}</span>
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.shortLabel}</span>
+                {tab.badge !== undefined && tab.badge > 0 && (
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                    isActive ? 'bg-white text-amber-700' : 'bg-amber-100 text-amber-800'
+                  }`}>
+                    {tab.badge}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {/* Quick Jump Dropdown Menu (Direct access to all tabs) */}
+          <div className="relative shrink-0 ml-1">
+            <button
+              type="button"
+              onClick={() => setShowAllTabsMenu(!showAllTabsMenu)}
+              className="flex items-center gap-1 px-2.5 py-2 rounded-xl text-xs font-bold text-slate-500 hover:text-amber-700 hover:bg-amber-50 border border-dashed border-slate-300 hover:border-amber-300 transition whitespace-nowrap cursor-pointer"
+              title="ดูเมนูทั้งหมด (All Tabs Menu)"
+            >
+              <Grid className="w-3.5 h-3.5 text-slate-500" />
+              <span className="hidden md:inline text-[11px]">ทั้งหมด</span>
+              <ChevronDown className="w-3 h-3 text-slate-400" />
+            </button>
+
+            {/* Dropdown Menu for Direct Tab Jumping */}
+            {showAllTabsMenu && (
+              <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 divide-y divide-slate-100">
+                <div className="px-4 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  เมนูทั้งหมด ({tabs.length} เมนู)
+                </div>
+                <div className="max-h-72 overflow-y-auto py-1">
+                  {tabs.map(tab => (
+                    <button
+                      key={tab.id}
+                      onClick={() => {
+                        onSelectTab(tab.id);
+                        setShowAllTabsMenu(false);
+                      }}
+                      className={`w-full text-left px-3.5 py-2 flex items-center justify-between hover:bg-amber-50/70 transition text-xs cursor-pointer ${
+                        activeTab === tab.id ? 'bg-amber-50 font-bold text-amber-900' : 'text-slate-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>{tab.icon}</span>
+                        <span>{tab.label}</span>
+                      </div>
+                      {tab.badge !== undefined && tab.badge > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[10px] font-black bg-amber-100 text-amber-800">
+                          {tab.badge}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Scroll Button & Fade Mask */}
+        {canScrollRight && (
+          <>
+            <div className="pointer-events-none absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-slate-100 via-slate-100/90 to-transparent z-10" />
+            <button
+              type="button"
+              onClick={() => handleScroll('right')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 w-7 h-7 rounded-full bg-white/95 border border-slate-300 shadow-md flex items-center justify-center text-slate-700 hover:text-amber-600 hover:bg-amber-50 hover:border-amber-300 transition-all active:scale-95 cursor-pointer animate-pulse"
+              title="เลื่อนเมนูไปทางขวา"
+              aria-label="Scroll right"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
