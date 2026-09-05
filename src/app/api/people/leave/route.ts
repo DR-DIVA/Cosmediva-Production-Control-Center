@@ -31,7 +31,29 @@ export async function GET(request: Request) {
         ORDER BY lt.sort_order ASC, lt.name_th ASC;
       `, [employeeId, year]);
 
-      return NextResponse.json({ success: true, data: rows });
+      // Shared Sick Quota Calculation (SICK_H + SICK_N share 30 days pool)
+      const sickRows = rows.filter((r: any) => r.type_code === 'SICK_H' || r.type_code === 'SICK_N');
+      const totalSickTaken = sickRows.reduce((sum: number, r: any) => sum + parseFloat(r.taken || '0'), 0);
+      const totalSickPending = sickRows.reduce((sum: number, r: any) => sum + parseFloat(r.pending || '0'), 0);
+      const sharedSickAvailable = Math.max(0, 30.0 - totalSickTaken - totalSickPending);
+
+      const enrichedRows = rows.map((r: any) => {
+        if (r.type_code === 'SICK_H' || r.type_code === 'SICK_N') {
+          return {
+            ...r,
+            available: sharedSickAvailable.toFixed(2),
+            is_shared_quota: true,
+            shared_quota_group: 'SICK',
+            shared_quota_total_entitled: '30.00',
+            shared_quota_total_taken: totalSickTaken.toFixed(2),
+            shared_quota_total_pending: totalSickPending.toFixed(2),
+            shared_quota_note: 'สิทธิ์ลาป่วยมีใบแพทย์และไม่มีใบแพทย์ใช้โควตารวมกัน 30 วัน/ปี'
+          };
+        }
+        return r;
+      });
+
+      return NextResponse.json({ success: true, data: enrichedRows });
     }
 
     if (view === 'ledger' && employeeId) {
@@ -295,16 +317,36 @@ export async function POST(request: Request) {
     }
 
     if (validate_only) {
-      const balCheck = await queryPeople(`
-        SELECT available FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026;
-      `, [employee_id, leave_type_id]);
-      const avail = parseFloat(balCheck.rows[0]?.available || '0');
+      const isSick = policy.type_code === 'SICK_H' || policy.type_code === 'SICK_N';
+      let avail = 0;
+
+      if (isSick) {
+        const sickBalCheck = await queryPeople(`
+          SELECT lb.*, lt.type_code 
+          FROM leave_balances lb
+          JOIN leave_types lt ON lb.leave_type_id = lt.id
+          WHERE lb.employee_id = $1 AND lt.type_code IN ('SICK_H', 'SICK_N') AND lb.year = 2026;
+        `, [employee_id]);
+        const totalTaken = sickBalCheck.rows.reduce((sum: number, r: any) => sum + parseFloat(r.taken || '0'), 0);
+        const totalPending = sickBalCheck.rows.reduce((sum: number, r: any) => sum + parseFloat(r.pending || '0'), 0);
+        avail = Math.max(0, 30.0 - totalTaken - totalPending);
+      } else {
+        const balCheck = await queryPeople(`
+          SELECT available FROM leave_balances WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026;
+        `, [employee_id, leave_type_id]);
+        avail = parseFloat(balCheck.rows[0]?.available || '0');
+      }
+
+      const isValid = policy.paid_unpaid !== 'PAID' || policy.allow_negative_balance || calculatedDays <= avail;
+
       return NextResponse.json({
         success: true,
-        valid: true,
+        valid: isValid,
         calculatedDays,
         availableBefore: avail,
-        availableAfter: avail - calculatedDays
+        availableAfter: avail - calculatedDays,
+        is_shared_quota: isSick,
+        error: !isValid ? `วันลาคงเหลือไม่เพียงพอ (โควตารวมคงเหลือ: ${avail} วัน, ต้องการลา: ${calculatedDays} วัน)` : null
       });
     }
 
@@ -330,17 +372,40 @@ export async function POST(request: Request) {
       }
 
       // B) Lock and verify leave balance inside transaction
-      const balRes = await client.query(`
-        SELECT * FROM leave_balances 
-        WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026
-        FOR UPDATE;
-      `, [employee_id, leave_type_id]);
+      const isSickLeave = policy.type_code === 'SICK_H' || policy.type_code === 'SICK_N';
+      let balance: any = null;
+      let availableBefore = 0;
 
-      const balance = balRes.rows[0];
-      const availableBefore = balance ? parseFloat(balance.available) : 0;
+      if (isSickLeave) {
+        const sickBals = await client.query(`
+          SELECT lb.*, lt.type_code 
+          FROM leave_balances lb
+          JOIN leave_types lt ON lb.leave_type_id = lt.id
+          WHERE lb.employee_id = $1 AND lt.type_code IN ('SICK_H', 'SICK_N') AND lb.year = 2026
+          FOR UPDATE;
+        `, [employee_id]);
 
-      if (policy.paid_unpaid === 'PAID' && !policy.allow_negative_balance && calculatedDays > availableBefore) {
-        throw new Error(`วันลาคงเหลือไม่เพียงพอ (คงเหลือ: ${availableBefore} วัน, คำขอ: ${calculatedDays} วัน)`);
+        balance = sickBals.rows.find((r: any) => r.leave_type_id === leave_type_id);
+        const totalTaken = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.taken || '0'), 0);
+        const totalPending = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.pending || '0'), 0);
+        availableBefore = Math.max(0, 30.0 - totalTaken - totalPending);
+
+        if (policy.paid_unpaid === 'PAID' && !policy.allow_negative_balance && calculatedDays > availableBefore) {
+          throw new Error(`สิทธิ์วันลาป่วยคงเหลือไม่เพียงพอ (โควตารวมลาป่วยมีใบแพทย์และไม่มีใบแพทย์คงเหลือ ${availableBefore} วัน, คำขอ: ${calculatedDays} วัน)`);
+        }
+      } else {
+        const balRes = await client.query(`
+          SELECT * FROM leave_balances 
+          WHERE employee_id = $1 AND leave_type_id = $2 AND year = 2026
+          FOR UPDATE;
+        `, [employee_id, leave_type_id]);
+
+        balance = balRes.rows[0];
+        availableBefore = balance ? parseFloat(balance.available) : 0;
+
+        if (policy.paid_unpaid === 'PAID' && !policy.allow_negative_balance && calculatedDays > availableBefore) {
+          throw new Error(`วันลาคงเหลือไม่เพียงพอ (คงเหลือ: ${availableBefore} วัน, คำขอ: ${calculatedDays} วัน)`);
+        }
       }
 
       // Determine initial approval stage:
@@ -400,12 +465,33 @@ export async function POST(request: Request) {
 
       // Update balance: pending +, available -
       const availableAfter = availableBefore - calculatedDays;
-      if (balance) {
+      if (isSickLeave) {
+        if (balance) {
+          await client.query(`
+            UPDATE leave_balances 
+            SET pending = pending + $1, updated_at = NOW()
+            WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
+          `, [calculatedDays, employee_id, leave_type_id]);
+        }
+        // Synchronize available for both SICK_H and SICK_N
+        const newAvail = Math.max(0, availableAfter);
         await client.query(`
-          UPDATE leave_balances 
-          SET pending = pending + $1, available = available - $1, updated_at = NOW()
-          WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
-        `, [calculatedDays, employee_id, leave_type_id]);
+          UPDATE leave_balances lb
+          SET available = $1, updated_at = NOW()
+          FROM leave_types lt
+          WHERE lb.leave_type_id = lt.id 
+            AND lb.employee_id = $2 
+            AND lb.year = 2026 
+            AND lt.type_code IN ('SICK_H', 'SICK_N');
+        `, [newAvail, employee_id]);
+      } else {
+        if (balance) {
+          await client.query(`
+            UPDATE leave_balances 
+            SET pending = pending + $1, available = available - $1, updated_at = NOW()
+            WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
+          `, [calculatedDays, employee_id, leave_type_id]);
+        }
       }
 
       // Create approval_requests record
@@ -528,13 +614,43 @@ export async function PATCH(request: Request) {
       const availableBefore = balance ? parseFloat(balance.available) : 0;
       const availableAfter = availableBefore + days;
 
+      const ltRes = await client.query(`SELECT type_code FROM leave_types WHERE id = $1`, [lr.leave_type_id]);
+      const isSick = ltRes.rows[0]?.type_code === 'SICK_H' || ltRes.rows[0]?.type_code === 'SICK_N';
+
       // Restore balance
       if (prevStatus === 'APPROVED') {
         await client.query(`
           UPDATE leave_balances 
-          SET taken = GREATEST(0, taken - $1), available = available + $1, updated_at = NOW()
+          SET taken = GREATEST(0, taken - $1), updated_at = NOW()
           WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
         `, [days, lr.employee_id, lr.leave_type_id]);
+
+        if (isSick) {
+          const sickBals = await client.query(`
+            SELECT lb.*, lt.type_code 
+            FROM leave_balances lb
+            JOIN leave_types lt ON lb.leave_type_id = lt.id
+            WHERE lb.employee_id = $1 AND lt.type_code IN ('SICK_H', 'SICK_N') AND lb.year = 2026;
+          `, [lr.employee_id]);
+          const totalTaken = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.taken || '0'), 0);
+          const totalPending = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.pending || '0'), 0);
+          const newAvail = Math.max(0, 30.0 - totalTaken - totalPending);
+          await client.query(`
+            UPDATE leave_balances lb
+            SET available = $1, updated_at = NOW()
+            FROM leave_types lt
+            WHERE lb.leave_type_id = lt.id 
+              AND lb.employee_id = $2 
+              AND lb.year = 2026 
+              AND lt.type_code IN ('SICK_H', 'SICK_N');
+          `, [newAvail, lr.employee_id]);
+        } else {
+          await client.query(`
+            UPDATE leave_balances 
+            SET available = available + $1, updated_at = NOW()
+            WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
+          `, [days, lr.employee_id, lr.leave_type_id]);
+        }
 
         // Ledger record with real balance_before and balance_after
         await client.query(`
@@ -552,9 +668,36 @@ export async function PATCH(request: Request) {
       } else if (prevStatus.startsWith('PENDING') || prevStatus === 'SUBMITTED') {
         await client.query(`
           UPDATE leave_balances 
-          SET pending = GREATEST(0, pending - $1), available = available + $1, updated_at = NOW()
+          SET pending = GREATEST(0, pending - $1), updated_at = NOW()
           WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
         `, [days, lr.employee_id, lr.leave_type_id]);
+
+        if (isSick) {
+          const sickBals = await client.query(`
+            SELECT lb.*, lt.type_code 
+            FROM leave_balances lb
+            JOIN leave_types lt ON lb.leave_type_id = lt.id
+            WHERE lb.employee_id = $1 AND lt.type_code IN ('SICK_H', 'SICK_N') AND lb.year = 2026;
+          `, [lr.employee_id]);
+          const totalTaken = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.taken || '0'), 0);
+          const totalPending = sickBals.rows.reduce((sum: number, r: any) => sum + parseFloat(r.pending || '0'), 0);
+          const newAvail = Math.max(0, 30.0 - totalTaken - totalPending);
+          await client.query(`
+            UPDATE leave_balances lb
+            SET available = $1, updated_at = NOW()
+            FROM leave_types lt
+            WHERE lb.leave_type_id = lt.id 
+              AND lb.employee_id = $2 
+              AND lb.year = 2026 
+              AND lt.type_code IN ('SICK_H', 'SICK_N');
+          `, [newAvail, lr.employee_id]);
+        } else {
+          await client.query(`
+            UPDATE leave_balances 
+            SET available = available + $1, updated_at = NOW()
+            WHERE employee_id = $2 AND leave_type_id = $3 AND year = 2026;
+          `, [days, lr.employee_id, lr.leave_type_id]);
+        }
       }
 
       // Update leave request status

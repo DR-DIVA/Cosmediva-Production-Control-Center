@@ -239,6 +239,10 @@ export function LeaveManagementView({
     );
   }, [approverSearch, approverList]);
 
+  const selectedLeaveTypeObj = useMemo(() => {
+    return leaveTypes.find((lt: any) => lt.leave_type_id === selectedType);
+  }, [leaveTypes, selectedType]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'camera' | 'upload') => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -609,38 +613,61 @@ export function LeaveManagementView({
       {/* SUBTAB 2: BALANCES */}
       {subTab === 'balances' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {balances.map((b) => (
-            <div key={b.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-slate-800 text-sm">{b.name_th}</span>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                  {b.type_code}
-                </span>
+          {balances.map((b) => {
+            const isSharedSick = b.is_shared_quota || b.type_code === 'SICK_H' || b.type_code === 'SICK_N';
+            return (
+              <div key={b.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="font-black text-slate-800 text-sm">{b.name_th}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {isSharedSick && (
+                      <span className="text-[10px] font-extrabold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-200">
+                        โควตารวม 30 วัน/ปี
+                      </span>
+                    )}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                      {b.type_code}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-slate-900">{b.available}</span>
+                  <span className="text-xs text-slate-400 font-bold">วันคงเหลือ (Available)</span>
+                </div>
+                {isSharedSick && (
+                  <div className="text-[11px] text-amber-800 bg-amber-50/90 rounded-xl p-2.5 border border-amber-200/70 space-y-0.5">
+                    <div className="font-extrabold flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>โควตารวมลาป่วย (ป่วย H + ป่วย N รวมกัน 30 วัน)</span>
+                    </div>
+                    <div className="text-[10.5px] text-slate-600">
+                      รวมใช้ไปทั้ง 2 ประเภท: <strong className="text-slate-800">{b.shared_quota_total_taken || b.taken} วัน</strong> • รออนุมัติ: <strong className="text-amber-700">{b.shared_quota_total_pending || b.pending} วัน</strong>
+                    </div>
+                  </div>
+                )}
+                <div className="grid grid-cols-4 gap-2 text-center pt-3 border-t border-slate-100 text-[11px]">
+                  <div>
+                    <span className="text-slate-400 block">สิทธิ์ทั้งปี</span>
+                    <span className="font-bold text-slate-700">{b.entitled}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">ยกยอดมา</span>
+                    <span className="font-bold text-slate-700">{b.carry_forward}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">ใช้ไปแล้ว</span>
+                    <span className="font-bold text-slate-700">{b.taken}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block">รออนุมัติ</span>
+                    <span className="font-bold text-amber-600">{b.pending}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-baseline gap-2">
-                <span className="text-3xl font-black text-slate-900">{b.available}</span>
-                <span className="text-xs text-slate-400 font-bold">วันคงเหลือ (Available)</span>
-              </div>
-              <div className="grid grid-cols-4 gap-2 text-center pt-3 border-t border-slate-100 text-[11px]">
-                <div>
-                  <span className="text-slate-400 block">สิทธิ์ทั้งปี</span>
-                  <span className="font-bold text-slate-700">{b.entitled}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">ยกยอดมา</span>
-                  <span className="font-bold text-slate-700">{b.carry_forward}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">ใช้ไปแล้ว</span>
-                  <span className="font-bold text-slate-700">{b.taken}</span>
-                </div>
-                <div>
-                  <span className="text-slate-400 block">รออนุมัติ</span>
-                  <span className="font-bold text-amber-600">{b.pending}</span>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -944,6 +971,20 @@ export function LeaveManagementView({
                     </option>
                   ))}
                 </select>
+                {selectedLeaveTypeObj && (selectedLeaveTypeObj.type_code === 'SICK_H' || selectedLeaveTypeObj.type_code === 'SICK_N') && (
+                  <div className="mt-2 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-[11px] flex items-start gap-2">
+                    <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">โควตารวมลาป่วย: </span>
+                      ลาป่วยมีใบแพทย์ (ป่วย H) และลาป่วยไม่มีใบแพทย์ (ป่วย N) ใช้สิทธิ์ร่วมกันไม่เกิน <strong>30 วัน/ปี</strong>
+                      {selectedLeaveTypeObj.type_code === 'SICK_H' && (
+                        <span className="block text-amber-700 mt-0.5 font-semibold">
+                          * ลาป่วยมีใบแพทย์ตั้งแต่ 1 วันขึ้นไป กรุณาแนบภาพถ่ายหรือเอกสารใบรับรองแพทย์ด้านล่าง
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Start Date & Time (Matching Q Center Plus style) */}
