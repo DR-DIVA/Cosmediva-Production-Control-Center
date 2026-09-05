@@ -24,10 +24,26 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
   const [roleFilter, setRoleFilter] = useState('');
   const [page, setPage] = useState(0);
   const limit = 15;
+  const [viewMode, setViewMode] = useState<'list' | 'org'>('list');
 
   const [departments, setDepartments] = useState<any[]>([]);
   const [workAreas, setWorkAreas] = useState<any[]>([]);
   const [selectedEmp, setSelectedEmp] = useState<any | null>(null);
+
+  const orgDivisions = React.useMemo(() => {
+    const map = new Map<string, { code: string; name: string; totalEmployees: number; depts: any[] }>();
+    departments.forEach((d: any) => {
+      const divCode = d.division_code || 'OTHER';
+      const divName = d.division_name || 'ฝ่ายอื่นๆ / ส่วนกลาง';
+      if (!map.has(divCode)) {
+        map.set(divCode, { code: divCode, name: divName, totalEmployees: 0, depts: [] });
+      }
+      const entry = map.get(divCode)!;
+      entry.totalEmployees += (Number(d.employee_count) || 0);
+      entry.depts.push(d);
+    });
+    return Array.from(map.values()).sort((a, b) => b.totalEmployees - a.totalEmployees);
+  }, [departments]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showImportModal, setShowImportModal] = useState(false);
 
@@ -131,7 +147,153 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
 
   return (
     <div className="space-y-5 max-w-7xl mx-auto">
-      {/* Search & Actions Header */}
+      {/* Mode Toggle Banner */}
+      <div className="bg-white rounded-2xl p-2 sm:p-2.5 border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <button
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'list'
+                ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <User className="w-3.5 h-3.5" />
+            <span>📋 ทะเบียนรายชื่อพนักงาน ({total} คน)</span>
+          </button>
+          <button
+            onClick={() => setViewMode('org')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+              viewMode === 'org'
+                ? 'bg-amber-500 text-slate-950 shadow-sm shadow-amber-500/20'
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+            }`}
+          >
+            <Building className="w-3.5 h-3.5" />
+            <span>🏢 โครงสร้างองค์กร (14 ฝ่าย / 18 แผนก)</span>
+          </button>
+        </div>
+
+        {viewMode === 'org' ? (
+          <span className="text-[11px] text-slate-400 font-medium">
+            💡 คลิกที่แผนกใดก็ได้ เพื่อดูรายชื่อพนักงานในแผนกนั้น
+          </span>
+        ) : (
+          <span className="text-[11px] text-slate-400 font-medium">
+            กำลังแสดง {total} คนจากฐานข้อมูลจริง
+          </span>
+        )}
+      </div>
+
+      {viewMode === 'org' ? (
+        <div className="space-y-6">
+          {/* Org KPI Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <div className="text-xs text-slate-500 font-bold flex items-center gap-1.5">
+                <span>👥</span>
+                <span>พนักงานทั้งหมด</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-slate-900 mt-1">{total} <span className="text-xs font-semibold text-slate-400">คน</span></div>
+              <div className="text-[11px] text-slate-400 mt-0.5">ในฐานข้อมูล Master</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <div className="text-xs text-slate-500 font-bold flex items-center gap-1.5">
+                <span>🏛️</span>
+                <span>สายงาน / ฝ่าย (Divisions)</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-amber-600 mt-1">{orgDivisions.filter(d => d.totalEmployees > 0).length} <span className="text-xs font-semibold text-slate-400">ฝ่าย</span></div>
+              <div className="text-[11px] text-slate-400 mt-0.5">โครงสร้างบริหารหลัก</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <div className="text-xs text-slate-500 font-bold flex items-center gap-1.5">
+                <span>🏢</span>
+                <span>แผนกปฏิบัติงาน</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-blue-600 mt-1">{departments.filter(d => (Number(d.employee_count) || 0) > 0).length} <span className="text-xs font-semibold text-slate-400">แผนก</span></div>
+              <div className="text-[11px] text-slate-400 mt-0.5">กระจายตามจุดปฏิบัติงาน</div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs">
+              <div className="text-xs text-slate-500 font-bold flex items-center gap-1.5">
+                <span>🏭</span>
+                <span>สายงานผลิต (Operations)</span>
+              </div>
+              <div className="text-2xl sm:text-3xl font-black text-emerald-600 mt-1">
+                {(orgDivisions.find(d => d.code === 'PD')?.totalEmployees || 0) + (orgDivisions.find(d => d.code === 'DIV-OPS')?.totalEmployees || 0)} <span className="text-xs font-semibold text-slate-400">คน</span>
+              </div>
+              <div className="text-[11px] text-slate-400 mt-0.5">กำลังคนหลักของโรงงาน</div>
+            </div>
+          </div>
+
+          {/* Divisions & Departments Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {orgDivisions.filter(d => d.totalEmployees > 0).map(div => (
+              <div key={div.code} className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs hover:border-amber-400 transition flex flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="w-8 h-8 rounded-xl bg-amber-50 text-amber-800 font-black text-xs flex items-center justify-center border border-amber-200">
+                        {div.code}
+                      </span>
+                      <div>
+                        <h4 className="font-bold text-slate-800 text-xs sm:text-sm">{div.name}</h4>
+                        <span className="text-[10px] text-slate-400 font-mono">รหัสฝ่าย: {div.code}</span>
+                      </div>
+                    </div>
+                    <span className="px-2.5 py-1 rounded-full text-xs font-black bg-slate-100 text-slate-800 shrink-0">
+                      {div.totalEmployees} คน
+                    </span>
+                  </div>
+
+                  {/* Departments inside this division */}
+                  <div className="mt-3 space-y-2">
+                    {div.depts.map((d: any) => (
+                      <div
+                        key={d.id}
+                        onClick={() => {
+                          setDeptFilter(d.id);
+                          setViewMode('list');
+                          setPage(0);
+                        }}
+                        className="group p-2.5 rounded-xl bg-slate-50/70 hover:bg-amber-50/60 border border-slate-200/60 hover:border-amber-300 transition cursor-pointer flex items-center justify-between"
+                      >
+                        <div className="min-w-0 pr-2">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-bold text-slate-800 text-xs group-hover:text-amber-900 truncate">
+                              {d.department_name}
+                            </span>
+                            <span className="text-[10px] font-mono text-slate-400 font-semibold shrink-0">
+                              ({d.department_code})
+                            </span>
+                          </div>
+                          <div className="w-28 bg-slate-200 rounded-full h-1 mt-1.5 overflow-hidden">
+                            <div
+                              className="bg-amber-500 h-full rounded-full"
+                              style={{ width: `${Math.min(100, Math.round(((d.employee_count || 0) / (div.totalEmployees || 1)) * 100))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-black text-slate-700 text-xs">
+                            {d.employee_count || 0} คน
+                          </span>
+                          <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-amber-600 transition group-hover:translate-x-0.5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Search & Actions Header */}
       <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
         {/* Search Bar */}
         <div className="relative flex-1 max-w-md">
@@ -380,6 +542,8 @@ export function EmployeeDirectory({ currentPersona }: EmployeeDirectoryProps) {
           </div>
         </div>
       </div>
+      </>
+      )}
 
       {/* 360 Profile Drawer / Modal */}
       {selectedEmp && (

@@ -117,8 +117,22 @@ export async function GET(request: Request) {
     const countRes = await queryPeople(countQuery, countParams);
     const total = parseInt(countRes.rows[0]?.count || '0');
 
-    // Also return departments and work areas for filter dropdowns
-    const depts = await queryPeople(`SELECT id, department_code, department_name FROM departments WHERE is_active = TRUE ORDER BY department_name`);
+    // Also return departments and work areas for filter dropdowns and Org Structure
+    const depts = await queryPeople(`
+      SELECT 
+        d.id, 
+        d.department_code, 
+        d.department_name,
+        COALESCE(div.division_code, 'OTHER') as division_code,
+        COALESCE(div.division_name, 'ฝ่ายอื่นๆ / ส่วนกลาง') as division_name,
+        COUNT(e.id)::int as employee_count
+      FROM departments d
+      LEFT JOIN divisions div ON d.division_id = div.id
+      LEFT JOIN employees e ON e.department_id = d.id AND e.deleted_at IS NULL
+      WHERE d.is_active = TRUE
+      GROUP BY d.id, d.department_code, d.department_name, div.division_code, div.division_name
+      ORDER BY employee_count DESC, d.department_name ASC
+    `);
     const areas = await queryPeople(`SELECT id, work_area_code, work_area_name, department_id FROM work_areas WHERE is_active = TRUE ORDER BY work_area_name`);
     const roles = ['Employee', 'Supervisor', 'Manager', 'HR Officer', 'HR Manager', 'Executive', 'Admin'];
 
