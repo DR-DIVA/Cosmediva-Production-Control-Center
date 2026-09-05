@@ -25,6 +25,32 @@ interface OtJobCostingViewProps {
   currentPersona: Persona;
 }
 
+export interface OtRequestItem {
+  id: string;
+  submissionDate: string;
+  division: string;
+  department: string;
+  lotNumber: string;
+  productName: string;
+  line: string;
+  requestedBy: string;
+  otDate: string;
+  timeSlot: string;
+  target: string;
+  reason: string;
+  plannedHeadcount: number;
+  actualHeadcount: number;
+  plannedHours: number;
+  actualHours: number;
+  estimatedCost: number;
+  actualCost: number;
+  status: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
+  participants: any[];
+}
+
 export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
   const [showRequestModal, setShowRequestModal] = useState(false);
   const [selectedLot, setSelectedLot] = useState('JHD-309');
@@ -58,32 +84,48 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       normalLaborCost: 8800,
       otLaborCost: 4650,
       materialCost: 44000,
-      overheadCost: 4500,
+      overheadCost: 3500,
       otHours: 42,
       headcount: 14,
-      status: 'DEFICIT_RISK',
+      status: 'PROFITABLE',
       line: 'Packing Line 1'
     },
     {
-      lotNumber: 'JHD-317',
-      productName: 'Diva Hydrating Body Lotion 200ml',
-      orderQuantity: 60000,
-      completedQuantity: 60000,
-      revenue: 95000,
-      budgetedLaborCost: 12000,
-      normalLaborCost: 9800,
-      otLaborCost: 1850,
-      materialCost: 52000,
-      overheadCost: 5000,
-      otHours: 18,
+      lotNumber: 'JHD-322',
+      productName: 'Melasma Clear Spot Corrector 15ml',
+      orderQuantity: 25000,
+      completedQuantity: 18000,
+      revenue: 55000,
+      budgetedLaborCost: 6500,
+      normalLaborCost: 5900,
+      otLaborCost: 2800,
+      materialCost: 31000,
+      overheadCost: 2800,
+      otHours: 24,
       headcount: 8,
+      status: 'LOSS_WARNING',
+      line: 'Packing Line 3'
+    },
+    {
+      lotNumber: 'JHD-330',
+      productName: 'Hydra Glow Sleeping Mask 100g',
+      orderQuantity: 30000,
+      completedQuantity: 5000,
+      revenue: 65000,
+      budgetedLaborCost: 8000,
+      normalLaborCost: 4200,
+      otLaborCost: 1200,
+      materialCost: 39000,
+      overheadCost: 3200,
+      otHours: 12,
+      headcount: 6,
       status: 'PROFITABLE',
       line: 'Mixing Room 3'
     }
   ];
 
   // Active OT Requests
-  const [otRequests, setOtRequests] = useState([
+  const [otRequests, setOtRequests] = useState<OtRequestItem[]>([
     {
       id: 'OT-2026-0908-01',
       submissionDate: '2026-09-08',
@@ -104,6 +146,8 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       estimatedCost: 4800,
       actualCost: 3950,
       status: 'APPROVED_EXECUTED',
+      approvedBy: 'คุณสมบูรณ์ คุมฝ่ายผลิต (Manager)',
+      approvedAt: '16:30 น.',
       participants: [
         { code: 'PK-BJP518', name: 'น.ส.เบ็ญจพร พูลสวัสดิ์', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
         { code: 'PK-SNT012', name: 'นายสุนทร มีโชค', rate: 68.06, hours: 3.0, cost: 204.18, position: 'พนักงานบรรจุ', status: 'Present' },
@@ -131,6 +175,8 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       estimatedCost: 5600,
       actualCost: 4650,
       status: 'PENDING_APPROVAL',
+      approvedBy: '',
+      approvedAt: '',
       participants: []
     }
   ]);
@@ -234,6 +280,36 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
     });
   };
 
+  const handleApproveOt = (otId: string) => {
+    const timeStr = new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' });
+    setOtRequests(prev => prev.map(req => {
+      if (req.id === otId) {
+        return {
+          ...req,
+          status: 'APPROVED_EXECUTED',
+          approvedBy: `${currentPersona.name} (${currentPersona.role})`,
+          approvedAt: timeStr
+        };
+      }
+      return req;
+    }));
+    toast.success(`อนุมัติคำขอ OT รหัส ${otId} เรียบร้อยแล้ว โดย ${currentPersona.name}`);
+  };
+
+  const handleRejectOt = (otId: string) => {
+    setOtRequests(prev => prev.map(req => {
+      if (req.id === otId) {
+        return {
+          ...req,
+          status: 'REJECTED',
+          rejectedBy: `${currentPersona.name} (${currentPersona.role})`
+        };
+      }
+      return req;
+    }));
+    toast.error(`ส่งกลับ / ไม่อนุมัติคำขอ OT รหัส ${otId}`);
+  };
+
   const handleOpenEFormFromRequest = (ot: any) => {
     const hours = ot.plannedHours && ot.plannedHeadcount ? Math.round((ot.plannedHours / ot.plannedHeadcount) * 10) / 10 : 2;
     setEformData({
@@ -319,6 +395,8 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
       estimatedCost: estCost,
       actualCost: estCost,
       status: 'PENDING_APPROVAL',
+      approvedBy: '',
+      approvedAt: '',
       participants: selectedEmployees.map(emp => ({
         code: emp.employee_code,
         name: `${emp.first_name} ${emp.last_name}${emp.nickname ? ` (${emp.nickname})` : ''}`,
@@ -663,12 +741,93 @@ export function OtJobCostingView({ currentPersona }: OtJobCostingViewProps) {
                   <span className={`px-3 py-1 rounded-full text-xs font-black ${
                     ot.status === 'APPROVED_EXECUTED'
                       ? 'bg-emerald-100 text-emerald-800'
+                      : ot.status === 'REJECTED'
+                      ? 'bg-rose-100 text-rose-800'
                       : 'bg-amber-100 text-amber-800'
                   }`}>
-                    {ot.status === 'APPROVED_EXECUTED' ? 'อนุมัติ & ปฏิบัติงานแล้ว' : 'รอผู้จัดการอนุมัติ'}
+                    {ot.status === 'APPROVED_EXECUTED' 
+                      ? 'อนุมัติ & ปฏิบัติงานแล้ว' 
+                      : ot.status === 'REJECTED'
+                      ? 'ส่งกลับ / ไม่อนุมัติ'
+                      : 'รอผู้จัดการอนุมัติ'}
                   </span>
                 </div>
               </div>
+
+              {/* Approval Workflow & Action Bar */}
+              {ot.status === 'PENDING_APPROVAL' && (
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200 shadow-2xs">
+                  <div className="flex items-center gap-2.5 text-xs text-amber-950 font-medium">
+                    <span className="flex h-3 w-3 relative shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                    <div>
+                      <div className="font-bold text-amber-900">
+                        ขั้นตอนอนุมัติ: รอการพิจารณาจากผู้จัดการฝ่ายผลิต
+                      </div>
+                      <div className="text-[11px] text-amber-800">
+                        ระบบส่งแจ้งเตือนไปยัง <strong>คุณสมบูรณ์ คุมฝ่ายผลิต (Manager)</strong> และ <strong>ดร.ภญ. ชมพูนุช (Supervisor)</strong> เรียบร้อยแล้ว
+                      </div>
+                    </div>
+                  </div>
+
+                  {['Supervisor', 'Manager', 'Executive', 'Admin', 'HR Manager'].includes(currentPersona.role) ? (
+                    <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+                      <button
+                        type="button"
+                        onClick={() => handleRejectOt(ot.id)}
+                        className="px-3 py-1.5 rounded-xl border border-rose-200 bg-white hover:bg-rose-50 text-rose-600 font-bold text-xs flex items-center gap-1 transition cursor-pointer shadow-2xs"
+                        title="ไม่อนุมัติและส่งกลับให้ผู้ยื่นแก้ไข"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        <span>ไม่อนุมัติ / ส่งกลับ</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleApproveOt(ot.id)}
+                        className="px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 shadow-sm shadow-emerald-600/30 transition cursor-pointer"
+                        title={`อนุมัติในฐานะ ${currentPersona.name}`}
+                      >
+                        <CheckCircle2 className="w-4 h-4" />
+                        <span>อนุมัติคำขอ OT (Approve)</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-[11px] text-amber-900 bg-white/90 px-3 py-1.5 rounded-xl border border-amber-200 font-medium self-end md:self-auto flex items-center gap-1.5">
+                      <span>💡</span>
+                      <span>ทดสอบอนุมัติ: สลับ Persona ที่มุมขวาบนเป็น <strong>คุณสมบูรณ์ (Manager)</strong> หรือ <strong>ดร.ชมพู่ (Supervisor)</strong></span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {ot.status === 'APPROVED_EXECUTED' && ot.approvedBy && (
+                <div className="flex flex-wrap items-center justify-between gap-2 text-xs p-3 rounded-2xl bg-emerald-50/80 border border-emerald-200 text-emerald-900">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                    <div>
+                      <span>ได้รับการอนุมัติเรียบร้อยแล้ว โดย: <strong>{ot.approvedBy}</strong></span>
+                      {ot.approvedAt && <span className="text-slate-500 text-[11px] ml-1.5 font-normal">({ot.approvedAt})</span>}
+                    </div>
+                  </div>
+                  <span className="text-[11px] text-emerald-700 font-black bg-white px-2.5 py-0.5 rounded-lg border border-emerald-200">
+                    อนุมัติแล้ว พร้อมนำไปคิดต้นทุนจริง
+                  </span>
+                </div>
+              )}
+
+              {ot.status === 'REJECTED' && (
+                <div className="flex items-center justify-between text-xs p-3 rounded-2xl bg-rose-50/80 border border-rose-200 text-rose-900">
+                  <div className="flex items-center gap-2">
+                    <X className="w-4 h-4 text-rose-600 shrink-0" />
+                    <span>คำขอนี้ถูกส่งกลับ / ไม่อนุมัติ โดย: <strong>{ot.rejectedBy || 'ผู้จัดการ'}</strong></span>
+                  </div>
+                  <span className="text-[11px] text-rose-700 font-bold bg-white px-2.5 py-0.5 rounded-lg border border-rose-200">
+                    ไม่อนุมัติ
+                  </span>
+                </div>
+              )}
 
               {/* Comparison Plan vs Actual */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs">
