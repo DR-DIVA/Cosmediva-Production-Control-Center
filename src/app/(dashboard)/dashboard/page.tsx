@@ -88,7 +88,7 @@ export default function DashboardPage() {
 
     // 1. Fetch Active Logs & Lots (For Production Overview)
     const logSelect = `
-        id, status, tank_start, tank_end, production_lot_id, piece_quantity, start_time, end_time, process_id, updated_at, activity_date,
+        id, status, tank_start, tank_end, production_lot_id, piece_quantity, start_time, end_time, process_id, updated_at, activity_date, end_date,
         processes (process_name), rooms (room_name), tank_details,
         production_lots (
           id, lot_no, current_status, total_tanks, capacity_max, kg_per_tank, g_per_piece, pcs_per_carton, qc_fg_passed_carton_ranges, planned_quantity, order_quantity,
@@ -112,7 +112,7 @@ export default function DashboardPage() {
     const [ { data: activeLogsInitial }, { data: todayLogsInitial }, { data: activityLogsInitial } ] = await Promise.all([
       supabase.from('production_logs').select(logSelect).in('production_lot_id', activeLotIds),
       supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd),
-      supabase.from('production_logs').select(logSelect).eq('activity_date', dashboardDate)
+      supabase.from('production_logs').select(logSelect).or(`and(activity_date.lte.${dashboardDate},end_date.gte.${dashboardDate}),activity_date.eq.${dashboardDate}`)
     ])
 
     const logsMap = new Map()
@@ -308,8 +308,13 @@ export default function DashboardPage() {
     const pName = (log.processes as any)?.process_name || ''
     const lot = log.production_lots as any
     if (!lot) return;
-    
-    const isPlannedForToday = log.activity_date === todayStr;
+    const rawStart = log.activity_date || log.end_date;
+    const rawEnd = log.end_date || log.activity_date;
+    const effStart = rawStart && rawEnd ? (rawStart <= rawEnd ? rawStart : rawEnd) : rawStart;
+    const effEnd = rawStart && rawEnd ? (rawStart <= rawEnd ? rawEnd : rawStart) : rawEnd;
+    const isPlannedForToday = (effStart && effEnd)
+      ? (todayStr >= effStart && todayStr <= effEnd)
+      : (log.activity_date === todayStr || log.end_date === todayStr);
     const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date(dashboardDate).setHours(0,0,0,0)).getTime() && new Date(log.updated_at).getTime() <= new Date(new Date(dashboardDate).setHours(23,59,59,999)).getTime();
     
     let hasActivityToday = false;
@@ -782,7 +787,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 🧭 14-Day Rolling Master Radar (Placed at top as requested) */}
+      {/* 🧭 21-Day Rolling Master Radar (Placed at top as requested) */}
       <RollingMasterRadar 
         startDateStr={dashboardDate} 
         onSelectLot={(lotId) => setSelectedFilter(lotId)} 

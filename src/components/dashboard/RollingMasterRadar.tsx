@@ -75,17 +75,23 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
     return startDateStr ? parseISO(startDateStr) : new Date()
   }, [startDateStr])
 
-  // 14-Day Horizon Array
+  // 21-Day Horizon Array (Columns 1-6: Past 6 days, Column 7: Today [Index 6], Columns 8-21: Forward 14 days)
   const horizonDates = useMemo(() => {
-    return Array.from({ length: 14 }, (_, i) => {
-      const d = addDays(baseDate, i)
+    return Array.from({ length: 21 }, (_, i) => {
+      const d = addDays(baseDate, i - 6)
+      const isToday = i === 6
+      const isPast = i < 6
+      const isFuture = i > 6
       return {
         date: d,
         dateStr: format(d, 'yyyy-MM-dd'),
         dayName: TH_DAYS[d.getDay()],
         dayNum: d.getDate(),
         monthName: TH_MONTHS[d.getMonth()],
-        isToday: i === 0
+        isToday,
+        isPast,
+        isFuture,
+        dayOffset: i - 6
       }
     })
   }, [baseDate])
@@ -107,34 +113,33 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         { data: logsData },
         { data: lotsData }
       ] = await Promise.all([
-        // 1. ETA RM/PM within 14 days
+        // 1. ETA RM/PM within 21 days
         supabase.from('production_lot_rms')
           .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier')
           .gte('eta_date', horizonStartStr)
           .lte('eta_date', horizonEndStr)
           .order('eta_date', { ascending: true }),
 
-        // 2. Production Schedule (Weighing, Mixing, Packing, POF)
+        // 2. Production Schedule (Weighing, Mixing, Packing, POF) across 21 days
         supabase.from('production_logs')
           .select(`
-            id, status, activity_date, tank_start, tank_end, piece_quantity, note,
+            id, status, activity_date, end_date, tank_start, tank_end, piece_quantity, note,
             processes (process_name),
             production_lots (
               id, lot_no, planned_quantity, order_quantity, total_tanks,
               products:sku_id (sku, product_name)
             )
           `)
-          .gte('activity_date', horizonStartStr)
-          .lte('activity_date', horizonEndStr)
+          .or(`and(activity_date.lte.${horizonEndStr},end_date.gte.${horizonStartStr}),and(activity_date.lte.${horizonEndStr},activity_date.gte.${horizonStartStr}),and(activity_date.is.null,end_date.gte.${horizonStartStr},end_date.lte.${horizonEndStr})`)
           .order('activity_date', { ascending: true }),
 
-        // 3. FG Due Date & Planned Deliveries (All active lots)
+        // 3. FG Due Date & Planned Deliveries (Active lots + Lots with due dates in horizon)
         supabase.from('production_lots')
           .select(`
             id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks,
             products:sku_id (sku, product_name)
           `)
-          .neq('current_status', 'DONE')
+          .or(`current_status.neq.DONE,and(fg_due_date.gte.${horizonStartStr},fg_due_date.lte.${horizonEndStr})`)
           .order('fg_due_date', { ascending: true })
       ])
 
@@ -201,11 +206,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
        }
     })
 
-    // 2. Process Production Logs
+    // 2. Process Production Logs (Multi-day date range support)
     radarData.logsList.forEach(log => {
-      const d = log.activity_date
-      if (!map[d]) return
-
       const pName = (log.processes?.process_name || '').toLowerCase()
       const lot = log.production_lots
       const sku = lot?.products?.sku || 'SKU'
@@ -215,50 +217,72 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
       const endT = parseInt(log.tank_end) || startT
       const tanksCount = Math.max(1, endT - startT + 1)
 
-      if (pName.includes('ชั่ง') || pName.includes('mm-rm')) {
-        totalWeighing++
-        map[d].WEIGHING.push({
-          id: log.id,
-          streamType: 'WEIGHING',
-          date: d,
-          title: `${sku} • LOT ${lotNo}`,
-          subtitle: pProductName || 'เตรียมและชั่งสารเคมี',
-          tag: `ถัง ${startT}-${endT}`,
-          lotNo,
-          sku,
-          lotId: lot?.id,
-          meta: log
-        })
-      } else if (pName.includes('ผสม') || pName.includes('mix')) {
-        totalMixing++
-        totalMixingTanks += tanksCount
-        map[d].MIXING.push({
-          id: log.id,
-          streamType: 'MIXING',
-          date: d,
-          title: `${sku} • LOT ${lotNo}`,
-          subtitle: pProductName || 'ผสมเนื้อ Bulk',
-          tag: `${tanksCount} ถัง (${startT}-${endT})`,
-          lotNo,
-          sku,
-          lotId: lot?.id,
-          meta: log
-        })
-      } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
-        totalPacking++
-        map[d].PACKING.push({
-          id: log.id,
-          streamType: 'PACKING',
-          date: d,
-          title: `${sku} • LOT ${lotNo}`,
-          subtitle: pProductName || 'บรรจุและแพ็คเกจจิ้ง',
-          tag: log.piece_quantity ? `${Number(log.piece_quantity).toLocaleString()} ชิ้น` : `ถัง ${startT}-${endT}`,
-          lotNo,
-          sku,
-          lotId: lot?.id,
-          meta: log
-        })
+      const rawStart = log.activity_date || log.end_date
+      const rawEnd = log.end_date || log.activity_date
+      if (!rawStart && !rawEnd) return
+
+      const effectiveStart = rawStart <= rawEnd ? rawStart : rawEnd
+      const effectiveEnd = rawStart <= rawEnd ? rawEnd : rawStart
+      const isMultiDay = effectiveStart !== effectiveEnd
+
+      // Check if this task overlaps the 21-day horizon for summary counts (count each batch once)
+      const overlapsHorizon = effectiveStart <= horizonEndStr && effectiveEnd >= horizonStartStr
+      if (overlapsHorizon) {
+        if (pName.includes('ชั่ง') || pName.includes('mm-rm')) {
+          totalWeighing++
+        } else if (pName.includes('ผสม') || pName.includes('mix')) {
+          totalMixing++
+          totalMixingTanks += tanksCount
+        } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
+          totalPacking++
+        }
       }
+
+      // Populate every day in the horizon that falls within [effectiveStart, effectiveEnd]
+      horizonDates.forEach(hd => {
+        if (hd.dateStr >= effectiveStart && hd.dateStr <= effectiveEnd) {
+          if (pName.includes('ชั่ง') || pName.includes('mm-rm')) {
+            map[hd.dateStr].WEIGHING.push({
+              id: `${log.id}-${hd.dateStr}`,
+              streamType: 'WEIGHING',
+              date: hd.dateStr,
+              title: `${sku} • LOT ${lotNo}`,
+              subtitle: pProductName || 'เตรียมและชั่งสารเคมี',
+              tag: `ถัง ${startT}-${endT}`,
+              lotNo,
+              sku,
+              lotId: lot?.id,
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+            })
+          } else if (pName.includes('ผสม') || pName.includes('mix')) {
+            map[hd.dateStr].MIXING.push({
+              id: `${log.id}-${hd.dateStr}`,
+              streamType: 'MIXING',
+              date: hd.dateStr,
+              title: `${sku} • LOT ${lotNo}`,
+              subtitle: pProductName || 'ผสมเนื้อ Bulk',
+              tag: `${tanksCount} ถัง (${startT}-${endT})`,
+              lotNo,
+              sku,
+              lotId: lot?.id,
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+            })
+          } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
+            map[hd.dateStr].PACKING.push({
+              id: `${log.id}-${hd.dateStr}`,
+              streamType: 'PACKING',
+              date: hd.dateStr,
+              title: `${sku} • LOT ${lotNo}`,
+              subtitle: pProductName || 'บรรจุและแพ็คเกจจิ้ง',
+              tag: log.piece_quantity ? `${Number(log.piece_quantity).toLocaleString()} ชิ้น` : `ถัง ${startT}-${endT}`,
+              lotNo,
+              sku,
+              lotId: lot?.id,
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+            })
+          }
+        }
+      })
     })
 
     // 3. Process FG Due & MTS Daily Delivery Ranges
@@ -397,17 +421,17 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
                   <h2 className="text-xl md:text-2xl font-black text-[#4A4238] whitespace-nowrap tracking-tight">
-                    14-Day Rolling Master Radar
+                    21-Day Rolling Master Radar
                   </h2>
                   <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
-                    แผนงานล่วงหน้า 2 สัปดาห์
+                    เรดาร์แผนงาน 3 สัปดาห์ (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)
                   </span>
                 </div>
                 <div className="text-xs text-[#8B7355] font-medium flex flex-wrap items-center gap-2 mt-1">
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
                     <span>
-                      หน้าต่างแผนงาน: <strong className="text-[#4A4238]">{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className="text-[#4A4238]">{horizonDates[13]?.dayNum} {horizonDates[13]?.monthName} 2026</strong>
+                      หน้าต่างแผนงาน: <strong className="text-[#4A4238]">{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className="text-[#4A4238]">{horizonDates[20]?.dayNum} {horizonDates[20]?.monthName} 2026</strong>
                     </span>
                   </div>
                   <span className="text-slate-300 hidden sm:inline">•</span>
@@ -482,13 +506,13 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
           </div>
         </div>
 
-        {/* 14-Day Executive Summary Chips */}
+        {/* 21-Day Executive Summary Chips */}
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mt-4 pt-4 border-t border-slate-100">
           <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Truck className="w-4 h-4 text-amber-600" />
               <div>
-                <div className="text-[10px] text-amber-700 font-medium">ของเข้า RM/PM</div>
+                <div className="text-[10px] text-amber-700 font-medium">ของเข้า RM/PM (21 วัน)</div>
                 <div className="text-sm font-black text-amber-900">{summaryCounts.totalEta} รายการ</div>
               </div>
             </div>
@@ -498,7 +522,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             <div className="flex items-center gap-2">
               <Scale className="w-4 h-4 text-indigo-600" />
               <div>
-                <div className="text-[10px] text-indigo-700 font-medium">เตรียม/ชั่งสาร</div>
+                <div className="text-[10px] text-indigo-700 font-medium">เตรียม/ชั่งสาร (21 วัน)</div>
                 <div className="text-sm font-black text-indigo-900">{summaryCounts.totalWeighing} รอบงาน</div>
               </div>
             </div>
@@ -508,7 +532,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             <div className="flex items-center gap-2">
               <Beaker className="w-4 h-4 text-blue-600" />
               <div>
-                <div className="text-[10px] text-blue-700 font-medium">งานผสม Bulk</div>
+                <div className="text-[10px] text-blue-700 font-medium">งานผสม Bulk (21 วัน)</div>
                 <div className="text-sm font-black text-blue-900">{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
               </div>
             </div>
@@ -518,7 +542,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4 text-emerald-600" />
               <div>
-                <div className="text-[10px] text-emerald-700 font-medium">ไลน์บรรจุ & POF</div>
+                <div className="text-[10px] text-emerald-700 font-medium">ไลน์บรรจุ & POF (21 วัน)</div>
                 <div className="text-sm font-black text-emerald-900">{summaryCounts.totalPacking} รอบงาน</div>
               </div>
             </div>
@@ -528,7 +552,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             <div className="flex items-center gap-2">
               <Gift className="w-4 h-4 text-rose-600" />
               <div>
-                <div className="text-[10px] text-rose-700 font-medium">กำหนดส่งมอบ FG</div>
+                <div className="text-[10px] text-rose-700 font-medium">กำหนดส่งมอบ FG (21 วัน)</div>
                 <div className="text-sm font-black text-rose-900">{summaryCounts.totalFgDue} ล็อต</div>
               </div>
             </div>
@@ -540,7 +564,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         {loading ? (
           <div className="p-12 text-center text-slate-400">
             <Compass className="w-8 h-8 mx-auto mb-3 animate-spin text-[#D4AF37]" />
-            กำลังจัดทำเรดาร์แผนงาน 14 วันข้างหน้า...
+            กำลังจัดทำเรดาร์แผนงาน 21 วัน (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)...
           </div>
         ) : (
           <>
@@ -548,9 +572,9 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             {viewMode === 'timeline' && (
               <div className="space-y-2">
                 <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-amber-200">
-                  <div className="min-w-[1100px] border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
-                    {/* Header: 14 Days */}
-                    <div className="grid grid-cols-[160px_repeat(14,minmax(65px,1fr))] bg-[#F9F7F2] border-b border-slate-200 text-center font-bold text-xs">
+                  <div className="min-w-[1500px] border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                    {/* Header: 21 Days (Column 7 is Today) */}
+                    <div className="grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] bg-[#F9F7F2] border-b border-slate-200 text-center font-bold text-xs">
                       <div className="p-3 text-left text-slate-600 font-bold border-r border-slate-200 flex items-center gap-1.5 bg-slate-100/70">
                         <Layers className="w-3.5 h-3.5 text-[#D4AF37]" /> สายงาน / วันที่
                       </div>
@@ -559,16 +583,24 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                           key={d.dateStr}
                           className={`p-2 border-r border-slate-200/80 flex flex-col items-center justify-center transition-colors ${
                             d.isToday
-                              ? 'bg-amber-100/70 text-amber-900 ring-2 ring-inset ring-[#D4AF37]'
+                              ? 'bg-amber-100/90 text-amber-900 ring-2 ring-inset ring-[#D4AF37] shadow-sm z-10'
+                              : d.isPast
+                              ? 'bg-slate-100/50 text-slate-600'
                               : idx % 2 === 0
                               ? 'bg-white'
                               : 'bg-slate-50/50'
                           }`}
                         >
-                          <div className="text-[10px] font-semibold text-slate-400 uppercase">
-                            {d.isToday ? <span className="text-amber-700 font-bold">📍 วันนี้</span> : d.dayName}
+                          <div className="text-[10px] font-semibold uppercase">
+                            {d.isToday ? (
+                              <span className="text-amber-800 font-bold flex items-center gap-0.5">📍 วันนี้</span>
+                            ) : d.isPast ? (
+                              <span className="text-slate-400">{d.dayName}</span>
+                            ) : (
+                              <span className="text-slate-500">{d.dayName}</span>
+                            )}
                           </div>
-                          <div className="text-sm font-black text-[#4A4238]">
+                          <div className={`text-sm font-black ${d.isToday ? 'text-amber-950 scale-110' : 'text-[#4A4238]'}`}>
                             {d.dayNum}
                           </div>
                           <div className="text-[9px] text-slate-500 font-medium">
@@ -585,7 +617,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                         return (
                           <div
                             key={stream.key}
-                            className="grid grid-cols-[160px_repeat(14,minmax(65px,1fr))] items-stretch hover:bg-slate-50/40 transition-colors"
+                            className="grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] items-stretch hover:bg-slate-50/40 transition-colors"
                           >
                             {/* Stream Name Header */}
                             <div className={`p-3 font-bold border-r border-slate-200 flex items-center gap-2 bg-slate-50/80 ${stream.color}`}>
@@ -593,7 +625,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                               <span className="truncate text-xs">{stream.shortLabel}</span>
                             </div>
 
-                            {/* 14 Day Cells */}
+                            {/* 21 Day Cells */}
                             {horizonDates.map(d => {
                               const items = dateStreamMap[d.dateStr]?.[stream.key] || []
                               const hasItems = items.length > 0
@@ -602,7 +634,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <div
                                   key={d.dateStr}
                                   className={`p-1.5 border-r border-slate-200/80 flex flex-col items-center justify-center min-h-[64px] transition-all ${
-                                    d.isToday ? 'bg-amber-50/30' : ''
+                                    d.isToday ? 'bg-amber-50/40' : d.isPast ? 'bg-slate-50/30' : ''
                                   }`}
                                 >
                                   {hasItems ? (
@@ -652,6 +684,12 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                                 )}
                                               </div>
                                               <div className="text-[11px] text-slate-600 leading-normal">{it.subtitle}</div>
+                                              {it.meta?.isMultiDay && (
+                                                <div className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-2 py-0.5 w-fit font-medium flex items-center gap-1.5 mt-0.5">
+                                                  <CalendarDays className="w-3 h-3 text-[#D4AF37]" />
+                                                  <span>ช่วงแผน: {format(parseISO(it.meta.startDate), 'd MMM')} - {format(parseISO(it.meta.endDate), 'd MMM yyyy')}</span>
+                                                </div>
+                                              )}
                                               {it.lotId && onSelectLot && (
                                                 <button
                                                   type="button"
@@ -685,7 +723,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             {viewMode === 'daily' && (
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {horizonDates.map((d, dIdx) => {
+                  {horizonDates.map((d) => {
                     const dayEta = dateStreamMap[d.dateStr]?.ETA || []
                     const dayWeighing = dateStreamMap[d.dateStr]?.WEIGHING || []
                     const dayMixing = dateStreamMap[d.dateStr]?.MIXING || []
@@ -702,6 +740,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                         className={`rounded-2xl border p-4 shadow-sm transition-all hover:shadow-md ${
                           d.isToday
                             ? 'bg-amber-50/40 border-[#D4AF37] ring-1 ring-[#D4AF37]'
+                            : d.isPast
+                            ? 'bg-slate-50/60 border-slate-200/80'
                             : 'bg-white border-slate-200'
                         }`}
                       >
@@ -709,12 +749,12 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                         <div className="flex justify-between items-center border-b border-slate-100 pb-2 mb-3">
                           <div className="flex items-center gap-2">
                             <span className={`text-xs font-black px-2.5 py-1 rounded-lg ${
-                              d.isToday ? 'bg-[#D4AF37] text-white' : 'bg-slate-100 text-slate-700'
+                              d.isToday ? 'bg-[#D4AF37] text-white' : d.isPast ? 'bg-slate-200 text-slate-700' : 'bg-slate-100 text-slate-700'
                             }`}>
                               {d.isToday ? '📍 วันนี้' : `${d.dayName} ${d.dayNum} ${d.monthName}`}
                             </span>
                             <span className="text-[11px] text-slate-400 font-medium">
-                              {dIdx === 0 ? 'Day 0' : `+${dIdx} วัน`}
+                              {d.isToday ? 'Day 0 (วันนี้)' : d.isPast ? `ย้อนหลัง ${Math.abs(d.dayOffset)} วัน` : `+${d.dayOffset} วัน`}
                             </span>
                           </div>
                           <span className="text-[11px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">
@@ -747,8 +787,13 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>เตรียม/ชั่งสาร ({dayWeighing.length} ล็อต)</span>
                               </div>
                               {dayWeighing.map(w => (
-                                <div key={w.id} className="text-[11px] text-indigo-800 pl-5">
-                                  • <strong>{w.title}</strong> ({w.tag})
+                                <div key={w.id} className="text-[11px] text-indigo-800 pl-5 flex items-center justify-between">
+                                  <span>• <strong>{w.title}</strong> ({w.tag})</span>
+                                  {w.meta?.isMultiDay && (
+                                    <span className="text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                      {format(parseISO(w.meta.startDate), 'd/M')}-{format(parseISO(w.meta.endDate), 'd/M')}
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -762,8 +807,13 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>งานผสม Bulk ({dayMixing.length} ล็อต)</span>
                               </div>
                               {dayMixing.map(m => (
-                                <div key={m.id} className="text-[11px] text-blue-800 pl-5">
-                                  • <strong>{m.title}</strong> <span className="text-blue-600">[{m.tag}]</span>
+                                <div key={m.id} className="text-[11px] text-blue-800 pl-5 flex items-center justify-between">
+                                  <span>• <strong>{m.title}</strong> <span className="text-blue-600">[{m.tag}]</span></span>
+                                  {m.meta?.isMultiDay && (
+                                    <span className="text-[9px] text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                      {format(parseISO(m.meta.startDate), 'd/M')}-{format(parseISO(m.meta.endDate), 'd/M')}
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -777,8 +827,13 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>ไลน์บรรจุ & POF ({dayPacking.length} ล็อต)</span>
                               </div>
                               {dayPacking.map(p => (
-                                <div key={p.id} className="text-[11px] text-emerald-800 pl-5">
-                                  • <strong>{p.title}</strong> <span className="text-emerald-700 font-semibold">{p.tag}</span>
+                                <div key={p.id} className="text-[11px] text-emerald-800 pl-5 flex items-center justify-between">
+                                  <span>• <strong>{p.title}</strong> <span className="text-emerald-700 font-semibold">{p.tag}</span></span>
+                                  {p.meta?.isMultiDay && (
+                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                      {format(parseISO(p.meta.startDate), 'd/M')}-{format(parseISO(p.meta.endDate), 'd/M')}
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -813,14 +868,14 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                   <div className="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center text-xs font-bold text-[#4A4238]">
                     <div className="flex items-center gap-2">
                       <Truck className="w-4 h-4 text-amber-600" />
-                      <span>รายการวัตถุดิบและบรรจุภัณฑ์รอเข้าโรงงาน (ETA Supply Chain 14 วัน)</span>
+                      <span>รายการวัตถุดิบและบรรจุภัณฑ์รอเข้าโรงงาน (ETA Supply Chain 21 วัน)</span>
                     </div>
                     <span className="text-slate-500 font-semibold">ทั้งหมด {radarData.etaList.length} รายการ</span>
                   </div>
 
                   {radarData.etaList.length === 0 ? (
                     <div className="p-8 text-center text-slate-400 text-xs">
-                      ไม่มีกำหนดการของเข้าในช่วง 14 วันนี้
+                      ไม่มีกำหนดการของเข้าในช่วง 21 วันนี้
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-100 text-xs">
