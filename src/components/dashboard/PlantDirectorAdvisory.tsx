@@ -28,12 +28,15 @@ import {
   Search,
   X,
   Sun,
-  Moon
+  Moon,
+  Edit3,
+  RotateCcw
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
 import { parseDelayInfo } from '@/lib/delayTracking'
 import { parsePlanChangeInfo } from '@/lib/planTracking'
+import { createClient } from '@/utils/supabase/client'
 
 export interface PlantDirectorDirective {
   id: string
@@ -80,6 +83,49 @@ export function PlantDirectorAdvisory({
   const [theme, setTheme] = useState<'night' | 'light'>('night')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+
+  // Plant Director (PDT) Custom Directives state & sync
+  const supabase = useMemo(() => createClient(), [])
+  const [customDirectives, setCustomDirectives] = useState<Record<string, { text: string; updatedAt?: string; updatedBy?: string }>>({})
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  // Load custom directives from localStorage and Supabase system_settings
+  React.useEffect(() => {
+    try {
+      const cached = localStorage.getItem('cosmeflow_pdt_custom_directives')
+      if (cached) {
+        setCustomDirectives(JSON.parse(cached))
+      }
+    } catch (e) {
+      console.error('Failed to parse cached custom directives', e)
+    }
+
+    async function loadDirectivesFromDb() {
+      try {
+        const { data, error } = await supabase
+          .from('system_settings')
+          .select('setting_value')
+          .eq('setting_key', 'PLANT_DIRECTOR_CUSTOM_DIRECTIVES')
+          .single()
+
+        if (!error && data?.setting_value && typeof data.setting_value === 'object') {
+          setCustomDirectives(prev => {
+            const merged = { ...prev, ...data.setting_value }
+            try {
+              localStorage.setItem('cosmeflow_pdt_custom_directives', JSON.stringify(merged))
+            } catch {}
+            return merged
+          })
+        }
+      } catch (err) {
+        console.error('Failed to load custom directives from DB', err)
+      }
+    }
+
+    loadDirectivesFromDb()
+  }, [supabase])
 
   React.useEffect(() => {
     if (propTheme) {
@@ -383,7 +429,8 @@ export function PlantDirectorAdvisory({
         const matchTopic = d.topic ? d.topic.toLowerCase().includes(q) : false
         const matchPillar = d.pillarLabel.toLowerCase().includes(q)
         const matchProblem = d.problemStatement.toLowerCase().includes(q)
-        const matchDirective = d.directorDirective.toLowerCase().includes(q)
+        const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
+        const matchDirective = effectiveDirective.toLowerCase().includes(q)
         const matchAction = d.actionItems.some(a => 
           a.dept.toLowerCase().includes(q) || a.action.toLowerCase().includes(q)
         )
@@ -391,7 +438,7 @@ export function PlantDirectorAdvisory({
       })
     }
     return list
-  }, [directives, activeFilter, searchQuery])
+  }, [directives, activeFilter, searchQuery, customDirectives])
 
   const criticalCount = directives.filter(d => d.severity === 'CRITICAL').length
   const warningCount = directives.filter(d => d.severity === 'WARNING').length
@@ -429,6 +476,105 @@ export function PlantDirectorAdvisory({
     })
   }
 
+  // Edit & Customize Directive Handlers (Plant Director PDT)
+  const handleStartEdit = (id: string, defaultText: string) => {
+    setEditingId(id)
+    const current = customDirectives[id]?.text !== undefined ? customDirectives[id].text : defaultText
+    setEditText(current)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditText('')
+  }
+
+  const handleSaveEdit = async (id: string) => {
+    const trimmed = editText.trim()
+    if (!trimmed) {
+      toast.error('กรุณาระบุข้อความข้อสั่งการ')
+      return
+    }
+
+    setSavingId(id)
+    const updatedRecord = {
+      ...customDirectives,
+      [id]: {
+        text: trimmed,
+        updatedAt: new Date().toISOString(),
+        updatedBy: 'Plant Director (PDT)'
+      }
+    }
+
+    setCustomDirectives(updatedRecord)
+    try {
+      localStorage.setItem('cosmeflow_pdt_custom_directives', JSON.stringify(updatedRecord))
+    } catch {}
+
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          {
+            setting_key: 'PLANT_DIRECTOR_CUSTOM_DIRECTIVES',
+            setting_value: updatedRecord,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'setting_key' }
+        )
+
+      if (error) {
+        console.error('Error saving custom directive to DB:', error)
+        toast.warning('บันทึกในเครื่องเรียบร้อย (ระบบคลาวด์กำลังซิงค์)')
+      } else {
+        toast.success('บันทึกข้อสั่งการของ ผอ. เรียบร้อยแล้ว')
+      }
+    } catch (err) {
+      console.error(err)
+      toast.warning('บันทึกในเครื่องเรียบร้อย')
+    } finally {
+      setSavingId(null)
+      setEditingId(null)
+    }
+  }
+
+  const handleResetToAi = async (id: string) => {
+    if (!confirm('คุณต้องการยกเลิกข้อสั่งการที่แก้ไข และคืนค่าเป็นคำแนะนำตั้งต้นของ AI หรือไม่?')) {
+      return
+    }
+
+    setSavingId(id)
+    const updatedRecord = { ...customDirectives }
+    delete updatedRecord[id]
+
+    setCustomDirectives(updatedRecord)
+    try {
+      localStorage.setItem('cosmeflow_pdt_custom_directives', JSON.stringify(updatedRecord))
+    } catch {}
+
+    try {
+      const { error } = await supabase
+        .from('system_settings')
+        .upsert(
+          {
+            setting_key: 'PLANT_DIRECTOR_CUSTOM_DIRECTIVES',
+            setting_value: updatedRecord,
+            updated_at: new Date().toISOString()
+          },
+          { onConflict: 'setting_key' }
+        )
+
+      if (error) {
+        console.error('Error resetting directive in DB:', error)
+      }
+      toast.success('คืนค่าเดิมของ AI เรียบร้อยแล้ว')
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSavingId(null)
+      setEditingId(null)
+    }
+  }
+
   // Copy morning briefing to clipboard
   const handleCopyBriefing = () => {
     const listToCopy = filteredDirectives.length > 0 ? filteredDirectives : directives
@@ -441,7 +587,9 @@ export function PlantDirectorAdvisory({
     const body = listToCopy.map((d, idx) => {
       const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
       const topicTag = d.topic ? `[${d.topic}] ` : ''
-      return `${idx + 1}. ${sevIcon} ${topicTag}${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.: ${d.directorDirective}\n`
+      const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
+      const customTag = customDirectives[d.id]?.text ? ' (✍️ ผอ. ปรับปรุงข้อสั่งการ)' : ''
+      return `${idx + 1}. ${sevIcon} ${topicTag}${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.${customTag}: ${effectiveDirective}\n`
     }).join('\n')
     const footer = `\n==============================\n📌 ขอให้ทุกฝ่ายถือปฏิบัติตามข้อสั่งการอย่างเคร่งครัด\nCosmeFlow AI Operations Intelligence`
 
@@ -1072,12 +1220,21 @@ export function PlantDirectorAdvisory({
 
                                 {/* Collapsed Teaser: One-line snapshot */}
                                 {!isExpanded && (
-                                  <p className={`text-xs truncate font-medium ${
-                                    isNight ? 'text-slate-400' : 'text-slate-600'
-                                  }`}>
-                                    <span className={isNight ? 'text-amber-400 font-bold' : 'text-amber-700 font-bold'}>➔ ข้อสั่งการ: </span>
-                                    {d.directorDirective}
-                                  </p>
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <p className={`text-xs truncate font-medium flex-1 ${
+                                      isNight ? 'text-slate-400' : 'text-slate-600'
+                                    }`}>
+                                      <span className={isNight ? 'text-amber-400 font-bold' : 'text-amber-700 font-bold'}>➔ ข้อสั่งการ: </span>
+                                      {customDirectives[d.id]?.text || d.directorDirective}
+                                    </p>
+                                    {customDirectives[d.id]?.text && (
+                                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 flex items-center gap-1 border ${
+                                        isNight ? 'bg-amber-400/20 text-amber-300 border-amber-500/30' : 'bg-amber-100 text-amber-900 border-amber-300'
+                                      }`}>
+                                        <Edit3 className="w-2.5 h-2.5" /> ผอ. สั่งการเพิ่ม
+                                      </span>
+                                    )}
+                                  </div>
                                 )}
                               </div>
 
@@ -1104,22 +1261,138 @@ export function PlantDirectorAdvisory({
                                   </div>
 
                                   {/* Plant Director Guide & Action Items */}
-                                  <div className={`p-3.5 rounded-xl border space-y-2 ${
+                                  <div className={`p-3.5 rounded-xl border space-y-2.5 ${
                                     isNight
                                       ? 'bg-gradient-to-r from-amber-950/30 via-slate-900/90 to-slate-950/90 border-[#D4AF37]/50'
                                       : 'bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/70 border-amber-300/80 shadow-sm'
                                   }`}>
-                                    <div className={`flex items-center gap-1.5 text-xs font-black ${
-                                      isNight ? 'text-[#D4AF37]' : 'text-amber-900'
-                                    }`}>
-                                      <Crown className={`w-4 h-4 ${isNight ? 'text-[#D4AF37]' : 'text-[#B8860B]'}`} />
-                                      <span>ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide):</span>
+                                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                                      <div className={`flex items-center gap-1.5 text-xs font-black ${
+                                        isNight ? 'text-[#D4AF37]' : 'text-amber-900'
+                                      }`}>
+                                        <Crown className={`w-4 h-4 ${isNight ? 'text-[#D4AF37]' : 'text-[#B8860B]'}`} />
+                                        <span>ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide):</span>
+                                        {customDirectives[d.id]?.text && (
+                                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
+                                            isNight ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-amber-100 text-amber-800 border-amber-300'
+                                          }`}>
+                                            ✍️ ปรับปรุงโดย ผอ. (PDT)
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      {/* Edit / Add Directive Button */}
+                                      {editingId !== d.id && (
+                                        <button
+                                          type="button"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            handleStartEdit(d.id, d.directorDirective)
+                                          }}
+                                          className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border flex items-center gap-1.5 transition active:scale-95 ${
+                                            isNight
+                                              ? 'bg-slate-800 hover:bg-slate-700 text-amber-300 border-amber-500/40 shadow-sm'
+                                              : 'bg-white hover:bg-amber-50 text-amber-900 border-amber-300 shadow-sm'
+                                          }`}
+                                          title="แก้ไขหรือพิมพ์ข้อสั่งการเพิ่มเติมสำหรับประเด็นนี้"
+                                        >
+                                          <Edit3 className="w-3 h-3 text-amber-500" />
+                                          <span>{customDirectives[d.id]?.text ? 'แก้ไขข้อสั่งการ' : 'แก้ไข / สั่งการเพิ่ม'}</span>
+                                        </button>
+                                      )}
                                     </div>
-                                    <p className={`text-xs leading-relaxed font-medium pl-3 border-l-2 ${
-                                      isNight ? 'text-amber-100/95 border-[#D4AF37]' : 'text-slate-800 border-[#D4AF37]'
-                                    }`}>
-                                      {d.directorDirective}
-                                    </p>
+
+                                    {/* Directives Content: Editing vs View Mode */}
+                                    {editingId === d.id ? (
+                                      <div className="space-y-2 pt-1" onClick={(e) => e.stopPropagation()}>
+                                        <div className="relative">
+                                          <textarea
+                                            value={editText}
+                                            onChange={(e) => setEditText(e.target.value)}
+                                            rows={3}
+                                            placeholder="พิมพ์ข้อสั่งการ แนวทางแก้ไข หรือคำแนะนำเพิ่มเติมของ ผอ.โรงงาน..."
+                                            className={`w-full p-2.5 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#D4AF37] border leading-relaxed transition ${
+                                              isNight
+                                                ? 'bg-slate-950 border-amber-500/50 text-white placeholder:text-slate-500'
+                                                : 'bg-white border-amber-400 text-slate-900 placeholder:text-slate-400 shadow-inner'
+                                            }`}
+                                            autoFocus
+                                          />
+                                        </div>
+
+                                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                                          <div className="flex items-center gap-2">
+                                            {customDirectives[d.id]?.text && (
+                                              <button
+                                                type="button"
+                                                disabled={savingId === d.id}
+                                                onClick={() => handleResetToAi(d.id)}
+                                                className={`text-[11px] font-medium px-2.5 py-1 rounded-lg flex items-center gap-1 transition ${
+                                                  isNight 
+                                                    ? 'text-slate-400 hover:text-rose-300 hover:bg-slate-800' 
+                                                    : 'text-slate-500 hover:text-rose-600 hover:bg-rose-50'
+                                                }`}
+                                                title="ยกเลิกข้อสั่งการที่แก้ไข และคืนค่าเป็นข้อความเริ่มต้นของ AI"
+                                              >
+                                                <RotateCcw className="w-3 h-3" />
+                                                <span>คืนค่าเดิมของ AI</span>
+                                              </button>
+                                            )}
+                                          </div>
+
+                                          <div className="flex items-center gap-2">
+                                            <button
+                                              type="button"
+                                              disabled={savingId === d.id}
+                                              onClick={handleCancelEdit}
+                                              className={`text-xs px-3 py-1.5 rounded-xl font-bold border transition ${
+                                                isNight
+                                                  ? 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                                                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
+                                              }`}
+                                            >
+                                              ยกเลิก
+                                            </button>
+                                            <button
+                                              type="button"
+                                              disabled={savingId === d.id}
+                                              onClick={() => handleSaveEdit(d.id)}
+                                              className="text-xs px-3.5 py-1.5 rounded-xl font-bold bg-gradient-to-r from-[#D4AF37] to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-950 shadow-md flex items-center gap-1.5 active:scale-95 transition"
+                                            >
+                                              {savingId === d.id ? (
+                                                <>
+                                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                                  <span>กำลังบันทึก...</span>
+                                                </>
+                                              ) : (
+                                                <>
+                                                  <CheckCircle2 className="w-3.5 h-3.5" />
+                                                  <span>บันทึกข้อสั่งการ</span>
+                                                </>
+                                              )}
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        <p className={`text-xs leading-relaxed font-medium pl-3 border-l-2 ${
+                                          isNight ? 'text-amber-100/95 border-[#D4AF37]' : 'text-slate-800 border-[#D4AF37]'
+                                        }`}>
+                                          {customDirectives[d.id]?.text || d.directorDirective}
+                                        </p>
+                                        {customDirectives[d.id]?.updatedAt && (
+                                          <p className={`text-[10px] pl-3 mt-1.5 flex items-center gap-1 ${
+                                            isNight ? 'text-amber-400/70' : 'text-amber-700/80'
+                                          }`}>
+                                            <Clock className="w-3 h-3" />
+                                            <span>
+                                              แก้ไขล่าสุดเมื่อ {format(parseISO(customDirectives[d.id].updatedAt!), 'dd/MM/yyyy HH:mm')} น. โดย ผอ. (PDT)
+                                            </span>
+                                          </p>
+                                        )}
+                                      </div>
+                                    )}
 
                                     {/* Department Action Checkpoints */}
                                     <div className={`pt-2 border-t space-y-1 text-xs ${
