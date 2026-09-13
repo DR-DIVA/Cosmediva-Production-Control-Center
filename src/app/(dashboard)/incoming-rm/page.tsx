@@ -515,7 +515,7 @@ export default function RMControlCenterPage() {
       bottom_remark: formattedRemark
     };
 
-    if (isEtaChanged) {
+    if (isEtaChanged || editingItem.status === 'DELAYED') {
       updatePayload.status = 'DELAYED';
     }
 
@@ -532,7 +532,8 @@ export default function RMControlCenterPage() {
 
   const originalCommittedEta = (item: RMItem) => {
     const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status);
-    return dInfo.originalEta || item.eta_date || '';
+    const raw = dInfo.originalEta || item.eta_date || '';
+    return raw ? raw.split('T')[0] : '';
   };
 
   const handleDelete = async (id: string) => {
@@ -1289,7 +1290,31 @@ export default function RMControlCenterPage() {
                           <TableCell className="font-medium text-[#D4AF37]">{item.po_no || '-'}</TableCell>
                           <TableCell className="line-clamp-2 break-words text-wrap" title={item.supplier}>{item.supplier || '-'}</TableCell>
                           <TableCell>{item.po_date ? new Date(item.po_date).toLocaleDateString('th-TH') : '-'}</TableCell>
-                          <TableCell>{item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-'}</TableCell>
+                          <TableCell>
+                            {(() => {
+                              const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status);
+                              const hasRevised = dInfo.originalEta && item.eta_date && dInfo.originalEta.split('T')[0] !== item.eta_date.split('T')[0];
+                              return (
+                                <div className="flex flex-col">
+                                  {hasRevised ? (
+                                    <>
+                                      <span className="text-orange-600 font-bold flex items-center gap-1">
+                                        <Clock className="w-3 h-3 text-orange-500 shrink-0" />
+                                        {new Date(item.eta_date).toLocaleDateString('th-TH')}
+                                      </span>
+                                      <span className="text-[10px] text-slate-400 line-through" title="กำหนดส่งแรกสุดตาม PO (ใช้คิด KPI/OTIF)">
+                                        PO: {new Date(dInfo.originalEta!).toLocaleDateString('th-TH')}
+                                      </span>
+                                    </>
+                                  ) : item.eta_date ? (
+                                    <span>{new Date(item.eta_date).toLocaleDateString('th-TH')}</span>
+                                  ) : (
+                                    '-'
+                                  )}
+                                </div>
+                              );
+                            })()}
+                          </TableCell>
                           <TableCell>{item.rm_code}</TableCell>
                           <TableCell className="line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</TableCell>
                           <TableCell className="text-right font-semibold">{item.quantity} {item.unit}</TableCell>
@@ -1307,8 +1332,8 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => openSplitModal(item)} 
-                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-purple-400 hover:text-purple-600 hover:bg-purple-50'}`}
+                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-purple-400 hover:text-purple-600 hover:bg-purple-50'}`}
                                 title="แยกงวดส่งของ (Split Delivery)"
                               >
                                 <Scissors className="w-4 h-4" />
@@ -1317,8 +1342,9 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => openEditModal(item)} 
-                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                                title="แก้ไขรายการ / เลื่อน ETA"
                               >
                                 <Edit className="w-4 h-4" />
                               </Button>
@@ -1326,8 +1352,9 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => handleDelete(item.id)} 
-                                disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                                title="ลบรายการ"
                               >
                                  <Trash2 className="w-4 h-4" />
                               </Button>
@@ -1446,10 +1473,15 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                             <Select value={item.status || ''} onValueChange={(val) => handleStatusChange(item, val as string)} disabled={item.status !== 'PENDING_DELIVERY' || !(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}>
+                             <Select 
+                               value={item.status || ''} 
+                               onValueChange={(val) => handleStatusChange(item, val as string)} 
+                               disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                             >
                                 <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                   <SelectItem value="PENDING_DELIVERY">รอรับเข้า</SelectItem>
+                                  {item.status === 'DELAYED' && <SelectItem value="DELAYED">ล่าช้า (รอรับเข้า)</SelectItem>}
                                   <SelectItem value="RECEIVED">รับของแล้ว</SelectItem>
                                 </SelectContent>
                              </Select>
@@ -2024,8 +2056,21 @@ export default function RMControlCenterPage() {
                 <Input value={editForm.unit} onChange={e => setEditForm({...editForm, unit: e.target.value})} className="w-24 placeholder:text-slate-400 text-xs" placeholder="Unit" />
               </div>
             </div>
+            {editingItem && (
+              <div className="grid grid-cols-4 items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
+                <Label className="text-right font-bold text-slate-500 text-[11px]">Original ETA (PO)</Label>
+                <div className="col-span-3 text-xs font-semibold text-slate-700 flex items-center justify-between">
+                  <span className="font-mono text-slate-800">
+                    {originalCommittedEta(editingItem) ? new Date(originalCommittedEta(editingItem)).toLocaleDateString('th-TH') : 'ตาม PO'}
+                  </span>
+                  <Badge variant="outline" className="text-[10px] bg-amber-50 text-amber-700 border-amber-200">
+                    ล็อกถาวรสำหรับคิด KPI / OTIF
+                  </Badge>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-4 items-center gap-3">
-              <Label className="text-right font-bold text-rose-700">ETA Date</Label>
+              <Label className="text-right font-bold text-rose-700">Revised ETA</Label>
               <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="col-span-3 text-xs font-mono font-bold text-rose-900 border-rose-300" />
             </div>
 

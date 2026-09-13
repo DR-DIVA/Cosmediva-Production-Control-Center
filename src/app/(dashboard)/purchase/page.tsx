@@ -199,7 +199,9 @@ export default function PurchasePage() {
     const toastId = toast.loading('กำลังบันทึกสาเหตุการเลื่อนส่ง...')
 
     try {
-      const originalCommittedEta = selectedItem.eta_date || ''
+      const existing = parseDelayInfo(selectedItem.bottom_remark, selectedItem.eta_date, selectedItem.receive_date, selectedItem.status)
+      const rawOriginal = existing.originalEta || selectedItem.eta_date || ''
+      const originalCommittedEta = rawOriginal ? rawOriginal.split('T')[0] : ''
       const updatedRemark = formatDelayRemark(selectedItem.bottom_remark, {
         originalEta: originalCommittedEta,
         revisedEta: revisedEta,
