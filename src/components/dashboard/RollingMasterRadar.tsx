@@ -29,6 +29,8 @@ import {
 import { format, addDays, isSameDay, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { parseDelayInfo } from '@/lib/delayTracking'
+import { parsePlanChangeInfo } from '@/lib/planTracking'
+import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvisory'
 
 interface RollingMasterRadarProps {
   startDateStr?: string
@@ -297,15 +299,33 @@ function computeOperationalStatus(
     }
   }
 
-  // Waiting / Planned
+  // Rescheduled plan check
+  const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+  if (planInfo.isRescheduled) {
+    const origStr = planInfo.originalDate ? new Date(planInfo.originalDate).toLocaleDateString('th-TH') : '-'
+    const revStr = planInfo.revisedDate ? new Date(planInfo.revisedDate).toLocaleDateString('th-TH') : '-'
+    return {
+      badge: `🔄 เลื่อนแผน (${planInfo.categoryLabel || 'ปรับแผน'})`,
+      shortBadge: 'เลื่อนแผน',
+      type: 'planned',
+      color: 'bg-purple-50 text-purple-700 border-purple-200/80',
+      dotColor: 'bg-purple-500',
+      startTimeStr: startTime,
+      endTimeStr: endTime,
+      note,
+      detailsText: `แผนเดิม: ${origStr} ➔ แผนใหม่: ${revStr}${planInfo.reason ? ` (${planInfo.reason})` : ''}`
+    }
+  }
+
+  // Waiting / Planned (Overdue past scheduled date)
   if (cellDate < todayStr) {
     return {
-      badge: '⚠️ ล่าช้ากว่าแผน',
-      shortBadge: 'ล่าช้า',
+      badge: '⚠️ แผนค้าง (รอทบทวนวัน)',
+      shortBadge: 'แผนค้าง',
       type: 'overdue',
       color: 'bg-amber-50 text-amber-700 border-amber-200/80',
       dotColor: 'bg-amber-500',
-      detailsText: 'เลยวันตามแผนงานแล้ว แต่ยังไม่มีการกดเริ่มงาน'
+      detailsText: 'เลยวันตามแผนงานแล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่'
     }
   }
 
@@ -687,7 +707,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
     : streamsConfig.filter(s => s.key === streamFilter)
 
   return (
-    <Card className="bg-white border-[#D4AF37]/35 shadow-2xl rounded-2xl overflow-hidden relative mb-8">
+    <div className="space-y-6">
+      <Card className="bg-white border-[#D4AF37]/35 shadow-2xl rounded-2xl overflow-hidden relative">
       {/* Decorative Gold Accent Bar */}
       <div className="h-1.5 bg-gradient-to-r from-[#D4AF37] via-amber-400 to-[#D4AF37]"></div>
 
@@ -1398,5 +1419,15 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         )}
       </CardContent>
     </Card>
+
+    {/* AI Plant Director Strategic Directives & Advisory Panel */}
+    <PlantDirectorAdvisory
+      etaList={radarData.etaList}
+      logsList={radarData.logsList}
+      fgDueLots={radarData.fgDueLots}
+      horizonDates={horizonDates}
+      onSelectLot={onSelectLot}
+    />
+  </div>
   )
 }

@@ -40,6 +40,12 @@ import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
 import { canEditRoute } from "@/lib/permissions"
 import { TaskCalendar } from "@/components/ui/TaskCalendar"
+import { 
+  PLAN_CHANGE_CATEGORIES, 
+  parsePlanChangeInfo, 
+  formatPlanChangeNote, 
+  getPlanCategoryLabel 
+} from "@/lib/planTracking"
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -95,6 +101,22 @@ export default function PlannerPage() {
   const [doneFgAmount, setDoneFgAmount] = useState("")
   const [doneCanClosePo, setDoneCanClosePo] = useState("yes")
   const [doneReason, setDoneReason] = useState("")
+
+  // Plan Reschedule Dialog State
+  const [rescheduleModal, setRescheduleModal] = useState<{
+    isOpen: boolean
+    logId: string
+    lotNo: string
+    sku: string
+    processName: string
+    originalDate: string
+    newDate: string
+    field: 'activity_date' | 'end_date'
+    category: string
+    reason: string
+    currentNote: string
+    revisionCount: number
+  } | null>(null)
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -383,6 +405,103 @@ export default function PlannerPage() {
       }
   }
 
+  const handleDateInputChange = (log: any, lot: any, process: any, field: 'activity_date' | 'end_date', newDateValue: string) => {
+    if (!newDateValue) {
+      handleUpdateLogDirect(log.id, field, newDateValue)
+      return
+    }
+
+    const currentVal = log[field]
+    // If it's a new task with no date set yet, just set it directly
+    if (!currentVal) {
+      handleUpdateLogDirect(log.id, field, newDateValue)
+      return
+    }
+
+    // If date hasn't changed, do nothing
+    if (currentVal === newDateValue) return
+
+    // It's an existing plan date being modified -> Open Reschedule Modal to track reason
+    const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+    setRescheduleModal({
+      isOpen: true,
+      logId: log.id,
+      lotNo: lot?.lot_no || '-',
+      sku: lot?.products?.sku || lot?.products?.product_name || '-',
+      processName: process?.process_name || 'งานผลิต',
+      originalDate: planInfo.originalDate || currentVal, // preserve first baseline plan date
+      newDate: newDateValue,
+      field,
+      category: planInfo.category || 'WAIT_RM_PM',
+      reason: planInfo.reason || '',
+      currentNote: log.note || '',
+      revisionCount: (planInfo.revisionCount || 0) + 1
+    })
+  }
+
+  const handleOpenRescheduleDetail = (log: any, lot: any, process: any) => {
+    const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+    setRescheduleModal({
+      isOpen: true,
+      logId: log.id,
+      lotNo: lot?.lot_no || '-',
+      sku: lot?.products?.sku || lot?.products?.product_name || '-',
+      processName: process?.process_name || 'งานผลิต',
+      originalDate: planInfo.originalDate || log.activity_date || '',
+      newDate: log.activity_date || '',
+      field: 'activity_date',
+      category: planInfo.category || 'WAIT_RM_PM',
+      reason: planInfo.reason || '',
+      currentNote: log.note || '',
+      revisionCount: planInfo.revisionCount || 1
+    })
+  }
+
+  const handleConfirmReschedule = async () => {
+    if (!rescheduleModal) return
+    const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+
+    const formattedNote = formatPlanChangeNote(currentNote, {
+      originalDate,
+      revisedDate: newDate,
+      category,
+      reason,
+      updatedBy: currentUser !== 'Unknown User' ? currentUser.split('@')[0] : 'Planner',
+      revisionCount
+    })
+
+    const updateData: any = { 
+      [field]: newDate,
+      note: formattedNote
+    }
+
+    // If updating activity_date and end_date was same as old activity_date, adjust end_date too
+    const existingLog = logs.find(l => l.id === logId)
+    if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
+      updateData.end_date = newDate
+    }
+
+    // Optimistic Update
+    setLogs(logs.map(l => l.id === logId ? { ...l, ...updateData } : l))
+    setRescheduleModal(null)
+
+    try {
+      const { error } = await supabase.from("production_logs").update(updateData).eq("id", logId)
+      if (error) throw error
+      toast.success("บันทึกการปรับเลื่อนแผนงานเรียบร้อย")
+    } catch (e: any) {
+      toast.error("อัปเดตไม่สำเร็จ: " + e.message)
+      fetchData()
+    }
+  }
+
+  const handleQuickRescheduleWithoutReason = async () => {
+    if (!rescheduleModal) return
+    const { logId, field, newDate } = rescheduleModal
+    setRescheduleModal(null)
+    await handleUpdateLogDirect(logId, field, newDate)
+  }
+
   const getSortedLotLogs = (lotId: string) => {
     return logs.filter(l => l.production_lot_id === lotId).sort((a, b) => {
       const processA = processes.find(p => p.id === a.process_id)?.process_name || "";
@@ -434,13 +553,15 @@ export default function PlannerPage() {
     const taskHistory = logs.map(log => {
       const lot = lots.find(l => l.id === log.production_lot_id);
       const process = processes.find(p => p.id === log.process_id);
+      const planInfo = parsePlanChangeInfo(log.note, log.activity_date);
+      const isRescheduled = planInfo.isRescheduled;
       return {
         id: `log-${log.id}`,
-        type: 'ลงคิวงาน',
+        type: isRescheduled ? 'ปรับเลื่อนแผน' : 'ลงคิวงาน',
         project: `${lot?.po_no || '-'} / ${lot?.products?.sku || 'Unknown SKU'}`,
         timestamp: log.updated_at || log.created_at,
         user: getUserName(log.created_by || log.operator_id),
-        details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}`
+        details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}${isRescheduled ? ` [🔄 เลื่อนจาก ${planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yyyy') : '-'}: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}]` : ''}`
       }
     });
 
@@ -1338,23 +1459,46 @@ export default function PlannerPage() {
                                 <span className="text-xs text-slate-500">)</span>
                               </div>
                             </TableCell>
-                            <TableCell className="py-2">
-                              <Input 
-                                disabled={!canEdit}
-                                type="date" 
-                                className="h-8 text-xs w-[130px] bg-white" 
-                                value={log.activity_date || ""} 
-                                onChange={(e) => handleUpdateLogDirect(log.id, "activity_date", e.target.value)}
-                              />
-                            </TableCell>
-                            <TableCell className="py-2">
-                              <Input 
-                                type="date" 
-                                className="h-8 text-xs w-[130px]" 
-                                value={log.end_date || ""} 
-                                onChange={(e) => handleUpdateLogDirect(log.id, "end_date", e.target.value)}
-                              />
-                            </TableCell>
+                            {(() => {
+                              const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+                              return (
+                                <>
+                                  <TableCell className="py-2">
+                                    <div className="flex flex-col gap-1">
+                                      <Input 
+                                        disabled={!canEdit}
+                                        type="date" 
+                                        className={cn(
+                                          "h-8 text-xs w-[130px] bg-white transition-colors", 
+                                          planInfo.isRescheduled && "border-amber-400 bg-amber-50/50 text-amber-900 font-medium"
+                                        )} 
+                                        value={log.activity_date || ""} 
+                                        onChange={(e) => handleDateInputChange(log, lot, process, "activity_date", e.target.value)}
+                                      />
+                                      {planInfo.isRescheduled && (
+                                        <button 
+                                          type="button"
+                                          onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                          title={`คลิกเพื่อดู/แก้ไขบันทึกเลื่อนแผน (เดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel})`}
+                                          className="text-[10px] text-amber-800 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit transition-colors text-left font-medium"
+                                        >
+                                          <span>🔄 เดิม:</span>
+                                          <span>{planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yy') : '-'}</span>
+                                        </button>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="py-2">
+                                    <Input 
+                                      type="date" 
+                                      className="h-8 text-xs w-[130px]" 
+                                      value={log.end_date || ""} 
+                                      onChange={(e) => handleDateInputChange(log, lot, process, "end_date", e.target.value)}
+                                    />
+                                  </TableCell>
+                                </>
+                              )
+                            })()}
                             <TableCell className="py-2">
                               <Select 
                                 value={log.status || "PLANNED"} 
@@ -1762,6 +1906,125 @@ export default function PlannerPage() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDoneDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={submitMarkAsDone} className="bg-emerald-600 hover:bg-emerald-700 text-white">ยืนยันปิดงาน</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Plan Reschedule Dialog */}
+      <Dialog open={!!rescheduleModal?.isOpen} onOpenChange={(open) => !open && setRescheduleModal(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-800 text-base">
+              <span className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-700 text-base">
+                🔄
+              </span>
+              บันทึกการปรับเลื่อนแผนงานผลิต
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              ระบบบันทึกประวัติการปรับวัน เพื่อใช้ประเมิน Schedule Adherence KPI และให้ AI Plant Director วิเคราะห์ผลกระทบ
+            </DialogDescription>
+          </DialogHeader>
+
+          {rescheduleModal && (
+            <div className="space-y-4 py-2 text-sm">
+              {/* Context Summary */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Lot No:</span>
+                  <span className="font-semibold text-slate-800">{rescheduleModal.lotNo}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">SKU / สินค้า:</span>
+                  <span className="font-medium text-slate-700">{rescheduleModal.sku}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ขั้นตอนการผลิต:</span>
+                  <span className="font-semibold text-blue-700">{rescheduleModal.processName}</span>
+                </div>
+              </div>
+
+              {/* Date Comparison */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-amber-50/60 rounded-lg border border-amber-200">
+                <div>
+                  <div className="text-[11px] text-amber-800 font-medium mb-1">📅 กำหนดเดิมตามแผน (Baseline)</div>
+                  <div className="text-sm font-bold text-slate-700">
+                    {rescheduleModal.originalDate ? format(new Date(rescheduleModal.originalDate), 'dd/MM/yyyy') : '-'}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-emerald-800 font-medium mb-1">🎯 กำหนดวันใหม่ (Revised)</div>
+                  <div className="text-sm font-bold text-emerald-700">
+                    {rescheduleModal.newDate ? format(new Date(rescheduleModal.newDate), 'dd/MM/yyyy') : '-'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Reason Category */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  สาเหตุหลักที่ต้องปรับเลื่อนแผน <span className="text-red-500">*</span>
+                </Label>
+                <Select 
+                  value={rescheduleModal.category} 
+                  onValueChange={(val) => setRescheduleModal({ ...rescheduleModal, category: val || 'WAIT_RM_PM' })}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-white">
+                    <SelectValue placeholder="เลือกหมวดหมู่สาเหตุ" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PLAN_CHANGE_CATEGORIES.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                        {cat.icon} {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Additional Note */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  รายละเอียดเพิ่มเติม / หมายเหตุของฝ่ายวางแผน
+                </Label>
+                <Textarea 
+                  placeholder="เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"
+                  value={rescheduleModal.reason}
+                  onChange={(e) => setRescheduleModal({ ...rescheduleModal, reason: e.target.value })}
+                  className="text-xs min-h-[70px] resize-none bg-white"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
+            <Button 
+              type="button" 
+              variant="ghost" 
+              size="sm" 
+              className="text-xs text-slate-500 hover:text-slate-700 w-full sm:w-auto"
+              onClick={handleQuickRescheduleWithoutReason}
+            >
+              ปรับวันโดยไม่บันทึกสาเหตุ
+            </Button>
+            <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                className="text-xs"
+                onClick={() => setRescheduleModal(null)}
+              >
+                ยกเลิก
+              </Button>
+              <Button 
+                type="button" 
+                size="sm" 
+                className="text-xs bg-[#0B192C] text-white hover:bg-[#1E3E62]"
+                onClick={handleConfirmReschedule}
+              >
+                💾 บันทึกการเลื่อนแผน
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
