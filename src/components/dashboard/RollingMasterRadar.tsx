@@ -1091,10 +1091,18 @@ export function RollingMasterRadar({
       return c.startsWith('cmd1') || c.startsWith('cmd2') || c.startsWith('p')
     }
 
-    // A. RM and PM Inbound Quality Checks
+    // A. RM and PM Inbound Quality Checks (Only items that have been received or sent to QC)
     radarData.etaList.forEach(item => {
+      // Must be physically received by the warehouse before QC can inspect it!
+      const isReceived = item.status === 'RECEIVED' || !!item.receive_date
+      const hasExplicitQc = !!item.qc_status && item.qc_status !== 'NONE'
+
+      // If not received yet, it belongs ONLY in Stream 1 (ETA RM/PM), NOT in the QC stream!
+      if (!isReceived && !hasExplicitQc) return
+
       const isPM = isMaterialPM(item.rm_code)
-      const targetDate = item.receive_date || item.eta_date
+      // The QC date is the date it was received at the factory
+      const targetDate = item.receive_date || (item.created_at ? item.created_at.split('T')[0] : item.eta_date)
       if (!targetDate || !map[targetDate]) return
 
       const rawQcStatus = item.qc_status || (item.status === 'RECEIVED' ? 'WAITING' : item.status === 'READY' ? 'PASSED' : item.status)
@@ -1120,11 +1128,21 @@ export function RollingMasterRadar({
       })
     })
 
-    // B. Bulk Quality Checks (Logs with "รอ QC" or mixing tank checks)
+    // B. Bulk Quality Checks (Logs with "รอ QC" or mixing tank checks with actual QC activity)
     radarData.logsList.forEach(log => {
       const pName = (log.processes?.process_name || '').toLowerCase()
       const isQcProc = pName === 'รอ qc' || pName.includes('รอ qc') || pName.includes('qc bulk')
-      const isMixingWithQc = (pName.includes('ผสม') || pName.includes('mix')) && (log.qc_status || log.tank_details)
+
+      // Check if tank_details has genuine QC actions (QC_PASS, HOLD, PAUSED, REPROCESS, SENT_TO_QC)
+      let hasTankQcActivity = false
+      if (log.tank_details && typeof log.tank_details === 'object') {
+        const vals = Object.values(log.tank_details)
+        hasTankQcActivity = vals.some((v: any) => {
+          const s = typeof v === 'string' ? v : v?.status
+          return s === 'QC_PASS' || s === 'HOLD' || s === 'PAUSED' || s === 'REPROCESS' || s === 'SENT_TO_QC'
+        })
+      }
+      const isMixingWithQc = (pName.includes('ผสม') || pName.includes('mix')) && (log.qc_status || hasTankQcActivity)
 
       if (isQcProc || isMixingWithQc) {
         const lot = log.production_lots
