@@ -44,7 +44,9 @@ import {
   PLAN_CHANGE_CATEGORIES, 
   parsePlanChangeInfo, 
   formatPlanChangeNote, 
-  getPlanCategoryLabel 
+  getPlanCategoryLabel,
+  cleanDisplayNote,
+  extractUserComment
 } from "@/lib/planTracking"
 
 const supabase = createClient(
@@ -433,8 +435,8 @@ export default function PlannerPage() {
       newDate: newDateValue,
       field,
       category: planInfo.category || 'WAIT_RM_PM',
-      reason: planInfo.reason || '',
-      currentNote: log.note || '',
+      reason: planInfo.reason ? cleanDisplayNote(planInfo.reason) : '',
+      currentNote: extractUserComment(log.note),
       revisionCount: (planInfo.revisionCount || 0) + 1
     })
   }
@@ -451,8 +453,8 @@ export default function PlannerPage() {
       newDate: log.activity_date || '',
       field: 'activity_date',
       category: planInfo.category || 'WAIT_RM_PM',
-      reason: planInfo.reason || '',
-      currentNote: log.note || '',
+      reason: planInfo.reason ? cleanDisplayNote(planInfo.reason) : '',
+      currentNote: extractUserComment(log.note),
       revisionCount: planInfo.revisionCount || 1
     })
   }
