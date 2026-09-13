@@ -959,16 +959,39 @@ export default function DashboardPage() {
       />
       
       {/* 🏭 Digital Twin Pipeline (Placed directly after AI Plant Director Strategic Directives) */}
-      <div className={`rounded-2xl shadow-xl border p-6 mt-6 overflow-hidden transition-colors duration-300 ${
-        isNightPipeline ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
-      }`}>
+      <div 
+        id="digital-twin-pipeline"
+        className={`rounded-2xl shadow-xl border p-6 mt-6 overflow-hidden transition-colors duration-300 ${
+          isNightPipeline ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+        }`}
+      >
         <div className={`flex justify-between items-center mb-6 border-b pb-4 ${
           isNightPipeline ? 'border-slate-800' : 'border-[#D4AF37]/30'
         }`}>
-          <h3 className={`text-lg font-bold flex items-center gap-3 ${isNightPipeline ? 'text-white' : 'text-[#4A4238]'}`}>
-            <Factory className="w-5 h-5 text-yellow-400" />
-            Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : <span className="text-yellow-400">LOT {filteredLots[0]?.lot_no}</span>}
-          </h3>
+          <div className="flex items-center gap-3 flex-wrap">
+            <h3 className={`text-lg font-bold flex items-center gap-3 ${isNightPipeline ? 'text-white' : 'text-[#4A4238]'}`}>
+              <Factory className="w-5 h-5 text-yellow-400" />
+              Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : (
+                <span className="text-yellow-400 font-black">
+                  LOT {filteredLots[0]?.lot_no || selectedFilter} {filteredLots[0]?.products?.sku ? `(${filteredLots[0].products.sku})` : ''}
+                </span>
+              )}
+            </h3>
+            {selectedFilter !== 'all' && (
+              <button
+                type="button"
+                onClick={() => setSelectedFilter('all')}
+                className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition flex items-center gap-1 ${
+                  isNightPipeline 
+                    ? 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-700' 
+                    : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                }`}
+                title="คลิกเพื่อแสดงทุกออเดอร์ในโรงงาน"
+              >
+                ✕ แสดงทุกออเดอร์ (ล้างตัวกรอง)
+              </button>
+            )}
+          </div>
           <ThemeToggleButton 
             isNight={isNightPipeline} 
             onToggle={toggleThemePipeline} 

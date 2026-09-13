@@ -46,6 +46,7 @@ export interface PlantDirectorDirective {
   topic?: string
   severity: 'CRITICAL' | 'WARNING' | 'OPPORTUNITY'
   title: string
+  lotId?: string
   lotNo?: string
   sku?: string
   poNo?: string
@@ -211,6 +212,7 @@ export function PlantDirectorAdvisory({
             topic: 'วัตถุดิบเข้าช้ากว่าคิวงาน',
             severity: 'CRITICAL',
             title: `วัตถุดิบเข้าช้ากว่าคิวงาน: ${rm.rm_name || rm.rm_code}`,
+            lotId: affectedLog.production_lots?.id,
             lotNo,
             sku,
             poNo: rm.po_no,
@@ -264,6 +266,7 @@ export function PlantDirectorAdvisory({
       Object.entries(overdueLotMap).slice(0, 3).forEach(([lotNo, tks]) => {
         const first = tks[0]
         const sku = first.production_lots?.products?.sku || 'SKU'
+        const lotId = first.production_lots?.id
         const pPlan = parsePlanChangeInfo(first.note, first.activity_date)
 
         list.push({
@@ -274,6 +277,7 @@ export function PlantDirectorAdvisory({
           topic: 'คิวงานค้างรอทบทวนวันผลิต',
           severity: 'CRITICAL',
           title: `คิวงานค้างรอทบทวนวันผลิต: LOT ${lotNo} (${sku})`,
+          lotId,
           lotNo,
           sku,
           problemStatement: `พบคิวงาน ${tks.length} รายการ (เช่น ${first.processes?.process_name || 'งานผลิต'} ถัง ${first.tank_start}-${first.tank_end}) เลยวันตามแผน (${first.activity_date}) แต่หน้างานยังไม่ได้กดเริ่มงาน อาจทำให้รายงาน Master Radar แสดงผลคลาดเคลื่อน`,
@@ -334,6 +338,7 @@ export function PlantDirectorAdvisory({
 
     if (qcWaitingLogs.length > 0) {
       qcWaitingLogs.slice(0, 2).forEach(l => {
+        const lotId = l.production_lots?.id
         const lotNo = l.production_lots?.lot_no || 'N/A'
         const sku = l.production_lots?.products?.sku || 'SKU'
         const isHold = l.qc_status === 'HOLD'
@@ -345,6 +350,7 @@ export function PlantDirectorAdvisory({
           topic: isHold ? 'ติดปัญหา NC/ Hold/ Reprocess' : 'เร่งรัดผลตรวจ QC (RM, PM, Bulk, FG)',
           severity: isHold ? 'CRITICAL' : 'WARNING',
           title: isHold ? `ติดปัญหา QC Hold: LOT ${lotNo} (${sku})` : `เร่งรัดผลตรวจแล็บ Bulk: LOT ${lotNo} (${sku})`,
+          lotId,
           lotNo,
           sku,
           problemStatement: isHold 
@@ -380,7 +386,8 @@ export function PlantDirectorAdvisory({
             pillarIcon: Gift,
             topic: 'กำหนดส่งมอบกระชั้นชิด',
             severity: 'CRITICAL',
-            title: `กำหนดส่งมอบกระชั้นชิด (อีก ${diffDays} วัน): LOT ${lotNo}`,
+            title: `กำหนดส่งมอบกระชั้นชิด (อีก ${diffDays} วัน): LOT ${lotNo} (${sku})`,
+            lotId: lot.id,
             lotNo,
             sku,
             problemStatement: `LOT ${lotNo} (${sku}) มีกำหนดส่งมอบ FG ภายใน ${diffDays === 0 ? 'วันนี้' : `${diffDays} วันข้างหน้า`} (${new Date(lot.fg_due_date).toLocaleDateString('th-TH')}) ยอดสั่ง ${Number(lot.order_quantity || lot.planned_quantity || 0).toLocaleString()} ชิ้น`,
@@ -1417,8 +1424,25 @@ export function PlantDirectorAdvisory({
                                       <button
                                         type="button"
                                         onClick={() => {
-                                          const matchedLot = fgDueLots.find(l => l.lot_no === d.lotNo) || logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
-                                          if (matchedLot?.id) onSelectLot(matchedLot.id)
+                                          if (d.lotId) {
+                                            onSelectLot(d.lotId)
+                                          } else {
+                                            const matchedLot = 
+                                              fgDueLots.find(l => l.lot_no === d.lotNo && (!d.sku || l.products?.sku === d.sku)) ||
+                                              logsList.find(l => l.production_lots?.lot_no === d.lotNo && (!d.sku || l.production_lots?.products?.sku === d.sku))?.production_lots ||
+                                              fgDueLots.find(l => l.lot_no === d.lotNo) ||
+                                              logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
+
+                                            if (matchedLot?.id) onSelectLot(matchedLot.id)
+                                          }
+
+                                          // Smoothly scroll down to Digital Twin Pipeline
+                                          setTimeout(() => {
+                                            const pipelineEl = document.getElementById('digital-twin-pipeline')
+                                            if (pipelineEl) {
+                                              pipelineEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                            }
+                                          }, 80)
                                         }}
                                         className={`text-[11px] font-bold flex items-center gap-1 px-3 py-1 rounded-lg border transition ${
                                           isNight 
@@ -1426,7 +1450,7 @@ export function PlantDirectorAdvisory({
                                             : 'text-[#B8860B] hover:text-amber-800 bg-amber-50 border-amber-200 shadow-sm'
                                         }`}
                                       >
-                                        เปิดดูกราฟ LOT {d.lotNo} <ChevronRight className="w-3.5 h-3.5" />
+                                        เปิดดูกราฟ LOT {d.lotNo} {d.sku ? `(${d.sku})` : ''} <ChevronRight className="w-3.5 h-3.5" />
                                       </button>
                                     ) : <div />}
 
