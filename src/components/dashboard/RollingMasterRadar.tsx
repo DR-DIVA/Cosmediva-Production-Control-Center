@@ -29,8 +29,11 @@ import {
   Compass, 
   CheckCircle2, 
   AlertCircle,
+  AlertTriangle,
+  ArrowUpRight,
   TrendingUp,
   Boxes,
+  Cylinder,
   CalendarDays,
   Filter,
   Sun,
@@ -66,10 +69,35 @@ export interface OperationalStatus {
   rescheduledInfo?: PlanChangeInfo
 }
 
+export interface QaIssueInfo {
+  id: string
+  reportedAt?: string
+  scope: 'RM' | 'PM' | 'BULK' | 'IPC' | 'FG'
+  issueType: 'HOLD' | 'REPROCESS' | 'REJECT' | 'NC' | 'DEFECT'
+  title: string
+  rawNote: string
+  isResolved: boolean
+  resolvedNote?: string
+  sku?: string
+  lotNo?: string
+  tankNo?: string | number
+}
+
+export interface BulkStockInfo {
+  lotNo: string
+  sku?: string
+  productName?: string
+  tanks: number[]
+  kgPerTank: number
+  totalKg: number
+  isConsumed: boolean
+  qcPassedDate: string
+}
+
 interface StreamItem {
   id: string
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE'
-  qcSubtype?: 'RM' | 'PM' | 'BULK' | 'FG'
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'
+  qcSubtype?: 'RM' | 'PM' | 'BULK' | 'IPC' | 'FG'
   date: string
   title: string
   subtitle: string
@@ -81,11 +109,13 @@ interface StreamItem {
   lotId?: string
   meta?: any
   opStatus?: OperationalStatus
+  qaIssue?: QaIssueInfo
+  bulkStock?: BulkStockInfo
 }
 
 function computeOperationalStatus(
   item: any,
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE',
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE',
   cellDate: string,
   todayStr: string
 ): OperationalStatus {
@@ -112,16 +142,16 @@ function computeOperationalStatus(
           type: 'qc_passed',
           color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
           dotColor: 'bg-emerald-500',
-          detailsText: 'รับสินค้าเข้าคลังและผ่านการตรวจ QC แล้ว'
+          detailsText: 'รับสินค้าเข้าคลัง RM/PM และผ่านการตรวจ QC แล้ว'
         }
       }
       return {
-        badge: '✅ ตรวจรับแล้ว',
-        shortBadge: 'รับแล้ว',
+        badge: '📥 รับเข้าคลัง RM/PM แล้ว',
+        shortBadge: 'รับเข้าคลัง',
         type: 'done',
         color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
         dotColor: 'bg-emerald-500',
-        detailsText: 'รับสินค้าเข้าคลังเรียบร้อย'
+        detailsText: `รับสินค้าเข้าคลังแล้วเมื่อ ${item.receive_date || cellDate}`
       }
     }
 
@@ -153,6 +183,18 @@ function computeOperationalStatus(
       type: 'planned',
       color: 'bg-slate-50 text-slate-600 border-slate-200/80',
       dotColor: 'bg-slate-400'
+    }
+  }
+
+  // Bulk Staging Stock (Tanks that passed QC and are ready for packing)
+  if (streamType === 'BULK_STOCK') {
+    return {
+      badge: '🛢️ สต็อก Bulk พร้อมบรรจุ',
+      shortBadge: 'พร้อมบรรจุ',
+      type: 'qc_passed',
+      color: 'bg-cyan-50 text-cyan-800 border-cyan-300/80',
+      dotColor: 'bg-cyan-500',
+      detailsText: item.meta?.bulkDetails || 'เนื้อผสมผ่าน QC สมบูรณ์ พร้อมให้ฝ่ายบรรจุ (PK) เบิกเดินเครื่อง'
     }
   }
 
@@ -215,10 +257,23 @@ function computeOperationalStatus(
     }
   }
 
-  // Quality Control (QC): RM, PM, BULK, FG
+  // Quality Control & QA Assurance (QC/QA): RM, PM, BULK, IPC, FG
   if (streamType === 'QC') {
+    if (item.qaIssue && !item.qaIssue.isResolved) {
+      const itype = item.qaIssue.issueType
+      return {
+        badge: `⚠️ รอ QA ประเมิน (${itype})`,
+        shortBadge: `รอ QA (${itype})`,
+        type: 'qc_issue',
+        color: 'bg-rose-100 text-rose-950 border-rose-400 font-bold',
+        dotColor: 'bg-rose-500 animate-pulse',
+        note: item.qaIssue.rawNote,
+        detailsText: `ตรวจพบประเด็น ${item.qaIssue.scope} อยู่ระหว่างรอฝ่ายประกันคุณภาพ (QA) เข้าประเมิน`
+      }
+    }
+
     const subtype = item.qcSubtype || 'BULK'
-    const subLabel = subtype === 'RM' ? 'RM' : subtype === 'PM' ? 'PM' : subtype === 'BULK' ? 'Bulk' : 'FG'
+    const subLabel = subtype === 'RM' ? 'RM' : subtype === 'PM' ? 'PM' : subtype === 'BULK' ? 'Bulk' : subtype === 'IPC' ? 'IPC' : 'FG'
     const rawStatus = (item.status || item.qc_status || '').toUpperCase()
 
     if (rawStatus === 'PASSED' || rawStatus === 'RELEASED' || rawStatus === 'QC_PASS' || rawStatus === 'READY' || rawStatus === 'DONE') {
@@ -427,6 +482,26 @@ function computeOperationalStatus(
 const TH_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
+function formatTankRanges(tanks: number[]): string {
+  if (!tanks || tanks.length === 0) return '-'
+  const sorted = Array.from(new Set(tanks)).sort((a, b) => a - b)
+  const ranges: string[] = []
+  let start = sorted[0]
+  let prev = sorted[0]
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (sorted[i] === prev + 1) {
+      prev = sorted[i]
+    } else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`)
+      start = sorted[i]
+      prev = sorted[i]
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`)
+  return ranges.join(', ')
+}
+
 function QcDetailDialog({
   isOpen,
   onClose,
@@ -440,11 +515,12 @@ function QcDetailDialog({
   isNight: boolean
   onSelectLot?: (lotId: string) => void
 }) {
-  const [activeTab, setActiveTab] = useState<'ALL' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
+  const [activeTab, setActiveTab] = useState<'ALL' | 'QA' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
 
   useEffect(() => {
     if (isOpen) {
-      setActiveTab('ALL')
+      const hasPendingQa = data?.items.some(it => it.qaIssue && !it.qaIssue.isResolved)
+      setActiveTab(hasPendingQa ? 'QA' : 'ALL')
     }
   }, [isOpen, data?.date?.dateStr])
 
@@ -452,12 +528,15 @@ function QcDetailDialog({
 
   const { items, stream, date } = data
 
+  const qaIssues = items.filter(it => it.qaIssue || it.opStatus?.type === 'qc_issue')
+  const pendingQaIssues = qaIssues.filter(it => it.qaIssue ? !it.qaIssue.isResolved : true)
   const rmItems = items.filter(it => it.qcSubtype === 'RM')
   const pmItems = items.filter(it => it.qcSubtype === 'PM')
   const bulkItems = items.filter(it => it.qcSubtype === 'BULK')
   const fgItems = items.filter(it => it.qcSubtype === 'FG')
 
   const filteredItems = 
+    activeTab === 'QA' ? qaIssues :
     activeTab === 'RM' ? rmItems :
     activeTab === 'PM' ? pmItems :
     activeTab === 'BULK' ? bulkItems :
@@ -469,7 +548,7 @@ function QcDetailDialog({
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent
-        className={`sm:max-w-2xl md:max-w-3xl lg:max-w-4xl w-full p-6 rounded-3xl border shadow-2xl transition-colors duration-200 z-[110] max-h-[90vh] overflow-y-auto ${
+        className={`sm:max-w-2xl md:max-w-3xl lg:max-w-5xl w-full p-6 rounded-3xl border shadow-2xl transition-colors duration-200 z-[110] max-h-[92vh] overflow-y-auto ${
           isNight 
             ? 'bg-[#0F172A] border-purple-800/60 text-slate-100' 
             : 'bg-white border-purple-200 text-[#4A4238]'
@@ -489,7 +568,7 @@ function QcDetailDialog({
                 <DialogTitle className={`text-base sm:text-lg font-bold flex items-center gap-2 ${
                   isNight ? 'text-white' : 'text-slate-900'
                 }`}>
-                  <span>งานตรวจสอบคุณภาพ QC</span>
+                  <span>งานตรวจสอบคุณภาพ QC & ประกันคุณภาพ QA</span>
                   <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
                     isNight 
                       ? 'text-purple-300 bg-purple-950/80 border-purple-800' 
@@ -497,31 +576,47 @@ function QcDetailDialog({
                   }`}>
                     {items.length} รายการ
                   </span>
+                  {pendingQaIssues.length > 0 && (
+                    <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-rose-600 text-white animate-pulse">
+                      ⚠️ รอ QA {pendingQaIssues.length} ประเด็น
+                    </span>
+                  )}
                 </DialogTitle>
                 <DialogDescription className={`text-xs ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  รายการตรวจสอบคุณภาพประจำวัน ครอบคลุม RM, PM, Bulk และ FG
+                  เกตเวย์ควบคุมคุณภาพ RM, PM, Bulk, IPC, FG และงานประกันคุณภาพเพื่อการปล่อยผ่านผลิตภัณฑ์ (Batch Release)
                 </DialogDescription>
               </div>
             </div>
 
-            <span className={`text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${
-              isNight 
-                ? 'text-purple-200 bg-purple-950/90 border-purple-700' 
-                : 'text-purple-900 bg-purple-100/80 border-purple-200'
-            }`}>
-              📅 {date.dayName} {date.dayNum} {date.monthName}
-            </span>
+            <div className="flex items-center gap-2">
+              <a
+                href="/issues"
+                target="_blank"
+                rel="noreferrer"
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs font-bold transition shadow-xs"
+              >
+                <span>จัดการปัญหา QA</span>
+                <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full border shrink-0 ${
+                isNight 
+                  ? 'text-purple-200 bg-purple-950/90 border-purple-700' 
+                  : 'text-purple-900 bg-purple-100/80 border-purple-200'
+              }`}>
+                📅 {date.dayName} {date.dayNum} {date.monthName}
+              </span>
+            </div>
           </div>
         </DialogHeader>
 
-        {/* 5 Category Filter Tabs - NO HORIZONTAL SCROLLBAR, FULL RESPONSIVE GRID */}
-        <div className={`grid grid-cols-2 sm:grid-cols-5 gap-2 p-1.5 rounded-2xl ${
+        {/* 6 Category Filter Tabs */}
+        <div className={`grid grid-cols-3 sm:grid-cols-6 gap-2 p-1.5 rounded-2xl ${
           isNight ? 'bg-slate-900/90 border border-slate-800' : 'bg-slate-100/90 border border-slate-200'
         }`}>
           <button
             type="button"
             onClick={() => setActiveTab('ALL')}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'ALL'
                 ? 'bg-purple-600 text-white shadow-sm'
                 : (isNight ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60')
@@ -537,14 +632,33 @@ function QcDetailDialog({
 
           <button
             type="button"
+            onClick={() => setActiveTab('QA')}
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+              activeTab === 'QA'
+                ? 'bg-rose-600 text-white shadow-sm ring-1 ring-rose-400'
+                : (pendingQaIssues.length > 0 
+                  ? 'bg-rose-50 text-rose-800 border border-rose-300 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-800' 
+                  : (isNight ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'))
+            }`}
+          >
+            <span>⚠️ รอ QA</span>
+            <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
+              activeTab === 'QA' ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-900 dark:bg-rose-900 dark:text-rose-200'
+            }`}>
+              {qaIssues.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setActiveTab('RM')}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'RM'
                 ? 'bg-amber-600 text-white shadow-sm'
                 : (isNight ? 'text-amber-300 hover:text-amber-200 hover:bg-slate-800/60' : 'text-amber-800 hover:text-amber-950 hover:bg-white/60')
             }`}
           >
-            <span>🧪 วัตถุดิบ RM</span>
+            <span>🧪 RM</span>
             <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
               activeTab === 'RM' ? 'bg-white/20 text-white' : 'bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-300'
             }`}>
@@ -555,13 +669,13 @@ function QcDetailDialog({
           <button
             type="button"
             onClick={() => setActiveTab('PM')}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'PM'
                 ? 'bg-cyan-600 text-white shadow-sm'
                 : (isNight ? 'text-cyan-300 hover:text-cyan-200 hover:bg-slate-800/60' : 'text-cyan-800 hover:text-cyan-950 hover:bg-white/60')
             }`}
           >
-            <span>🏷️ บรรจุภัณฑ์ PM</span>
+            <span>🏷️ PM</span>
             <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
               activeTab === 'PM' ? 'bg-white/20 text-white' : 'bg-cyan-100 text-cyan-900 dark:bg-cyan-950 dark:text-cyan-300'
             }`}>
@@ -572,13 +686,13 @@ function QcDetailDialog({
           <button
             type="button"
             onClick={() => setActiveTab('BULK')}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'BULK'
                 ? 'bg-blue-600 text-white shadow-sm'
                 : (isNight ? 'text-blue-300 hover:text-blue-200 hover:bg-slate-800/60' : 'text-blue-800 hover:text-blue-950 hover:bg-white/60')
             }`}
           >
-            <span>🥣 เนื้อ Bulk</span>
+            <span>🥣 Bulk</span>
             <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
               activeTab === 'BULK' ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-900 dark:bg-blue-950 dark:text-blue-300'
             }`}>
@@ -589,13 +703,13 @@ function QcDetailDialog({
           <button
             type="button"
             onClick={() => setActiveTab('FG')}
-            className={`py-2 px-2.5 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-2 px-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer ${
               activeTab === 'FG'
                 ? 'bg-emerald-600 text-white shadow-sm'
                 : (isNight ? 'text-emerald-300 hover:text-emerald-200 hover:bg-slate-800/60' : 'text-emerald-800 hover:text-emerald-950 hover:bg-white/60')
             }`}
           >
-            <span>🎁 สำเร็จรูป FG</span>
+            <span>🎁 FG</span>
             <span className={`px-1.5 py-0.2 text-[10px] rounded-full font-extrabold ${
               activeTab === 'FG' ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950 dark:text-emerald-300'
             }`}>
@@ -604,109 +718,255 @@ function QcDetailDialog({
           </button>
         </div>
 
-        {/* Item List - FULL HEIGHT, NO INNER CRAMPED SCROLLBAR */}
-        <div className="space-y-3">
-          {filteredItems.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-sm">
-              ไม่มีรายการงานตรวจ QC ในหมวดนี้
+        {/* Dedicated QA Incident Table View when QA tab is selected */}
+        {activeTab === 'QA' ? (
+          <div className="space-y-3">
+            <div className={`p-3 rounded-2xl border flex items-center justify-between gap-2 flex-wrap ${
+              isNight ? 'bg-rose-950/40 border-rose-800 text-rose-200' : 'bg-rose-50 border-rose-200 text-rose-900'
+            }`}>
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                <span className="text-xs font-bold">
+                  บันทึกปัญหาคุณภาพและประเด็นที่รอฝ่ายประกันคุณภาพ (QA) ประเมินความเสี่ยง ({qaIssues.length} รายการ)
+                </span>
+              </div>
+              <a
+                href="/issues"
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs font-bold text-rose-700 dark:text-rose-300 underline flex items-center gap-1"
+              >
+                เปิดหน้าจัดการปัญหา QA เต็มรูปแบบ <ArrowUpRight className="w-3.5 h-3.5" />
+              </a>
             </div>
-          ) : (
-            filteredItems.map((it, idx) => {
-              const isHold = it.opStatus?.type === 'qc_issue'
-              const isWaiting = it.opStatus?.type === 'qc_waiting'
-              const isPassed = it.opStatus?.type === 'qc_passed'
-              const isProgress = it.opStatus?.type === 'in_progress'
 
-              return (
-                <div
-                  key={it.id || idx}
-                  className={`p-3.5 sm:p-4 rounded-2xl border space-y-2 transition ${
-                    isNight
-                      ? isHold
-                        ? 'bg-rose-950/40 border-rose-800'
-                        : isWaiting
-                        ? 'bg-amber-950/40 border-amber-800'
-                        : isPassed
-                        ? 'bg-emerald-950/40 border-emerald-800'
-                        : isProgress
-                        ? 'bg-blue-950/40 border-blue-800'
-                        : 'bg-slate-900 border-slate-800'
-                      : isHold 
-                      ? 'bg-rose-50/80 border-rose-300' 
-                      : isWaiting
-                      ? 'bg-amber-50/60 border-amber-200'
-                      : isPassed
-                      ? 'bg-emerald-50/50 border-emerald-200'
-                      : isProgress
-                      ? 'bg-blue-50/50 border-blue-200'
-                      : 'bg-slate-50 border-slate-200'
-                  }`}
-                >
-                  <div className="flex justify-between items-start gap-2 flex-wrap sm:flex-nowrap">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      {/* Category Badge */}
-                      <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
-                        it.qcSubtype === 'RM' ? 'bg-amber-100 text-amber-900 border-amber-300' :
-                        it.qcSubtype === 'PM' ? 'bg-cyan-100 text-cyan-900 border-cyan-300' :
-                        it.qcSubtype === 'BULK' ? 'bg-blue-100 text-blue-900 border-blue-300' :
-                        'bg-purple-100 text-purple-900 border-purple-300'
+            {qaIssues.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                🎉 ไม่มีประเด็นปัญหาคุณภาพหรือ Hold ในวันนี้
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {qaIssues.map((it, idx) => {
+                  const qa = it.qaIssue
+                  const issueType = qa?.issueType || 'HOLD'
+                  const scope = qa?.scope || it.qcSubtype || 'BULK'
+                  const isResolved = qa?.isResolved ?? false
+
+                  return (
+                    <div
+                      key={it.id || idx}
+                      className={`p-4 rounded-2xl border transition space-y-2.5 ${
+                        isNight
+                          ? isResolved
+                            ? 'bg-slate-900/60 border-slate-800'
+                            : 'bg-rose-950/40 border-rose-800'
+                          : isResolved
+                          ? 'bg-slate-50 border-slate-200'
+                          : 'bg-rose-50/80 border-rose-300'
+                      }`}
+                    >
+                      <div className="flex justify-between items-start gap-2 flex-wrap sm:flex-nowrap">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {/* Issue Type Badge */}
+                          <span className={`text-xs font-black px-2.5 py-0.5 rounded-md border ${
+                            issueType === 'REJECT' ? 'bg-red-600 text-white border-red-700' :
+                            issueType === 'REPROCESS' ? 'bg-purple-600 text-white border-purple-700' :
+                            issueType === 'NC' ? 'bg-amber-600 text-white border-amber-700' :
+                            'bg-orange-600 text-white border-orange-700'
+                          }`}>
+                            [{issueType}]
+                          </span>
+
+                          {/* Scope Badge */}
+                          <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
+                            scope === 'RM' ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                            scope === 'PM' ? 'bg-cyan-100 text-cyan-900 border-cyan-300' :
+                            scope === 'BULK' ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                            scope === 'IPC' ? 'bg-indigo-100 text-indigo-900 border-indigo-300' :
+                            'bg-purple-100 text-purple-900 border-purple-300'
+                          }`}>
+                            {scope}
+                          </span>
+
+                          <strong className={`font-bold text-sm ${isNight ? 'text-white' : 'text-slate-900'}`}>
+                            {it.title}
+                          </strong>
+
+                          {isResolved ? (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              ✓ ได้รับการแก้ไขแล้ว
+                            </span>
+                          ) : (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
+                              ⚠️ รอ QA ประเมิน
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {it.meta?.processName && (
+                            <span className="text-xs font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                              {it.meta.processName} {it.meta.roomName ? `(${it.meta.roomName})` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Issue Description */}
+                      <div className={`text-xs p-3 rounded-xl border leading-relaxed ${
+                        isNight ? 'bg-slate-900/80 border-slate-800 text-slate-200' : 'bg-white border-rose-200/80 text-slate-700'
                       }`}>
-                        {it.qcSubtype === 'RM' ? '🧪 วัตถุดิบ RM' :
-                         it.qcSubtype === 'PM' ? '🏷️ บรรจุภัณฑ์ PM' :
-                         it.qcSubtype === 'BULK' ? '🥣 เนื้อ Bulk' : '🎁 สำเร็จรูป FG'}
-                      </span>
+                        <div className="font-semibold text-rose-700 dark:text-rose-400 mb-1 flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5" />
+                          <span>รายละเอียดปัญหา / ข้อสังเกต QC:</span>
+                        </div>
+                        <div className="font-mono text-xs pl-5 whitespace-pre-wrap">
+                          {qa?.rawNote || it.subtitle}
+                        </div>
+                      </div>
 
-                      <strong className={`font-bold text-sm ${isNight ? 'text-white' : 'text-slate-800'}`}>
-                        {it.title}
-                      </strong>
+                      {/* Action Links */}
+                      <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                        <div className="text-[11px] text-slate-400">
+                          {qa?.reportedAt ? `แจ้งเมื่อ: ${new Date(qa.reportedAt).toLocaleString('th-TH')}` : ''}
+                        </div>
 
-                      {it.opStatus && (
-                        <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${it.opStatus.color}`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${it.opStatus.dotColor} shrink-0`} />
-                          <span>{it.opStatus.badge}</span>
+                        <div className="flex items-center gap-3">
+                          {it.lotId && onSelectLot && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose()
+                                onSelectLot(it.lotId!)
+                              }}
+                              className="text-xs text-purple-600 hover:text-purple-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              ดูกราฟล็อตนี้ <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                          <a
+                            href="/issues"
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-xs text-rose-600 hover:text-rose-700 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                          >
+                            จัดการปัญหาในหน้า QA <ArrowUpRight className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        ) : (
+          /* Item List for Other Tabs */
+          <div className="space-y-3">
+            {filteredItems.length === 0 ? (
+              <div className="py-12 text-center text-slate-400 text-sm">
+                ไม่มีรายการงานตรวจ QC ในหมวดนี้
+              </div>
+            ) : (
+              filteredItems.map((it, idx) => {
+                const isHold = it.opStatus?.type === 'qc_issue'
+                const isWaiting = it.opStatus?.type === 'qc_waiting'
+                const isPassed = it.opStatus?.type === 'qc_passed'
+                const isProgress = it.opStatus?.type === 'in_progress'
+
+                return (
+                  <div
+                    key={it.id || idx}
+                    className={`p-3.5 sm:p-4 rounded-2xl border space-y-2 transition ${
+                      isNight
+                        ? isHold
+                          ? 'bg-rose-950/40 border-rose-800'
+                          : isWaiting
+                          ? 'bg-amber-950/40 border-amber-800'
+                          : isPassed
+                          ? 'bg-emerald-950/40 border-emerald-800'
+                          : isProgress
+                          ? 'bg-blue-950/40 border-blue-800'
+                          : 'bg-slate-900 border-slate-800'
+                        : isHold 
+                        ? 'bg-rose-50/80 border-rose-300' 
+                        : isWaiting
+                        ? 'bg-amber-50/60 border-amber-200'
+                        : isPassed
+                        ? 'bg-emerald-50/50 border-emerald-200'
+                        : isProgress
+                        ? 'bg-blue-50/50 border-blue-200'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}
+                  >
+                    <div className="flex justify-between items-start gap-2 flex-wrap sm:flex-nowrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        {/* Category Badge */}
+                        <span className={`text-[11px] font-extrabold px-2 py-0.5 rounded-md border ${
+                          it.qcSubtype === 'RM' ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                          it.qcSubtype === 'PM' ? 'bg-cyan-100 text-cyan-900 border-cyan-300' :
+                          it.qcSubtype === 'BULK' ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                          it.qcSubtype === 'IPC' ? 'bg-indigo-100 text-indigo-900 border-indigo-300' :
+                          'bg-purple-100 text-purple-900 border-purple-300'
+                        }`}>
+                          {it.qcSubtype === 'RM' ? '🧪 วัตถุดิบ RM' :
+                           it.qcSubtype === 'PM' ? '🏷️ บรรจุภัณฑ์ PM' :
+                           it.qcSubtype === 'BULK' ? '🥣 เนื้อ Bulk' :
+                           it.qcSubtype === 'IPC' ? '⚖️ ระหว่างผลิต IPC' : '🎁 สำเร็จรูป FG'}
+                        </span>
+
+                        <strong className={`font-bold text-sm ${isNight ? 'text-white' : 'text-slate-800'}`}>
+                          {it.title}
+                        </strong>
+
+                        {it.opStatus && (
+                          <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${it.opStatus.color}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${it.opStatus.dotColor} shrink-0`} />
+                            <span>{it.opStatus.badge}</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {it.tag && (
+                        <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 border ${
+                          isNight ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-white text-slate-700 border-slate-200 shadow-2xs'
+                        }`}>
+                          {it.tag}
                         </span>
                       )}
                     </div>
 
-                    {it.tag && (
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded-lg shrink-0 border ${
-                        isNight ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-white text-slate-700 border-slate-200 shadow-2xs'
+                    <div className={`text-xs font-medium ${isNight ? 'text-slate-300' : 'text-slate-600'}`}>
+                      {it.subtitle}
+                    </div>
+
+                    {it.opStatus?.detailsText && (
+                      <div className={`text-xs p-2 rounded-xl border flex items-center gap-2 ${
+                        isNight ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200/80 text-slate-600'
                       }`}>
-                        {it.tag}
-                      </span>
+                        <Info className="w-4 h-4 text-purple-500 shrink-0" />
+                        <span>{it.opStatus.detailsText}</span>
+                      </div>
+                    )}
+
+                    {it.lotId && onSelectLot && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose()
+                          onSelectLot(it.lotId!)
+                        }}
+                        className="text-xs text-purple-600 hover:text-purple-700 font-bold hover:underline flex items-center gap-1 pt-1 cursor-pointer"
+                      >
+                        ดูกราฟล็อตนี้ <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
                     )}
                   </div>
-
-                  <div className={`text-xs font-medium ${isNight ? 'text-slate-300' : 'text-slate-600'}`}>
-                    {it.subtitle}
-                  </div>
-
-                  {it.opStatus?.detailsText && (
-                    <div className={`text-xs p-2 rounded-xl border flex items-center gap-2 ${
-                      isNight ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200/80 text-slate-600'
-                    }`}>
-                      <Info className="w-4 h-4 text-purple-500 shrink-0" />
-                      <span>{it.opStatus.detailsText}</span>
-                    </div>
-                  )}
-
-                  {it.lotId && onSelectLot && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose()
-                        onSelectLot(it.lotId!)
-                      }}
-                      className="text-xs text-purple-600 hover:text-purple-700 font-bold hover:underline flex items-center gap-1 pt-1 cursor-pointer"
-                    >
-                      ดูกราฟล็อตนี้ <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
-              )
-            })
-          )}
-        </div>
+                )
+              })
+            )}
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )
@@ -776,18 +1036,24 @@ export function RollingMasterRadar({
   }
 
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
-  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE'>('ALL')
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
   const [radarData, setRadarData] = useState<{
     etaList: any[]
     logsList: any[]
     fgDueLots: any[]
     fgInventoryList: any[]
+    qaIssuesLogs: any[]
+    bulkLogsAll: any[]
+    packLogsAll: any[]
   }>({
     etaList: [],
     logsList: [],
     fgDueLots: [],
-    fgInventoryList: []
+    fgInventoryList: [],
+    qaIssuesLogs: [],
+    bulkLogsAll: [],
+    packLogsAll: []
   })
   const [selectedCell, setSelectedCell] = useState<{ dateStr: string; items: StreamItem[]; streamTitle: string } | null>(null)
   const [qcModalData, setQcModalData] = useState<{ items: StreamItem[]; stream: any; date: any } | null>(null)
@@ -841,7 +1107,10 @@ export function RollingMasterRadar({
         { data: etaData },
         { data: logsData },
         { data: lotsData },
-        { data: fgInvData }
+        { data: fgInvData },
+        { data: qaLogsData },
+        { data: bulkDataAll },
+        { data: packDataAll }
       ] = await Promise.all([
         // 1. ETA RM/PM within 21 days (or received within horizon)
         supabase.from('production_lot_rms')
@@ -879,14 +1148,47 @@ export function RollingMasterRadar({
             products:sku_id (sku, product_name)
           `)
           .or(`and(created_at.gte.${horizonStartStr}T00:00:00,created_at.lte.${horizonEndStr}T23:59:59),qc_status.eq.QUARANTINE`)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+
+        // 5. QA Issues from logs (Hold, Reprocess, Reject, NC across RM, PM, Bulk, IPC, FG)
+        supabase.from('production_logs')
+          .select(`
+            id, status, note, updated_at, activity_date, tank_start, tank_end,
+            production_lots (id, lot_no, planned_quantity, products:sku_id (product_name, sku)),
+            processes (process_name), rooms (room_name)
+          `)
+          .or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%,note.ilike.%[NC]%')
+          .order('updated_at', { ascending: false }),
+
+        // 6. Bulk Mixing & QC logs for tracking Bulk Staging Stock
+        supabase.from('production_logs')
+          .select(`
+            id, status, qc_status, activity_date, end_date, tank_start, tank_end, tank_details, total_tanks,
+            processes (process_name),
+            production_lots (id, lot_no, planned_quantity, total_tanks, products:sku_id (sku, product_name))
+          `)
+          .or('processes.process_name.ilike.%รอ qc%,processes.process_name.ilike.%ผสม%,processes.process_name.ilike.%qc%,processes.process_name.ilike.%bulk%,qc_status.eq.PASSED,qc_status.eq.QC_PASS')
+          .order('activity_date', { ascending: true }),
+
+        // 7. Packing logs for tracking consumed tanks
+        supabase.from('production_logs')
+          .select(`
+            id, status, activity_date, end_date, tank_start, tank_end, tank_details,
+            processes (process_name),
+            production_lots (id, lot_no)
+          `)
+          .or('processes.process_name.ilike.%บรรจุ%,processes.process_name.ilike.%packing%,processes.process_name.ilike.%รอบรรจุ%,processes.process_name.ilike.%ลงลัง%')
+          .order('activity_date', { ascending: true })
       ])
 
       setRadarData({
         etaList: etaData || [],
         logsList: logsData || [],
         fgDueLots: lotsData || [],
-        fgInventoryList: fgInvData || []
+        fgInventoryList: fgInvData || [],
+        qaIssuesLogs: qaLogsData || [],
+        bulkLogsAll: bulkDataAll || [],
+        packLogsAll: packDataAll || []
       })
     } catch (err) {
       console.error('Error fetching rolling radar data:', err)
@@ -902,6 +1204,7 @@ export function RollingMasterRadar({
       WEIGHING: StreamItem[]
       MIXING: StreamItem[]
       QC: StreamItem[]
+      BULK_STOCK: StreamItem[]
       PACKING: StreamItem[]
       FG_DUE: StreamItem[]
     }> = {}
@@ -912,6 +1215,7 @@ export function RollingMasterRadar({
         WEIGHING: [],
         MIXING: [],
         QC: [],
+        BULK_STOCK: [],
         PACKING: [],
         FG_DUE: []
       }
@@ -921,6 +1225,10 @@ export function RollingMasterRadar({
     let totalWeighing = 0
     let totalMixing = 0
     let totalMixingTanks = 0
+    let totalQc = 0
+    let totalPendingQa = 0
+    let totalBulkStockTanks = 0
+    let totalBulkStockLots = 0
     let totalPacking = 0
     let totalFgDue = 0
 
@@ -1035,7 +1343,192 @@ export function RollingMasterRadar({
       })
     })
 
-    // 3. Process FG Due & MTS Daily Delivery Ranges
+    // 3. Process Bulk Staging Stock (Tanks that passed QC and are not yet packed)
+    const packedTankMap: Record<string, Set<number>> = {}
+    ;(radarData.packLogsAll || []).forEach(l => {
+      const lotId = l.production_lots?.id
+      if (!lotId) return
+      if (!packedTankMap[lotId]) packedTankMap[lotId] = new Set()
+
+      if (l.tank_details && typeof l.tank_details === 'object') {
+        Object.entries(l.tank_details).forEach(([t, s]) => {
+          const status = typeof s === 'string' ? s : (s as any)?.status
+          if (status === 'DONE' || status === 'SENT_TO_POF' || status === 'COMPLETED' || status === 'IN_PROGRESS') {
+            packedTankMap[lotId].add(parseInt(t))
+          }
+        })
+      }
+      const sT = parseInt(l.tank_start)
+      const eT = parseInt(l.tank_end)
+      if (sT && eT && (l.status === 'DONE' || l.status === 'IN_PROGRESS')) {
+        for (let i = sT; i <= eT; i++) {
+          packedTankMap[lotId].add(i)
+        }
+      }
+    })
+
+    const bulkPassedMap: Record<string, {
+      lotNo: string
+      sku: string
+      productName: string
+      lotId: string
+      plannedQty: number
+      totalTanks: number
+      tanks: Record<number, { date: string; logId: string }>
+    }> = {}
+
+    ;(radarData.bulkLogsAll || []).forEach(l => {
+      const lot = l.production_lots
+      const lotId = lot?.id
+      if (!lotId) return
+
+      if (!bulkPassedMap[lotId]) {
+        bulkPassedMap[lotId] = {
+          lotNo: lot?.lot_no || 'N/A',
+          sku: lot?.products?.sku || 'SKU',
+          productName: lot?.products?.product_name || '',
+          lotId,
+          plannedQty: lot?.planned_quantity || 0,
+          totalTanks: lot?.total_tanks || 1,
+          tanks: {}
+        }
+      }
+
+      const logDate = l.activity_date || l.end_date || todayDateStr
+
+      if (l.tank_details && typeof l.tank_details === 'object') {
+        Object.entries(l.tank_details).forEach(([t, s]) => {
+          const status = typeof s === 'string' ? s : (s as any)?.status
+          if (status === 'QC_PASS' || status === 'PASSED' || status === 'COMPLETED') {
+            bulkPassedMap[lotId].tanks[parseInt(t)] = { date: logDate, logId: l.id }
+          }
+        })
+      }
+      if (l.qc_status === 'PASSED' || l.qc_status === 'QC_PASS') {
+        const sT = parseInt(l.tank_start) || 1
+        const eT = parseInt(l.tank_end) || sT
+        for (let i = sT; i <= eT; i++) {
+          if (!bulkPassedMap[lotId].tanks[i]) {
+            bulkPassedMap[lotId].tanks[i] = { date: logDate, logId: l.id }
+          }
+        }
+      }
+    })
+
+    const seenBulkStockLots = new Set<string>()
+    Object.values(bulkPassedMap).forEach(bLot => {
+      const packed = packedTankMap[bLot.lotId] || new Set<number>()
+      const unconsumedTanks = Object.keys(bLot.tanks)
+        .map(Number)
+        .filter(t => !packed.has(t))
+        .sort((a, b) => a - b)
+
+      if (unconsumedTanks.length === 0) return
+
+      totalBulkStockTanks += unconsumedTanks.length
+      if (!seenBulkStockLots.has(bLot.lotId)) {
+        seenBulkStockLots.add(bLot.lotId)
+        totalBulkStockLots++
+      }
+
+      const kgPerTank = bLot.plannedQty && bLot.totalTanks 
+        ? Math.round(bLot.plannedQty / bLot.totalTanks) 
+        : 50
+      const totalKg = kgPerTank * unconsumedTanks.length
+
+      // Group tanks by QC pass date
+      const tanksByDate: Record<string, number[]> = {}
+      unconsumedTanks.forEach(t => {
+        const passDate = bLot.tanks[t]?.date || todayDateStr
+        if (!tanksByDate[passDate]) tanksByDate[passDate] = []
+        tanksByDate[passDate].push(t)
+      })
+
+      let addedToToday = false
+      Object.entries(tanksByDate).forEach(([pDate, tList]) => {
+        const targetDate = map[pDate] ? pDate : todayDateStr
+        const tCount = tList.length
+        const tWeight = kgPerTank * tCount
+        const rangeStr = formatTankRanges(tList)
+
+        if (map[targetDate]) {
+          map[targetDate].BULK_STOCK.push({
+            id: `bulk-stock-${bLot.lotId}-${targetDate}`,
+            streamType: 'BULK_STOCK',
+            date: targetDate,
+            title: `${bLot.sku} • LOT ${bLot.lotNo}`,
+            subtitle: `${bLot.productName || 'เนื้อผสม Bulk ผ่าน QC'} (ถัง ${rangeStr})`,
+            tag: `${tCount} ถัง (${tWeight.toLocaleString()} kg)`,
+            quantity: tWeight,
+            lotNo: bLot.lotNo,
+            sku: bLot.sku,
+            lotId: bLot.lotId,
+            bulkStock: {
+              lotNo: bLot.lotNo,
+              sku: bLot.sku,
+              productName: bLot.productName,
+              tanks: tList,
+              kgPerTank,
+              totalKg: tWeight,
+              isConsumed: false,
+              qcPassedDate: pDate
+            },
+            meta: {
+              bulkDetails: `เนื้อ Bulk ผ่าน QC พร้อมให้ฝ่ายบรรจุ (PK) เบิกเดินเครื่อง รวม ${tCount} ถัง [${rangeStr}] ปริมาณ ${tWeight.toLocaleString()} kg`
+            },
+            opStatus: {
+              badge: '🛢️ สต็อก Bulk พร้อมบรรจุ',
+              shortBadge: 'พร้อมบรรจุ',
+              type: 'qc_passed',
+              color: 'bg-cyan-50 text-cyan-800 border-cyan-300/80',
+              dotColor: 'bg-cyan-500',
+              detailsText: `เนื้อ Bulk ผ่าน QC พร้อมให้ฝ่ายบรรจุ (PK) เบิกเดินเครื่อง รวม ${tCount} ถัง [${rangeStr}] ปริมาณ ${tWeight.toLocaleString()} kg`
+            }
+          })
+          if (targetDate === todayDateStr) addedToToday = true
+        }
+      })
+
+      // If tanks passed QC prior to today and are still unconsumed, also show in Today so operators see ready stock
+      if (!addedToToday && map[todayDateStr]) {
+        const rangeStr = formatTankRanges(unconsumedTanks)
+        map[todayDateStr].BULK_STOCK.push({
+          id: `bulk-stock-${bLot.lotId}-today`,
+          streamType: 'BULK_STOCK',
+          date: todayDateStr,
+          title: `${bLot.sku} • LOT ${bLot.lotNo}`,
+          subtitle: `${bLot.productName || 'เนื้อผสม Bulk ในคลัง'} (พร้อมบรรจุ ${unconsumedTanks.length} ถัง)`,
+          tag: `พร้อมเบิก ${unconsumedTanks.length} ถัง (${totalKg.toLocaleString()} kg)`,
+          quantity: totalKg,
+          lotNo: bLot.lotNo,
+          sku: bLot.sku,
+          lotId: bLot.lotId,
+          bulkStock: {
+            lotNo: bLot.lotNo,
+            sku: bLot.sku,
+            productName: bLot.productName,
+            tanks: unconsumedTanks,
+            kgPerTank,
+            totalKg,
+            isConsumed: false,
+            qcPassedDate: todayDateStr
+          },
+          meta: {
+            bulkDetails: `สต็อก Bulk พร้อมเบิกบรรจุวันนี้: ${unconsumedTanks.length} ถัง [${rangeStr}] รวม ${totalKg.toLocaleString()} kg`
+          },
+          opStatus: {
+            badge: '🛢️ พร้อมเบิกบรรจุวันนี้',
+            shortBadge: 'พร้อมเบิก',
+            type: 'qc_passed',
+            color: 'bg-cyan-100 text-cyan-950 border-cyan-400 font-bold',
+            dotColor: 'bg-cyan-600',
+            detailsText: `สต็อก Bulk ในคลังพร้อมให้ไลน์บรรจุเบิกเดินเครื่อง รวม ${unconsumedTanks.length} ถัง [${rangeStr}] (${totalKg.toLocaleString()} kg)`
+          }
+        })
+      }
+    })
+
+    // 4. Process FG Due & MTS Daily Delivery Ranges
     radarData.fgDueLots.forEach(lot => {
       const sku = lot.products?.sku || 'SKU'
       const qty = lot.planned_quantity || lot.order_quantity || 0
@@ -1089,7 +1582,7 @@ export function RollingMasterRadar({
       }
     })
 
-    // 4. Process QC Stream (RM, PM, Bulk, FG)
+    // 5. Process QC Stream (RM, PM, Bulk, FG)
     const isMaterialPM = (code?: string) => {
       if (!code) return false
       const c = code.trim().toLowerCase()
@@ -1098,15 +1591,12 @@ export function RollingMasterRadar({
 
     // A. RM and PM Inbound Quality Checks (Only items that have been received or sent to QC)
     radarData.etaList.forEach(item => {
-      // Must be physically received by the warehouse before QC can inspect it!
       const isReceived = item.status === 'RECEIVED' || !!item.receive_date
       const hasExplicitQc = !!item.qc_status && item.qc_status !== 'NONE'
 
-      // If not received yet, it belongs ONLY in Stream 1 (ETA RM/PM), NOT in the QC stream!
       if (!isReceived && !hasExplicitQc) return
 
       const isPM = isMaterialPM(item.rm_code)
-      // The QC date is the date it was received at the factory
       const targetDate = item.receive_date || (item.created_at ? item.created_at.split('T')[0] : item.eta_date)
       if (!targetDate || !map[targetDate]) return
 
@@ -1138,7 +1628,6 @@ export function RollingMasterRadar({
       const pName = (log.processes?.process_name || '').toLowerCase()
       const isQcProc = pName === 'รอ qc' || pName.includes('รอ qc') || pName.includes('qc bulk')
 
-      // Check if tank_details has genuine QC actions (QC_PASS, HOLD, PAUSED, REPROCESS, SENT_TO_QC)
       let hasTankQcActivity = false
       if (log.tank_details && typeof log.tank_details === 'object') {
         const vals = Object.values(log.tank_details)
@@ -1231,7 +1720,97 @@ export function RollingMasterRadar({
       })
     })
 
-    let totalQc = 0
+    // D. QA Issues from Production Logs (Hold, Reprocess, Reject, NC across RM, PM, Bulk, IPC, FG)
+    ;(radarData.qaIssuesLogs || []).forEach(log => {
+      if (!log.note) return
+      const lines = log.note.split('\n').filter((l: string) => l.trim())
+      const pName = (log.processes?.process_name || '').toLowerCase()
+      const lot = log.production_lots
+      const sku = lot?.products?.sku || 'SKU'
+      const lotNo = lot?.lot_no || 'N/A'
+      const targetDate = log.activity_date || (log.updated_at ? log.updated_at.split('T')[0] : todayDateStr)
+
+      lines.forEach((line: string, lineIdx: number) => {
+        const isQaIncident = line.includes('[QC ') || line.includes('[แจ้งปัญหา]') || line.includes('[NC]')
+        if (!isQaIncident) return
+
+        const isResolved = line.includes('[Resolved') || line.includes('> [QA Approved]') || line.includes('รับทราบ')
+        
+        let scope: 'RM' | 'PM' | 'BULK' | 'IPC' | 'FG' = 'BULK'
+        if (line.includes(' PM [') || line.includes(' PM:') || line.includes(' PM ') || line.includes('CMD1')) {
+          scope = 'PM'
+        } else if (line.includes(' RM [') || line.includes(' RM:') || line.includes(' RM ') || line.includes('RM/PM')) {
+          scope = 'RM'
+        } else if (line.includes('IPC') || pName.includes('ชั่ง') || pName.includes('mm-rm')) {
+          scope = 'IPC'
+        } else if (line.includes(' FG ') || line.includes(' FG(') || line.includes('FG:') || pName.includes('บรรจุ') || pName.includes('ลัง')) {
+          scope = 'FG'
+        } else if (line.includes('ถัง') || pName.includes('ผสม') || pName.includes('qc') || line.includes('Bulk') || line.includes('เนื้อ')) {
+          scope = 'BULK'
+        }
+
+        let issueType: 'HOLD' | 'REPROCESS' | 'REJECT' | 'NC' | 'DEFECT' = 'DEFECT'
+        if (line.includes('[QC HOLD]')) issueType = 'HOLD'
+        else if (line.includes('[QC REPROCESS]')) issueType = 'REPROCESS'
+        else if (line.includes('[QC REJECT]')) issueType = 'REJECT'
+        else if (line.includes('[NC]')) issueType = 'NC'
+
+        if (!isResolved) {
+          totalPendingQa++
+        }
+
+        const qaIssue: QaIssueInfo = {
+          id: `${log.id}-${lineIdx}`,
+          reportedAt: log.updated_at || log.activity_date,
+          scope,
+          issueType,
+          title: `${issueType} (${scope}): ${sku} • LOT ${lotNo}`,
+          rawNote: line,
+          isResolved,
+          sku,
+          lotNo,
+          resolvedNote: isResolved ? line : undefined
+        }
+
+        const opStatus = computeOperationalStatus(
+          { ...log, qaIssue, qcSubtype: scope },
+          'QC',
+          targetDate,
+          todayDateStr
+        )
+
+        const item: StreamItem = {
+          id: `qa-${log.id}-${lineIdx}`,
+          streamType: 'QC',
+          qcSubtype: scope,
+          date: targetDate,
+          title: `${sku} • LOT ${lotNo}`,
+          subtitle: cleanDisplayNote(line),
+          tag: isResolved ? `✓ QA แก้ไขแล้ว` : `⚠️ รอ QA (${issueType})`,
+          lotNo,
+          sku,
+          lotId: lot?.id,
+          meta: { ...log, roomName: log.rooms?.room_name, processName: log.processes?.process_name },
+          opStatus,
+          qaIssue
+        }
+
+        if (map[targetDate]) {
+          map[targetDate].QC.unshift(item)
+        }
+
+        // If not resolved and targetDate < todayDateStr, also surface in today's cell so QA can immediately see pending incidents
+        if (!isResolved && targetDate < todayDateStr && map[todayDateStr]) {
+          map[todayDateStr].QC.unshift({
+            ...item,
+            id: `qa-${log.id}-${lineIdx}-today`,
+            date: todayDateStr,
+            tag: `⚠️ รอ QA ตกค้าง (${issueType})`
+          })
+        }
+      })
+    })
+
     Object.values(map).forEach(day => {
       totalQc += day.QC.length
     })
@@ -1244,6 +1823,9 @@ export function RollingMasterRadar({
         totalMixing,
         totalMixingTanks,
         totalQc,
+        totalPendingQa,
+        totalBulkStockTanks,
+        totalBulkStockLots,
         totalPacking,
         totalFgDue
       }
@@ -1253,8 +1835,8 @@ export function RollingMasterRadar({
   const streamsConfig = [
     {
       key: 'ETA' as const,
-      label: '1. ของเข้า (ETA RM/PM)',
-      shortLabel: 'ของเข้า RM/PM',
+      label: '1. คลัง RM/PM (รับเข้าจริง & แผน ETA)',
+      shortLabel: 'คลัง RM/PM',
       icon: Truck,
       color: 'text-amber-700',
       bgColor: 'bg-amber-500/10',
@@ -1283,8 +1865,8 @@ export function RollingMasterRadar({
     },
     {
       key: 'QC' as const,
-      label: '4. ตรวจสอบคุณภาพ QC (RM / PM / Bulk / FG)',
-      shortLabel: 'งานตรวจ QC',
+      label: '4. ตรวจสอบคุณภาพ QC & ประกัน QA (QC/QA Gate)',
+      shortLabel: 'ตรวจ QC & QA',
       icon: ShieldCheck,
       color: 'text-purple-700',
       bgColor: 'bg-purple-500/10',
@@ -1292,8 +1874,18 @@ export function RollingMasterRadar({
       pillColor: 'bg-purple-100/90 text-purple-900 border-purple-300/80 hover:bg-purple-200'
     },
     {
+      key: 'BULK_STOCK' as const,
+      label: '5. คลัง Bulk (Bulk Stock)',
+      shortLabel: 'คลัง Bulk',
+      icon: Boxes,
+      color: 'text-cyan-700',
+      bgColor: 'bg-cyan-500/10',
+      badgeBorder: 'border-cyan-300',
+      pillColor: 'bg-cyan-100/90 text-cyan-950 border-cyan-300/80 hover:bg-cyan-200'
+    },
+    {
       key: 'PACKING' as const,
-      label: '5. ไลน์บรรจุ & POF',
+      label: '6. ไลน์บรรจุ & POF',
       shortLabel: 'บรรจุ/แพ็คกิ้ง',
       icon: Package,
       color: 'text-emerald-700',
@@ -1303,8 +1895,8 @@ export function RollingMasterRadar({
     },
     {
       key: 'FG_DUE' as const,
-      label: '6. กำหนดส่งมอบ (Due FG)',
-      shortLabel: 'ส่งมอบ FG',
+      label: '7. คลัง FG & กำหนดส่งมอบ (Due FG)',
+      shortLabel: 'คลัง FG & ส่งมอบ',
       icon: Gift,
       color: 'text-rose-700',
       bgColor: 'bg-rose-500/10',
@@ -1437,7 +2029,7 @@ export function RollingMasterRadar({
             isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
           }`}>
             <span className={`text-[11px] font-bold px-2 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>สายงาน:</span>
-            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'PACKING', 'FG_DUE'] as const).map(f => (
+            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'BULK_STOCK', 'PACKING', 'FG_DUE'] as const).map(f => (
               <button
                 key={f}
                 type="button"
@@ -1448,24 +2040,24 @@ export function RollingMasterRadar({
                     : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
                 }`}
               >
-                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'QC' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
+                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC & QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : 'คลัง FG'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* 21-Day Executive Summary Chips */}
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mt-4 pt-4 border-t ${
+        {/* 21-Day Executive Summary Chips (7 Streams) */}
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-2.5 mt-4 pt-4 border-t ${
           isNight ? 'border-slate-800' : 'border-slate-100'
         }`}>
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-amber-500" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-amber-300' : 'text-amber-700'}`}>ของเข้า RM/PM (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-amber-100' : 'text-amber-900'}`}>{summaryCounts.totalEta} รายการ</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Truck className="w-4 h-4 text-amber-500 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-amber-300' : 'text-amber-700'}`}>คลัง RM/PM (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-amber-100' : 'text-amber-900'}`}>{summaryCounts.totalEta} รายการ</div>
               </div>
             </div>
           </div>
@@ -1473,11 +2065,11 @@ export function RollingMasterRadar({
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/70 border-indigo-200/80 text-indigo-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-indigo-400" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-indigo-300' : 'text-indigo-700'}`}>เตรียม/ชั่งสาร (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-indigo-100' : 'text-indigo-900'}`}>{summaryCounts.totalWeighing} รอบงาน</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Scale className="w-4 h-4 text-indigo-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-indigo-300' : 'text-indigo-700'}`}>เตรียม/ชั่งสาร (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-indigo-100' : 'text-indigo-900'}`}>{summaryCounts.totalWeighing} รอบงาน</div>
               </div>
             </div>
           </div>
@@ -1485,11 +2077,11 @@ export function RollingMasterRadar({
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-blue-950/40 border-blue-800/60 text-blue-200' : 'bg-blue-50/70 border-blue-200/80 text-blue-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <Beaker className="w-4 h-4 text-blue-400" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-blue-300' : 'text-blue-700'}`}>งานผสม Bulk (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-blue-100' : 'text-blue-900'}`}>{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Beaker className="w-4 h-4 text-blue-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-blue-300' : 'text-blue-700'}`}>งานผสม Bulk (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-blue-100' : 'text-blue-900'}`}>{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
               </div>
             </div>
           </div>
@@ -1497,11 +2089,30 @@ export function RollingMasterRadar({
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-purple-950/40 border-purple-800/60 text-purple-200' : 'bg-purple-50/70 border-purple-200/80 text-purple-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-4 h-4 text-purple-400" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>งานตรวจ QC (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{summaryCounts.totalQc} งานตรวจ</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate flex items-center gap-1 ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>
+                  <span>ตรวจ QC & QA</span>
+                  {summaryCounts.totalPendingQa > 0 && (
+                    <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-extrabold animate-pulse">
+                      รอ QA: {summaryCounts.totalPendingQa}
+                    </span>
+                  )}
+                </div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{summaryCounts.totalQc} รายการ</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-cyan-950/40 border-cyan-800/60 text-cyan-200' : 'bg-cyan-50/70 border-cyan-200/80 text-cyan-900'
+          }`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <Boxes className="w-4 h-4 text-cyan-500 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-cyan-300' : 'text-cyan-700'}`}>คลัง Bulk (สต็อกพร้อมบรรจุ)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-cyan-100' : 'text-cyan-900'}`}>{summaryCounts.totalBulkStockTanks} ถัง ({summaryCounts.totalBulkStockLots} ล็อต)</div>
               </div>
             </div>
           </div>
@@ -1509,11 +2120,11 @@ export function RollingMasterRadar({
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-emerald-400" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>ไลน์บรรจุ & POF (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{summaryCounts.totalPacking} รอบงาน</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Package className="w-4 h-4 text-emerald-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>ไลน์บรรจุ & POF (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{summaryCounts.totalPacking} รอบงาน</div>
               </div>
             </div>
           </div>
@@ -1521,11 +2132,11 @@ export function RollingMasterRadar({
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50/70 border-rose-200/80 text-rose-900'
           }`}>
-            <div className="flex items-center gap-2">
-              <Gift className="w-4 h-4 text-rose-400" />
-              <div>
-                <div className={`text-[10px] font-medium ${isNight ? 'text-rose-300' : 'text-rose-700'}`}>กำหนดส่งมอบ FG (21 วัน)</div>
-                <div className={`text-sm font-black ${isNight ? 'text-rose-100' : 'text-rose-900'}`}>{summaryCounts.totalFgDue} ล็อต</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <Gift className="w-4 h-4 text-rose-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-rose-300' : 'text-rose-700'}`}>คลัง FG & ส่งมอบ (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-rose-100' : 'text-rose-900'}`}>{summaryCounts.totalFgDue} ล็อต</div>
               </div>
             </div>
           </div>
@@ -1626,6 +2237,8 @@ export function RollingMasterRadar({
                               const hasDelayed = items.some(it => it.opStatus?.type === 'delayed' || it.opStatus?.type === 'overdue')
                               const hasInProgress = items.some(it => it.opStatus?.type === 'in_progress')
                               const allDone = items.length > 0 && items.every(it => it.opStatus?.type === 'done' || it.opStatus?.type === 'qc_passed')
+                              const hasQaIssue = items.some(it => it.qaIssue && !it.qaIssue.isResolved)
+                              const qaPendingCount = items.filter(it => it.qaIssue && !it.qaIssue.isResolved).length
 
                               return (
                                 <div
@@ -1640,7 +2253,9 @@ export function RollingMasterRadar({
                                         type="button"
                                         onClick={() => setQcModalData({ items, stream, date: d })}
                                         className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 cursor-pointer relative ${
-                                          hasDelayed
+                                          hasQaIssue
+                                            ? 'bg-rose-100/95 text-rose-950 border-rose-400 font-black ring-2 ring-rose-400'
+                                            : hasDelayed
                                             ? 'bg-amber-100/95 text-amber-950 border-amber-400 font-bold'
                                             : hasInProgress
                                             ? 'bg-blue-50/90 text-blue-950 border-blue-400/80 font-bold ring-1 ring-blue-300'
@@ -1649,25 +2264,36 @@ export function RollingMasterRadar({
                                             : stream.pillColor
                                         }`}
                                       >
-                                        {hasInProgress && (
+                                        {hasQaIssue && (
+                                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600 animate-ping" title="พบปัญหาคุณภาพรอ QA ประเมิน" />
+                                        )}
+                                        {hasInProgress && !hasQaIssue && (
                                           <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" title="กำลังดำเนินการ (In Progress)" />
                                         )}
                                         <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
-                                          {hasDelayed && (
-                                            <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
+                                          {hasQaIssue ? (
+                                            <span className="text-rose-700 font-black flex items-center gap-0.5">⚠️ รอ QA ({qaPendingCount})</span>
+                                          ) : (
+                                            <>
+                                              {hasDelayed && (
+                                                <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
+                                              )}
+                                              {hasInProgress && !hasDelayed && (
+                                                <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
+                                              )}
+                                              {allDone && (
+                                                <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
+                                              )}
+                                              <span>{items.length} งาน QC</span>
+                                            </>
                                           )}
-                                          {hasInProgress && !hasDelayed && (
-                                            <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
-                                          )}
-                                          {allDone && (
-                                            <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
-                                          )}
-                                          <span>{items.length} งาน QC</span>
                                         </span>
                                         <div className="flex items-center gap-0.5 text-[8px] opacity-85 font-semibold truncate max-w-[62px]">
+                                          {hasQaIssue && <span className="text-rose-700 font-black">QA•</span>}
                                           {items.some(i => i.qcSubtype === 'RM') && <span>RM</span>}
                                           {items.some(i => i.qcSubtype === 'PM') && <span>•PM</span>}
                                           {items.some(i => i.qcSubtype === 'BULK') && <span>•Bulk</span>}
+                                          {items.some(i => i.qcSubtype === 'IPC') && <span>•IPC</span>}
                                           {items.some(i => i.qcSubtype === 'FG') && <span>•FG</span>}
                                         </div>
                                       </button>
@@ -1698,7 +2324,11 @@ export function RollingMasterRadar({
                                               <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
                                             )}
                                             <span>
-                                              {items.length === 1
+                                              {stream.key === 'BULK_STOCK'
+                                                ? (items.length === 1 && items[0].bulkStock
+                                                    ? `ถัง ${formatTankRanges(items[0].bulkStock.tanks)}`
+                                                    : `${items.length} ล็อต Bulk`)
+                                                : items.length === 1
                                                 ? items[0].tag || items[0].lotNo || '1 งาน'
                                                 : `${items.length} รายการ`}
                                             </span>
@@ -1897,10 +2527,11 @@ export function RollingMasterRadar({
                     const dayWeighing = dateStreamMap[d.dateStr]?.WEIGHING || []
                     const dayMixing = dateStreamMap[d.dateStr]?.MIXING || []
                     const dayQc = dateStreamMap[d.dateStr]?.QC || []
+                    const dayBulkStock = dateStreamMap[d.dateStr]?.BULK_STOCK || []
                     const dayPacking = dateStreamMap[d.dateStr]?.PACKING || []
                     const dayFgDue = dateStreamMap[d.dateStr]?.FG_DUE || []
 
-                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayPacking.length + dayFgDue.length
+                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayBulkStock.length + dayPacking.length + dayFgDue.length
 
                     if (totalDayTasks === 0) return null
 
@@ -2015,13 +2646,15 @@ export function RollingMasterRadar({
                             <div className="p-2 rounded-xl bg-purple-50/70 border border-purple-200/70 space-y-1">
                               <div className="font-bold text-purple-900 flex items-center gap-1.5 text-[11px]">
                                 <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
-                                <span>ตรวจสอบคุณภาพ QC ({dayQc.length} รายการ)</span>
+                                <span>ตรวจสอบคุณภาพ QC & QA ({dayQc.length} รายการ)</span>
                               </div>
                               {dayQc.map(q => (
                                 <div key={q.id} className="text-[11px] text-purple-800 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-purple-100 text-purple-900 border-purple-200">
-                                      {q.qcSubtype || 'QC'}
+                                    <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                                      q.qaIssue ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-purple-100 text-purple-900 border-purple-200'
+                                    }`}>
+                                      {q.qaIssue ? `QA: ${q.qaIssue.issueType}` : (q.qcSubtype || 'QC')}
                                     </span>
                                     <span>• <strong>{q.title}</strong></span>
                                     {q.tag && <span className="text-purple-600 font-medium">[{q.tag}]</span>}
@@ -2029,6 +2662,32 @@ export function RollingMasterRadar({
                                   {q.opStatus && (
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${q.opStatus.color}`}>
                                       {q.opStatus.shortBadge}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Bulk Stock */}
+                          {dayBulkStock.length > 0 && (
+                            <div className="p-2 rounded-xl bg-cyan-50/70 border border-cyan-200/70 space-y-1">
+                              <div className="font-bold text-cyan-950 flex items-center justify-between text-[11px]">
+                                <div className="flex items-center gap-1.5">
+                                  <Boxes className="w-3.5 h-3.5 text-cyan-700" />
+                                  <span>คลัง Bulk สต็อกพร้อมบรรจุ ({dayBulkStock.length} รายการ)</span>
+                                </div>
+                                <span className="text-[9px] font-bold text-cyan-800 bg-cyan-100 px-1.5 py-0.2 rounded">สต็อกพร้อมเบิก</span>
+                              </div>
+                              {dayBulkStock.map(b => (
+                                <div key={b.id} className="text-[11px] text-cyan-900 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{b.title}</strong></span>
+                                    <span className="text-cyan-700 font-semibold">[{b.tag}]</span>
+                                  </div>
+                                  {b.opStatus && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${b.opStatus.color}`}>
+                                      {b.opStatus.shortBadge}
                                     </span>
                                   )}
                                 </div>
