@@ -28,12 +28,33 @@ export default function ProductionLine({
   
   // Helper to determine status and tank count for a stage
   const getStageInfo = (lot: any, stageKey: string) => {
+    const isLotDone = lot.current_status === 'DONE'
+
     if (stageKey === 'delivered') {
-      const isDone = lot.current_status === 'DONE'
       return {
-        count: isDone ? '✔' : '-',
-        status: isDone ? 'active' : 'pending',
+        count: isLotDone ? '✔' : '-',
+        status: isLotDone ? 'delivered' : 'pending',
         totalAssigned: 0
+      }
+    }
+
+    if (isLotDone) {
+      // If the lot is marked as DONE by planner, all stages prior to delivery are 100% completed
+      const stage = PROCESS_STAGES.find(p => p.key === stageKey)
+      const stageLogs = activeLogs.filter(log => {
+        if (log.production_lot_id !== lot.id) return false
+        const processName = (log.processes?.process_name || '').toLowerCase()
+        const roomName = (log.rooms?.room_name || '').toLowerCase()
+        const combined = `${processName} ${roomName}`
+        return stage?.keywords.some((kw: string) => combined.includes(kw))
+      })
+      const tankEnd = stageLogs.length > 0 
+        ? (parseInt(stageLogs[0]?.tank_end) || parseInt(stageLogs[0]?.tank_start) || lot.total_tanks || 1)
+        : (lot.total_tanks || 1)
+      return {
+        count: tankEnd > 0 ? tankEnd : '✔',
+        status: 'completed',
+        totalAssigned: lot.total_tanks || 1
       }
     }
 
@@ -196,6 +217,7 @@ export default function ProductionLine({
                     
                     // Colors based on status
                     const bgColors = {
+                      delivered: isNight ? 'bg-emerald-600 text-white border-emerald-400 shadow-md scale-105 ring-2 ring-emerald-400/40' : 'bg-emerald-600 text-white border-emerald-700 shadow-md scale-105 ring-2 ring-emerald-500/30',
                       completed: isNight ? 'bg-emerald-950/80 text-emerald-300 border-emerald-500/80' : 'bg-emerald-100 text-emerald-700 border-emerald-300',
                       active: 'bg-emerald-500 text-white border-emerald-600 shadow-md scale-110',
                       warning: 'bg-yellow-400 text-yellow-900 border-yellow-500 shadow-md scale-110',
@@ -226,10 +248,11 @@ export default function ProductionLine({
 
                         {/* Status Label */}
                         <div className="mt-2 text-[10px] text-center w-max min-w-[5rem] whitespace-nowrap">
+                            {info.status === 'delivered' && <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ ส่งมอบแล้ว</span>}
+                            {info.status === 'completed' && <span className="text-emerald-500 font-bold">✓ เสร็จสิ้น</span>}
                             {info.status === 'active' && <span className="text-emerald-500 font-bold animate-pulse">● กำลังทำ</span>}
                             {info.status === 'warning' && <span className="text-yellow-500 font-bold">● รอคิว</span>}
                             {info.status === 'error' && <span className="text-red-500 font-bold animate-bounce">▲ ติดปัญหา</span>}
-                            {info.status === 'completed' && <span className="text-emerald-400 font-bold">✓ เสร็จสิ้น</span>}
                             {stage.key === 'delivered' && (
                               <div className={`mt-1 text-[9px] font-medium leading-tight ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
                                 {(!lot.order_type || lot.order_type === 'MTS') ? (

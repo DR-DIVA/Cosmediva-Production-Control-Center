@@ -157,6 +157,7 @@ export default function DashboardPage() {
   const [mixingHours, setMixingHours] = useState(8)
   const [packingHours, setPackingHours] = useState(8)
   const [activeLots, setActiveLots] = useState<any[]>([])
+  const [allLots, setAllLots] = useState<any[]>([])
   const [activeLogs, setActiveLogs] = useState<any[]>([])
   const [allDefects, setAllDefects] = useState<any[]>([])
   const [qaQcLogs, setQaQcLogs] = useState<any[]>([])
@@ -232,6 +233,10 @@ export default function DashboardPage() {
         products:sku_id (sku, product_name)
       `)
       .order('created_at', { ascending: true })
+
+    if (activeLotsData) {
+      setAllLots(activeLotsData)
+    }
 
     const activeLotIds = activeLotsData && activeLotsData.length > 0 ? activeLotsData.map((l: any) => l.id) : ['none']
 
@@ -426,7 +431,8 @@ export default function DashboardPage() {
     let lots = filteredLots
     if (pipelineSearch.trim()) {
       const q = pipelineSearch.toLowerCase().trim()
-      lots = lots.filter(l => {
+      const pool = allLots.length > 0 ? allLots : filteredLots
+      lots = pool.filter(l => {
         const matchLot = l.lot_no ? l.lot_no.toLowerCase().includes(q) : false
         const matchSku = l.products?.sku ? l.products.sku.toLowerCase().includes(q) : false
         const matchName = l.products?.product_name ? l.products.product_name.toLowerCase().includes(q) : false
@@ -434,7 +440,7 @@ export default function DashboardPage() {
       })
     }
     return lots
-  }, [filteredLots, pipelineSearch])
+  }, [filteredLots, pipelineSearch, allLots])
   
   // 1. กำลังการผลิตวันนี้ (แยก 5 กรอบ)
   const prodOutput = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
