@@ -153,7 +153,7 @@ export default function ProductionLine({
 
           {/* Data Rows */}
           {activeLots.length === 0 ? (
-            <div className={`p-8 text-center ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>ไม่มีข้อมูลออเดอร์ที่กำลังผลิต</div>
+            <div className={`p-8 text-center ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>ไม่พบข้อมูลออเดอร์ที่ตรงกับเงื่อนไข หรือคำค้นหา</div>
           ) : (
             activeLots.map((lot, idx) => (
               <div key={lot.id} className={`grid grid-cols-9 p-4 border-b items-center transition-colors duration-200 ${

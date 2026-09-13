@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -165,6 +165,7 @@ export default function DashboardPage() {
   const [rmQcLogs, setRmQcLogs] = useState<any[]>([])
   const [fgQcLogs, setFgQcLogs] = useState<any[]>([])
   const [selectedFilter, setSelectedFilter] = useState<string>('all')
+  const [pipelineSearch, setPipelineSearch] = useState<string>('')
   const [dashboardDate, setDashboardDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'))
 
   const [qcMetrics, setQcMetrics] = useState({
@@ -420,6 +421,20 @@ export default function DashboardPage() {
   // --- Calculations ---
 
   const filteredLots = selectedFilter === 'all' ? activeLots : activeLots.filter(l => l.id === selectedFilter)
+  
+  const pipelineLots = useMemo(() => {
+    let lots = filteredLots
+    if (pipelineSearch.trim()) {
+      const q = pipelineSearch.toLowerCase().trim()
+      lots = lots.filter(l => {
+        const matchLot = l.lot_no ? l.lot_no.toLowerCase().includes(q) : false
+        const matchSku = l.products?.sku ? l.products.sku.toLowerCase().includes(q) : false
+        const matchName = l.products?.product_name ? l.products.product_name.toLowerCase().includes(q) : false
+        return matchLot || matchSku || matchName
+      })
+    }
+    return lots
+  }, [filteredLots, pipelineSearch])
   
   // 1. กำลังการผลิตวันนี้ (แยก 5 กรอบ)
   const prodOutput = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
@@ -965,14 +980,18 @@ export default function DashboardPage() {
           isNightPipeline ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
         }`}
       >
-        <div className={`flex justify-between items-center mb-6 border-b pb-4 ${
+        <div className={`flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 mb-6 border-b pb-4 ${
           isNightPipeline ? 'border-slate-800' : 'border-[#D4AF37]/30'
         }`}>
           <div className="flex items-center gap-3 flex-wrap">
-            <h3 className={`text-lg font-bold flex items-center gap-3 ${isNightPipeline ? 'text-white' : 'text-[#4A4238]'}`}>
+            <h3 className={`text-lg font-bold flex items-center gap-2.5 ${isNightPipeline ? 'text-white' : 'text-[#4A4238]'}`}>
               <Factory className="w-5 h-5 text-yellow-400" />
-              Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : (
-                <span className="text-yellow-400 font-black">
+              <span>Digital Twin Pipeline</span>
+              <span className="text-xs font-normal text-slate-400">-</span>
+              {selectedFilter === 'all' ? (
+                <span className={`text-sm font-semibold ${isNightPipeline ? 'text-slate-300' : 'text-slate-600'}`}>ทุกออเดอร์</span>
+              ) : (
+                <span className="text-sm font-black text-yellow-400 bg-yellow-400/10 px-2 py-0.5 rounded-lg border border-yellow-400/30">
                   LOT {filteredLots[0]?.lot_no || selectedFilter} {filteredLots[0]?.products?.sku ? `(${filteredLots[0].products.sku})` : ''}
                 </span>
               )}
@@ -980,7 +999,10 @@ export default function DashboardPage() {
             {selectedFilter !== 'all' && (
               <button
                 type="button"
-                onClick={() => setSelectedFilter('all')}
+                onClick={() => {
+                  setSelectedFilter('all')
+                  setPipelineSearch('')
+                }}
                 className={`text-xs px-2.5 py-1 rounded-lg border font-bold transition flex items-center gap-1 ${
                   isNightPipeline 
                     ? 'bg-slate-800 text-amber-300 border-slate-700 hover:bg-slate-700' 
@@ -992,15 +1014,48 @@ export default function DashboardPage() {
               </button>
             )}
           </div>
-          <ThemeToggleButton 
-            isNight={isNightPipeline} 
-            onToggle={toggleThemePipeline} 
-            size="sm" 
-            title={isNightPipeline ? 'เปลี่ยนเป็นโหมดสว่าง (Digital Twin Pipeline)' : 'เปลี่ยนเป็นโหมดมืด (Digital Twin Pipeline)'}
-          />
+
+          {/* Search Box inside Digital Twin Pipeline */}
+          <div className="flex items-center gap-2.5 flex-1 max-w-md w-full">
+            <div className="relative flex-1">
+              <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${
+                isNightPipeline ? 'text-amber-400' : 'text-slate-400'
+              }`} />
+              <input
+                type="text"
+                value={pipelineSearch}
+                onChange={(e) => setPipelineSearch(e.target.value)}
+                placeholder="ค้นหารหัสงาน (LOT No., SKU, ชื่อสินค้า)..."
+                className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs font-medium focus:outline-none focus:ring-1 focus:ring-[#D4AF37] transition shadow-inner ${
+                  isNightPipeline 
+                    ? 'bg-slate-950/90 border border-slate-700 text-white placeholder:text-slate-500 focus:border-[#D4AF37]' 
+                    : 'bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-[#D4AF37] shadow-sm'
+                }`}
+              />
+              {pipelineSearch && (
+                <button
+                  type="button"
+                  onClick={() => setPipelineSearch('')}
+                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full transition ${
+                    isNightPipeline ? 'text-slate-400 hover:text-white' : 'text-slate-400 hover:text-slate-700'
+                  }`}
+                  title="ล้างคำค้นหา"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+
+            <ThemeToggleButton 
+              isNight={isNightPipeline} 
+              onToggle={toggleThemePipeline} 
+              size="sm" 
+              title={isNightPipeline ? 'เปลี่ยนเป็นโหมดสว่าง (Digital Twin Pipeline)' : 'เปลี่ยนเป็นโหมดมืด (Digital Twin Pipeline)'}
+            />
+          </div>
         </div>
         <div className="bg-transparent p-4 rounded-xl">
-          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} theme={themePipeline} />
+          <ProductionLine activeLots={pipelineLots} activeLogs={activeLogs} theme={themePipeline} />
         </div>
       </div>
       
