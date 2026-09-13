@@ -96,7 +96,7 @@ export interface BulkStockInfo {
 
 interface StreamItem {
   id: string
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'
   qcSubtype?: 'RM' | 'PM' | 'BULK' | 'IPC' | 'FG'
   date: string
   title: string
@@ -115,7 +115,7 @@ interface StreamItem {
 
 function computeOperationalStatus(
   item: any,
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE',
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE',
   cellDate: string,
   todayStr: string
 ): OperationalStatus {
@@ -257,8 +257,8 @@ function computeOperationalStatus(
     }
   }
 
-  // Quality Control & QA Assurance (QC/QA): RM, PM, BULK, IPC, FG
-  if (streamType === 'QC') {
+  // Quality Assurance & Incident Gate (QA): Incidents, Hold, Reprocess, Reject, NC
+  if (streamType === 'QA') {
     if (item.qaIssue && !item.qaIssue.isResolved) {
       const itype = item.qaIssue.issueType
       return {
@@ -268,9 +268,21 @@ function computeOperationalStatus(
         color: 'bg-rose-100 text-rose-950 border-rose-400 font-bold',
         dotColor: 'bg-rose-500 animate-pulse',
         note: item.qaIssue.rawNote,
-        detailsText: `ตรวจพบประเด็น ${item.qaIssue.scope} อยู่ระหว่างรอฝ่ายประกันคุณภาพ (QA) เข้าประเมิน`
+        detailsText: `ตรวจพบประเด็น ${item.qaIssue.scope} (${itype}) อยู่ระหว่างรอฝ่ายประกันคุณภาพ (QA) เข้าประเมินความเสี่ยงและปลดล็อค`
       }
     }
+    return {
+      badge: '✅ QA รับทราบ/อนุมัติแล้ว',
+      shortBadge: 'QA ผ่าน',
+      type: 'qc_passed',
+      color: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+      dotColor: 'bg-emerald-500',
+      detailsText: 'ฝ่ายประกันคุณภาพ (QA) ได้ทำการประเมินและอนุมัติให้ดำเนินการต่อแล้ว'
+    }
+  }
+
+  // Quality Control Routine Lab (QC): RM, PM, BULK, IPC, FG
+  if (streamType === 'QC') {
 
     const subtype = item.qcSubtype || 'BULK'
     const subLabel = subtype === 'RM' ? 'RM' : subtype === 'PM' ? 'PM' : subtype === 'BULK' ? 'Bulk' : subtype === 'IPC' ? 'IPC' : 'FG'
@@ -517,12 +529,17 @@ function QcDetailDialog({
 }) {
   const [activeTab, setActiveTab] = useState<'ALL' | 'QA' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
 
+  const isQaModal = data?.stream?.key === 'QA'
+
   useEffect(() => {
     if (isOpen) {
-      const hasPendingQa = data?.items.some(it => it.qaIssue && !it.qaIssue.isResolved)
-      setActiveTab(hasPendingQa ? 'QA' : 'ALL')
+      if (isQaModal) {
+        setActiveTab('QA')
+      } else {
+        setActiveTab('ALL')
+      }
     }
-  }, [isOpen, data?.date?.dateStr])
+  }, [isOpen, data?.date?.dateStr, isQaModal])
 
   if (!data) return null
 
@@ -558,9 +575,9 @@ function QcDetailDialog({
           <div className="flex items-center justify-between gap-3 flex-wrap pr-8">
             <div className="flex items-center gap-2.5">
               <div className={`p-2 rounded-xl border shrink-0 ${
-                isNight 
-                  ? 'bg-purple-950/60 border-purple-800 text-purple-400' 
-                  : 'bg-purple-50 border-purple-200 text-purple-700'
+                isQaModal
+                  ? (isNight ? 'bg-rose-950/60 border-rose-800 text-rose-400' : 'bg-rose-50 border-rose-200 text-rose-700')
+                  : (isNight ? 'bg-purple-950/60 border-purple-800 text-purple-400' : 'bg-purple-50 border-purple-200 text-purple-700')
               }`}>
                 <Icon className="w-5 h-5" />
               </div>
@@ -568,11 +585,15 @@ function QcDetailDialog({
                 <DialogTitle className={`text-base sm:text-lg font-bold flex items-center gap-2 ${
                   isNight ? 'text-white' : 'text-slate-900'
                 }`}>
-                  <span>งานตรวจสอบคุณภาพ QC & ประกันคุณภาพ QA</span>
+                  <span>{isQaModal ? 'งานประกันคุณภาพ QA (QA Assurance & Gate)' : 'งานตรวจสอบคุณภาพ QC (QC Testing Lab)'}</span>
                   <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${
-                    isNight 
-                      ? 'text-purple-300 bg-purple-950/80 border-purple-800' 
-                      : 'text-purple-700 bg-purple-50 border-purple-200'
+                    isQaModal
+                      ? (pendingQaIssues.length > 0
+                        ? 'text-rose-200 bg-rose-950/80 border-rose-800'
+                        : 'text-emerald-700 bg-emerald-50 border-emerald-200')
+                      : (isNight 
+                        ? 'text-purple-300 bg-purple-950/80 border-purple-800' 
+                        : 'text-purple-700 bg-purple-50 border-purple-200')
                   }`}>
                     {items.length} รายการ
                   </span>
@@ -583,7 +604,9 @@ function QcDetailDialog({
                   )}
                 </DialogTitle>
                 <DialogDescription className={`text-xs ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
-                  เกตเวย์ควบคุมคุณภาพ RM, PM, Bulk, IPC, FG และงานประกันคุณภาพเพื่อการปล่อยผ่านผลิตภัณฑ์ (Batch Release)
+                  {isQaModal
+                    ? 'เกตเวย์กำกับมาตรฐาน ประเมินความเสี่ยงและปลดล็อคข้อผิดพลาด Hold, Reprocess, Reject, NC ทุกมิติการผลิต'
+                    : 'เกตเวย์ควบคุมคุณภาพและตรวจวิเคราะห์ตามคิวปฏิบัติการ RM, PM, เนื้อ Bulk, IPC, และสินค้าสำเร็จรูป FG'}
                 </DialogDescription>
               </div>
             </div>
@@ -1036,7 +1059,7 @@ export function RollingMasterRadar({
   }
 
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
-  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'>('ALL')
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
   const [radarData, setRadarData] = useState<{
     etaList: any[]
@@ -1202,6 +1225,7 @@ export function RollingMasterRadar({
       WEIGHING: StreamItem[]
       MIXING: StreamItem[]
       QC: StreamItem[]
+      QA: StreamItem[]
       BULK_STOCK: StreamItem[]
       PACKING: StreamItem[]
       FG_DUE: StreamItem[]
@@ -1213,6 +1237,7 @@ export function RollingMasterRadar({
         WEIGHING: [],
         MIXING: [],
         QC: [],
+        QA: [],
         BULK_STOCK: [],
         PACKING: [],
         FG_DUE: []
@@ -1775,14 +1800,14 @@ export function RollingMasterRadar({
 
         const opStatus = computeOperationalStatus(
           { ...log, qaIssue, qcSubtype: scope },
-          'QC',
+          'QA',
           targetDate,
           todayDateStr
         )
 
         const item: StreamItem = {
           id: `qa-${log.id}-${lineIdx}`,
-          streamType: 'QC',
+          streamType: 'QA',
           qcSubtype: scope,
           date: targetDate,
           title: `${sku} • LOT ${lotNo}`,
@@ -1797,12 +1822,12 @@ export function RollingMasterRadar({
         }
 
         if (map[targetDate]) {
-          map[targetDate].QC.unshift(item)
+          map[targetDate].QA.unshift(item)
         }
 
         // If not resolved and targetDate < todayDateStr, also surface in today's cell so QA can immediately see pending incidents
         if (!isResolved && targetDate < todayDateStr && map[todayDateStr]) {
-          map[todayDateStr].QC.unshift({
+          map[todayDateStr].QA.unshift({
             ...item,
             id: `qa-${log.id}-${lineIdx}-today`,
             date: todayDateStr,
@@ -1866,8 +1891,8 @@ export function RollingMasterRadar({
     },
     {
       key: 'QC' as const,
-      label: '4. ตรวจสอบคุณภาพ QC & ประกัน QA (QC/QA Gate)',
-      shortLabel: 'ตรวจ QC & QA',
+      label: '4. ตรวจสอบคุณภาพ QC (QC Testing Lab)',
+      shortLabel: 'ตรวจ QC',
       icon: ShieldCheck,
       color: 'text-purple-700',
       bgColor: 'bg-purple-500/10',
@@ -1875,8 +1900,18 @@ export function RollingMasterRadar({
       pillColor: 'bg-purple-100/90 text-purple-900 border-purple-300/80 hover:bg-purple-200'
     },
     {
+      key: 'QA' as const,
+      label: '5. ประกันคุณภาพ QA (QA Assurance & Gate)',
+      shortLabel: 'ประกัน QA',
+      icon: AlertTriangle,
+      color: 'text-rose-700',
+      bgColor: 'bg-rose-500/10',
+      badgeBorder: 'border-rose-300',
+      pillColor: 'bg-rose-100/90 text-rose-950 border-rose-400/90 hover:bg-rose-200 font-bold'
+    },
+    {
       key: 'BULK_STOCK' as const,
-      label: '5. คลัง Bulk (Bulk Stock)',
+      label: '6. คลัง Bulk (Bulk Stock)',
       shortLabel: 'คลัง Bulk',
       icon: Boxes,
       color: 'text-cyan-700',
@@ -1886,7 +1921,7 @@ export function RollingMasterRadar({
     },
     {
       key: 'PACKING' as const,
-      label: '6. ไลน์บรรจุ & POF',
+      label: '7. ไลน์บรรจุ & POF',
       shortLabel: 'บรรจุ/แพ็คกิ้ง',
       icon: Package,
       color: 'text-emerald-700',
@@ -1896,13 +1931,13 @@ export function RollingMasterRadar({
     },
     {
       key: 'FG_DUE' as const,
-      label: '7. คลัง FG & กำหนดส่งมอบ (Due FG)',
+      label: '8. คลัง FG & กำหนดส่งมอบ (Due FG)',
       shortLabel: 'คลัง FG & ส่งมอบ',
       icon: Gift,
-      color: 'text-rose-700',
-      bgColor: 'bg-rose-500/10',
-      badgeBorder: 'border-rose-300',
-      pillColor: 'bg-rose-100/90 text-rose-900 border-rose-300/80 hover:bg-rose-200'
+      color: 'text-pink-700',
+      bgColor: 'bg-pink-500/10',
+      badgeBorder: 'border-pink-300',
+      pillColor: 'bg-pink-100/90 text-pink-900 border-pink-300/80 hover:bg-pink-200'
     }
   ]
 
@@ -2030,7 +2065,7 @@ export function RollingMasterRadar({
             isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
           }`}>
             <span className={`text-[11px] font-bold px-2 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>สายงาน:</span>
-            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'BULK_STOCK', 'PACKING', 'FG_DUE'] as const).map(f => (
+            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'QA', 'BULK_STOCK', 'PACKING', 'FG_DUE'] as const).map(f => (
               <button
                 key={f}
                 type="button"
@@ -2041,14 +2076,14 @@ export function RollingMasterRadar({
                     : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
                 }`}
               >
-                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC & QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : 'คลัง FG'}
+                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC' : f === 'QA' ? 'ประกัน QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : 'คลัง FG'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* 21-Day Executive Summary Chips (7 Streams) */}
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 sm:gap-2.5 mt-4 pt-4 border-t ${
+        {/* 21-Day Executive Summary Chips (8 Streams) */}
+        <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 mt-4 pt-4 border-t ${
           isNight ? 'border-slate-800' : 'border-slate-100'
         }`}>
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
@@ -2093,15 +2128,26 @@ export function RollingMasterRadar({
             <div className="flex items-center gap-2 min-w-0">
               <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
               <div className="min-w-0">
-                <div className={`text-[10px] font-medium truncate flex items-center gap-1 ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>
-                  <span>ตรวจ QC & QA</span>
-                  {summaryCounts.totalPendingQa > 0 && (
-                    <span className="px-1 py-0.2 rounded-full bg-rose-500 text-white text-[9px] font-extrabold animate-pulse">
-                      รอ QA: {summaryCounts.totalPendingQa}
-                    </span>
-                  )}
-                </div>
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>ตรวจ QC (21 วัน)</div>
                 <div className={`text-sm font-black truncate ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{summaryCounts.totalQc} รายการ</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight 
+              ? (summaryCounts.totalPendingQa > 0 ? 'bg-rose-950/50 border-rose-700/80 text-rose-200' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200')
+              : (summaryCounts.totalPendingQa > 0 ? 'bg-rose-50/80 border-rose-300/90 text-rose-950' : 'bg-emerald-50/60 border-emerald-200/80 text-emerald-900')
+          }`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <AlertTriangle className={`w-4 h-4 shrink-0 ${summaryCounts.totalPendingQa > 0 ? 'text-rose-500 animate-bounce' : 'text-emerald-500'}`} />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate flex items-center gap-1 ${summaryCounts.totalPendingQa > 0 ? (isNight ? 'text-rose-300' : 'text-rose-700') : (isNight ? 'text-emerald-300' : 'text-emerald-700')}`}>
+                  <span>ประกัน QA (Gate)</span>
+                </div>
+                <div className={`text-sm font-black truncate ${summaryCounts.totalPendingQa > 0 ? (isNight ? 'text-rose-200 font-black' : 'text-rose-700 font-black') : (isNight ? 'text-emerald-200' : 'text-emerald-800')}`}>
+                  {summaryCounts.totalPendingQa > 0 ? `รอ QA: ${summaryCounts.totalPendingQa}` : '✅ ปกติ (0 เคส)'}
+                </div>
               </div>
             </div>
           </div>
@@ -2249,14 +2295,40 @@ export function RollingMasterRadar({
                                   }`}
                                 >
                                   {hasItems ? (
-                                    stream.key === 'QC' ? (
+                                    stream.key === 'QA' ? (
                                       <button
                                         type="button"
                                         onClick={() => setQcModalData({ items, stream, date: d })}
                                         className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 cursor-pointer relative ${
-                                          hasQaIssue
+                                          qaPendingCount > 0
                                             ? 'bg-rose-100/95 text-rose-950 border-rose-400 font-black ring-2 ring-rose-400'
-                                            : hasDelayed
+                                            : 'bg-emerald-50/90 text-emerald-950 border-emerald-300 font-medium'
+                                        }`}
+                                      >
+                                        {qaPendingCount > 0 && (
+                                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600 animate-ping" title="พบปัญหาคุณภาพรอ QA ประเมิน" />
+                                        )}
+                                        <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
+                                          {qaPendingCount > 0 ? (
+                                            <span className="text-rose-700 font-black flex items-center gap-0.5">⚠️ รอ QA ({qaPendingCount})</span>
+                                          ) : (
+                                            <span className="text-emerald-700 font-bold flex items-center gap-0.5">✓ ปกติ ({items.length})</span>
+                                          )}
+                                        </span>
+                                        <div className="flex items-center gap-0.5 text-[8px] opacity-85 font-semibold truncate max-w-[62px]">
+                                          {items.some(i => i.qcSubtype === 'RM') && <span>RM</span>}
+                                          {items.some(i => i.qcSubtype === 'PM') && <span>•PM</span>}
+                                          {items.some(i => i.qcSubtype === 'BULK') && <span>•Bulk</span>}
+                                          {items.some(i => i.qcSubtype === 'IPC') && <span>•IPC</span>}
+                                          {items.some(i => i.qcSubtype === 'FG') && <span>•FG</span>}
+                                        </div>
+                                      </button>
+                                    ) : stream.key === 'QC' ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => setQcModalData({ items, stream, date: d })}
+                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 cursor-pointer relative ${
+                                          hasDelayed
                                             ? 'bg-amber-100/95 text-amber-950 border-amber-400 font-bold'
                                             : hasInProgress
                                             ? 'bg-blue-50/90 text-blue-950 border-blue-400/80 font-bold ring-1 ring-blue-300'
@@ -2265,32 +2337,22 @@ export function RollingMasterRadar({
                                             : stream.pillColor
                                         }`}
                                       >
-                                        {hasQaIssue && (
-                                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600 animate-ping" title="พบปัญหาคุณภาพรอ QA ประเมิน" />
-                                        )}
-                                        {hasInProgress && !hasQaIssue && (
+                                        {hasInProgress && (
                                           <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" title="กำลังดำเนินการ (In Progress)" />
                                         )}
                                         <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
-                                          {hasQaIssue ? (
-                                            <span className="text-rose-700 font-black flex items-center gap-0.5">⚠️ รอ QA ({qaPendingCount})</span>
-                                          ) : (
-                                            <>
-                                              {hasDelayed && (
-                                                <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
-                                              )}
-                                              {hasInProgress && !hasDelayed && (
-                                                <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
-                                              )}
-                                              {allDone && (
-                                                <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
-                                              )}
-                                              <span>{items.length} งาน QC</span>
-                                            </>
+                                          {hasDelayed && (
+                                            <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
                                           )}
+                                          {hasInProgress && !hasDelayed && (
+                                            <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
+                                          )}
+                                          {allDone && (
+                                            <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
+                                          )}
+                                          <span>{items.length} งาน QC</span>
                                         </span>
                                         <div className="flex items-center gap-0.5 text-[8px] opacity-85 font-semibold truncate max-w-[62px]">
-                                          {hasQaIssue && <span className="text-rose-700 font-black">QA•</span>}
                                           {items.some(i => i.qcSubtype === 'RM') && <span>RM</span>}
                                           {items.some(i => i.qcSubtype === 'PM') && <span>•PM</span>}
                                           {items.some(i => i.qcSubtype === 'BULK') && <span>•Bulk</span>}
@@ -2533,11 +2595,12 @@ export function RollingMasterRadar({
                     const dayWeighing = dateStreamMap[d.dateStr]?.WEIGHING || []
                     const dayMixing = dateStreamMap[d.dateStr]?.MIXING || []
                     const dayQc = dateStreamMap[d.dateStr]?.QC || []
+                    const dayQa = dateStreamMap[d.dateStr]?.QA || []
                     const dayBulkStock = dateStreamMap[d.dateStr]?.BULK_STOCK || []
                     const dayPacking = dateStreamMap[d.dateStr]?.PACKING || []
                     const dayFgDue = dateStreamMap[d.dateStr]?.FG_DUE || []
 
-                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayBulkStock.length + dayPacking.length + dayFgDue.length
+                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayQa.length + dayBulkStock.length + dayPacking.length + dayFgDue.length
 
                     if (totalDayTasks === 0) return null
 
@@ -2652,15 +2715,13 @@ export function RollingMasterRadar({
                             <div className="p-2 rounded-xl bg-purple-50/70 border border-purple-200/70 space-y-1">
                               <div className="font-bold text-purple-900 flex items-center gap-1.5 text-[11px]">
                                 <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
-                                <span>ตรวจสอบคุณภาพ QC & QA ({dayQc.length} รายการ)</span>
+                                <span>ตรวจสอบคุณภาพ QC ({dayQc.length} รายการตรวจ)</span>
                               </div>
                               {dayQc.map(q => (
                                 <div key={q.id} className="text-[11px] text-purple-800 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
-                                      q.qaIssue ? 'bg-rose-100 text-rose-900 border-rose-300' : 'bg-purple-100 text-purple-900 border-purple-200'
-                                    }`}>
-                                      {q.qaIssue ? `QA: ${q.qaIssue.issueType}` : (q.qcSubtype || 'QC')}
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-purple-100 text-purple-900 border-purple-200">
+                                      {q.qcSubtype || 'QC'}
                                     </span>
                                     <span>• <strong>{q.title}</strong></span>
                                     {q.tag && <span className="text-purple-600 font-medium">[{q.tag}]</span>}
@@ -2668,6 +2729,35 @@ export function RollingMasterRadar({
                                   {q.opStatus && (
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${q.opStatus.color}`}>
                                       {q.opStatus.shortBadge}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* QA */}
+                          {dayQa.length > 0 && (
+                            <div className="p-2 rounded-xl bg-rose-50/70 border border-rose-200/70 space-y-1">
+                              <div className="font-bold text-rose-950 flex items-center justify-between text-[11px]">
+                                <div className="flex items-center gap-1.5">
+                                  <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                                  <span>ประกันคุณภาพ QA ({dayQa.length} ประเด็นรอประเมิน)</span>
+                                </div>
+                                <span className="text-[9px] font-bold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded">QA Gate</span>
+                              </div>
+                              {dayQa.map(qa => (
+                                <div key={qa.id} className="text-[11px] text-rose-900 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-rose-100 text-rose-900 border-rose-300">
+                                      {qa.qaIssue ? `QA: ${qa.qaIssue.issueType}` : 'QA'}
+                                    </span>
+                                    <span>• <strong>{qa.title}</strong></span>
+                                    {qa.tag && <span className="text-rose-700 font-medium">[{qa.tag}]</span>}
+                                  </div>
+                                  {qa.opStatus && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${qa.opStatus.color}`}>
+                                      {qa.opStatus.shortBadge}
                                     </span>
                                   )}
                                 </div>
