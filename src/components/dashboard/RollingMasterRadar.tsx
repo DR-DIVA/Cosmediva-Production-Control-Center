@@ -115,7 +115,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
       ] = await Promise.all([
         // 1. ETA RM/PM within 21 days
         supabase.from('production_lot_rms')
-          .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier')
+          .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier, bottom_remark, receive_date')
           .gte('eta_date', horizonStartStr)
           .lte('eta_date', horizonEndStr)
           .order('eta_date', { ascending: true }),
@@ -188,20 +188,18 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
        if (map[d]) {
          totalEta++
          const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status)
-         const isRescheduled = dInfo.isDelayed && (dInfo.categoryLabel || dInfo.reason)
+         const isRescheduled = dInfo.isDelayed || item.status === 'DELAYED'
 
          map[d].ETA.push({
            id: item.id,
            streamType: 'ETA',
            date: d,
            title: `${item.rm_code} (${item.quantity || 0} ${item.unit || ''})`,
-           subtitle: isRescheduled 
-             ? `⚠️ เลื่อนส่ง: ${dInfo.categoryLabel || 'แจ้งเลื่อน'} (${item.supplier || ''})` 
-             : (item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์'),
+           subtitle: item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์',
            tag: item.po_no ? `PO: ${item.po_no}` : undefined,
            quantity: item.quantity,
            status: item.status,
-           meta: { ...item, delayInfo: dInfo }
+           meta: { ...item, delayInfo: dInfo, isDelayed: isRescheduled }
          })
        }
     })
@@ -640,9 +638,16 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                   {hasItems ? (
                                     <Popover>
                                       <PopoverTrigger
-                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 ${stream.pillColor}`}
+                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 ${
+                                          stream.key === 'ETA' && items.some(it => it.meta?.isDelayed)
+                                            ? 'bg-amber-100/95 text-amber-950 border-amber-400 font-bold'
+                                            : stream.pillColor
+                                        }`}
                                       >
-                                        <span className="font-extrabold text-[11px] leading-tight">
+                                        <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-0.5">
+                                          {stream.key === 'ETA' && items.some(it => it.meta?.isDelayed) && (
+                                            <span className="text-[10px]" title="มีรายการเลื่อนส่ง">⚠️</span>
+                                          )}
                                           {items.length === 1
                                             ? items[0].tag || items[0].lotNo || '1 งาน'
                                             : `${items.length} รายการ`}
@@ -670,37 +675,78 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                         </div>
 
                                         <div className="space-y-2">
-                                          {items.map((it, itIdx) => (
-                                            <div
-                                              key={it.id || itIdx}
-                                              className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1 hover:bg-amber-50/50 transition"
-                                            >
-                                              <div className="flex justify-between items-start gap-2">
-                                                <strong className="text-[#4A4238] font-bold text-xs leading-snug">{it.title}</strong>
-                                                {it.tag && (
-                                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300/60 px-1.5 py-0.5 rounded-md shrink-0">
-                                                    {it.tag}
-                                                  </span>
+                                          {items.map((it, itIdx) => {
+                                            const isDelayedItem = it.streamType === 'ETA' && it.meta?.isDelayed
+                                            const delayInfo = it.meta?.delayInfo
+                                            return (
+                                              <div
+                                                key={it.id || itIdx}
+                                                className={`p-2.5 rounded-xl border space-y-1.5 transition ${
+                                                  isDelayedItem 
+                                                    ? 'bg-amber-50/70 border-amber-300/90 hover:bg-amber-100/50' 
+                                                    : 'bg-slate-50 border-slate-200/80 hover:bg-amber-50/50'
+                                                }`}
+                                              >
+                                                <div className="flex justify-between items-start gap-2">
+                                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                                    <strong className="text-[#4A4238] font-bold text-xs leading-snug">{it.title}</strong>
+                                                    {isDelayedItem && (
+                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md">
+                                                        ⚠️ เลื่อนส่ง
+                                                      </span>
+                                                    )}
+                                                  </div>
+                                                  {it.tag && (
+                                                    <span className="text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300/60 px-1.5 py-0.5 rounded-md shrink-0">
+                                                      {it.tag}
+                                                    </span>
+                                                  )}
+                                                </div>
+                                                
+                                                <div className="text-[11px] text-slate-600 leading-normal font-medium">
+                                                  {it.subtitle}
+                                                </div>
+
+                                                {/* Dedicated Delay Warning Box */}
+                                                {isDelayedItem && (
+                                                  <div className="p-2 rounded-lg bg-white/95 border border-amber-200 text-amber-900 text-[10px] space-y-1 mt-1 shadow-xs">
+                                                    <div className="font-bold flex items-center justify-between gap-1 text-rose-800 flex-wrap">
+                                                      <span className="flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0"></span>
+                                                        <span>สาเหตุ: {delayInfo?.categoryLabel || 'เลื่อนกำหนดส่งมอบ'}</span>
+                                                      </span>
+                                                      {delayInfo?.originalEta && (
+                                                        <span className="text-[9px] text-slate-500 font-normal">
+                                                          (กำหนดเดิมตาม PO: {new Date(delayInfo.originalEta).toLocaleDateString('th-TH')})
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    {delayInfo?.reason && (
+                                                      <div className="text-slate-600 pl-2.5 text-[10px] italic border-l-2 border-amber-300">
+                                                        &ldquo;{delayInfo.reason}&rdquo;
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+
+                                                {it.meta?.isMultiDay && (
+                                                  <div className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-2 py-0.5 w-fit font-medium flex items-center gap-1.5 mt-0.5">
+                                                    <CalendarDays className="w-3 h-3 text-[#D4AF37]" />
+                                                    <span>ช่วงแผน: {format(parseISO(it.meta.startDate), 'd MMM')} - {format(parseISO(it.meta.endDate), 'd MMM yyyy')}</span>
+                                                  </div>
+                                                )}
+                                                {it.lotId && onSelectLot && (
+                                                  <button
+                                                    type="button"
+                                                    onClick={() => onSelectLot(it.lotId!)}
+                                                    className="text-[10px] text-[#8B7355] font-bold hover:underline flex items-center gap-1 pt-1"
+                                                  >
+                                                    ดูกราฟล็อตนี้ <ChevronRight className="w-3 h-3" />
+                                                  </button>
                                                 )}
                                               </div>
-                                              <div className="text-[11px] text-slate-600 leading-normal">{it.subtitle}</div>
-                                              {it.meta?.isMultiDay && (
-                                                <div className="text-[10px] text-amber-800 bg-amber-50 border border-amber-200/80 rounded px-2 py-0.5 w-fit font-medium flex items-center gap-1.5 mt-0.5">
-                                                  <CalendarDays className="w-3 h-3 text-[#D4AF37]" />
-                                                  <span>ช่วงแผน: {format(parseISO(it.meta.startDate), 'd MMM')} - {format(parseISO(it.meta.endDate), 'd MMM yyyy')}</span>
-                                                </div>
-                                              )}
-                                              {it.lotId && onSelectLot && (
-                                                <button
-                                                  type="button"
-                                                  onClick={() => onSelectLot(it.lotId!)}
-                                                  className="text-[10px] text-[#8B7355] font-bold hover:underline flex items-center gap-1 pt-1"
-                                                >
-                                                  ดูกราฟล็อตนี้ <ChevronRight className="w-3 h-3" />
-                                                </button>
-                                              )}
-                                            </div>
-                                          ))}
+                                            )
+                                          })}
                                         </div>
                                       </PopoverContent>
                                     </Popover>
@@ -774,6 +820,11 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                               {dayEta.map(e => (
                                 <div key={e.id} className="text-[11px] text-amber-800 pl-5">
                                   • <strong>{e.title}</strong> - <span className="text-amber-700">{e.subtitle}</span>
+                                  {e.meta?.isDelayed && (
+                                    <span className="ml-1 text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
+                                      ⚠️ เลื่อนส่ง ({e.meta?.delayInfo?.categoryLabel || 'แจ้งเลื่อน'})
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -882,6 +933,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                       {radarData.etaList.map((item, idx) => {
                         const etaD = parseISO(item.eta_date)
                         const isToday = isSameDay(etaD, baseDate)
+                        const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status)
+                        const isDelayed = dInfo.isDelayed || item.status === 'DELAYED'
 
                         return (
                           <div
@@ -900,11 +953,16 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                               </div>
 
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-extrabold text-[#4A4238] text-sm">{item.rm_code}</span>
                                   {item.po_no && (
                                     <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
                                       PO: {item.po_no}
+                                    </span>
+                                  )}
+                                  {isDelayed && (
+                                    <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-full inline-flex items-center gap-1">
+                                      ⚠️ เลื่อนส่ง: {dInfo.categoryLabel || 'แจ้งเลื่อน'}
                                     </span>
                                   )}
                                   {isToday && (
@@ -913,9 +971,19 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-slate-500 text-xs mt-0.5">
-                                  {item.rm_name || item.supplier || 'ไม่ระบุชื่อ'}
+                                <div className="text-slate-500 text-xs mt-0.5 flex items-center gap-2 flex-wrap">
+                                  <span>{item.rm_name || item.supplier || 'ไม่ระบุชื่อ'}</span>
+                                  {isDelayed && dInfo.originalEta && (
+                                    <span className="text-[10px] text-slate-400 line-through">
+                                      (PO เดิม: {new Date(dInfo.originalEta).toLocaleDateString('th-TH')})
+                                    </span>
+                                  )}
                                 </div>
+                                {isDelayed && dInfo.reason && (
+                                  <div className="text-[10px] text-amber-800 mt-1 italic bg-amber-50/80 px-2 py-0.5 rounded border border-amber-200/60 inline-block">
+                                    เหตุผล: {dInfo.reason}
+                                  </div>
+                                )}
                               </div>
                             </div>
 
