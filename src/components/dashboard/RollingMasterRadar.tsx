@@ -1109,8 +1109,7 @@ export function RollingMasterRadar({
         { data: lotsData },
         { data: fgInvData },
         { data: qaLogsData },
-        { data: bulkDataAll },
-        { data: packDataAll }
+        { data: allLogsData }
       ] = await Promise.all([
         // 1. ETA RM/PM within 21 days (or received within horizon)
         supabase.from('production_lot_rms')
@@ -1160,26 +1159,25 @@ export function RollingMasterRadar({
           .or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%,note.ilike.%[NC]%')
           .order('updated_at', { ascending: false }),
 
-        // 6. Bulk Mixing & QC logs for tracking Bulk Staging Stock
+        // 6. All production logs for tracking Bulk Staging Stock & Packing consumption
         supabase.from('production_logs')
           .select(`
             id, status, qc_status, activity_date, end_date, tank_start, tank_end, tank_details, total_tanks,
             processes (process_name),
-            production_lots (id, lot_no, planned_quantity, total_tanks, products:sku_id (sku, product_name))
+            production_lots (id, lot_no, planned_quantity, total_tanks, current_status, products:sku_id (sku, product_name))
           `)
-          .or('processes.process_name.ilike.%รอ qc%,processes.process_name.ilike.%ผสม%,processes.process_name.ilike.%qc%,processes.process_name.ilike.%bulk%,qc_status.eq.PASSED,qc_status.eq.QC_PASS')
-          .order('activity_date', { ascending: true }),
-
-        // 7. Packing logs for tracking consumed tanks
-        supabase.from('production_logs')
-          .select(`
-            id, status, activity_date, end_date, tank_start, tank_end, tank_details,
-            processes (process_name),
-            production_lots (id, lot_no)
-          `)
-          .or('processes.process_name.ilike.%บรรจุ%,processes.process_name.ilike.%packing%,processes.process_name.ilike.%รอบรรจุ%,processes.process_name.ilike.%ลงลัง%')
           .order('activity_date', { ascending: true })
       ])
+
+      const allProdLogs = (allLogsData as any[]) || []
+      const bulkLogsAll = allProdLogs.filter((l: any) => {
+        const pName = (l.processes?.process_name || '').toLowerCase()
+        return pName.includes('ผสม') || pName.includes('qc') || pName.includes('bulk') || pName.includes('แช่')
+      })
+      const packLogsAll = allProdLogs.filter((l: any) => {
+        const pName = (l.processes?.process_name || '').toLowerCase()
+        return pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('กล่อง') || pName.includes('รอบรรจุ')
+      })
 
       setRadarData({
         etaList: etaData || [],
@@ -1187,8 +1185,8 @@ export function RollingMasterRadar({
         fgDueLots: lotsData || [],
         fgInventoryList: fgInvData || [],
         qaIssuesLogs: qaLogsData || [],
-        bulkLogsAll: bulkDataAll || [],
-        packLogsAll: packDataAll || []
+        bulkLogsAll,
+        packLogsAll
       })
     } catch (err) {
       console.error('Error fetching rolling radar data:', err)
@@ -1352,6 +1350,7 @@ export function RollingMasterRadar({
 
       if (l.tank_details && typeof l.tank_details === 'object') {
         Object.entries(l.tank_details).forEach(([t, s]) => {
+          if (t.includes('history') || t === 'delivery_info') return
           const status = typeof s === 'string' ? s : (s as any)?.status
           if (status === 'DONE' || status === 'SENT_TO_POF' || status === 'COMPLETED' || status === 'IN_PROGRESS') {
             packedTankMap[lotId].add(parseInt(t))
@@ -1381,6 +1380,7 @@ export function RollingMasterRadar({
       const lot = l.production_lots
       const lotId = lot?.id
       if (!lotId) return
+      if (lot?.current_status === 'DONE') return // Skip lots that are already finished
 
       if (!bulkPassedMap[lotId]) {
         bulkPassedMap[lotId] = {
@@ -1398,13 +1398,14 @@ export function RollingMasterRadar({
 
       if (l.tank_details && typeof l.tank_details === 'object') {
         Object.entries(l.tank_details).forEach(([t, s]) => {
+          if (t.includes('history') || t === 'delivery_info') return
           const status = typeof s === 'string' ? s : (s as any)?.status
-          if (status === 'QC_PASS' || status === 'PASSED' || status === 'COMPLETED') {
+          if (status === 'QC_PASS' || status === 'PASSED' || status === 'SENT_TO_PACKING' || status === 'COMPLETED') {
             bulkPassedMap[lotId].tanks[parseInt(t)] = { date: logDate, logId: l.id }
           }
         })
       }
-      if (l.qc_status === 'PASSED' || l.qc_status === 'QC_PASS') {
+      if (l.qc_status === 'PASSED' || l.qc_status === 'QC_PASS' || l.status === 'DONE') {
         const sT = parseInt(l.tank_start) || 1
         const eT = parseInt(l.tank_end) || sT
         for (let i = sT; i <= eT; i++) {
@@ -2336,6 +2337,11 @@ export function RollingMasterRadar({
                                           {items.length === 1 && items[0].lotNo && (
                                             <span className="text-[9px] opacity-80 truncate max-w-[55px]">
                                               {items[0].sku}
+                                            </span>
+                                          )}
+                                          {items.length > 1 && stream.key === 'BULK_STOCK' && (
+                                            <span className="text-[8px] opacity-90 font-bold truncate max-w-[62px] text-cyan-800">
+                                              {items.reduce((acc, it) => acc + (it.bulkStock?.tanks.length || 0), 0)} ถัง
                                             </span>
                                           )}
                                         </PopoverTrigger>
