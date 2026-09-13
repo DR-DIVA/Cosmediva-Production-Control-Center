@@ -17,12 +17,14 @@ function ThemeToggleButton({
   isNight, 
   onToggle, 
   size = 'md', 
-  className = '' 
+  className = '',
+  title
 }: { 
   isNight: boolean
   onToggle: () => void
   size?: 'sm' | 'md'
   className?: string 
+  title?: string
 }) {
   return (
     <button
@@ -35,7 +37,7 @@ function ThemeToggleButton({
           ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
           : 'bg-white hover:bg-slate-100 text-slate-700 border-[#D4AF37]/40 hover:text-slate-900 shadow-xs'
       } ${className}`}
-      title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)'}
+      title={title || (isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)')}
     >
       {isNight ? (
         <>
@@ -68,31 +70,89 @@ const parseRanges = (str: string) => {
 }
 
 export default function DashboardPage() {
-  const [theme, setTheme] = useState<'night' | 'light'>('light')
+  // 1. 21-Day Rolling Master Radar theme state
+  const [theme21Day, setTheme21Day] = useState<'night' | 'light'>('light')
+
+  // 2. AI Plant Director Strategic Directives theme state
+  const [themeAiDirector, setThemeAiDirector] = useState<'night' | 'light'>('night')
+
+  // 3. Digital Twin Pipeline theme state
+  const [themePipeline, setThemePipeline] = useState<'night' | 'light'>('light')
+
+  // 4. Dashboard 1-10 Operational Sections theme state
+  const [themeDashboard, setThemeDashboard] = useState<'night' | 'light'>('light')
 
   useEffect(() => {
     try {
-      const savedTheme = localStorage.getItem('cosmeflow_dashboard_theme') || localStorage.getItem('cosmeflow_director_advisory_theme')
-      if (savedTheme === 'night' || savedTheme === 'light') {
-        setTheme(savedTheme)
+      const saved21Day = localStorage.getItem('cosmeflow_theme_21day')
+      if (saved21Day === 'night' || saved21Day === 'light') {
+        setTheme21Day(saved21Day)
+      }
+
+      const savedDirector = localStorage.getItem('cosmeflow_theme_ai_director') || localStorage.getItem('cosmeflow_director_advisory_theme')
+      if (savedDirector === 'night' || savedDirector === 'light') {
+        setThemeAiDirector(savedDirector)
+      }
+
+      const savedPipeline = localStorage.getItem('cosmeflow_theme_digital_twin')
+      if (savedPipeline === 'night' || savedPipeline === 'light') {
+        setThemePipeline(savedPipeline)
+      }
+
+      const savedDashboard = localStorage.getItem('cosmeflow_theme_dashboard')
+      if (savedDashboard === 'night' || savedDashboard === 'light') {
+        setThemeDashboard(savedDashboard)
       }
     } catch {
       // ignore
     }
   }, [])
 
-  const toggleTheme = () => {
-    const nextTheme = theme === 'night' ? 'light' : 'night'
-    setTheme(nextTheme)
+  const toggleTheme21Day = () => {
+    const nextTheme = theme21Day === 'night' ? 'light' : 'night'
+    setTheme21Day(nextTheme)
     try {
-      localStorage.setItem('cosmeflow_dashboard_theme', nextTheme)
+      localStorage.setItem('cosmeflow_theme_21day', nextTheme)
+    } catch {
+      // ignore
+    }
+  }
+
+  const toggleThemeAiDirector = () => {
+    const nextTheme = themeAiDirector === 'night' ? 'light' : 'night'
+    setThemeAiDirector(nextTheme)
+    try {
+      localStorage.setItem('cosmeflow_theme_ai_director', nextTheme)
       localStorage.setItem('cosmeflow_director_advisory_theme', nextTheme)
     } catch {
       // ignore
     }
   }
 
-  const isNight = theme === 'night'
+  const toggleThemePipeline = () => {
+    const nextTheme = themePipeline === 'night' ? 'light' : 'night'
+    setThemePipeline(nextTheme)
+    try {
+      localStorage.setItem('cosmeflow_theme_digital_twin', nextTheme)
+    } catch {
+      // ignore
+    }
+  }
+
+  const toggleThemeDashboard = () => {
+    const nextTheme = themeDashboard === 'night' ? 'light' : 'night'
+    setThemeDashboard(nextTheme)
+    try {
+      localStorage.setItem('cosmeflow_theme_dashboard', nextTheme)
+    } catch {
+      // ignore
+    }
+  }
+
+  const toggleTheme = toggleThemeDashboard
+  const isNight = themeDashboard === 'night'
+  const isNightDashboard = themeDashboard === 'night'
+  const isNightPipeline = themePipeline === 'night'
 
   const [mixingHours, setMixingHours] = useState(8)
   const [packingHours, setPackingHours] = useState(8)
@@ -665,7 +725,12 @@ export default function DashboardPage() {
         
         <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
           {/* Header Theme Switcher */}
-          <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="md" />
+          <ThemeToggleButton 
+            isNight={isNight} 
+            onToggle={toggleTheme} 
+            size="md" 
+            title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+          />
 
           <div className={`flex items-center gap-2 rounded-xl p-1.5 shadow-xs border ${
             isNight ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
@@ -887,25 +952,32 @@ export default function DashboardPage() {
       <RollingMasterRadar 
         startDateStr={dashboardDate} 
         onSelectLot={(lotId) => setSelectedFilter(lotId)} 
-        theme={theme}
-        onToggleTheme={toggleTheme}
+        themeRadar={theme21Day}
+        onToggleThemeRadar={toggleTheme21Day}
+        themeDirector={themeAiDirector}
+        onToggleThemeDirector={toggleThemeAiDirector}
       />
       
       {/* 🏭 Digital Twin Pipeline (Placed directly after AI Plant Director Strategic Directives) */}
       <div className={`rounded-2xl shadow-xl border p-6 mt-6 overflow-hidden transition-colors duration-300 ${
-        isNight ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+        isNightPipeline ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
       }`}>
         <div className={`flex justify-between items-center mb-6 border-b pb-4 ${
-          isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+          isNightPipeline ? 'border-slate-800' : 'border-[#D4AF37]/30'
         }`}>
-          <h3 className={`text-lg font-bold flex items-center gap-3 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+          <h3 className={`text-lg font-bold flex items-center gap-3 ${isNightPipeline ? 'text-white' : 'text-[#4A4238]'}`}>
             <Factory className="w-5 h-5 text-yellow-400" />
             Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : <span className="text-yellow-400">LOT {filteredLots[0]?.lot_no}</span>}
           </h3>
-          <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+          <ThemeToggleButton 
+            isNight={isNightPipeline} 
+            onToggle={toggleThemePipeline} 
+            size="sm" 
+            title={isNightPipeline ? 'เปลี่ยนเป็นโหมดสว่าง (Digital Twin Pipeline)' : 'เปลี่ยนเป็นโหมดมืด (Digital Twin Pipeline)'}
+          />
         </div>
         <div className="bg-transparent p-4 rounded-xl">
-          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} theme={theme} />
+          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} theme={themePipeline} />
         </div>
       </div>
       
@@ -916,7 +988,12 @@ export default function DashboardPage() {
         <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
           <span className="text-yellow-400 text-2xl font-black">1.</span> กำลังการผลิตวันนี้ (Production Volume)
         </h3>
-        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+        <ThemeToggleButton 
+          isNight={isNight} 
+          onToggle={toggleTheme} 
+          size="sm" 
+          title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+        />
       </div>
       <div className="grid gap-4 md:grid-cols-5">
         <MetricCard isNight={isNight} title="ชั่งสาร" value={prodOutput.weighing} target={prodTarget.weighing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
@@ -935,7 +1012,12 @@ export default function DashboardPage() {
              <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
                <span className="text-yellow-400 text-2xl font-black">2.</span> % Yield
              </h3>
-             <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+             <ThemeToggleButton 
+               isNight={isNight} 
+               onToggle={toggleTheme} 
+               size="sm" 
+               title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+             />
            </div>
            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <YieldCard isNight={isNight} title="แผนกผสม" value={yieldMixing} />
@@ -951,7 +1033,12 @@ export default function DashboardPage() {
              <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
                <span className="text-yellow-400 text-2xl font-black">4.</span> ประสิทธิภาพเครื่องจักร (OEE)
              </h3>
-             <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+             <ThemeToggleButton 
+               isNight={isNight} 
+               onToggle={toggleTheme} 
+               size="sm" 
+               title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+             />
            </div>
            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
               <OeeCard isNight={isNight} title="เครื่องผสม" value={Number(oeeMixing)} hours={mixingHours} onHoursChange={setMixingHours} />
@@ -967,7 +1054,12 @@ export default function DashboardPage() {
         <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
           <span className="text-yellow-400 text-2xl font-black">3.</span> ของเสียรายแผนก (% Defect)
         </h3>
-        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+        <ThemeToggleButton 
+          isNight={isNight} 
+          onToggle={toggleTheme} 
+          size="sm" 
+          title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+        />
       </div>
       <div className="grid gap-4 md:grid-cols-4">
         <DefectCard isNight={isNight} title="ชั่งสาร" value={defectPct.weighing} count={defectsCount.weighing} />
@@ -994,7 +1086,12 @@ export default function DashboardPage() {
                  }`}>
                    Real-time Assurance
                  </span>
-                 <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+                 <ThemeToggleButton 
+                   isNight={isNight} 
+                   onToggle={toggleTheme} 
+                   size="sm" 
+                   title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+                 />
                </div>
              </div>
            </CardHeader>
@@ -1128,7 +1225,12 @@ export default function DashboardPage() {
                  }`}>
                    สต็อก FG รวม {fgInventoryStats.fgTotalPcs.toLocaleString()} ชิ้น
                  </span>
-                 <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+                 <ThemeToggleButton 
+                   isNight={isNight} 
+                   onToggle={toggleTheme} 
+                   size="sm" 
+                   title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+                 />
                </div>
              </div>
            </CardHeader>
@@ -1223,7 +1325,12 @@ export default function DashboardPage() {
         <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
           <span className="text-yellow-400 text-2xl font-black">10.</span> Performance รายแผนก
         </h3>
-        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+        <ThemeToggleButton 
+          isNight={isNight} 
+          onToggle={toggleTheme} 
+          size="sm" 
+          title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Dashboard 1-10)' : 'เปลี่ยนเป็นโหมดมืด (Dashboard 1-10)'}
+        />
       </div>
       <div className={`rounded-2xl shadow-xl border p-8 transition-colors duration-300 ${
         isNight ? 'bg-[#1E293B] border-slate-700/80' : 'bg-white border-[#D4AF37]/30'

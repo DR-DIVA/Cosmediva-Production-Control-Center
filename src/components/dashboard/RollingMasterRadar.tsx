@@ -34,9 +34,13 @@ import { parseDelayInfo } from '@/lib/delayTracking'
 import { parsePlanChangeInfo } from '@/lib/planTracking'
 import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvisory'
 
-interface RollingMasterRadarProps {
+export interface RollingMasterRadarProps {
   startDateStr?: string
   onSelectLot?: (lotId: string) => void
+  themeRadar?: 'night' | 'light'
+  onToggleThemeRadar?: () => void
+  themeDirector?: 'night' | 'light'
+  onToggleThemeDirector?: () => void
   theme?: 'night' | 'light'
   onToggleTheme?: () => void
 }
@@ -348,10 +352,66 @@ const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.�
 export function RollingMasterRadar({ 
   startDateStr, 
   onSelectLot,
-  theme = 'light',
+  themeRadar,
+  onToggleThemeRadar,
+  themeDirector,
+  onToggleThemeDirector,
+  theme,
   onToggleTheme
 }: RollingMasterRadarProps) {
-  const isNight = theme === 'night'
+  const [internalRadarTheme, setInternalRadarTheme] = useState<'night' | 'light'>('light')
+  const [internalDirectorTheme, setInternalDirectorTheme] = useState<'night' | 'light'>('night')
+
+  useEffect(() => {
+    try {
+      const savedRadar = localStorage.getItem('cosmeflow_theme_21day')
+      if (savedRadar === 'night' || savedRadar === 'light') {
+        setInternalRadarTheme(savedRadar)
+      }
+      const savedDirector = localStorage.getItem('cosmeflow_theme_ai_director') || localStorage.getItem('cosmeflow_director_advisory_theme')
+      if (savedDirector === 'night' || savedDirector === 'light') {
+        setInternalDirectorTheme(savedDirector)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const currentRadarTheme = themeRadar ?? (theme !== undefined ? theme : internalRadarTheme)
+  const isNight = currentRadarTheme === 'night'
+
+  const handleToggleRadar = () => {
+    if (onToggleThemeRadar) {
+      onToggleThemeRadar()
+    } else if (onToggleTheme) {
+      onToggleTheme()
+    } else {
+      const next = currentRadarTheme === 'night' ? 'light' : 'night'
+      setInternalRadarTheme(next)
+      try {
+        localStorage.setItem('cosmeflow_theme_21day', next)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  const currentDirectorTheme = themeDirector ?? internalDirectorTheme
+  const handleToggleDirector = () => {
+    if (onToggleThemeDirector) {
+      onToggleThemeDirector()
+    } else {
+      const next = currentDirectorTheme === 'night' ? 'light' : 'night'
+      setInternalDirectorTheme(next)
+      try {
+        localStorage.setItem('cosmeflow_theme_ai_director', next)
+        localStorage.setItem('cosmeflow_director_advisory_theme', next)
+      } catch {
+        // ignore
+      }
+    }
+  }
+
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
   const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
@@ -761,17 +821,17 @@ export function RollingMasterRadar({
 
           {/* View Switcher Controls & Theme Toggle */}
           <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto shrink-0">
-            {/* Change Theme Button */}
-            {onToggleTheme && (
+            {/* Change Theme Button (21-Day Radar) */}
+            {handleToggleRadar && (
               <button
                 type="button"
-                onClick={onToggleTheme}
+                onClick={handleToggleRadar}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 border cursor-pointer select-none ${
                   isNight
                     ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
                     : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 hover:text-slate-900 shadow-xs'
                 }`}
-                title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)'}
+                title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (21-Day Radar)' : 'เปลี่ยนเป็นโหมดมืด (21-Day Radar)'}
               >
                 {isNight ? (
                   <>
@@ -1505,8 +1565,8 @@ export function RollingMasterRadar({
       fgDueLots={radarData.fgDueLots}
       horizonDates={horizonDates}
       onSelectLot={onSelectLot}
-      theme={theme}
-      onToggleTheme={onToggleTheme}
+      theme={currentDirectorTheme}
+      onToggleTheme={handleToggleDirector}
     />
   </div>
   )

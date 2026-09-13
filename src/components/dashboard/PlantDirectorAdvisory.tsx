@@ -80,7 +80,7 @@ export function PlantDirectorAdvisory({
       return
     }
     try {
-      const savedTheme = localStorage.getItem('cosmeflow_director_advisory_theme') || localStorage.getItem('cosmeflow_dashboard_theme')
+      const savedTheme = localStorage.getItem('cosmeflow_theme_ai_director') || localStorage.getItem('cosmeflow_director_advisory_theme')
       if (savedTheme === 'light' || savedTheme === 'night') {
         setTheme(savedTheme)
       }
@@ -97,8 +97,8 @@ export function PlantDirectorAdvisory({
     const nextTheme = theme === 'night' ? 'light' : 'night'
     setTheme(nextTheme)
     try {
+      localStorage.setItem('cosmeflow_theme_ai_director', nextTheme)
       localStorage.setItem('cosmeflow_director_advisory_theme', nextTheme)
-      localStorage.setItem('cosmeflow_dashboard_theme', nextTheme)
     } catch {
       // ignore
     }
@@ -477,7 +477,7 @@ export function PlantDirectorAdvisory({
                   ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200'
                   : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 hover:text-slate-900 shadow-sm'
               }`}
-              title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)'}
+              title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (AI Plant Director)' : 'เปลี่ยนเป็นโหมดมืด (AI Plant Director)'}
             >
               {isNight ? (
                 <>
