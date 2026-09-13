@@ -1,8 +1,9 @@
 'use client'
 
+import { useState, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box, CheckCircle2 } from 'lucide-react'
+import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { format } from 'date-fns'
 
 const PROCESS_STAGES = [
@@ -15,6 +16,8 @@ const PROCESS_STAGES = [
   { key: 'delivered', label: 'ส่งมอบ FG เรียบร้อย', icon: CheckCircle2, keywords: [] },
 ]
 
+export type ProductionSortCriterion = 'weigh' | 'mix' | 'pack' | 'due'
+
 export default function ProductionLine({ 
   activeLots, 
   activeLogs = [],
@@ -25,6 +28,79 @@ export default function ProductionLine({
   theme?: 'night' | 'light'
 }) {
   const isNight = theme === 'night'
+
+  const [sortBy, setSortBy] = useState<ProductionSortCriterion>('weigh')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const handleSortClick = (criterion: ProductionSortCriterion) => {
+    if (sortBy === criterion) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortBy(criterion)
+      setSortDir('asc')
+    }
+  }
+
+  const getStageDate = (lotId: string, criterion: ProductionSortCriterion): number => {
+    if (criterion === 'due') {
+      const lot = activeLots.find(l => l.id === lotId)
+      const dStr = lot?.fg_due_date || lot?.planned_start_date
+      return dStr ? new Date(dStr).getTime() : Infinity
+    }
+    const keywordsMap: Record<string, string[]> = {
+      weigh: ['ชั่ง', 'mm-rm'],
+      mix: ['ผสม', 'mix', 'mx'],
+      pack: ['บรรจุ', 'pack', 'pk', 'ลงลัง', 'pof']
+    }
+    const keywords = keywordsMap[criterion] || []
+    const matched = activeLogs.filter(log => {
+      if (log.production_lot_id !== lotId) return false
+      const pName = (log.processes?.process_name || '').toLowerCase()
+      const rName = (log.rooms?.room_name || '').toLowerCase()
+      const combined = `${pName} ${rName}`
+      return keywords.some(kw => combined.includes(kw))
+    })
+    let earliest = Infinity
+    matched.forEach(l => {
+      const dStr = l.activity_date || l.start_time
+      if (dStr) {
+        const t = new Date(dStr).getTime()
+        if (t < earliest) earliest = t
+      }
+    })
+    return earliest
+  }
+
+  const sortedLots = useMemo(() => {
+    const fallbacks: Record<ProductionSortCriterion, ProductionSortCriterion[]> = {
+      weigh: ['mix', 'pack', 'due'],
+      mix: ['pack', 'due', 'weigh'],
+      pack: ['due', 'mix', 'weigh'],
+      due: ['pack', 'mix', 'weigh']
+    }
+
+    return [...activeLots].sort((a, b) => {
+      const dateA = getStageDate(a.id, sortBy)
+      const dateB = getStageDate(b.id, sortBy)
+      let diff = dateA - dateB
+
+      if (diff === 0) {
+        const secondaryList = fallbacks[sortBy] || []
+        for (const sec of secondaryList) {
+          const sA = getStageDate(a.id, sec)
+          const sB = getStageDate(b.id, sec)
+          diff = sA - sB
+          if (diff !== 0) break
+        }
+      }
+
+      if (diff === 0) {
+        diff = (a.lot_no || '').localeCompare(b.lot_no || '', undefined, { numeric: true })
+      }
+
+      return sortDir === 'asc' ? diff : -diff
+    })
+  }, [activeLots, activeLogs, sortBy, sortDir])
   
   // Helper to determine status and tank count for a stage
   const getStageInfo = (lot: any, stageKey: string) => {
@@ -143,11 +219,84 @@ export default function ProductionLine({
       <CardHeader className={`pb-3 border-b transition-colors duration-300 ${
         isNight ? 'bg-[#0F172A] border-slate-700/60' : 'bg-[#F8F6F0]'
       }`}>
-        <div className="flex items-center justify-between">
-          <CardTitle className={`text-lg font-bold ${isNight ? 'text-white' : 'text-slate-800'}`}>
-            Production Line (Digital Twin)
-          </CardTitle>
-          <div className={`flex items-center space-x-4 text-xs font-medium ${isNight ? 'text-slate-300' : 'text-slate-500'}`}>
+        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <CardTitle className={`text-lg font-bold shrink-0 ${isNight ? 'text-white' : 'text-slate-800'}`}>
+              Production Line (Digital Twin)
+            </CardTitle>
+            
+            {/* Quick Sort Toolbar */}
+            <div className={`flex flex-wrap items-center gap-1 p-1 rounded-xl border text-xs font-semibold ${
+              isNight ? 'bg-slate-900/90 border-slate-700/80 text-slate-300' : 'bg-white border-slate-200 text-slate-600 shadow-sm'
+            }`}>
+              <span className="text-[11px] font-bold text-slate-400 dark:text-slate-500 px-2 flex items-center gap-1">
+                <ArrowUpDown className="w-3.5 h-3.5 text-amber-500" />
+                เรียงตาม:
+              </span>
+              <button
+                type="button"
+                onClick={() => handleSortClick('weigh')}
+                className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+                  sortBy === 'weigh'
+                    ? 'bg-amber-500 text-white shadow font-bold'
+                    : 'hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                }`}
+                title="เรียงตามคิวชั่งสาร (คลิกเพื่อสลับ ก่อน ➔ หลัง / หลัง ➔ ก่อน)"
+              >
+                <span>⚖️ คิวชั่งสาร</span>
+                {sortBy === 'weigh' && (
+                  <span className="text-[10px] font-mono">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSortClick('mix')}
+                className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+                  sortBy === 'mix'
+                    ? 'bg-purple-600 text-white shadow font-bold'
+                    : 'hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                }`}
+                title="เรียงตามคิวผสมเนื้อ (คลิกเพื่อสลับ ก่อน ➔ หลัง / หลัง ➔ ก่อน)"
+              >
+                <span>🥣 คิวผสม</span>
+                {sortBy === 'mix' && (
+                  <span className="text-[10px] font-mono">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSortClick('pack')}
+                className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+                  sortBy === 'pack'
+                    ? 'bg-indigo-600 text-white shadow font-bold'
+                    : 'hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                }`}
+                title="เรียงตามคิวบรรจุ (คลิกเพื่อสลับ ก่อน ➔ หลัง / หลัง ➔ ก่อน)"
+              >
+                <span>📦 คิวบรรจุ</span>
+                {sortBy === 'pack' && (
+                  <span className="text-[10px] font-mono">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSortClick('due')}
+                className={`px-2.5 py-1 rounded-lg transition flex items-center gap-1 ${
+                  sortBy === 'due'
+                    ? 'bg-emerald-600 text-white shadow font-bold'
+                    : 'hover:bg-slate-200/50 dark:hover:bg-slate-800'
+                }`}
+                title="เรียงตามกำหนดส่งมอบ FG (คลิกเพื่อสลับ ก่อน ➔ หลัง / หลัง ➔ ก่อน)"
+              >
+                <span>🎯 กำหนดส่งมอบ FG</span>
+                {sortBy === 'due' && (
+                  <span className="text-[10px] font-mono">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                )}
+              </button>
+            </div>
+          </div>
+          
+          <div className={`flex items-center space-x-4 text-xs font-medium shrink-0 ${isNight ? 'text-slate-300' : 'text-slate-500'}`}>
             <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-emerald-500 mr-1.5 shadow-sm"></span> กำลังผลิต (Active)</div>
             <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-yellow-400 mr-1.5 shadow-sm"></span> รอคิว (Waiting)</div>
             <div className="flex items-center"><span className="w-3 h-3 rounded-full bg-red-500 mr-1.5 shadow-sm"></span> ติดปัญหา (Issue)</div>
@@ -163,20 +312,45 @@ export default function ProductionLine({
             }`}>
               <div className="col-span-2 pl-2">LOT No. (สินค้า)</div>
               <div className="col-span-7 grid grid-cols-7 gap-2 text-center">
-              {PROCESS_STAGES.map(stage => (
-                <div key={stage.key} className="flex flex-col items-center justify-center space-y-1">
-                  <stage.icon className={`w-5 h-5 ${isNight ? 'text-amber-400/80' : 'text-slate-400'}`} />
-                  <span>{stage.label}</span>
-                </div>
-              ))}
+              {PROCESS_STAGES.map(stage => {
+                const stageSortKeyMap: Record<string, ProductionSortCriterion> = {
+                  weigh: 'weigh',
+                  mix: 'mix',
+                  fill: 'pack',
+                  delivered: 'due'
+                }
+                const sortKey = stageSortKeyMap[stage.key]
+                const isCurrentSort = sortKey && sortBy === sortKey
+
+                return (
+                  <div 
+                    key={stage.key} 
+                    onClick={() => sortKey && handleSortClick(sortKey)}
+                    className={`flex flex-col items-center justify-center space-y-1 select-none transition-all rounded-lg p-1 ${
+                      sortKey ? 'cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800/80' : ''
+                    } ${
+                      isCurrentSort ? (isNight ? 'bg-slate-800/90 text-amber-300 ring-1 ring-amber-400/40' : 'bg-amber-100/70 text-amber-900 ring-1 ring-amber-300') : ''
+                    }`}
+                    title={sortKey ? `คลิกเพื่อเรียงตาม${stage.label}` : undefined}
+                  >
+                    <div className="flex items-center gap-1">
+                      <stage.icon className={`w-5 h-5 ${isCurrentSort ? 'text-amber-500' : (isNight ? 'text-amber-400/80' : 'text-slate-400')}`} />
+                      {isCurrentSort && (
+                        <span className="text-xs font-mono font-bold">{sortDir === 'asc' ? '↑' : '↓'}</span>
+                      )}
+                    </div>
+                    <span className={`text-xs ${isCurrentSort ? 'font-black underline decoration-amber-400 decoration-2 underline-offset-2' : ''}`}>{stage.label}</span>
+                  </div>
+                )
+              })}
             </div>
           </div>
 
           {/* Data Rows */}
-          {activeLots.length === 0 ? (
+          {sortedLots.length === 0 ? (
             <div className={`p-8 text-center ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>ไม่พบข้อมูลออเดอร์ที่ตรงกับเงื่อนไข หรือคำค้นหา</div>
           ) : (
-            activeLots.map((lot, idx) => (
+            sortedLots.map((lot, idx) => (
               <div key={lot.id} className={`grid grid-cols-9 p-4 border-b items-center transition-colors duration-200 ${
                 isNight 
                   ? `${idx % 2 === 0 ? 'bg-slate-900/60' : 'bg-slate-900/30'} border-slate-800/80 hover:bg-slate-800/50`
@@ -200,9 +374,36 @@ export default function ProductionLine({
                   <div className={`text-xs truncate max-w-[200px] mt-0.5 ${isNight ? 'text-slate-300' : 'text-slate-500'}`} title={lot.products?.product_name}>
                     {lot.products?.product_name}
                   </div>
-                  <div className={`text-[10px] mt-1 inline-block px-2 py-0.5 rounded ${
-                    isNight ? 'bg-slate-800/80 text-slate-400 border border-slate-700/60' : 'bg-slate-100 text-slate-400'
-                  }`}>ทั้งหมด: {lot.total_tanks || 0} ถัง</div>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                    <span className={`text-[10px] inline-block px-1.5 py-0.5 rounded ${
+                      isNight ? 'bg-slate-800/80 text-slate-400 border border-slate-700/60' : 'bg-slate-100 text-slate-400'
+                    }`}>ทั้งหมด: {lot.total_tanks || 0} ถัง</span>
+
+                    {/* Dynamic Active Sort Date Badge */}
+                    {(() => {
+                      const d = getStageDate(lot.id, sortBy)
+                      if (d === Infinity) return null
+                      const formatted = format(new Date(d), 'dd MMM')
+                      const badgeColors: Record<ProductionSortCriterion, string> = {
+                        weigh: isNight ? 'bg-amber-950/60 text-amber-300 border-amber-800' : 'bg-amber-50 text-amber-800 border-amber-200',
+                        mix: isNight ? 'bg-purple-950/60 text-purple-300 border-purple-800' : 'bg-purple-50 text-purple-800 border-purple-200',
+                        pack: isNight ? 'bg-indigo-950/60 text-indigo-300 border-indigo-800' : 'bg-indigo-50 text-indigo-800 border-indigo-200',
+                        due: isNight ? 'bg-emerald-950/60 text-emerald-300 border-emerald-800' : 'bg-emerald-50 text-emerald-800 border-emerald-200',
+                      }
+                      const labels: Record<ProductionSortCriterion, string> = {
+                        weigh: 'ชั่ง:',
+                        mix: 'ผสม:',
+                        pack: 'บรรจุ:',
+                        due: 'Due:'
+                      }
+                      return (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${badgeColors[sortBy]}`}>
+                          <span>{labels[sortBy]}</span>
+                          <span>{formatted}</span>
+                        </span>
+                      )
+                    })()}
+                  </div>
                 </div>
 
                 {/* Pipeline Lanes */}
