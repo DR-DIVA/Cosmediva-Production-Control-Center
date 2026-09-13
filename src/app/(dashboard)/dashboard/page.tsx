@@ -5,13 +5,52 @@ import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Activity, AlertTriangle, TrendingUp, Package, Box, ShieldAlert, CheckCircle2, Factory, Calendar, Search, Check, ChevronsUpDown, X, Layers, Filter } from 'lucide-react'
+import { Activity, AlertTriangle, TrendingUp, Package, Box, ShieldAlert, CheckCircle2, Factory, Calendar, Search, Check, ChevronsUpDown, X, Layers, Filter, Sun, Moon } from 'lucide-react'
 import ProductionLine from '@/components/dashboard/ProductionLine'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { RollingMasterRadar } from '@/components/dashboard/RollingMasterRadar'
+
+function ThemeToggleButton({ 
+  isNight, 
+  onToggle, 
+  size = 'md', 
+  className = '' 
+}: { 
+  isNight: boolean
+  onToggle: () => void
+  size?: 'sm' | 'md'
+  className?: string 
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold transition active:scale-95 border cursor-pointer select-none ${
+        size === 'sm' ? 'text-[11px] py-1 px-2.5' : 'text-xs py-1.5 px-3'
+      } ${
+        isNight
+          ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
+          : 'bg-white hover:bg-slate-100 text-slate-700 border-[#D4AF37]/40 hover:text-slate-900 shadow-xs'
+      } ${className}`}
+      title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)'}
+    >
+      {isNight ? (
+        <>
+          <Sun className="w-3.5 h-3.5 text-amber-400 animate-pulse" />
+          <span>โหมดสว่าง (Light)</span>
+        </>
+      ) : (
+        <>
+          <Moon className="w-3.5 h-3.5 text-indigo-600" />
+          <span>โหมดมืด (Night)</span>
+        </>
+      )}
+    </button>
+  )
+}
 
 const parseRanges = (str: string) => {
   if (!str) return 0;
@@ -29,6 +68,32 @@ const parseRanges = (str: string) => {
 }
 
 export default function DashboardPage() {
+  const [theme, setTheme] = useState<'night' | 'light'>('light')
+
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem('cosmeflow_dashboard_theme') || localStorage.getItem('cosmeflow_director_advisory_theme')
+      if (savedTheme === 'night' || savedTheme === 'light') {
+        setTheme(savedTheme)
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'night' ? 'light' : 'night'
+    setTheme(nextTheme)
+    try {
+      localStorage.setItem('cosmeflow_dashboard_theme', nextTheme)
+      localStorage.setItem('cosmeflow_director_advisory_theme', nextTheme)
+    } catch {
+      // ignore
+    }
+  }
+
+  const isNight = theme === 'night'
+
   const [mixingHours, setMixingHours] = useState(8)
   const [packingHours, setPackingHours] = useState(8)
   const [activeLots, setActiveLots] = useState<any[]>([])
@@ -575,27 +640,42 @@ export default function DashboardPage() {
   const selectedLot = activeLots.find(l => l.id === selectedFilter)
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 lg:p-8 space-y-6 max-w-[1400px] w-full mx-auto bg-transparent min-h-screen pb-12 font-sans text-[#4A4238]">
+    <div className={`p-3 sm:p-5 md:p-6 lg:p-8 space-y-6 max-w-[1400px] w-full mx-auto min-h-screen pb-12 font-sans transition-colors duration-300 ${
+      isNight ? 'bg-[#0B132B] text-slate-100' : 'bg-transparent text-[#4A4238]'
+    }`}>
       
       {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/30 gap-4">
+      <div className={`flex flex-col md:flex-row justify-between items-start md:items-center p-4 md:p-6 rounded-2xl shadow-xl border gap-4 transition-colors duration-300 ${
+        isNight ? 'bg-[#0F172A] border-[#D4AF37]/40 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+      }`}>
         <div>
-          <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight text-[#4A4238] flex flex-wrap items-center gap-2 md:gap-3">
+          <h2 className={`text-2xl md:text-3xl font-extrabold tracking-tight flex flex-wrap items-center gap-2 md:gap-3 ${
+            isNight ? 'text-white' : 'text-[#4A4238]'
+          }`}>
             <Activity className="w-8 h-8 text-yellow-400" />
             CosmeFlow Executive Dashboard
           </h2>
-          <div className="text-sm text-[#8B7355] flex items-center mt-2 font-medium">
+          <div className={`text-sm flex items-center mt-2 font-medium ${
+            isNight ? 'text-amber-300' : 'text-[#8B7355]'
+          }`}>
             <span className="w-2.5 h-2.5 rounded-full bg-[#D4AF37] mr-2 animate-pulse shadow-[0_0_10px_rgba(212,175,55,0.8)]"></span>
             Turn Factory Data into Business Decisions.
           </div>
         </div>
         
         <div className="flex flex-wrap items-center gap-3 mt-4 md:mt-0">
-          <div className="flex items-center gap-2 bg-white border border-[#D4AF37]/30 rounded-xl p-1.5 shadow-xs">
+          {/* Header Theme Switcher */}
+          <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="md" />
+
+          <div className={`flex items-center gap-2 rounded-xl p-1.5 shadow-xs border ${
+            isNight ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+          }`}>
              <Calendar className="w-5 h-5 text-yellow-500 ml-1.5" />
              <input 
                type="date" 
-               className="bg-transparent border-none outline-none text-sm font-semibold text-[#4A4238] p-0.5 pr-2 cursor-pointer"
+               className={`bg-transparent border-none outline-none text-sm font-semibold p-0.5 pr-2 cursor-pointer ${
+                 isNight ? 'text-white' : 'text-[#4A4238]'
+               }`}
                value={dashboardDate}
                onChange={(e) => setDashboardDate(e.target.value)}
              />
@@ -604,7 +684,11 @@ export default function DashboardPage() {
           {/* Smart Searchable Lot Filter */}
           <Popover open={isFilterOpen} onOpenChange={setIsFilterOpen}>
             <PopoverTrigger
-              className="flex items-center justify-between gap-2 px-3.5 h-11 bg-white hover:bg-slate-50 border border-[#D4AF37]/40 rounded-xl shadow-xs transition-all duration-200 min-w-[220px] max-w-[320px] text-left cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30"
+              className={`flex items-center justify-between gap-2 px-3.5 h-11 border rounded-xl shadow-xs transition-all duration-200 min-w-[220px] max-w-[320px] text-left cursor-pointer group focus:outline-none focus:ring-2 focus:ring-[#D4AF37]/30 ${
+                isNight 
+                  ? 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-100' 
+                  : 'bg-white hover:bg-slate-50 border-[#D4AF37]/40 text-[#4A4238]'
+              }`}
             >
               <div className="flex items-center gap-2.5 min-w-0 flex-1">
                 {selectedFilter === 'all' ? (
@@ -613,8 +697,8 @@ export default function DashboardPage() {
                       <Layers className="w-4 h-4 text-[#D4AF37]" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-bold text-[#4A4238] truncate">ภาพรวมโรงงาน</span>
-                      <span className="text-[10px] text-slate-500 font-medium truncate">ทุกล็อตการผลิต ({activeLots.length})</span>
+                      <span className={`text-xs font-bold truncate ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>ภาพรวมโรงงาน</span>
+                      <span className={`text-[10px] font-medium truncate ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>ทุกล็อตการผลิต ({activeLots.length})</span>
                     </div>
                   </>
                 ) : (
@@ -623,10 +707,10 @@ export default function DashboardPage() {
                       <Package className="w-4 h-4 text-amber-600" />
                     </div>
                     <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-bold text-[#4A4238] truncate">
+                      <span className={`text-xs font-bold truncate ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
                         {selectedLot?.products?.sku || 'SKU'} • LOT {selectedLot?.lot_no}
                       </span>
-                      <span className="text-[10px] text-slate-500 font-medium truncate">
+                      <span className={`text-[10px] font-medium truncate ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
                         {selectedLot?.products?.product_name || 'เฉพาะล็อตนี้'}
                       </span>
                     </div>
@@ -643,33 +727,39 @@ export default function DashboardPage() {
                       e.stopPropagation()
                       setSelectedFilter('all')
                     }}
-                    className="p-1 hover:bg-slate-200 rounded-full text-slate-400 hover:text-slate-700 transition"
+                    className={`p-1 rounded-full transition ${
+                      isNight ? 'hover:bg-slate-700 text-slate-400 hover:text-white' : 'hover:bg-slate-200 text-slate-400 hover:text-slate-700'
+                    }`}
                     title="กลับสู่ภาพรวมโรงงาน"
                   >
                     <X className="w-3.5 h-3.5" />
                   </span>
                 )}
-                <ChevronsUpDown className="w-4 h-4 text-slate-400 group-hover:text-slate-600 transition" />
+                <ChevronsUpDown className="w-4 h-4 text-slate-400 group-hover:text-slate-300 transition" />
               </div>
             </PopoverTrigger>
 
-            <PopoverContent className="w-80 md:w-96 p-0 bg-white border border-[#D4AF37]/30 shadow-2xl rounded-2xl overflow-hidden z-50" align="end">
+            <PopoverContent className={`w-80 md:w-96 p-0 border shadow-2xl rounded-2xl overflow-hidden z-50 ${
+              isNight ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-white border-[#D4AF37]/30 text-slate-700'
+            }`} align="end">
               {/* Search Box Header */}
-              <div className="p-3 border-b border-slate-100 bg-slate-50/70">
+              <div className={`p-3 border-b ${isNight ? 'border-slate-800 bg-slate-950/70' : 'border-slate-100 bg-slate-50/70'}`}>
                 <div className="relative">
                   <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                   <Input
                     placeholder="พิมพ์ค้นหา SKU, Lot No, หรือชื่อสินค้า..."
                     value={filterSearch}
                     onChange={(e) => setFilterSearch(e.target.value)}
-                    className="pl-9 pr-8 h-9 text-xs bg-white border-slate-200 focus-visible:ring-[#D4AF37]/40 rounded-lg"
+                    className={`pl-9 pr-8 h-9 text-xs rounded-lg ${
+                      isNight ? 'bg-slate-800 border-slate-700 text-white placeholder:text-slate-500' : 'bg-white border-slate-200 text-slate-900'
+                    } focus-visible:ring-[#D4AF37]/40`}
                     autoFocus
                   />
                   {filterSearch && (
                     <button
                       type="button"
                       onClick={() => setFilterSearch('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-200 p-0.5"
                     >
                       <X className="w-3.5 h-3.5" />
                     </button>
@@ -678,7 +768,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Quick Option: Factory Overview */}
-              <div className="p-2 border-b border-slate-100">
+              <div className={`p-2 border-b ${isNight ? 'border-slate-800' : 'border-slate-100'}`}>
                 <button
                   type="button"
                   onClick={() => {
@@ -688,33 +778,33 @@ export default function DashboardPage() {
                   }}
                   className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer ${
                     selectedFilter === 'all'
-                      ? 'bg-amber-500/10 text-[#4A4238] font-bold border border-[#D4AF37]/40'
-                      : 'hover:bg-slate-100 text-slate-700'
+                      ? (isNight ? 'bg-amber-500/20 text-amber-300 font-bold border border-[#D4AF37]/50' : 'bg-amber-500/10 text-[#4A4238] font-bold border border-[#D4AF37]/40')
+                      : (isNight ? 'hover:bg-slate-800 text-slate-300' : 'hover:bg-slate-100 text-slate-700')
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`p-1.5 rounded-lg ${selectedFilter === 'all' ? 'bg-[#D4AF37] text-white shadow-xs' : 'bg-slate-200 text-slate-600'}`}>
+                    <div className={`p-1.5 rounded-lg ${selectedFilter === 'all' ? 'bg-[#D4AF37] text-slate-950 shadow-xs' : (isNight ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600')}`}>
                       <Layers className="w-4 h-4" />
                     </div>
                     <div>
                       <div className="text-xs font-bold flex items-center gap-1.5">
                         <span>ภาพรวมโรงงานทั้งหมด (Factory Overview)</span>
                       </div>
-                      <div className="text-[10px] text-slate-500 font-normal">แสดงสรุปผลรวมทุกสายงานการผลิต</div>
+                      <div className={`text-[10px] font-normal ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>แสดงสรุปผลรวมทุกสายงานการผลิต</div>
                     </div>
                   </div>
                   {selectedFilter === 'all' && (
-                    <div className="p-1 rounded-full bg-[#D4AF37] text-white shrink-0">
-                      <Check className="w-3.5 h-3.5" />
+                    <div className="p-1 rounded-full bg-[#D4AF37] text-slate-950 shrink-0">
+                      <Check className="w-3.5 h-3.5 font-black" />
                     </div>
                   )}
                 </button>
               </div>
 
               {/* Search Results List */}
-              <div className="max-h-72 overflow-y-auto p-2 space-y-1 divide-y divide-slate-100/60">
+              <div className={`max-h-72 overflow-y-auto p-2 space-y-1 divide-y ${isNight ? 'divide-slate-800' : 'divide-slate-100/60'}`}>
                 {filteredSearchLots.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-slate-400">
+                  <div className={`p-6 text-center text-xs ${isNight ? 'text-slate-500' : 'text-slate-400'}`}>
                     <Search className="w-6 h-6 mx-auto mb-2 opacity-40" />
                     ไม่พบงานที่ตรงกับ &quot;{filterSearch}&quot;
                   </div>
@@ -732,35 +822,39 @@ export default function DashboardPage() {
                         }}
                         className={`w-full flex items-center justify-between p-2.5 rounded-xl text-left transition-all cursor-pointer pt-2 ${
                           isSelected
-                            ? 'bg-amber-500/10 border border-[#D4AF37]/40 shadow-xs'
-                            : 'hover:bg-slate-50 text-slate-700'
+                            ? (isNight ? 'bg-amber-500/20 border border-[#D4AF37]/50 shadow-xs' : 'bg-amber-500/10 border border-[#D4AF37]/40 shadow-xs')
+                            : (isNight ? 'hover:bg-slate-800/80 text-slate-300' : 'hover:bg-slate-50 text-slate-700')
                         }`}
                       >
                         <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                          <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isSelected ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                          <div className={`p-1.5 rounded-lg mt-0.5 shrink-0 ${isSelected ? 'bg-amber-500 text-white' : (isNight ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-500')}`}>
                             <Package className="w-4 h-4" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="text-xs font-bold text-slate-900">{lot.products?.sku || 'SKU'}</span>
-                              <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-200/80 text-slate-700">
+                              <span className={`text-xs font-bold ${isNight ? 'text-white' : 'text-slate-900'}`}>{lot.products?.sku || 'SKU'}</span>
+                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                isNight ? 'bg-slate-800 text-slate-300 border border-slate-700' : 'bg-slate-200/80 text-slate-700'
+                              }`}>
                                 LOT {lot.lot_no}
                               </span>
                               {lot.total_tanks && (
-                                <span className="text-[10px] text-amber-700 font-medium bg-amber-50 px-1.5 py-0.2 rounded border border-amber-200/50">
+                                <span className={`text-[10px] font-medium px-1.5 py-0.2 rounded border ${
+                                  isNight ? 'bg-amber-950/60 text-amber-300 border-amber-800' : 'text-amber-700 bg-amber-50 border-amber-200/50'
+                                }`}>
                                   {lot.total_tanks} ถัง
                                 </span>
                               )}
                             </div>
-                            <div className="text-[11px] text-slate-500 truncate mt-0.5">
+                            <div className={`text-[11px] truncate mt-0.5 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
                               {lot.products?.product_name || 'ไม่มีชื่อสินค้า'}
                             </div>
                           </div>
                         </div>
 
                         {isSelected && (
-                          <div className="p-1 rounded-full bg-[#D4AF37] text-white shrink-0 ml-2">
-                            <Check className="w-3.5 h-3.5" />
+                          <div className="p-1 rounded-full bg-[#D4AF37] text-slate-950 shrink-0 ml-2">
+                            <Check className="w-3.5 h-3.5 font-black" />
                           </div>
                         )}
                       </button>
@@ -770,13 +864,15 @@ export default function DashboardPage() {
               </div>
 
               {/* Footer Summary */}
-              <div className="p-2 border-t border-slate-100 bg-slate-50 text-[10px] text-slate-500 flex justify-between items-center px-3">
+              <div className={`p-2 border-t text-[10px] flex justify-between items-center px-3 ${
+                isNight ? 'border-slate-800 bg-slate-950 text-slate-400' : 'border-slate-100 bg-slate-50 text-slate-500'
+              }`}>
                 <span>แสดง {filteredSearchLots.length} จาก {activeLots.length} ล็อต</span>
                 {filterSearch && (
                   <button
                     type="button"
                     onClick={() => setFilterSearch('')}
-                    className="text-[#8B7355] font-semibold hover:underline"
+                    className={`font-semibold hover:underline ${isNight ? 'text-amber-400' : 'text-[#8B7355]'}`}
                   >
                     ล้างการค้นหา
                   </button>
@@ -791,121 +887,167 @@ export default function DashboardPage() {
       <RollingMasterRadar 
         startDateStr={dashboardDate} 
         onSelectLot={(lotId) => setSelectedFilter(lotId)} 
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       
       {/* 🏭 Digital Twin Pipeline (Placed directly after AI Plant Director Strategic Directives) */}
-      <div className="bg-white rounded-2xl shadow-xl border border-[#D4AF37]/30 p-6 mt-6 overflow-hidden">
-        <div className="flex justify-between items-center mb-6 border-b border-[#D4AF37]/30 pb-4">
-          <h3 className="text-lg font-bold text-[#4A4238] flex items-center gap-3">
+      <div className={`rounded-2xl shadow-xl border p-6 mt-6 overflow-hidden transition-colors duration-300 ${
+        isNight ? 'bg-[#0B132B] border-[#D4AF37]/35 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+      }`}>
+        <div className={`flex justify-between items-center mb-6 border-b pb-4 ${
+          isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+        }`}>
+          <h3 className={`text-lg font-bold flex items-center gap-3 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
             <Factory className="w-5 h-5 text-yellow-400" />
             Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : <span className="text-yellow-400">LOT {filteredLots[0]?.lot_no}</span>}
           </h3>
+          <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
         </div>
-        <div className="bg-transparent p-4 rounded-xl border border-[#D4AF37]/30">
-          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} />
+        <div className="bg-transparent p-4 rounded-xl">
+          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} theme={theme} />
         </div>
       </div>
       
       {/* 1. กำลังการผลิตวันนี้ */}
-      <h3 className="text-xl font-bold text-[#4A4238] mt-10 mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
-        <span className="text-yellow-400 text-2xl font-black">1.</span> กำลังการผลิตวันนี้ (Production Volume)
-      </h3>
+      <div className={`flex justify-between items-center mt-10 mb-4 border-b pb-3 ${
+        isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+      }`}>
+        <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+          <span className="text-yellow-400 text-2xl font-black">1.</span> กำลังการผลิตวันนี้ (Production Volume)
+        </h3>
+        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+      </div>
       <div className="grid gap-4 md:grid-cols-5">
-        <MetricCard title="ชั่งสาร" value={prodOutput.weighing} target={prodTarget.weighing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
-        <MetricCard title="ผสม" value={prodOutput.mixing} target={prodTarget.mixing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
-        <MetricCard title="บรรจุ" value={prodOutput.packing} target={prodTarget.packing} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
-        <MetricCard title="ลงลัง (POF)" value={prodOutput.pof} target={prodTarget.pof} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
-        <MetricCard title="QC" value={prodOutput.qc} target={prodTarget.qc} unit="รายการ" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard isNight={isNight} title="ชั่งสาร" value={prodOutput.weighing} target={prodTarget.weighing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard isNight={isNight} title="ผสม" value={prodOutput.mixing} target={prodTarget.mixing} unit="ถัง" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard isNight={isNight} title="บรรจุ" value={prodOutput.packing} target={prodTarget.packing} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard isNight={isNight} title="ลงลัง (POF)" value={prodOutput.pof} target={prodTarget.pof} unit="ชิ้น" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
+        <MetricCard isNight={isNight} title="QC" value={prodOutput.qc} target={prodTarget.qc} unit="รายการ" glowColor="rgba(212,175,55,0.2)" barColor="bg-[#D4AF37]" textColor="text-[#D4AF37]" />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 mt-8">
         {/* 2. %Yield */}
         <div>
-           <h3 className="text-xl font-bold text-[#4A4238] mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
-             <span className="text-yellow-400 text-2xl font-black">2.</span> % Yield
-           </h3>
+           <div className={`flex justify-between items-center mb-4 border-b pb-3 ${
+             isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+           }`}>
+             <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+               <span className="text-yellow-400 text-2xl font-black">2.</span> % Yield
+             </h3>
+             <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+           </div>
            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <YieldCard title="แผนกผสม" value={yieldMixing} />
-              <YieldCard title="แผนกบรรจุ" value={yieldPacking} />
+              <YieldCard isNight={isNight} title="แผนกผสม" value={yieldMixing} />
+              <YieldCard isNight={isNight} title="แผนกบรรจุ" value={yieldPacking} />
            </div>
         </div>
 
         {/* 4. OEE */}
         <div>
-           <h3 className="text-xl font-bold text-[#4A4238] mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
-             <span className="text-yellow-400 text-2xl font-black">4.</span> ประสิทธิภาพเครื่องจักร (OEE)
-           </h3>
+           <div className={`flex justify-between items-center mb-4 border-b pb-3 ${
+             isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+           }`}>
+             <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+               <span className="text-yellow-400 text-2xl font-black">4.</span> ประสิทธิภาพเครื่องจักร (OEE)
+             </h3>
+             <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+           </div>
            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
-              <OeeCard title="เครื่องผสม" value={Number(oeeMixing)} hours={mixingHours} onHoursChange={setMixingHours} />
-              <OeeCard title="เครื่องบรรจุ" value={Number(oeePacking)} hours={packingHours} onHoursChange={setPackingHours} />
+              <OeeCard isNight={isNight} title="เครื่องผสม" value={Number(oeeMixing)} hours={mixingHours} onHoursChange={setMixingHours} />
+              <OeeCard isNight={isNight} title="เครื่องบรรจุ" value={Number(oeePacking)} hours={packingHours} onHoursChange={setPackingHours} />
            </div>
         </div>
       </div>
 
       {/* 3. %Defect */}
-      <h3 className="text-xl font-bold text-[#4A4238] mt-10 mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
-        <span className="text-yellow-400 text-2xl font-black">3.</span> ของเสียรายแผนก (% Defect)
-      </h3>
+      <div className={`flex justify-between items-center mt-10 mb-4 border-b pb-3 ${
+        isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+      }`}>
+        <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+          <span className="text-yellow-400 text-2xl font-black">3.</span> ของเสียรายแผนก (% Defect)
+        </h3>
+        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+      </div>
       <div className="grid gap-4 md:grid-cols-4">
-        <DefectCard title="ชั่งสาร" value={defectPct.weighing} count={defectsCount.weighing} />
-        <DefectCard title="ผสม" value={defectPct.mixing} count={defectsCount.mixing} />
-        <DefectCard title="บรรจุ" value={defectPct.packing} count={defectsCount.packing} />
-        <DefectCard title="ลงลัง (POF)" value={defectPct.pof} count={defectsCount.pof} />
+        <DefectCard isNight={isNight} title="ชั่งสาร" value={defectPct.weighing} count={defectsCount.weighing} />
+        <DefectCard isNight={isNight} title="ผสม" value={defectPct.mixing} count={defectsCount.mixing} />
+        <DefectCard isNight={isNight} title="บรรจุ" value={defectPct.packing} count={defectsCount.packing} />
+        <DefectCard isNight={isNight} title="ลงลัง (POF)" value={defectPct.pof} count={defectsCount.pof} />
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 mt-10">
          {/* 5. QC Status & 6. QA Issues */}
-         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group rounded-2xl">
+         <Card className={`shadow-xl overflow-hidden relative group rounded-2xl transition-colors duration-300 ${
+           isNight ? 'bg-[#1E293B] border-slate-700/80 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+         }`}>
            <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/30 pb-3">
+           <CardHeader className={`border-b pb-3 ${isNight ? 'bg-[#0F172A] border-slate-800' : 'bg-[#F8F6F0] border-[#D4AF37]/30'}`}>
              <div className="flex justify-between items-center">
-               <CardTitle className="text-base font-bold flex items-center gap-2.5 text-[#4A4238]">
+               <CardTitle className={`text-base font-bold flex items-center gap-2.5 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
                  <ShieldAlert className="w-5 h-5 text-rose-500" /> 
                  <div><span className="text-[#D4AF37] font-black">5-6.</span> คุณภาพและปัญหา (QC & QA)</div>
                </CardTitle>
-               <span className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full">
-                 Real-time Assurance
-               </span>
+               <div className="flex items-center gap-2">
+                 <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full ${
+                   isNight ? 'text-slate-300 bg-slate-800 border border-slate-700' : 'text-slate-500 bg-slate-100'
+                 }`}>
+                   Real-time Assurance
+                 </span>
+                 <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+               </div>
              </div>
            </CardHeader>
            <CardContent className="p-5 relative z-10">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                {/* QC Inspection Status */}
                <div className="space-y-3">
-                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                 <div className={`flex items-center justify-between border-b pb-1.5 ${isNight ? 'border-slate-800' : 'border-slate-100'}`}>
+                   <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>
                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> สถานะการตรวจ (QC)
                    </h4>
-                   <span className="text-[10px] text-slate-400 font-medium">หน้างานทั้งหมด</span>
+                   <span className={`text-[10px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>หน้างานทั้งหมด</span>
                  </div>
                  
                  <div className="space-y-2">
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/70 border-amber-200/60'
+                   }`}>
                      <div>
-                       <span className="text-amber-900 font-bold text-xs">🟡 กักตรวจ (HOLD)</span>
-                       <div className="text-[10px] text-amber-700">RM/PM {qcMetrics.holdRM} • FG {qcMetrics.holdFG} กล่อง</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-amber-200' : 'text-amber-900'}`}>🟡 กักตรวจ (HOLD)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-amber-300/80' : 'text-amber-700'}`}>RM/PM {qcMetrics.holdRM} • FG {qcMetrics.holdFG} กล่อง</div>
                      </div>
-                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-amber-200 bg-amber-900/60' : 'text-amber-700 bg-amber-100/80'
+                     }`}>
                        {qcMetrics.totalHold}
                      </span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-sky-50/70 border border-sky-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-sky-950/40 border-sky-800/60 text-sky-200' : 'bg-sky-50/70 border-sky-200/60'
+                   }`}>
                      <div>
-                       <span className="text-sky-900 font-bold text-xs">🔵 สั่งแก้สูตร (REPROCESS)</span>
-                       <div className="text-[10px] text-sky-700">ถังผสมที่ต้องปรับปรุง</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-sky-200' : 'text-sky-900'}`}>🔵 สั่งแก้สูตร (REPROCESS)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-sky-300/80' : 'text-sky-700'}`}>ถังผสมที่ต้องปรับปรุง</div>
                      </div>
-                     <span className="text-base font-black text-sky-700 bg-sky-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-sky-200 bg-sky-900/60' : 'text-sky-700 bg-sky-100/80'
+                     }`}>
                        {qcMetrics.reprocessBulk}
                      </span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-rose-50/70 border border-rose-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50/70 border-rose-200/60'
+                   }`}>
                      <div>
-                       <span className="text-rose-900 font-bold text-xs">🔴 ไม่ผ่าน/ตีกลับ (REJECT)</span>
-                       <div className="text-[10px] text-rose-700">ของตกเกณฑ์/ส่งคืน</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-rose-200' : 'text-rose-900'}`}>🔴 ไม่ผ่าน/ตีกลับ (REJECT)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-rose-300/80' : 'text-rose-700'}`}>ของตกเกณฑ์/ส่งคืน</div>
                      </div>
-                     <span className="text-base font-black text-rose-700 bg-rose-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-rose-200 bg-rose-900/60' : 'text-rose-700 bg-rose-100/80'
+                     }`}>
                        {qcMetrics.rejectTotal}
                      </span>
                    </div>
@@ -914,40 +1056,52 @@ export default function DashboardPage() {
 
                {/* QA Compliance & Issues */}
                <div className="space-y-3">
-                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                 <div className={`flex items-center justify-between border-b pb-1.5 ${isNight ? 'border-slate-800' : 'border-slate-100'}`}>
+                   <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>
                      <span className="w-2 h-2 rounded-full bg-rose-500"></span> ข้อบกพร่อง (QA)
                    </h4>
-                   <span className="text-[10px] text-slate-400 font-medium">Compliance & Issues</span>
+                   <span className={`text-[10px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>Compliance & Issues</span>
                  </div>
 
                  <div className="space-y-2">
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/70 border-amber-200/60'
+                   }`}>
                      <div>
-                       <span className="text-[#4A4238] font-bold text-xs">⚠️ รอแก้ไข (Open NCs)</span>
-                       <div className="text-[10px] text-slate-500">เคสปัญหาที่รอปิด</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-amber-200' : 'text-[#4A4238]'}`}>⚠️ รอแก้ไข (Open NCs)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>เคสปัญหาที่รอปิด</div>
                      </div>
-                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-amber-200 bg-amber-900/60' : 'text-amber-700 bg-amber-100/80'
+                     }`}>
                        {qaMetrics.openNc}
                      </span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-slate-900 border-slate-700 text-slate-200' : 'bg-slate-50 border-slate-200/60 text-[#4A4238]'
+                   }`}>
                      <div>
-                       <span className="text-[#4A4238] font-bold text-xs">📋 มาตรการป้องกัน (CAR)</span>
-                       <div className="text-[10px] text-slate-500">เคสระดับโรงงาน</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>📋 มาตรการป้องกัน (CAR)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>เคสระดับโรงงาน</div>
                      </div>
-                     <span className="text-base font-black text-slate-700 bg-slate-200/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-slate-200 bg-slate-800' : 'text-slate-700 bg-slate-200/80'
+                     }`}>
                        {qaMetrics.carCount}
                      </span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200/60'
+                   }`}>
                      <div>
-                       <span className="text-emerald-900 font-bold text-xs">✅ ปิดปัญหาแล้ว (Resolved)</span>
-                       <div className="text-[10px] text-emerald-700">QA อนุมัติผ่านเกณฑ์</div>
+                       <span className={`font-bold text-xs ${isNight ? 'text-emerald-200' : 'text-emerald-900'}`}>✅ ปิดปัญหาแล้ว (Resolved)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-emerald-300/80' : 'text-emerald-700'}`}>QA อนุมัติผ่านเกณฑ์</div>
                      </div>
-                     <span className="text-base font-black text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-emerald-200 bg-emerald-900/60' : 'text-emerald-700 bg-emerald-100/80'
+                     }`}>
                        {qaMetrics.resolvedCount}
                      </span>
                    </div>
@@ -958,79 +1112,100 @@ export default function DashboardPage() {
          </Card>
 
          {/* 7-9. Planner & Warehouse */}
-         <Card className="bg-white border-[#D4AF37]/30 shadow-xl overflow-hidden relative group rounded-2xl">
+         <Card className={`shadow-xl overflow-hidden relative group rounded-2xl transition-colors duration-300 ${
+           isNight ? 'bg-[#1E293B] border-slate-700/80 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+         }`}>
            <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
-           <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/30 pb-3">
+           <CardHeader className={`border-b pb-3 ${isNight ? 'bg-[#0F172A] border-slate-800' : 'bg-[#F8F6F0] border-[#D4AF37]/30'}`}>
              <div className="flex justify-between items-center">
-               <CardTitle className="text-base font-bold flex items-center gap-2.5 text-[#4A4238]">
-                 <Package className="w-5 h-5 text-emerald-600" /> 
+               <CardTitle className={`text-base font-bold flex items-center gap-2.5 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+                 <Package className="w-5 h-5 text-emerald-500" /> 
                  <div><span className="text-[#D4AF37] font-black">7-9.</span> คิวงานและคลังสินค้า (Planner & FG)</div>
                </CardTitle>
-               <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full">
-                 สต็อก FG รวม {fgInventoryStats.fgTotalPcs.toLocaleString()} ชิ้น
-               </span>
+               <div className="flex items-center gap-2">
+                 <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full border ${
+                   isNight ? 'text-emerald-300 bg-emerald-950/60 border-emerald-800' : 'text-emerald-800 bg-emerald-50 border-emerald-200/80'
+                 }`}>
+                   สต็อก FG รวม {fgInventoryStats.fgTotalPcs.toLocaleString()} ชิ้น
+                 </span>
+                 <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+               </div>
              </div>
            </CardHeader>
            <CardContent className="p-5 relative z-10">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
                {/* Planner Queue */}
                <div className="space-y-3">
-                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                 <div className={`flex items-center justify-between border-b pb-1.5 ${isNight ? 'border-slate-800' : 'border-slate-100'}`}>
+                   <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>
                      <span className="w-2 h-2 rounded-full bg-amber-500"></span> แผนการผลิต (Planner)
                    </h4>
-                   <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full">
+                   <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                     isNight ? 'text-emerald-300 bg-emerald-950/80' : 'text-emerald-700 bg-emerald-50'
+                   }`}>
                      ตรงแผน {plannerStats.onTrackPct}%
                    </span>
                  </div>
                  
                  <div className="space-y-2">
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-100'
+                   }`}>
                      <div>
-                       <span className="text-xs font-semibold text-slate-700">📋 PO ในมือ (Active POs)</span>
-                       <div className="text-[10px] text-slate-400">กำลังผลิต {plannerStats.totalTanksPlanned} ถัง</div>
+                       <span className={`text-xs font-semibold ${isNight ? 'text-slate-300' : 'text-slate-700'}`}>📋 PO ในมือ (Active POs)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-slate-500' : 'text-slate-400'}`}>กำลังผลิต {plannerStats.totalTanksPlanned} ถัง</div>
                      </div>
                      <span className="text-base font-black text-[#D4AF37]">{plannerStats.poOnHand} ล็อต</span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-slate-50 border border-slate-100">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-slate-900 border-slate-800 text-slate-200' : 'bg-slate-50 border-slate-100'
+                   }`}>
                      <div>
-                       <span className="text-xs font-semibold text-slate-700">📦 ยอดชิ้นงานรอผลิต</span>
-                       <div className="text-[10px] text-slate-400">รวมทุกคำสั่งผลิตตามแผน</div>
+                       <span className={`text-xs font-semibold ${isNight ? 'text-slate-300' : 'text-slate-700'}`}>📦 ยอดชิ้นงานรอผลิต</span>
+                       <div className={`text-[10px] ${isNight ? 'text-slate-500' : 'text-slate-400'}`}>รวมทุกคำสั่งผลิตตามแผน</div>
                      </div>
-                     <span className="text-base font-black text-[#4A4238]">{plannerStats.piecesOnHand.toLocaleString()}</span>
+                     <span className={`text-base font-black ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>{plannerStats.piecesOnHand.toLocaleString()}</span>
                    </div>
                  </div>
                </div>
 
                {/* FG Warehouse */}
                <div className="space-y-3">
-                 <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
-                   <h4 className="font-bold text-[#4A4238] text-xs uppercase tracking-wider flex items-center gap-1.5">
+                 <div className={`flex items-center justify-between border-b pb-1.5 ${isNight ? 'border-slate-800' : 'border-slate-100'}`}>
+                   <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>
                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span> คลังสินค้าสำเร็จรูป (FG)
                    </h4>
-                   <span className="text-[10px] text-slate-500 font-medium">
+                   <span className={`text-[10px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
                      เข้าเดือนนี้ {fgInventoryStats.fgMonthPcs.toLocaleString()}
                    </span>
                  </div>
 
                  <div className="space-y-2">
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200/60'
+                   }`}>
                      <div>
-                       <span className="text-xs font-bold text-emerald-800">🟢 พร้อมส่งมอบ (Released)</span>
-                       <div className="text-[10px] text-emerald-600">ตรวจแล็บผ่านแล้ว พร้อมส่ง</div>
+                       <span className={`text-xs font-bold ${isNight ? 'text-emerald-200' : 'text-emerald-800'}`}>🟢 พร้อมส่งมอบ (Released)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-emerald-300/80' : 'text-emerald-600'}`}>ตรวจแล็บผ่านแล้ว พร้อมส่ง</div>
                      </div>
-                     <span className="text-base font-black text-emerald-700 bg-emerald-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-emerald-200 bg-emerald-900/60' : 'text-emerald-700 bg-emerald-100/80'
+                     }`}>
                        {fgInventoryStats.fgReleasedPcs.toLocaleString()}
                      </span>
                    </div>
 
-                   <div className="flex justify-between items-center p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/60">
+                   <div className={`flex justify-between items-center p-2.5 rounded-xl border ${
+                     isNight ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/70 border-amber-200/60'
+                   }`}>
                      <div>
-                       <span className="text-xs font-bold text-amber-800">🟡 กักตรวจเชื้อ (Quarantine)</span>
-                       <div className="text-[10px] text-amber-600">อยู่ระหว่างรอบ่มเชื้อ/ผลตรวจ ({fgInventoryStats.fgTotalCartons} ลัง)</div>
+                       <span className={`text-xs font-bold ${isNight ? 'text-amber-200' : 'text-amber-800'}`}>🟡 กักตรวจเชื้อ (Quarantine)</span>
+                       <div className={`text-[10px] ${isNight ? 'text-amber-300/80' : 'text-amber-600'}`}>อยู่ระหว่างรอบ่มเชื้อ/ผลตรวจ ({fgInventoryStats.fgTotalCartons} ลัง)</div>
                      </div>
-                     <span className="text-base font-black text-amber-700 bg-amber-100/80 px-2.5 py-0.5 rounded-lg">
+                     <span className={`text-base font-black px-2.5 py-0.5 rounded-lg ${
+                       isNight ? 'text-amber-200 bg-amber-900/60' : 'text-amber-700 bg-amber-100/80'
+                     }`}>
                        {fgInventoryStats.fgQuarantinePcs.toLocaleString()}
                      </span>
                    </div>
@@ -1042,39 +1217,66 @@ export default function DashboardPage() {
       </div>
 
       {/* 10. Performance Section */}
-      <h3 className="text-xl font-bold text-[#4A4238] mt-10 mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
-        <span className="text-yellow-400 text-2xl font-black">10.</span> Performance รายแผนก
-      </h3>
-      <div className="bg-white rounded-2xl shadow-xl border border-[#D4AF37]/30 p-8">
+      <div className={`flex justify-between items-center mt-10 mb-4 border-b pb-3 ${
+        isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
+      }`}>
+        <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+          <span className="text-yellow-400 text-2xl font-black">10.</span> Performance รายแผนก
+        </h3>
+        <ThemeToggleButton isNight={isNight} onToggle={toggleTheme} size="sm" />
+      </div>
+      <div className={`rounded-2xl shadow-xl border p-8 transition-colors duration-300 ${
+        isNight ? 'bg-[#1E293B] border-slate-700/80' : 'bg-white border-[#D4AF37]/30'
+      }`}>
          <div className="grid gap-6 md:grid-cols-5">
-            <PerfItem title="ชั่งสาร" value={prodOutput.weighing} target={prodTarget.weighing} />
-            <PerfItem title="ผสม" value={prodOutput.mixing} target={prodTarget.mixing} />
-            <PerfItem title="บรรจุ" value={prodOutput.packing} target={prodTarget.packing} />
-            <PerfItem title="ลงลัง (POF)" value={prodOutput.pof} target={prodTarget.pof} />
-            <PerfItem title="QC" value={prodOutput.qc} target={prodTarget.qc} />
+            <PerfItem isNight={isNight} title="ชั่งสาร" value={prodOutput.weighing} target={prodTarget.weighing} />
+            <PerfItem isNight={isNight} title="ผสม" value={prodOutput.mixing} target={prodTarget.mixing} />
+            <PerfItem isNight={isNight} title="บรรจุ" value={prodOutput.packing} target={prodTarget.packing} />
+            <PerfItem isNight={isNight} title="ลงลัง (POF)" value={prodOutput.pof} target={prodTarget.pof} />
+            <PerfItem isNight={isNight} title="QC" value={prodOutput.qc} target={prodTarget.qc} />
          </div>
       </div>
     </div>
   )
 }
 
-function MetricCard({ title, value, target, unit, glowColor, barColor, textColor }: { title: string, value: number, target: number, unit: string, glowColor: string, barColor: string, textColor: string }) {
+function MetricCard({ 
+  title, 
+  value, 
+  target, 
+  unit, 
+  glowColor, 
+  barColor, 
+  textColor,
+  isNight = false 
+}: { 
+  title: string
+  value: number
+  target: number
+  unit: string
+  glowColor: string
+  barColor: string
+  textColor: string
+  isNight?: boolean 
+}) {
   const percent = target > 0 ? Math.min(Math.round((value / target) * 100), 100) : 0
   return (
-    <Card className="bg-white border-[#D4AF37]/30 shadow-lg relative overflow-hidden transition-transform hover:-translate-y-1 hover:shadow-xl group">
+    <Card className={`shadow-lg relative overflow-hidden transition-all duration-300 hover:-translate-y-1 hover:shadow-xl group ${
+      isNight ? 'bg-[#1E293B] border-slate-700/70 text-slate-100' : 'bg-white border-[#D4AF37]/30 text-[#4A4238]'
+    }`}>
       <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500" style={{ background: `radial-gradient(circle at center, ${glowColor} 0%, transparent 70%)` }}></div>
       <CardContent className="p-5 relative z-10">
-        <div className="text-sm font-semibold text-[#4A4238] mb-2 uppercase tracking-wide">{title}</div>
+        <div className={`text-sm font-semibold mb-2 uppercase tracking-wide ${isNight ? 'text-slate-300' : 'text-[#4A4238]'}`}>{title}</div>
         <div className="flex items-baseline space-x-2">
           <span className={`text-4xl font-black ${textColor}`}>{value.toLocaleString()}</span>
-          <span className="text-xs text-[#4A4238]/ font-medium">{unit}</span>
+          <span className={`text-xs font-medium ${isNight ? 'text-slate-400' : 'text-[#4A4238]/70'}`}>{unit}</span>
         </div>
         <div className="mt-4">
-          <div className="flex justify-between text-[11px] font-bold text-[#4A4238] mb-2">
+          <div className={`flex justify-between text-[11px] font-bold mb-2 ${isNight ? 'text-slate-300' : 'text-[#4A4238]'}`}>
             <span>เป้า {target.toLocaleString()}</span>
             <span className={textColor}>{percent}%</span>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+          <div className={`w-full rounded-full h-2 overflow-hidden shadow-inner ${isNight ? 'bg-slate-800' : 'bg-slate-100'}`}>
             <div className={`${barColor} h-2 rounded-full transition-all duration-1000 shadow-[0_0_10px_rgba(255,255,255,0.3)]`} style={{ width: `${percent}%` }}></div>
           </div>
         </div>
@@ -1083,49 +1285,57 @@ function MetricCard({ title, value, target, unit, glowColor, barColor, textColor
   )
 }
 
-function YieldCard({ title, value }: { title: string, value: number }) {
+function YieldCard({ title, value, isNight = false }: { title: string, value: number, isNight?: boolean }) {
   return (
-    <Card className="bg-white border-[#D4AF37]/30 shadow-lg overflow-hidden relative group">
+    <Card className={`shadow-lg overflow-hidden relative group transition-colors duration-300 ${
+      isNight ? 'bg-[#1E293B] border-slate-700/70' : 'bg-white border-[#D4AF37]/30'
+    }`}>
       <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
       <CardContent className="p-6 flex items-center justify-between relative z-10">
-        <div className="font-semibold text-[#4A4238] text-lg">{title}</div>
+        <div className={`font-semibold text-lg ${isNight ? 'text-slate-100' : 'text-[#4A4238]'}`}>{title}</div>
         <div className="text-4xl font-black text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]">{value}%</div>
       </CardContent>
     </Card>
   )
 }
 
-function DefectCard({ title, value, count }: { title: string, value: string, count: number }) {
+function DefectCard({ title, value, count, isNight = false }: { title: string, value: string, count: number, isNight?: boolean }) {
   const num = parseFloat(value)
   const isHigh = num > 3
   return (
-    <Card className={`bg-white shadow-lg transition-transform hover:-translate-y-1 ${isHigh ? 'border-rose-500/50 relative overflow-hidden' : 'border-[#D4AF37]/30'}`}>
+    <Card className={`shadow-lg transition-all duration-300 hover:-translate-y-1 ${
+      isHigh ? 'border-rose-500/50 relative overflow-hidden' : isNight ? 'border-slate-700/70' : 'border-[#D4AF37]/30'
+    } ${isNight ? 'bg-[#1E293B]' : 'bg-white'}`}>
       {isHigh && <div className="absolute inset-0 bg-rose-500/5 animate-pulse"></div>}
       <CardContent className="p-5 relative z-10">
-        <div className="text-sm font-semibold text-[#4A4238] mb-2 uppercase tracking-wide">{title}</div>
+        <div className={`text-sm font-semibold mb-2 uppercase tracking-wide ${isNight ? 'text-slate-300' : 'text-[#4A4238]'}`}>{title}</div>
         <div className="flex items-end justify-between">
-          <span className={`text-3xl font-black ${isHigh ? 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]' : 'text-[#4A4238]'}`}>{value}%</span>
-          <span className="text-sm font-medium text-[#4A4238]/ bg-white px-2 py-1 rounded-md">{count} ชิ้น</span>
+          <span className={`text-3xl font-black ${isHigh ? 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]' : isNight ? 'text-white' : 'text-[#4A4238]'}`}>{value}%</span>
+          <span className={`text-sm font-medium px-2 py-1 rounded-md ${isNight ? 'text-slate-300 bg-slate-800' : 'text-[#4A4238] bg-white'}`}>{count} ชิ้น</span>
         </div>
       </CardContent>
     </Card>
   )
 }
 
-function OeeCard({ title, value, hours, onHoursChange }: { title: string, value: number, hours: number, onHoursChange: (v: number) => void }) {
+function OeeCard({ title, value, hours, onHoursChange, isNight = false }: { title: string, value: number, hours: number, onHoursChange: (v: number) => void, isNight?: boolean }) {
   const colorClass = value > 80 ? 'text-[#D4AF37] drop-shadow-[0_0_8px_rgba(212,175,55,0.4)]' : value > 60 ? 'text-yellow-400 drop-shadow-[0_0_8px_rgba(250,204,21,0.4)]' : 'text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]'
   return (
-    <Card className="bg-white border-[#D4AF37]/30 shadow-lg overflow-hidden relative group">
+    <Card className={`shadow-lg overflow-hidden relative group transition-colors duration-300 ${
+      isNight ? 'bg-[#1E293B] border-slate-700/70' : 'bg-white border-[#D4AF37]/30'
+    }`}>
       <CardContent className="p-4 md:p-6 flex flex-row items-center justify-between relative z-10 gap-2">
         <div className="flex flex-col gap-2">
-          <div className="font-semibold text-[#4A4238] text-lg">{title}</div>
+          <div className={`font-semibold text-lg ${isNight ? 'text-slate-100' : 'text-[#4A4238]'}`}>{title}</div>
           <div className="flex items-center gap-2">
-            <span className="text-xs font-medium text-[#8B7355] whitespace-nowrap">ชม.ทำงาน:</span>
+            <span className={`text-xs font-medium whitespace-nowrap ${isNight ? 'text-amber-300' : 'text-[#8B7355]'}`}>ชม.ทำงาน:</span>
             <Input 
               type="number" 
               value={hours}
               onChange={(e) => onHoursChange(Number(e.target.value) || 0)}
-              className="w-16 h-7 text-xs text-center border-[#D4AF37]/30 p-1"
+              className={`w-16 h-7 text-xs text-center p-1 ${
+                isNight ? 'bg-slate-900 border-slate-700 text-white' : 'border-[#D4AF37]/30 bg-white text-[#4A4238]'
+              }`}
               min={1} max={24}
             />
           </div>
@@ -1136,12 +1346,16 @@ function OeeCard({ title, value, hours, onHoursChange }: { title: string, value:
   )
 }
 
-function PerfItem({ title, value, target }: { title: string, value: number, target: number }) {
+function PerfItem({ title, value, target, isNight = false }: { title: string, value: number, target: number, isNight?: boolean }) {
   const pct = target > 0 ? (value / target) * 100 : 0
   const isGood = pct >= 90
   return (
-    <div className="flex flex-col items-center p-5 rounded-xl border border-[#D4AF37]/30 bg-transparent/50 transition-all hover:bg-white hover:border-[#D4AF37]/30">
-      <span className="text-sm font-bold text-[#4A4238] mb-3 uppercase tracking-wider">{title}</span>
+    <div className={`flex flex-col items-center p-5 rounded-xl border transition-all ${
+      isNight 
+        ? 'border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 hover:border-amber-400/40' 
+        : 'border-[#D4AF37]/30 bg-transparent/50 hover:bg-white hover:border-[#D4AF37]/50'
+    }`}>
+      <span className={`text-sm font-bold mb-3 uppercase tracking-wider ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>{title}</span>
       <div className="relative">
         {isGood ? 
           <CheckCircle2 className="w-12 h-12 text-[#D4AF37] mb-3 drop-shadow-[0_0_10px_rgba(52,211,153,0.6)]" /> : 

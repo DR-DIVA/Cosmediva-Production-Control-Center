@@ -24,7 +24,9 @@ import {
   TrendingUp,
   Boxes,
   CalendarDays,
-  Filter
+  Filter,
+  Sun,
+  Moon
 } from 'lucide-react'
 import { format, addDays, isSameDay, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
@@ -35,6 +37,8 @@ import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvis
 interface RollingMasterRadarProps {
   startDateStr?: string
   onSelectLot?: (lotId: string) => void
+  theme?: 'night' | 'light'
+  onToggleTheme?: () => void
 }
 
 export interface OperationalStatus {
@@ -341,7 +345,13 @@ function computeOperationalStatus(
 const TH_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
-export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterRadarProps) {
+export function RollingMasterRadar({ 
+  startDateStr, 
+  onSelectLot,
+  theme = 'light',
+  onToggleTheme
+}: RollingMasterRadarProps) {
+  const isNight = theme === 'night'
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
   const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
@@ -708,12 +718,16 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
 
   return (
     <div className="space-y-6">
-      <Card className="bg-white border-[#D4AF37]/35 shadow-2xl rounded-2xl overflow-hidden relative">
+      <Card className={`border-[#D4AF37]/35 shadow-2xl rounded-2xl overflow-hidden relative transition-colors duration-300 ${
+        isNight ? 'bg-[#0B132B] text-slate-100' : 'bg-white text-[#4A4238]'
+      }`}>
       {/* Decorative Gold Accent Bar */}
       <div className="h-1.5 bg-gradient-to-r from-[#D4AF37] via-amber-400 to-[#D4AF37]"></div>
 
       {/* Radar Master Header */}
-      <CardHeader className="bg-gradient-to-b from-[#FAF8F5] to-white border-b border-[#D4AF37]/25 p-5 md:p-6">
+      <CardHeader className={`border-b border-[#D4AF37]/25 p-5 md:p-6 transition-colors duration-300 ${
+        isNight ? 'bg-[#0F172A]' : 'bg-gradient-to-b from-[#FAF8F5] to-white'
+      }`}>
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-3">
@@ -722,18 +736,18 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               </div>
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className="text-xl md:text-2xl font-black text-[#4A4238] whitespace-nowrap tracking-tight">
+                  <h2 className={`text-xl md:text-2xl font-black whitespace-nowrap tracking-tight ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
                     21-Day Rolling Master Radar
                   </h2>
                   <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
                     เรดาร์แผนงาน 3 สัปดาห์ (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)
                   </span>
                 </div>
-                <div className="text-xs text-[#8B7355] font-medium flex flex-wrap items-center gap-2 mt-1">
+                <div className={`text-xs font-medium flex flex-wrap items-center gap-2 mt-1 ${isNight ? 'text-slate-300' : 'text-[#8B7355]'}`}>
                   <div className="flex items-center gap-1.5 whitespace-nowrap">
                     <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
                     <span>
-                      หน้าต่างแผนงาน: <strong className="text-[#4A4238]">{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className="text-[#4A4238]">{horizonDates[20]?.dayNum} {horizonDates[20]?.monthName} 2026</strong>
+                      หน้าต่างแผนงาน: <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[20]?.dayNum} {horizonDates[20]?.monthName} 2026</strong>
                     </span>
                   </div>
                   <span className="text-slate-300 hidden sm:inline">•</span>
@@ -745,17 +759,45 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             </div>
           </div>
 
-          {/* View Switcher Controls */}
+          {/* View Switcher Controls & Theme Toggle */}
           <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto shrink-0">
+            {/* Change Theme Button */}
+            {onToggleTheme && (
+              <button
+                type="button"
+                onClick={onToggleTheme}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 border cursor-pointer select-none ${
+                  isNight
+                    ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
+                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 hover:text-slate-900 shadow-xs'
+                }`}
+                title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Night Mode)'}
+              >
+                {isNight ? (
+                  <>
+                    <Sun className="w-3.5 h-3.5 text-amber-400" />
+                    <span>โหมดสว่าง (Light)</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                    <span>โหมดมืด (Night)</span>
+                  </>
+                )}
+              </button>
+            )}
+
             {/* View Mode Buttons */}
-            <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200 shadow-inner">
+            <div className={`flex items-center p-1 rounded-xl border shadow-inner ${
+              isNight ? 'bg-slate-900/90 border-slate-700' : 'bg-slate-100/90 border-slate-200'
+            }`}>
               <button
                 type="button"
                 onClick={() => setViewMode('timeline')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   viewMode === 'timeline'
-                    ? 'bg-white text-[#4A4238] shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-[#4A4238]'
+                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
                 }`}
               >
                 <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -766,8 +808,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                 onClick={() => setViewMode('daily')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   viewMode === 'daily'
-                    ? 'bg-white text-[#4A4238] shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-[#4A4238]'
+                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
                 }`}
               >
                 <ListOrdered className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -778,8 +820,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                 onClick={() => setViewMode('logistics')}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                   viewMode === 'logistics'
-                    ? 'bg-white text-[#4A4238] shadow-sm border border-slate-200'
-                    : 'text-slate-500 hover:text-[#4A4238]'
+                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
                 }`}
               >
                 <Truck className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -788,8 +830,10 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             </div>
 
             {/* Stream Filter Pills */}
-            <div className="flex flex-wrap items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 text-xs">
-              <span className="text-[10px] font-bold text-slate-400 px-1.5">สายงาน:</span>
+            <div className={`flex flex-wrap items-center gap-1 p-1 rounded-xl border text-xs ${
+              isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+            }`}>
+              <span className={`text-[10px] font-bold px-1.5 ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>สายงาน:</span>
               {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'PACKING', 'FG_DUE'] as const).map(f => (
                 <button
                   key={f}
@@ -797,8 +841,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                   onClick={() => setStreamFilter(f)}
                   className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
                     streamFilter === f
-                      ? 'bg-[#D4AF37] text-white shadow-xs'
-                      : 'text-slate-600 hover:bg-slate-100'
+                      ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs'
+                      : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
                   }`}
                 >
                   {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
@@ -809,53 +853,65 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         </div>
 
         {/* 21-Day Executive Summary Chips */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mt-4 pt-4 border-t border-slate-100">
-          <div className="p-2.5 rounded-xl bg-amber-50/70 border border-amber-200/80 flex items-center justify-between">
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mt-4 pt-4 border-t ${
+          isNight ? 'border-slate-800' : 'border-slate-100'
+        }`}>
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-amber-950/40 border-amber-800/60 text-amber-200' : 'bg-amber-50/70 border-amber-200/80 text-amber-900'
+          }`}>
             <div className="flex items-center gap-2">
-              <Truck className="w-4 h-4 text-amber-600" />
+              <Truck className="w-4 h-4 text-amber-500" />
               <div>
-                <div className="text-[10px] text-amber-700 font-medium">ของเข้า RM/PM (21 วัน)</div>
-                <div className="text-sm font-black text-amber-900">{summaryCounts.totalEta} รายการ</div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-amber-300' : 'text-amber-700'}`}>ของเข้า RM/PM (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-amber-100' : 'text-amber-900'}`}>{summaryCounts.totalEta} รายการ</div>
               </div>
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-indigo-50/70 border border-indigo-200/80 flex items-center justify-between">
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-indigo-950/40 border-indigo-800/60 text-indigo-200' : 'bg-indigo-50/70 border-indigo-200/80 text-indigo-900'
+          }`}>
             <div className="flex items-center gap-2">
-              <Scale className="w-4 h-4 text-indigo-600" />
+              <Scale className="w-4 h-4 text-indigo-400" />
               <div>
-                <div className="text-[10px] text-indigo-700 font-medium">เตรียม/ชั่งสาร (21 วัน)</div>
-                <div className="text-sm font-black text-indigo-900">{summaryCounts.totalWeighing} รอบงาน</div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-indigo-300' : 'text-indigo-700'}`}>เตรียม/ชั่งสาร (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-indigo-100' : 'text-indigo-900'}`}>{summaryCounts.totalWeighing} รอบงาน</div>
               </div>
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-blue-50/70 border border-blue-200/80 flex items-center justify-between">
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-blue-950/40 border-blue-800/60 text-blue-200' : 'bg-blue-50/70 border-blue-200/80 text-blue-900'
+          }`}>
             <div className="flex items-center gap-2">
-              <Beaker className="w-4 h-4 text-blue-600" />
+              <Beaker className="w-4 h-4 text-blue-400" />
               <div>
-                <div className="text-[10px] text-blue-700 font-medium">งานผสม Bulk (21 วัน)</div>
-                <div className="text-sm font-black text-blue-900">{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-blue-300' : 'text-blue-700'}`}>งานผสม Bulk (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-blue-100' : 'text-blue-900'}`}>{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
               </div>
             </div>
           </div>
 
-          <div className="p-2.5 rounded-xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
+          }`}>
             <div className="flex items-center gap-2">
-              <Package className="w-4 h-4 text-emerald-600" />
+              <Package className="w-4 h-4 text-emerald-400" />
               <div>
-                <div className="text-[10px] text-emerald-700 font-medium">ไลน์บรรจุ & POF (21 วัน)</div>
-                <div className="text-sm font-black text-emerald-900">{summaryCounts.totalPacking} รอบงาน</div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>ไลน์บรรจุ & POF (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{summaryCounts.totalPacking} รอบงาน</div>
               </div>
             </div>
           </div>
 
-          <div className="col-span-2 sm:col-span-1 p-2.5 rounded-xl bg-rose-50/70 border border-rose-200/80 flex items-center justify-between">
+          <div className={`col-span-2 sm:col-span-1 p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50/70 border-rose-200/80 text-rose-900'
+          }`}>
             <div className="flex items-center gap-2">
-              <Gift className="w-4 h-4 text-rose-600" />
+              <Gift className="w-4 h-4 text-rose-400" />
               <div>
-                <div className="text-[10px] text-rose-700 font-medium">กำหนดส่งมอบ FG (21 วัน)</div>
-                <div className="text-sm font-black text-rose-900">{summaryCounts.totalFgDue} ล็อต</div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-rose-300' : 'text-rose-700'}`}>กำหนดส่งมอบ FG (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-rose-100' : 'text-rose-900'}`}>{summaryCounts.totalFgDue} ล็อต</div>
               </div>
             </div>
           </div>
@@ -864,7 +920,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
 
       <CardContent className="p-4 md:p-6">
         {loading ? (
-          <div className="p-12 text-center text-slate-400">
+          <div className={`p-12 text-center ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>
             <Compass className="w-8 h-8 mx-auto mb-3 animate-spin text-[#D4AF37]" />
             กำลังจัดทำเรดาร์แผนงาน 21 วัน (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)...
           </div>
@@ -874,38 +930,56 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
             {viewMode === 'timeline' && (
               <div className="space-y-2">
                 <div className="overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-amber-200">
-                  <div className="min-w-[1500px] border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  <div className={`min-w-[1500px] border rounded-2xl overflow-hidden shadow-xs ${
+                    isNight ? 'border-slate-800 bg-[#0B132B]' : 'border-slate-200 bg-white'
+                  }`}>
                     {/* Header: 21 Days (Column 7 is Today) */}
-                    <div className="grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] bg-[#F9F7F2] border-b border-slate-200 text-center font-bold text-xs">
-                      <div className="p-3 text-left text-slate-600 font-bold border-r border-slate-200 flex items-center gap-1.5 bg-slate-100/70">
+                    <div className={`grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] border-b text-center font-bold text-xs ${
+                      isNight ? 'bg-[#0F172A] border-slate-800 text-slate-200' : 'bg-[#F9F7F2] border-slate-200 text-slate-700'
+                    }`}>
+                      <div className={`p-3 text-left font-bold border-r flex items-center gap-1.5 ${
+                        isNight ? 'bg-slate-900 border-slate-800 text-slate-300' : 'bg-slate-100/70 border-slate-200 text-slate-600'
+                      }`}>
                         <Layers className="w-3.5 h-3.5 text-[#D4AF37]" /> สายงาน / วันที่
                       </div>
                       {horizonDates.map((d, idx) => (
                         <div
                           key={d.dateStr}
-                          className={`p-2 border-r border-slate-200/80 flex flex-col items-center justify-center transition-colors ${
-                            d.isToday
-                              ? 'bg-amber-100/90 text-amber-900 ring-2 ring-inset ring-[#D4AF37] shadow-sm z-10'
+                          className={`p-2 border-r flex flex-col items-center justify-center transition-colors ${
+                            isNight
+                              ? d.isToday
+                                ? 'bg-amber-950/80 text-amber-200 ring-2 ring-inset ring-[#D4AF37] shadow-sm z-10 border-slate-700'
+                                : d.isPast
+                                ? 'bg-slate-900/60 text-slate-400 border-slate-800'
+                                : idx % 2 === 0
+                                ? 'bg-slate-900/40 text-slate-200 border-slate-800'
+                                : 'bg-slate-900/20 text-slate-300 border-slate-800'
+                              : d.isToday
+                              ? 'bg-amber-100/90 text-amber-900 ring-2 ring-inset ring-[#D4AF37] shadow-sm z-10 border-slate-200/80'
                               : d.isPast
-                              ? 'bg-slate-100/50 text-slate-600'
+                              ? 'bg-slate-100/50 text-slate-600 border-slate-200/80'
                               : idx % 2 === 0
-                              ? 'bg-white'
-                              : 'bg-slate-50/50'
+                              ? 'bg-white border-slate-200/80'
+                              : 'bg-slate-50/50 border-slate-200/80'
                           }`}
                         >
                           <div className="text-[10px] font-semibold uppercase">
                             {d.isToday ? (
-                              <span className="text-amber-800 font-bold flex items-center gap-0.5">📍 วันนี้</span>
+                              <span className={`font-bold flex items-center gap-0.5 ${isNight ? 'text-amber-300' : 'text-amber-800'}`}>📍 วันนี้</span>
                             ) : d.isPast ? (
-                              <span className="text-slate-400">{d.dayName}</span>
+                              <span className={isNight ? 'text-slate-400' : 'text-slate-400'}>{d.dayName}</span>
                             ) : (
-                              <span className="text-slate-500">{d.dayName}</span>
+                              <span className={isNight ? 'text-slate-300' : 'text-slate-500'}>{d.dayName}</span>
                             )}
                           </div>
-                          <div className={`text-sm font-black ${d.isToday ? 'text-amber-950 scale-110' : 'text-[#4A4238]'}`}>
+                          <div className={`text-sm font-black ${
+                            d.isToday 
+                              ? (isNight ? 'text-amber-300 scale-110' : 'text-amber-950 scale-110') 
+                              : (isNight ? 'text-slate-100' : 'text-[#4A4238]')
+                          }`}>
                             {d.dayNum}
                           </div>
-                          <div className="text-[9px] text-slate-500 font-medium">
+                          <div className={`text-[9px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
                             {d.monthName}
                           </div>
                         </div>
@@ -913,16 +987,20 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                     </div>
 
                     {/* Stream Rows */}
-                    <div className="divide-y divide-slate-200/80 text-xs">
+                    <div className={`divide-y text-xs ${isNight ? 'divide-slate-800/80' : 'divide-slate-200/80'}`}>
                       {activeStreams.map(stream => {
                         const Icon = stream.icon
                         return (
                           <div
                             key={stream.key}
-                            className="grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] items-stretch hover:bg-slate-50/40 transition-colors"
+                            className={`grid grid-cols-[160px_repeat(21,minmax(60px,1fr))] items-stretch transition-colors ${
+                              isNight ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/40'
+                            }`}
                           >
                             {/* Stream Name Header */}
-                            <div className={`p-3 font-bold border-r border-slate-200 flex items-center gap-2 bg-slate-50/80 ${stream.color}`}>
+                            <div className={`p-3 font-bold border-r flex items-center gap-2 ${
+                              isNight ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50/80 border-slate-200'
+                            } ${stream.color}`}>
                               <Icon className="w-4 h-4 shrink-0" />
                               <span className="truncate text-xs">{stream.shortLabel}</span>
                             </div>
@@ -1427,6 +1505,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
       fgDueLots={radarData.fgDueLots}
       horizonDates={horizonDates}
       onSelectLot={onSelectLot}
+      theme={theme}
+      onToggleTheme={onToggleTheme}
     />
   </div>
   )

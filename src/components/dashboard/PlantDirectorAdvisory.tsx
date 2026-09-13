@@ -56,6 +56,8 @@ interface PlantDirectorAdvisoryProps {
   fgDueLots: any[]
   horizonDates: any[]
   onSelectLot?: (lotId: string) => void
+  theme?: 'night' | 'light'
+  onToggleTheme?: () => void
 }
 
 export function PlantDirectorAdvisory({
@@ -63,7 +65,9 @@ export function PlantDirectorAdvisory({
   logsList,
   fgDueLots,
   horizonDates,
-  onSelectLot
+  onSelectLot,
+  theme: propTheme,
+  onToggleTheme
 }: PlantDirectorAdvisoryProps) {
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'SUPPLY_CHAIN' | 'SHOPFLOOR' | 'QC_GATE' | 'CUSTOMER_OTIF'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
@@ -71,27 +75,36 @@ export function PlantDirectorAdvisory({
   const [theme, setTheme] = useState<'night' | 'light'>('night')
 
   React.useEffect(() => {
+    if (propTheme) {
+      setTheme(propTheme)
+      return
+    }
     try {
-      const savedTheme = localStorage.getItem('cosmeflow_director_advisory_theme')
+      const savedTheme = localStorage.getItem('cosmeflow_director_advisory_theme') || localStorage.getItem('cosmeflow_dashboard_theme')
       if (savedTheme === 'light' || savedTheme === 'night') {
         setTheme(savedTheme)
       }
     } catch {
       // ignore
     }
-  }, [])
+  }, [propTheme])
 
   const toggleTheme = () => {
+    if (onToggleTheme) {
+      onToggleTheme()
+      return
+    }
     const nextTheme = theme === 'night' ? 'light' : 'night'
     setTheme(nextTheme)
     try {
       localStorage.setItem('cosmeflow_director_advisory_theme', nextTheme)
+      localStorage.setItem('cosmeflow_dashboard_theme', nextTheme)
     } catch {
       // ignore
     }
   }
 
-  const isNight = theme === 'night'
+  const isNight = (propTheme || theme) === 'night'
 
   const todayStr = horizonDates[6]?.dateStr || format(new Date(), 'yyyy-MM-dd')
 
