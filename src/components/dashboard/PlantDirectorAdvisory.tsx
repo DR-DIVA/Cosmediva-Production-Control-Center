@@ -188,7 +188,7 @@ export function PlantDirectorAdvisory({
           title: `แจ้งเตือนเลื่อนส่งมอบ: ${rm.rm_name || rm.rm_code} (${rm.supplier || 'Supplier'})`,
           poNo: rm.po_no,
           problemStatement: `Supplier ขอเลื่อนกำหนดส่งเป็น ${revisedDate ? new Date(revisedDate).toLocaleDateString('th-TH') : '-'} (สาเหตุ: ${dInfo.categoryLabel || 'เลื่อนส่ง'}) หมายเหตุ: "${dInfo.reason || '-'}"`,
-          directorDirective: `ให้จัดซื้อประเมินร่วมกับคลังสินค้า ตรวจสอบสต็อกสำรอง (Safety Stock) ในโรงงาน หากมีสต็อกให้ดึงมาใช้ก่อน หากไม่มีให้แจ้งเตือนฝ่ายวางแผนระงับการเปิด Job ชั่งสาร`,
+          directorDirective: `ให้จัดซื้อประเมินร่วมกับคลังสินค้า ตรวจสอบสต็อกสำรอง (Safety Stock) ในโรงงาน หากมีสต็อกให้ดึงมาใช้ก่อน หากไม่มีให้แจ้งเตือนฝ่ายวางแผนปรับคิวงานชั่งสาร`,
           actionItems: [
             { dept: 'ฝ่ายจัดซื้อ & คลัง', action: `เช็คสต็อกคงเหลือหน้างาน และยืนยันกำหนดนำเข้าจริง` }
           ]
