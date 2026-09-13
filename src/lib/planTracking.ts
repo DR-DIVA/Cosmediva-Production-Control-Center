@@ -56,14 +56,41 @@ export function parsePlanChangeInfo(note?: string | null, activityDate?: string 
   }
 
   // Fallback text check
-  if (note.includes('[เลื่อนแผน') || note.includes('[ปรับแผน')) {
+  if (note.includes('[เลื่อนแผน') || note.includes('[ปรับแผน') || note.includes('(เลื่อนแผน')) {
     result.isRescheduled = true
     result.category = 'PLAN_CALIBRATION'
     result.categoryLabel = 'ปรับเลื่อนแผนงาน'
-    result.reason = note
+    result.reason = cleanDisplayNote(note)
   }
 
   return result
+}
+
+/**
+ * Strips hidden JSON metadata tags ([PLAN_RESCHEDULE:{...}], [DELAY_TRACKING:{...}]) for human-facing UI display.
+ */
+export function cleanDisplayNote(note?: string | null): string {
+  if (!note) return ''
+  return note
+    .replace(/\[PLAN_RESCHEDULE:.*?\]/g, '')
+    .replace(/\[DELAY_TRACKING:.*?\]/g, '')
+    .replace(/^\s*[\r\n]/gm, '')
+    .trim()
+}
+
+/**
+ * Extracts pure user comments from note, stripping both automated reschedule summaries and JSON metadata tags.
+ */
+export function extractUserComment(note?: string | null): string {
+  if (!note) return ''
+  let cleaned = cleanDisplayNote(note)
+  cleaned = cleaned
+    .replace(/\[เลื่อนแผนเป็น .*?\]/g, '')
+    .replace(/\*?\s*\(เลื่อนแผนเป็น .*?\)/g, '')
+    .replace(/\[เลื่อนเป็น .*?\]/g, '')
+    .replace(/^\s*[\r\n]/gm, '')
+    .trim()
+  return cleaned
 }
 
 /**
@@ -87,15 +114,16 @@ export function formatPlanChangeNote(
 
   const tag = `[PLAN_RESCHEDULE:${JSON.stringify(payload)}]`
 
-  // Clean existing PLAN_RESCHEDULE tag
-  let cleanNote = (existingNote || '').replace(/\[PLAN_RESCHEDULE:.*?\]/g, '').trim()
+  // Clean existing PLAN_RESCHEDULE tag and previous auto-generated summaries
+  let cleanNote = (existingNote || '')
+    .replace(/\[PLAN_RESCHEDULE:.*?\]/g, '')
+    .replace(/\*?\s*\(เลื่อนแผนเป็น .*?\)/g, '')
+    .replace(/\[เลื่อนแผนเป็น .*?\]/g, '')
+    .trim()
 
   // Human readable description prefix
   const categoryText = getPlanCategoryLabel(changeData.category)
   const humanSummary = `[เลื่อนแผนเป็น ${changeData.revisedDate}: ${categoryText}${changeData.reason ? ` - ${changeData.reason}` : ''}]`
-
-  // Also clean old human summary if present
-  cleanNote = cleanNote.replace(/\[เลื่อนแผนเป็น .*?\]/g, '').trim()
 
   return cleanNote 
     ? `${humanSummary} ${tag}\n${cleanNote}` 

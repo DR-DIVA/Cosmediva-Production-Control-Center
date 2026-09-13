@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, Loader2, Calendar, FileText, Search } from 'lucide-react'
 import { toast } from 'sonner'
+import { cleanDisplayNote } from '@/lib/planTracking'
 
 export default function WorkHistoryPage() {
   const [historyItems, setHistoryItems] = useState<any[]>([])
@@ -344,8 +345,8 @@ export default function WorkHistoryPage() {
                         <TableCell className="text-right font-medium text-emerald-600">
                           {item.qty ? Number(item.qty).toLocaleString() : '-'}
                         </TableCell>
-                        <TableCell className="text-xs text-slate-500 truncate max-w-[200px]" title={item.note}>
-                          {item.note || '-'}
+                        <TableCell className="text-xs text-slate-500 truncate max-w-[200px]" title={cleanDisplayNote(item.note)}>
+                          {cleanDisplayNote(item.note) || '-'}
                         </TableCell>
                       </TableRow>
                     ))}

@@ -31,7 +31,7 @@ import {
 import { format, addDays, isSameDay, parseISO } from 'date-fns'
 import { th } from 'date-fns/locale'
 import { parseDelayInfo } from '@/lib/delayTracking'
-import { parsePlanChangeInfo } from '@/lib/planTracking'
+import { parsePlanChangeInfo, cleanDisplayNote, extractUserComment, PlanChangeInfo } from '@/lib/planTracking'
 import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvisory'
 
 export interface RollingMasterRadarProps {
@@ -55,6 +55,7 @@ export interface OperationalStatus {
   endTimeStr?: string
   note?: string
   detailsText?: string
+  rescheduledInfo?: PlanChangeInfo
 }
 
 interface StreamItem {
@@ -212,7 +213,11 @@ function computeOperationalStatus(
   const qcStatus = (log.qc_status || '').toUpperCase()
   const startTime = formatTime(log.start_time)
   const endTime = formatTime(log.end_time)
-  const note = log.note || undefined
+
+  // Parse plan rescheduling tracking & clean user comments
+  const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+  const userComment = extractUserComment(log.note)
+  const note = userComment || undefined
 
   const streamVerb = 
     streamType === 'WEIGHING' ? 'ชั่งสาร' : 
@@ -233,7 +238,8 @@ function computeOperationalStatus(
       startTimeStr: startTime,
       endTimeStr: endTime,
       note,
-      detailsText: 'ผ่านการตรวจสอบคุณภาพ (QC Pass) เรียบร้อย'
+      detailsText: 'ผ่านการตรวจสอบคุณภาพ (QC Pass) เรียบร้อย',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -246,7 +252,8 @@ function computeOperationalStatus(
       dotColor: 'bg-amber-500',
       startTimeStr: startTime,
       note,
-      detailsText: 'งานเสร็จแล้ว อยู่ระหว่างรอผลทดสอบแล็บ QC'
+      detailsText: 'งานเสร็จแล้ว อยู่ระหว่างรอผลทดสอบแล็บ QC',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -258,7 +265,8 @@ function computeOperationalStatus(
       color: 'bg-orange-50 text-orange-700 border-orange-200/80',
       dotColor: 'bg-orange-500',
       note,
-      detailsText: 'ผลตรวจไม่สมบูรณ์ อยู่ระหว่างรอฝ่าย QC พิจารณา'
+      detailsText: 'ผลตรวจไม่สมบูรณ์ อยู่ระหว่างรอฝ่าย QC พิจารณา',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -270,7 +278,8 @@ function computeOperationalStatus(
       color: 'bg-rose-50 text-rose-700 border-rose-200/80',
       dotColor: 'bg-rose-500',
       note,
-      detailsText: 'ไม่ผ่านเกณฑ์มาตรฐาน QC'
+      detailsText: 'ไม่ผ่านเกณฑ์มาตรฐาน QC',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -284,7 +293,8 @@ function computeOperationalStatus(
       dotColor: 'bg-blue-500 animate-pulse',
       startTimeStr: startTime,
       note,
-      detailsText: startTime ? `หน้างานเริ่มแล้วเมื่อเวลา ${startTime} น.` : 'หน้างานกำลังดำเนินการ'
+      detailsText: startTime ? `หน้างานเริ่มแล้วเมื่อเวลา ${startTime} น.` : 'หน้างานกำลังดำเนินการ',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -303,12 +313,12 @@ function computeOperationalStatus(
       startTimeStr: startTime,
       endTimeStr: endTime,
       note,
-      detailsText: [endTime ? `เสร็จเมื่อ ${endTime} น.` : '', piecesText].filter(Boolean).join(' • ') || 'ดำเนินการเสร็จสิ้นเรียบร้อย'
+      detailsText: [endTime ? `เสร็จเมื่อ ${endTime} น.` : '', piecesText].filter(Boolean).join(' • ') || 'ดำเนินการเสร็จสิ้นเรียบร้อย',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
   // Rescheduled plan check
-  const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
   if (planInfo.isRescheduled) {
     const origStr = planInfo.originalDate ? new Date(planInfo.originalDate).toLocaleDateString('th-TH') : '-'
     const revStr = planInfo.revisedDate ? new Date(planInfo.revisedDate).toLocaleDateString('th-TH') : '-'
@@ -321,7 +331,8 @@ function computeOperationalStatus(
       startTimeStr: startTime,
       endTimeStr: endTime,
       note,
-      detailsText: `แผนเดิม: ${origStr} ➔ แผนใหม่: ${revStr}${planInfo.reason ? ` (${planInfo.reason})` : ''}`
+      detailsText: `แผนเดิม: ${origStr} ➔ แผนใหม่: ${revStr}${planInfo.reason ? ` (${planInfo.reason})` : ''}`,
+      rescheduledInfo: planInfo
     }
   }
 
@@ -333,7 +344,8 @@ function computeOperationalStatus(
       type: 'overdue',
       color: 'bg-amber-50 text-amber-700 border-amber-200/80',
       dotColor: 'bg-amber-500',
-      detailsText: 'เลยวันตามแผนงานแล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่'
+      detailsText: 'เลยวันตามแผนงานแล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่',
+      rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
 
@@ -342,7 +354,8 @@ function computeOperationalStatus(
     shortBadge: 'ตามแผน',
     type: 'planned',
     color: 'bg-slate-50 text-slate-600 border-slate-200/80',
-    dotColor: 'bg-slate-400'
+    dotColor: 'bg-slate-400',
+    rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
   }
 }
 
@@ -1188,7 +1201,35 @@ export function RollingMasterRadar({
                                                     </div>
                                                     {delayInfo?.reason && (
                                                       <div className="text-slate-600 pl-2.5 text-[10px] italic border-l-2 border-amber-300">
-                                                        &ldquo;{delayInfo.reason}&rdquo;
+                                                        &ldquo;{cleanDisplayNote(delayInfo.reason)}&rdquo;
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+
+                                                {/* Plan Rescheduled Alert Box (for Manufacturing items) */}
+                                                {it.opStatus?.rescheduledInfo?.isRescheduled && (
+                                                  <div className="p-2 rounded-lg bg-purple-50/95 border border-purple-200/90 text-purple-900 text-[10px] space-y-1 mt-1 shadow-xs">
+                                                    <div className="font-bold flex items-center justify-between gap-1 text-purple-950 flex-wrap">
+                                                      <span className="flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-purple-600 shrink-0"></span>
+                                                        <span>🔄 ปรับเลื่อนแผน: {it.opStatus.rescheduledInfo.categoryLabel || 'เลื่อนแผนงาน'}</span>
+                                                      </span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1.5 text-[10px] text-purple-800 flex-wrap font-medium pl-2.5">
+                                                      <span>แผนเดิม:</span>
+                                                      <span className="line-through font-mono text-slate-500">
+                                                        {it.opStatus.rescheduledInfo.originalDate ? format(parseISO(it.opStatus.rescheduledInfo.originalDate), 'dd/MM/yyyy') : '-'}
+                                                      </span>
+                                                      <span>➔</span>
+                                                      <span>แผนใหม่:</span>
+                                                      <strong className="font-mono text-purple-950">
+                                                        {it.opStatus.rescheduledInfo.revisedDate ? format(parseISO(it.opStatus.rescheduledInfo.revisedDate), 'dd/MM/yyyy') : '-'}
+                                                      </strong>
+                                                    </div>
+                                                    {it.opStatus.rescheduledInfo.reason && (
+                                                      <div className="text-purple-700 pl-2.5 text-[10px] italic border-l-2 border-purple-300">
+                                                        &ldquo;{cleanDisplayNote(it.opStatus.rescheduledInfo.reason)}&rdquo;
                                                       </div>
                                                     )}
                                                   </div>
@@ -1226,7 +1267,7 @@ export function RollingMasterRadar({
                                                     </div>
                                                     {it.opStatus.note && (
                                                       <div className="text-slate-600 pl-2 text-[10px] italic border-l-2 border-slate-300">
-                                                        &ldquo;{it.opStatus.note}&rdquo;
+                                                        &ldquo;{cleanDisplayNote(it.opStatus.note)}&rdquo;
                                                       </div>
                                                     )}
                                                   </div>

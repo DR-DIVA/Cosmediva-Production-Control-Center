@@ -18,6 +18,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { differenceInDays, startOfDay } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
+import { cleanDisplayNote } from '@/lib/planTracking'
 
 export default function MixingTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
@@ -520,9 +521,9 @@ export default function MixingTasksPage() {
                         <User className="w-3 h-3 shrink-0" />
                         <span className="text-[10px] truncate max-w-[120px]">{h.user?.split('@')[0]}</span>
                       </div>
-                      {h.note && (
+                      {h.note && cleanDisplayNote(h.note) && (
                         <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
-                          {h.note}
+                          {cleanDisplayNote(h.note)}
                         </div>
                       )}
                     </div>
@@ -576,14 +577,14 @@ export default function MixingTasksPage() {
           })}
         </div>
         
-        {task.note && (
+        {task.note && cleanDisplayNote(task.note) && (
           <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg shadow-sm max-w-2xl">
             <div className="flex items-center gap-2 text-red-700 font-semibold mb-1">
               <AlertTriangle className="w-4 h-4" />
               <span>ปัญหาการผลิต (Issues)</span>
             </div>
             <div className="text-sm text-red-600 whitespace-pre-wrap pl-6">
-              {task.note.split('\n').map((line: string, i: number) => (
+              {cleanDisplayNote(task.note).split('\n').map((line: string, i: number) => (
                 <div key={i} className="mb-0.5">
                   {line.includes('[') ? 
                     <span><strong>{line.split(']')[0] + ']'}</strong> {line.split(']').slice(1).join(']')}</span> : 

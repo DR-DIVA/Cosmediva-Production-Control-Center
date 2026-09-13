@@ -27,6 +27,7 @@ import {
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
+import { cleanDisplayNote } from '@/lib/planTracking'
 
 export default function QCQueuePage() {
   const [activeTab, setActiveTab] = useState('bulk')
@@ -1728,9 +1729,9 @@ export default function QCQueuePage() {
                                                     <User className="w-3 h-3 shrink-0" />
                                                     <span className="text-[10px] line-clamp-2 break-words text-wrap max-w-[120px]">{h.user}</span>
                                                   </div>
-                                                  {h.note && (
+                                                  {h.note && cleanDisplayNote(h.note) && (
                                                     <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
-                                                      {h.note}
+                                                      {cleanDisplayNote(h.note)}
                                                     </div>
                                                   )}
                                                 </div>
@@ -1855,7 +1856,7 @@ export default function QCQueuePage() {
                                 <td className="px-4 py-3 ">
                                   <Badge variant="secondary" className={statusColor}>{item.action}</Badge>
                                 </td>
-                                <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">{item.note || '-'}</td>
+                                <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">{cleanDisplayNote(item.note) || '-'}</td>
                               </tr>
                             )
                           })}

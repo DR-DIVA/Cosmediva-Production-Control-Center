@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { cleanDisplayNote } from '@/lib/planTracking'
 
 const COLUMNS = [
   { id: 'MM-RM', title: '1. ชั่งสาร (MM-RM)', keywords: ['ชั่ง', 'mm-rm'], colorClasses: { bg: 'bg-amber-50', header: 'bg-amber-100', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-200 text-amber-800', cardBorder: 'border-t-amber-500' } },
@@ -1289,9 +1290,9 @@ export default function MyTasksPage() {
 
                       {col.id === 'MIX' && renderBatteryBar(task.sub_step)}
 
-                      {task.note && (
+                      {task.note && cleanDisplayNote(task.note) && (
                         <div className={`text-xs p-1.5 rounded border ${task.note.includes('[สารขาด]') ? 'bg-red-50 text-red-700 border-red-200 font-bold' : task.note.includes('[ประวัติการเบิก]') ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-orange-50 text-orange-800 border-orange-100'}`}>
-                          {task.note.split('\\n').map((line: string, i: number) => (
+                          {cleanDisplayNote(task.note).split('\\n').map((line: string, i: number) => (
                             <div key={i} className="mb-0.5">
                               {line.includes('[') ? 
                                 <span><strong>{line.split(']')[0] + ']'}</strong> {line.split(']').slice(1).join(']')}</span> : 

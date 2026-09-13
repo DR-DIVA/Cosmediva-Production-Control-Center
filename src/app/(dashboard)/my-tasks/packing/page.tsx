@@ -13,6 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label'
 import { differenceInDays, startOfDay } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
+import { cleanDisplayNote } from '@/lib/planTracking'
 
 const getPackagingIcon = (unit: string, className: string) => {
   switch (unit) {
@@ -535,9 +536,9 @@ export default function PackingTasksPage() {
                         <User className="w-3 h-3 shrink-0" />
                         <span className="text-[10px] truncate max-w-[120px]">{h.user?.split('@')[0]}</span>
                       </div>
-                      {h.note && (
+                      {h.note && cleanDisplayNote(h.note) && (
                         <div className="text-[10px] text-slate-300 mt-1 italic border-l-2 border-slate-600 pl-1">
-                          {h.note}
+                          {cleanDisplayNote(h.note)}
                         </div>
                       )}
                       {h.box_lot && (
