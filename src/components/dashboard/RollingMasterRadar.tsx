@@ -825,11 +825,16 @@ export function RollingMasterRadar({
 
   useEffect(() => {
     fetchRadarData()
+    // Auto-sync data every 30 seconds for live production updates
+    const interval = setInterval(() => {
+      fetchRadarData(true)
+    }, 30000)
+    return () => clearInterval(interval)
   }, [horizonStartStr, horizonEndStr])
 
-  const fetchRadarData = async () => {
+  const fetchRadarData = async (silent = false) => {
     if (!horizonStartStr || !horizonEndStr) return
-    setLoading(true)
+    if (!silent) setLoading(true)
 
     try {
       const [
@@ -886,7 +891,7 @@ export function RollingMasterRadar({
     } catch (err) {
       console.error('Error fetching rolling radar data:', err)
     } finally {
-      setLoading(false)
+      if (!silent) setLoading(false)
     }
   }
 
