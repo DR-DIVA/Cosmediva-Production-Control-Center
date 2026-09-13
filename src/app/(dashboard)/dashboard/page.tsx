@@ -787,11 +787,24 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* 🧭 21-Day Rolling Master Radar (Placed at top as requested) */}
+      {/* 🧭 21-Day Rolling Master Radar & AI Plant Director Strategic Directives */}
       <RollingMasterRadar 
         startDateStr={dashboardDate} 
         onSelectLot={(lotId) => setSelectedFilter(lotId)} 
       />
+      
+      {/* 🏭 Digital Twin Pipeline (Placed directly after AI Plant Director Strategic Directives) */}
+      <div className="bg-white rounded-2xl shadow-xl border border-[#D4AF37]/30 p-6 mt-6 overflow-hidden">
+        <div className="flex justify-between items-center mb-6 border-b border-[#D4AF37]/30 pb-4">
+          <h3 className="text-lg font-bold text-[#4A4238] flex items-center gap-3">
+            <Factory className="w-5 h-5 text-yellow-400" />
+            Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : <span className="text-yellow-400">LOT {filteredLots[0]?.lot_no}</span>}
+          </h3>
+        </div>
+        <div className="bg-transparent p-4 rounded-xl border border-[#D4AF37]/30">
+          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} />
+        </div>
+      </div>
       
       {/* 1. กำลังการผลิตวันนี้ */}
       <h3 className="text-xl font-bold text-[#4A4238] mt-10 mb-4 border-b border-[#D4AF37]/30 pb-3 flex items-center gap-2">
@@ -1041,20 +1054,6 @@ export default function DashboardPage() {
             <PerfItem title="QC" value={prodOutput.qc} target={prodTarget.qc} />
          </div>
       </div>
-
-      {/* Digital Twin Pipeline */}
-      <div className="bg-white rounded-2xl shadow-xl border border-[#D4AF37]/30 p-6 mt-10 overflow-hidden">
-        <div className="flex justify-between items-center mb-6 border-b border-[#D4AF37]/30 pb-4">
-          <h3 className="text-lg font-bold text-[#4A4238] flex items-center gap-3">
-            <Factory className="w-5 h-5 text-yellow-400" />
-            Digital Twin Pipeline - {selectedFilter === 'all' ? 'ทุกออเดอร์' : <span className="text-yellow-400">LOT {filteredLots[0]?.lot_no}</span>}
-          </h3>
-        </div>
-        <div className="bg-transparent p-4 rounded-xl border border-[#D4AF37]/30">
-          <ProductionLine activeLots={filteredLots} activeLogs={activeLogs} />
-        </div>
-      </div>
-
     </div>
   )
 }
