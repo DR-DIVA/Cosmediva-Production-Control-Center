@@ -972,9 +972,11 @@ export function PlantDirectorAdvisory({
                                 {/* Meta Row: Index, Topic badge, LOT, PO, Severity & Expand Button */}
                                 <div className="flex items-center justify-between gap-2 flex-wrap">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    {/* Index */}
-                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
-                                      isNight ? 'text-slate-400 bg-slate-800/90 border-slate-700' : 'text-slate-500 bg-slate-100 border-slate-200'
+                                    {/* Index - Large & Prominent */}
+                                    <span className={`text-sm sm:text-base md:text-lg font-black font-mono px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-xl border shadow-sm tracking-tight inline-flex items-center justify-center shrink-0 ${
+                                      isNight 
+                                        ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-amber-400/20' 
+                                        : 'bg-slate-900 text-amber-300 border-slate-800 shadow-slate-400/40'
                                     }`}>
                                       #{globalIdx}
                                     </span>
