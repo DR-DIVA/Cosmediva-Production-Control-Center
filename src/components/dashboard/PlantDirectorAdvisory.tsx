@@ -20,7 +20,9 @@ import {
   ChevronRight,
   Send,
   SlidersHorizontal,
-  Flame
+  Flame,
+  Search,
+  X
 } from 'lucide-react'
 import { format, parseISO } from 'date-fns'
 import { toast } from 'sonner'
@@ -62,6 +64,7 @@ export function PlantDirectorAdvisory({
   onSelectLot
 }: PlantDirectorAdvisoryProps) {
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'SUPPLY_CHAIN' | 'SHOPFLOOR' | 'QC_GATE' | 'CUSTOMER_OTIF'>('ALL')
+  const [searchQuery, setSearchQuery] = useState('')
   const [isCopied, setIsCopied] = useState(false)
 
   const todayStr = horizonDates[6]?.dateStr || format(new Date(), 'yyyy-MM-dd')
@@ -309,17 +312,42 @@ export function PlantDirectorAdvisory({
   }, [etaList, logsList, fgDueLots, horizonDates, todayStr])
 
   const filteredDirectives = useMemo(() => {
-    if (activeFilter === 'ALL') return directives
-    return directives.filter(d => d.pillar === activeFilter)
-  }, [directives, activeFilter])
+    let list = directives
+    if (activeFilter !== 'ALL') {
+      list = list.filter(d => d.pillar === activeFilter)
+    }
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim()
+      list = list.filter(d => {
+        const matchLot = d.lotNo ? d.lotNo.toLowerCase().includes(q) : false
+        const matchSku = d.sku ? d.sku.toLowerCase().includes(q) : false
+        const matchPo = d.poNo ? d.poNo.toLowerCase().includes(q) : false
+        const matchTitle = d.title.toLowerCase().includes(q)
+        const matchPillar = d.pillarLabel.toLowerCase().includes(q)
+        const matchProblem = d.problemStatement.toLowerCase().includes(q)
+        const matchDirective = d.directorDirective.toLowerCase().includes(q)
+        const matchAction = d.actionItems.some(a => 
+          a.dept.toLowerCase().includes(q) || a.action.toLowerCase().includes(q)
+        )
+        return matchLot || matchSku || matchPo || matchTitle || matchPillar || matchProblem || matchDirective || matchAction
+      })
+    }
+    return list
+  }, [directives, activeFilter, searchQuery])
 
   const criticalCount = directives.filter(d => d.severity === 'CRITICAL').length
   const warningCount = directives.filter(d => d.severity === 'WARNING').length
 
   // Copy morning briefing to clipboard
   const handleCopyBriefing = () => {
-    const header = `👑 [ข้อสั่งการและสรุปประชุมเช้าจาก Plant Director]\n📅 วันที่: ${new Date().toLocaleDateString('th-TH')}\n==============================\n`
-    const body = directives.map((d, idx) => {
+    const listToCopy = filteredDirectives.length > 0 ? filteredDirectives : directives
+    const filterNote = searchQuery.trim() 
+      ? ` (ผลการค้นหา: "${searchQuery}")` 
+      : activeFilter !== 'ALL' 
+      ? ` (หมวด: ${activeFilter})` 
+      : ''
+    const header = `👑 [ข้อสั่งการและสรุปประชุมเช้าจาก Plant Director]${filterNote}\n📅 วันที่: ${new Date().toLocaleDateString('th-TH')}\n==============================\n`
+    const body = listToCopy.map((d, idx) => {
       const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
       return `${idx + 1}. ${sevIcon} ${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.: ${d.directorDirective}\n`
     }).join('\n')
@@ -386,49 +414,106 @@ export function PlantDirectorAdvisory({
           </div>
         </div>
 
-        {/* Pillar Filter Tabs */}
-        <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-3 border-t border-slate-800/70 text-xs">
-          <span className="text-slate-400 text-[11px] font-semibold flex items-center gap-1 mr-1">
-            <SlidersHorizontal className="w-3 h-3 text-[#D4AF37]" /> มุมมองสายงาน:
-          </span>
-          {[
-            { key: 'ALL', label: 'ทั้งหมด', count: directives.length },
-            { key: 'SUPPLY_CHAIN', label: '📦 จัดซื้อ ➔ ผลิต', count: directives.filter(d => d.pillar === 'SUPPLY_CHAIN').length },
-            { key: 'SHOPFLOOR', label: '⚖️ คิวผลิต & หน้างาน', count: directives.filter(d => d.pillar === 'SHOPFLOOR').length },
-            { key: 'QC_GATE', label: '🛡️ แล็บ QC ➔ บรรจุ', count: directives.filter(d => d.pillar === 'QC_GATE').length },
-            { key: 'CUSTOMER_OTIF', label: '🎯 ส่งมอบ FG ลูกค้า', count: directives.filter(d => d.pillar === 'CUSTOMER_OTIF').length }
-          ].map(tab => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveFilter(tab.key as any)}
-              className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 ${
-                activeFilter === tab.key
-                  ? 'bg-[#D4AF37] text-slate-950 shadow-sm'
-                  : 'bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/60'
-              }`}
-            >
-              <span>{tab.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                activeFilter === tab.key ? 'bg-slate-950/30 text-slate-900' : 'bg-slate-700 text-slate-300'
-              }`}>
-                {tab.count}
-              </span>
-            </button>
-          ))}
+        {/* Toolbar: Pillar Filter Tabs & Search Input */}
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-800/70 text-xs">
+          {/* Pillar Filter Tabs */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-slate-400 text-[11px] font-semibold flex items-center gap-1 mr-1">
+              <SlidersHorizontal className="w-3 h-3 text-[#D4AF37]" /> มุมมองสายงาน:
+            </span>
+            {[
+              { key: 'ALL', label: 'ทั้งหมด', count: directives.length },
+              { key: 'SUPPLY_CHAIN', label: '📦 จัดซื้อ ➔ ผลิต', count: directives.filter(d => d.pillar === 'SUPPLY_CHAIN').length },
+              { key: 'SHOPFLOOR', label: '⚖️ คิวผลิต & หน้างาน', count: directives.filter(d => d.pillar === 'SHOPFLOOR').length },
+              { key: 'QC_GATE', label: '🛡️ แล็บ QC ➔ บรรจุ', count: directives.filter(d => d.pillar === 'QC_GATE').length },
+              { key: 'CUSTOMER_OTIF', label: '🎯 ส่งมอบ FG ลูกค้า', count: directives.filter(d => d.pillar === 'CUSTOMER_OTIF').length }
+            ].map(tab => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveFilter(tab.key as any)}
+                className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 ${
+                  activeFilter === tab.key
+                    ? 'bg-[#D4AF37] text-slate-950 shadow-sm'
+                    : 'bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/60'
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                  activeFilter === tab.key ? 'bg-slate-950/30 text-slate-900' : 'bg-slate-700 text-slate-300'
+                }`}>
+                  {tab.count}
+                </span>
+              </button>
+            ))}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative min-w-[280px] lg:min-w-[360px] w-full lg:w-auto">
+            <Search className="w-4 h-4 text-amber-400/80 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="ค้นหารหัสงาน (LOT, PO, SKU), หน้างาน หรือชื่อสาร..."
+              className="w-full pl-9 pr-8 py-1.5 bg-slate-950/80 border border-slate-700/80 rounded-xl text-xs text-white placeholder:text-slate-400 focus:outline-none focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/50 transition shadow-inner"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded-full hover:bg-slate-800 transition"
+                title="ล้างการค้นหา"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
         </div>
+
+        {/* Search feedback bar if searchQuery active */}
+        {searchQuery.trim() && (
+          <div className="flex items-center justify-between text-xs text-amber-300 bg-amber-950/40 border border-amber-800/50 px-3 py-1.5 rounded-xl mt-3">
+            <span className="flex items-center gap-1.5">
+              <Search className="w-3.5 h-3.5 text-[#D4AF37]" />
+              ผลการค้นหาสำหรับ <strong className="text-white">"{searchQuery}"</strong>: พบ {filteredDirectives.length} รายการ
+            </span>
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-[11px] text-amber-400 hover:text-white underline hover:no-underline font-medium cursor-pointer"
+            >
+              ล้างคำค้นหา (แสดงทั้งหมด)
+            </button>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent className="p-4 md:p-6 space-y-4">
         {filteredDirectives.length === 0 ? (
           <div className="p-8 text-center text-slate-400 bg-slate-900/40 rounded-xl border border-slate-800">
             <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-            <p className="text-sm font-semibold text-slate-200">ไม่มีประเด็นความขัดแย้งในมุมมองนี้</p>
-            <p className="text-xs text-slate-400 mt-0.5">ทุกขั้นตอนดำเนินงานสอดคล้องตามแผนงานโรงงาน</p>
+            <p className="text-sm font-semibold text-slate-200">
+              {searchQuery.trim() ? `ไม่พบข้อสั่งการที่ตรงกับคำค้นหา "${searchQuery}"` : 'ไม่มีประเด็นความขัดแย้งในมุมมองนี้'}
+            </p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              {searchQuery.trim() ? 'ลองเปลี่ยนคำค้นหาเป็น รหัส LOT, PO หรือชื่อหน้างาน' : 'ทุกขั้นตอนดำเนินงานสอดคล้องตามแผนงานโรงงาน'}
+            </p>
+            {searchQuery.trim() && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setSearchQuery('')}
+                className="mt-3 text-xs bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700"
+              >
+                ล้างคำค้นหา
+              </Button>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {filteredDirectives.map((d) => {
+          <div className="flex flex-col space-y-3.5">
+            {filteredDirectives.map((d, index) => {
               const PillarIcon = d.pillarIcon
               const isCritical = d.severity === 'CRITICAL'
               const isWarning = d.severity === 'WARNING'
@@ -436,12 +521,12 @@ export function PlantDirectorAdvisory({
               return (
                 <div
                   key={d.id}
-                  className={`p-4 rounded-2xl border transition-all duration-200 relative overflow-hidden flex flex-col justify-between ${
+                  className={`p-4 md:p-5 rounded-2xl border transition-all duration-200 relative overflow-hidden flex flex-col space-y-3 ${
                     isCritical
-                      ? 'bg-slate-900/90 border-rose-500/60 hover:border-rose-400 shadow-rose-950/20 shadow-md'
+                      ? 'bg-slate-900/95 border-rose-500/60 hover:border-rose-400 shadow-rose-950/20 shadow-md'
                       : isWarning
-                      ? 'bg-slate-900/90 border-amber-500/50 hover:border-amber-400 shadow-amber-950/20 shadow-md'
-                      : 'bg-slate-900/90 border-emerald-500/50 hover:border-emerald-400'
+                      ? 'bg-slate-900/95 border-amber-500/50 hover:border-amber-400 shadow-amber-950/20 shadow-md'
+                      : 'bg-slate-900/95 border-emerald-500/50 hover:border-emerald-400'
                   }`}
                 >
                   {/* Left severity indicator bar */}
@@ -449,92 +534,109 @@ export function PlantDirectorAdvisory({
                     isCritical ? 'bg-rose-500' : isWarning ? 'bg-amber-400' : 'bg-emerald-400'
                   }`} />
 
-                  <div className="space-y-3 pl-2">
-                    {/* Header line */}
-                    <div className="flex items-start justify-between gap-2">
+                  <div className="pl-2 space-y-2.5">
+                    {/* Line 1: Header tags, order metadata, and severity */}
+                    <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                        {/* Number index */}
+                        <span className="text-[11px] font-mono font-black text-slate-400 bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-700">
+                          #{index + 1}
+                        </span>
+
+                        {/* Pillar flow badge */}
+                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 ${
                           isCritical
                             ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50'
                             : isWarning
                             ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50'
                             : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
                         }`}>
-                          <PillarIcon className="w-3 h-3" />
+                          <PillarIcon className="w-3.5 h-3.5" />
                           <span>{d.pillarLabel}</span>
                         </span>
 
                         {d.lotNo && (
-                          <span className="text-[10px] font-bold text-amber-300 bg-amber-950/60 border border-amber-700/50 px-2 py-0.5 rounded-md font-mono">
-                            LOT: {d.lotNo}
+                          <span className="text-[11px] font-bold text-amber-300 bg-amber-950/70 border border-amber-700/60 px-2.5 py-0.5 rounded-lg font-mono flex items-center gap-1">
+                            <span>LOT:</span> <span className="text-white">{d.lotNo}</span>
+                          </span>
+                        )}
+
+                        {d.poNo && (
+                          <span className="text-[11px] font-bold text-cyan-300 bg-cyan-950/70 border border-cyan-700/60 px-2.5 py-0.5 rounded-lg font-mono flex items-center gap-1">
+                            <span>PO:</span> <span className="text-white">{d.poNo}</span>
                           </span>
                         )}
 
                         {d.sku && (
-                          <span className="text-[10px] font-medium text-slate-300 bg-slate-800 px-2 py-0.5 rounded-md">
+                          <span className="text-[11px] font-medium text-slate-200 bg-slate-800/90 border border-slate-700 px-2.5 py-0.5 rounded-lg">
                             {d.sku}
                           </span>
                         )}
                       </div>
 
-                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                        isCritical
-                          ? 'bg-rose-600 text-white font-black'
-                          : isWarning
-                          ? 'bg-amber-600 text-white font-black'
-                          : 'bg-emerald-600 text-white font-black'
-                      }`}>
-                        {isCritical ? '🚨 ด่วนที่สุด' : isWarning ? '⚠️ เฝ้าระวัง' : '✅ ปกติ'}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
+                          isCritical
+                            ? 'bg-rose-600 text-white font-black shadow-sm'
+                            : isWarning
+                            ? 'bg-amber-600 text-white font-black shadow-sm'
+                            : 'bg-emerald-600 text-white font-black shadow-sm'
+                        }`}>
+                          {isCritical ? '🚨 ด่วนที่สุด' : isWarning ? '⚠️ เฝ้าระวัง' : '✅ ปกติ'}
+                        </span>
+
+                        {d.lotNo && onSelectLot && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const matchedLot = fgDueLots.find(l => l.lot_no === d.lotNo) || logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
+                              if (matchedLot?.id) onSelectLot(matchedLot.id)
+                            }}
+                            className="text-[11px] text-[#D4AF37] hover:text-amber-300 font-bold flex items-center gap-1 hover:underline bg-slate-800/80 px-2.5 py-0.5 rounded-lg border border-slate-700 transition"
+                          >
+                            เปิดดูกราฟ LOT {d.lotNo} <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Problem Title */}
-                    <div>
-                      <h4 className="font-bold text-white text-sm leading-snug">
-                        {d.title}
-                      </h4>
-                      <p className="text-xs text-slate-300 mt-1 leading-relaxed bg-slate-950/50 p-2.5 rounded-xl border border-slate-800">
-                        <strong className="text-amber-200">🔍 ข้อเท็จจริงหน้างาน:</strong> {d.problemStatement}
+                    {/* Line 2: Prominent Title */}
+                    <h4 className="font-bold text-white text-base md:text-lg leading-snug">
+                      {d.title}
+                    </h4>
+
+                    {/* Line 3: ข้อเท็จจริงหน้างาน (Shopfloor Fact) */}
+                    <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800/90 text-xs text-slate-200 leading-relaxed">
+                      <span className="font-bold text-amber-300 flex items-center gap-1.5 mb-1">
+                        <Search className="w-3.5 h-3.5 text-amber-400" />
+                        ข้อเท็จจริงหน้างาน (Shopfloor Fact):
+                      </span>
+                      <p className="pl-5 text-slate-200 font-normal">
+                        {d.problemStatement}
                       </p>
                     </div>
 
-                    {/* Plant Director Directive Box */}
-                    <div className="p-3 rounded-xl bg-gradient-to-r from-amber-950/40 via-slate-900/60 to-slate-950/80 border border-[#D4AF37]/40 space-y-2">
+                    {/* Line 4: ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide & Actions) */}
+                    <div className="p-3.5 rounded-xl bg-gradient-to-r from-amber-950/30 via-slate-900/80 to-slate-950/90 border border-[#D4AF37]/50 space-y-2">
                       <div className="flex items-center gap-1.5 text-xs font-black text-[#D4AF37]">
-                        <Crown className="w-3.5 h-3.5 text-[#D4AF37]" />
+                        <Crown className="w-4 h-4 text-[#D4AF37]" />
                         <span>ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide):</span>
                       </div>
-                      <p className="text-xs text-amber-100/90 leading-relaxed font-medium pl-2 border-l-2 border-[#D4AF37]">
+                      <p className="text-xs text-amber-100/95 leading-relaxed font-medium pl-3 border-l-2 border-[#D4AF37]">
                         {d.directorDirective}
                       </p>
 
                       {/* Department Action Checkpoints */}
-                      <div className="pt-2 border-t border-slate-800/80 space-y-1 text-[11px]">
+                      <div className="pt-2 border-t border-slate-800/80 space-y-1 text-xs">
                         {d.actionItems.map((act, actIdx) => (
-                          <div key={actIdx} className="flex items-start gap-1.5 text-slate-300">
+                          <div key={actIdx} className="flex items-start gap-2 text-slate-200 pl-1">
                             <span className="text-amber-400 font-bold shrink-0">➔ [{act.dept}]:</span>
-                            <span>{act.action}</span>
+                            <span className="leading-snug">{act.action}</span>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
-
-                  {/* Lot graph shortcut if available */}
-                  {d.lotNo && onSelectLot && (
-                    <div className="pt-3 mt-2 border-t border-slate-800/60 pl-2 flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const matchedLot = fgDueLots.find(l => l.lot_no === d.lotNo) || logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
-                          if (matchedLot?.id) onSelectLot(matchedLot.id)
-                        }}
-                        className="text-[11px] text-[#D4AF37] hover:text-amber-300 font-bold flex items-center gap-1 hover:underline"
-                      >
-                        เปิดดูกราฟ LOT {d.lotNo} <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
                 </div>
               )
             })}
