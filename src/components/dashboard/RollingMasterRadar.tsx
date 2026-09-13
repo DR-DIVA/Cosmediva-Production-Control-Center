@@ -35,6 +35,18 @@ interface RollingMasterRadarProps {
   onSelectLot?: (lotId: string) => void
 }
 
+export interface OperationalStatus {
+  badge: string
+  shortBadge: string
+  type: 'in_progress' | 'done' | 'qc_passed' | 'qc_waiting' | 'qc_issue' | 'delayed' | 'overdue' | 'planned'
+  color: string
+  dotColor: string
+  startTimeStr?: string
+  endTimeStr?: string
+  note?: string
+  detailsText?: string
+}
+
 interface StreamItem {
   id: string
   streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE'
@@ -48,6 +60,262 @@ interface StreamItem {
   sku?: string
   lotId?: string
   meta?: any
+  opStatus?: OperationalStatus
+}
+
+function computeOperationalStatus(
+  item: any,
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE',
+  cellDate: string,
+  todayStr: string
+): OperationalStatus {
+  const formatTime = (tStr?: string) => {
+    if (!tStr) return ''
+    try {
+      const d = new Date(tStr)
+      return isNaN(d.getTime()) ? '' : format(d, 'HH:mm')
+    } catch {
+      return ''
+    }
+  }
+
+  if (streamType === 'ETA') {
+    const isReceived = item.status === 'RECEIVED' || item.status === 'READY'
+    const isDelayed = item.meta?.isDelayed || item.status === 'DELAYED' || item.delayInfo?.isDelayed
+    const isQcPassed = item.qc_status === 'PASSED'
+
+    if (isReceived) {
+      if (isQcPassed) {
+        return {
+          badge: '🛡️ QC Pass (ตรวจรับแล้ว)',
+          shortBadge: 'QC Pass',
+          type: 'qc_passed',
+          color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+          dotColor: 'bg-emerald-500',
+          detailsText: 'รับสินค้าเข้าคลังและผ่านการตรวจ QC แล้ว'
+        }
+      }
+      return {
+        badge: '✅ ตรวจรับแล้ว',
+        shortBadge: 'รับแล้ว',
+        type: 'done',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+        dotColor: 'bg-emerald-500',
+        detailsText: 'รับสินค้าเข้าคลังเรียบร้อย'
+      }
+    }
+
+    if (isDelayed) {
+      return {
+        badge: '⚠️ เลื่อนส่ง',
+        shortBadge: 'เลื่อนส่ง',
+        type: 'delayed',
+        color: 'bg-rose-50 text-rose-700 border-rose-200/80',
+        dotColor: 'bg-rose-500',
+        detailsText: item.meta?.delayInfo?.categoryLabel || item.delayInfo?.categoryLabel || 'เลื่อนกำหนดส่งมอบ'
+      }
+    }
+
+    if (cellDate < todayStr && !item.receive_date) {
+      return {
+        badge: '⚠️ เกินกำหนดเข้า',
+        shortBadge: 'เกินกำหนด',
+        type: 'overdue',
+        color: 'bg-amber-50 text-amber-700 border-amber-200/80',
+        dotColor: 'bg-amber-500',
+        detailsText: 'เกินกำหนดส่งตาม PO และยังไม่ได้รับสินค้า'
+      }
+    }
+
+    return {
+      badge: '📦 รอนำส่ง',
+      shortBadge: 'รอนำส่ง',
+      type: 'planned',
+      color: 'bg-slate-50 text-slate-600 border-slate-200/80',
+      dotColor: 'bg-slate-400'
+    }
+  }
+
+  if (streamType === 'FG_DUE') {
+    const lot = item.meta || item
+    const cStatus = lot.current_status
+    const qcCarton = lot.qc_fg_passed_carton_ranges
+
+    if (cStatus === 'DONE') {
+      return {
+        badge: '✅ ส่งมอบ/ผลิตเสร็จ',
+        shortBadge: 'ส่งมอบแล้ว',
+        type: 'done',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+        dotColor: 'bg-emerald-500',
+        detailsText: 'ล็อตการผลิตนี้ผลิตเสร็จและปิดยอดเรียบร้อย'
+      }
+    }
+
+    if (qcCarton && String(qcCarton).trim() !== '') {
+      return {
+        badge: '🛡️ FG QC Pass พร้อมส่ง',
+        shortBadge: 'QC Pass',
+        type: 'qc_passed',
+        color: 'bg-teal-50 text-teal-700 border-teal-200/80',
+        dotColor: 'bg-teal-500',
+        detailsText: `ผ่านการตรวจปล่อย FG กล่องที่: ${qcCarton}`
+      }
+    }
+
+    if (cStatus === 'IN_PROGRESS') {
+      return {
+        badge: '⚙️ กำลังผลิตในสายงาน',
+        shortBadge: 'กำลังผลิต',
+        type: 'in_progress',
+        color: 'bg-blue-50 text-blue-700 border-blue-200/80',
+        dotColor: 'bg-blue-500 animate-pulse',
+        detailsText: 'กำลังดำเนินงานผลิตตามแผนงาน'
+      }
+    }
+
+    const dueDate = lot.fg_due_date || cellDate
+    if (dueDate < todayStr && cStatus !== 'DONE') {
+      return {
+        badge: '⚠️ เกินกำหนดส่งมอบ',
+        shortBadge: 'เกินกำหนด',
+        type: 'overdue',
+        color: 'bg-rose-50 text-rose-700 border-rose-200/80',
+        dotColor: 'bg-rose-500',
+        detailsText: 'ยังผลิตไม่เสร็จและเลยกำหนดส่งมอบ FG แล้ว'
+      }
+    }
+
+    return {
+      badge: '📋 รอส่งมอบตามแผน',
+      shortBadge: 'ตามแผน',
+      type: 'planned',
+      color: 'bg-slate-50 text-slate-600 border-slate-200/80',
+      dotColor: 'bg-slate-400'
+    }
+  }
+
+  // Manufacturing logs: WEIGHING, MIXING, PACKING
+  const log = item.meta || item
+  const procName = (log.processes?.process_name || '').toLowerCase()
+  const status = (log.status || '').toUpperCase()
+  const qcStatus = (log.qc_status || '').toUpperCase()
+  const startTime = formatTime(log.start_time)
+  const endTime = formatTime(log.end_time)
+  const note = log.note || undefined
+
+  const streamVerb = 
+    streamType === 'WEIGHING' ? 'ชั่งสาร' : 
+    streamType === 'MIXING' ? 'ผสม Bulk' : 'บรรจุ'
+
+  const streamShortVerb = 
+    streamType === 'WEIGHING' ? 'ชั่ง' : 
+    streamType === 'MIXING' ? 'ผสม' : 'บรรจุ'
+
+  // QC checks
+  if (procName.includes('qc pass') || qcStatus === 'PASSED') {
+    return {
+      badge: `🛡️ QC Pass (${streamShortVerb})`,
+      shortBadge: 'QC Pass',
+      type: 'qc_passed',
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+      dotColor: 'bg-emerald-500',
+      startTimeStr: startTime,
+      endTimeStr: endTime,
+      note,
+      detailsText: 'ผ่านการตรวจสอบคุณภาพ (QC Pass) เรียบร้อย'
+    }
+  }
+
+  if (procName === 'รอ qc' || qcStatus === 'WAITING') {
+    return {
+      badge: '⏳ รอผลตรวจ QC',
+      shortBadge: 'รอ QC',
+      type: 'qc_waiting',
+      color: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      dotColor: 'bg-amber-500',
+      startTimeStr: startTime,
+      note,
+      detailsText: 'งานเสร็จแล้ว อยู่ระหว่างรอผลทดสอบแล็บ QC'
+    }
+  }
+
+  if (procName.includes('qc hold') || qcStatus === 'HOLD') {
+    return {
+      badge: '⚠️ QC Hold (ระงับ)',
+      shortBadge: 'QC Hold',
+      type: 'qc_issue',
+      color: 'bg-orange-50 text-orange-700 border-orange-200/80',
+      dotColor: 'bg-orange-500',
+      note,
+      detailsText: 'ผลตรวจไม่สมบูรณ์ อยู่ระหว่างรอฝ่าย QC พิจารณา'
+    }
+  }
+
+  if (procName.includes('qc reject') || qcStatus === 'REJECTED') {
+    return {
+      badge: '❌ QC Reject',
+      shortBadge: 'QC Reject',
+      type: 'qc_issue',
+      color: 'bg-rose-50 text-rose-700 border-rose-200/80',
+      dotColor: 'bg-rose-500',
+      note,
+      detailsText: 'ไม่ผ่านเกณฑ์มาตรฐาน QC'
+    }
+  }
+
+  // Active work
+  if (status === 'IN_PROGRESS') {
+    return {
+      badge: `▶️ กำลัง${streamVerb}`,
+      shortBadge: `กำลัง${streamShortVerb}`,
+      type: 'in_progress',
+      color: 'bg-blue-50 text-blue-700 border-blue-200/80',
+      dotColor: 'bg-blue-500 animate-pulse',
+      startTimeStr: startTime,
+      note,
+      detailsText: startTime ? `หน้างานเริ่มแล้วเมื่อเวลา ${startTime} น.` : 'หน้างานกำลังดำเนินการ'
+    }
+  }
+
+  // Completed work
+  if (status === 'DONE' || status === 'COMPLETED') {
+    let piecesText = ''
+    if (log.piece_quantity) {
+      piecesText = `ทำได้ ${Number(log.piece_quantity).toLocaleString()} ชิ้น`
+    }
+    return {
+      badge: `✅ ${streamShortVerb}เสร็จแล้ว`,
+      shortBadge: 'เสร็จสิ้น',
+      type: 'done',
+      color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+      dotColor: 'bg-emerald-500',
+      startTimeStr: startTime,
+      endTimeStr: endTime,
+      note,
+      detailsText: [endTime ? `เสร็จเมื่อ ${endTime} น.` : '', piecesText].filter(Boolean).join(' • ') || 'ดำเนินการเสร็จสิ้นเรียบร้อย'
+    }
+  }
+
+  // Waiting / Planned
+  if (cellDate < todayStr) {
+    return {
+      badge: '⚠️ ล่าช้ากว่าแผน',
+      shortBadge: 'ล่าช้า',
+      type: 'overdue',
+      color: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      dotColor: 'bg-amber-500',
+      detailsText: 'เลยวันตามแผนงานแล้ว แต่ยังไม่มีการกดเริ่มงาน'
+    }
+  }
+
+  return {
+    badge: `📋 ตามแผน (รอ${streamShortVerb})`,
+    shortBadge: 'ตามแผน',
+    type: 'planned',
+    color: 'bg-slate-50 text-slate-600 border-slate-200/80',
+    dotColor: 'bg-slate-400'
+  }
 }
 
 const TH_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
@@ -124,9 +392,10 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         supabase.from('production_logs')
           .select(`
             id, status, activity_date, end_date, tank_start, tank_end, piece_quantity, note,
+            start_time, end_time, qc_status, sub_step,
             processes (process_name),
             production_lots (
-              id, lot_no, planned_quantity, order_quantity, total_tanks,
+              id, lot_no, planned_quantity, order_quantity, total_tanks, current_status, qc_fg_passed_carton_ranges,
               products:sku_id (sku, product_name)
             )
           `)
@@ -136,7 +405,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         // 3. FG Due Date & Planned Deliveries (Active lots + Lots with due dates in horizon)
         supabase.from('production_lots')
           .select(`
-            id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks,
+            id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks, qc_fg_passed_carton_ranges,
             products:sku_id (sku, product_name)
           `)
           .or(`current_status.neq.DONE,and(fg_due_date.gte.${horizonStartStr},fg_due_date.lte.${horizonEndStr})`)
@@ -182,6 +451,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
     let totalPacking = 0
     let totalFgDue = 0
 
+    const todayDateStr = horizonDates[6]?.dateStr || format(new Date(), 'yyyy-MM-dd')
+
     // 1. Process ETA RM/PM
     radarData.etaList.forEach(item => {
        const d = item.eta_date
@@ -189,6 +460,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
          totalEta++
          const dInfo = parseDelayInfo(item.bottom_remark, item.eta_date, item.receive_date, item.status)
          const isRescheduled = dInfo.isDelayed || item.status === 'DELAYED'
+         const opStatus = computeOperationalStatus(item, 'ETA', d, todayDateStr)
 
          map[d].ETA.push({
            id: item.id,
@@ -199,7 +471,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
            tag: item.po_no ? `PO: ${item.po_no}` : undefined,
            quantity: item.quantity,
            status: item.status,
-           meta: { ...item, delayInfo: dInfo, isDelayed: isRescheduled }
+           meta: { ...item, delayInfo: dInfo, isDelayed: isRescheduled },
+           opStatus
          })
        }
     })
@@ -240,6 +513,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
       horizonDates.forEach(hd => {
         if (hd.dateStr >= effectiveStart && hd.dateStr <= effectiveEnd) {
           if (pName.includes('ชั่ง') || pName.includes('mm-rm')) {
+            const opStatus = computeOperationalStatus(log, 'WEIGHING', hd.dateStr, todayDateStr)
             map[hd.dateStr].WEIGHING.push({
               id: `${log.id}-${hd.dateStr}`,
               streamType: 'WEIGHING',
@@ -250,9 +524,11 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               lotNo,
               sku,
               lotId: lot?.id,
-              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
+              opStatus
             })
           } else if (pName.includes('ผสม') || pName.includes('mix')) {
+            const opStatus = computeOperationalStatus(log, 'MIXING', hd.dateStr, todayDateStr)
             map[hd.dateStr].MIXING.push({
               id: `${log.id}-${hd.dateStr}`,
               streamType: 'MIXING',
@@ -263,9 +539,11 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               lotNo,
               sku,
               lotId: lot?.id,
-              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
+              opStatus
             })
           } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
+            const opStatus = computeOperationalStatus(log, 'PACKING', hd.dateStr, todayDateStr)
             map[hd.dateStr].PACKING.push({
               id: `${log.id}-${hd.dateStr}`,
               streamType: 'PACKING',
@@ -276,7 +554,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               lotNo,
               sku,
               lotId: lot?.id,
-              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay }
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
+              opStatus
             })
           }
         }
@@ -299,6 +578,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
         horizonDates.forEach(hd => {
           if (hd.dateStr >= effectiveStart && hd.dateStr <= effectiveEnd) {
             totalFgDue++
+            const opStatus = computeOperationalStatus(lot, 'FG_DUE', hd.dateStr, todayDateStr)
             map[hd.dateStr].FG_DUE.push({
               id: `${lot.id}-${hd.dateStr}`,
               streamType: 'FG_DUE',
@@ -310,13 +590,15 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
               lotNo: lot.lot_no,
               sku,
               lotId: lot.id,
-              meta: { ...lot, isMtsRange: true }
+              meta: { ...lot, isMtsRange: true },
+              opStatus
             })
           }
         })
       } else if (lot.fg_due_date && map[lot.fg_due_date]) {
         // MTO / Single Due Date
         totalFgDue++
+        const opStatus = computeOperationalStatus(lot, 'FG_DUE', lot.fg_due_date, todayDateStr)
         map[lot.fg_due_date].FG_DUE.push({
           id: lot.id,
           streamType: 'FG_DUE',
@@ -328,7 +610,8 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
           lotNo: lot.lot_no,
           sku,
           lotId: lot.id,
-          meta: lot
+          meta: lot,
+          opStatus
         })
       }
     })
@@ -627,6 +910,9 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                             {horizonDates.map(d => {
                               const items = dateStreamMap[d.dateStr]?.[stream.key] || []
                               const hasItems = items.length > 0
+                              const hasDelayed = items.some(it => it.opStatus?.type === 'delayed' || it.opStatus?.type === 'overdue')
+                              const hasInProgress = items.some(it => it.opStatus?.type === 'in_progress')
+                              const allDone = items.length > 0 && items.every(it => it.opStatus?.type === 'done' || it.opStatus?.type === 'qc_passed')
 
                               return (
                                 <div
@@ -638,19 +924,34 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                   {hasItems ? (
                                     <Popover>
                                       <PopoverTrigger
-                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 ${
-                                          stream.key === 'ETA' && items.some(it => it.meta?.isDelayed)
+                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 relative ${
+                                          hasDelayed
                                             ? 'bg-amber-100/95 text-amber-950 border-amber-400 font-bold'
+                                            : hasInProgress
+                                            ? 'bg-blue-50/90 text-blue-950 border-blue-400/80 font-bold ring-1 ring-blue-300'
+                                            : allDone
+                                            ? 'bg-emerald-50/90 text-emerald-950 border-emerald-300 font-medium'
                                             : stream.pillColor
                                         }`}
                                       >
-                                        <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-0.5">
-                                          {stream.key === 'ETA' && items.some(it => it.meta?.isDelayed) && (
-                                            <span className="text-[10px]" title="มีรายการเลื่อนส่ง">⚠️</span>
+                                        {hasInProgress && (
+                                          <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" title="กำลังดำเนินการ (In Progress)" />
+                                        )}
+                                        <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
+                                          {hasDelayed && (
+                                            <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
                                           )}
-                                          {items.length === 1
-                                            ? items[0].tag || items[0].lotNo || '1 งาน'
-                                            : `${items.length} รายการ`}
+                                          {hasInProgress && !hasDelayed && (
+                                            <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
+                                          )}
+                                          {allDone && (
+                                            <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
+                                          )}
+                                          <span>
+                                            {items.length === 1
+                                              ? items[0].tag || items[0].lotNo || '1 งาน'
+                                              : `${items.length} รายการ`}
+                                          </span>
                                         </span>
                                         {items.length === 1 && items[0].lotNo && (
                                           <span className="text-[9px] opacity-80 truncate max-w-[55px]">
@@ -684,15 +985,20 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                                 className={`p-2.5 rounded-xl border space-y-1.5 transition ${
                                                   isDelayedItem 
                                                     ? 'bg-amber-50/70 border-amber-300/90 hover:bg-amber-100/50' 
+                                                    : it.opStatus?.type === 'in_progress'
+                                                    ? 'bg-blue-50/40 border-blue-200/80 hover:bg-blue-50/70'
+                                                    : it.opStatus?.type === 'done' || it.opStatus?.type === 'qc_passed'
+                                                    ? 'bg-emerald-50/30 border-emerald-200/80 hover:bg-emerald-50/60'
                                                     : 'bg-slate-50 border-slate-200/80 hover:bg-amber-50/50'
                                                 }`}
                                               >
                                                 <div className="flex justify-between items-start gap-2">
                                                   <div className="flex items-center gap-1.5 flex-wrap">
                                                     <strong className="text-[#4A4238] font-bold text-xs leading-snug">{it.title}</strong>
-                                                    {isDelayedItem && (
-                                                      <span className="inline-flex items-center gap-1 text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-md">
-                                                        ⚠️ เลื่อนส่ง
+                                                    {it.opStatus && (
+                                                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs ${it.opStatus.color}`}>
+                                                        <span className={`w-1.5 h-1.5 rounded-full ${it.opStatus.dotColor} shrink-0`}></span>
+                                                        <span>{it.opStatus.badge}</span>
                                                       </span>
                                                     )}
                                                   </div>
@@ -707,7 +1013,7 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                                   {it.subtitle}
                                                 </div>
 
-                                                {/* Dedicated Delay Warning Box */}
+                                                {/* Dedicated Delay Warning Box (for ETA items) */}
                                                 {isDelayedItem && (
                                                   <div className="p-2 rounded-lg bg-white/95 border border-amber-200 text-amber-900 text-[10px] space-y-1 mt-1 shadow-xs">
                                                     <div className="font-bold flex items-center justify-between gap-1 text-rose-800 flex-wrap">
@@ -724,6 +1030,44 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                                     {delayInfo?.reason && (
                                                       <div className="text-slate-600 pl-2.5 text-[10px] italic border-l-2 border-amber-300">
                                                         &ldquo;{delayInfo.reason}&rdquo;
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+
+                                                {/* Operational Progress / Timestamp Info Box */}
+                                                {it.streamType !== 'ETA' && (it.opStatus?.startTimeStr || it.opStatus?.endTimeStr || it.opStatus?.note || it.opStatus?.detailsText) && (
+                                                  <div className={`p-2 rounded-lg border text-[10px] space-y-1 mt-1 shadow-xs ${
+                                                    it.opStatus.type === 'in_progress' 
+                                                      ? 'bg-white/95 border-blue-200 text-blue-900' 
+                                                      : it.opStatus.type === 'done' || it.opStatus.type === 'qc_passed'
+                                                      ? 'bg-white/95 border-emerald-200 text-emerald-900'
+                                                      : it.opStatus.type === 'overdue'
+                                                      ? 'bg-white/95 border-rose-200 text-rose-900'
+                                                      : 'bg-white/95 border-slate-200 text-slate-700'
+                                                  }`}>
+                                                    <div className="flex items-center justify-between gap-2 flex-wrap font-medium">
+                                                      <div className="flex items-center gap-2">
+                                                        {it.opStatus.startTimeStr && (
+                                                          <span className="flex items-center gap-1 text-slate-700">
+                                                            <Clock className="w-3 h-3 text-blue-500" />
+                                                            <span>เริ่ม: <strong>{it.opStatus.startTimeStr} น.</strong></span>
+                                                          </span>
+                                                        )}
+                                                        {it.opStatus.endTimeStr && (
+                                                          <span className="flex items-center gap-1 text-slate-700">
+                                                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                                            <span>เสร็จ: <strong>{it.opStatus.endTimeStr} น.</strong></span>
+                                                          </span>
+                                                        )}
+                                                      </div>
+                                                      {it.opStatus.detailsText && (
+                                                        <span className="text-[9px] text-slate-500">{it.opStatus.detailsText}</span>
+                                                      )}
+                                                    </div>
+                                                    {it.opStatus.note && (
+                                                      <div className="text-slate-600 pl-2 text-[10px] italic border-l-2 border-slate-300">
+                                                        &ldquo;{it.opStatus.note}&rdquo;
                                                       </div>
                                                     )}
                                                   </div>
@@ -818,11 +1162,13 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>ของเข้า ({dayEta.length} รายการ)</span>
                               </div>
                               {dayEta.map(e => (
-                                <div key={e.id} className="text-[11px] text-amber-800 pl-5">
-                                  • <strong>{e.title}</strong> - <span className="text-amber-700">{e.subtitle}</span>
-                                  {e.meta?.isDelayed && (
-                                    <span className="ml-1 text-[9px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5">
-                                      ⚠️ เลื่อนส่ง ({e.meta?.delayInfo?.categoryLabel || 'แจ้งเลื่อน'})
+                                <div key={e.id} className="text-[11px] text-amber-800 pl-5 flex items-center justify-between gap-1 flex-wrap">
+                                  <div>
+                                    • <strong>{e.title}</strong> - <span className="text-amber-700">{e.subtitle}</span>
+                                  </div>
+                                  {e.opStatus && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${e.opStatus.color}`}>
+                                      {e.opStatus.shortBadge}
                                     </span>
                                   )}
                                 </div>
@@ -838,10 +1184,17 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>เตรียม/ชั่งสาร ({dayWeighing.length} ล็อต)</span>
                               </div>
                               {dayWeighing.map(w => (
-                                <div key={w.id} className="text-[11px] text-indigo-800 pl-5 flex items-center justify-between">
-                                  <span>• <strong>{w.title}</strong> ({w.tag})</span>
+                                <div key={w.id} className="text-[11px] text-indigo-800 pl-5 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{w.title}</strong> ({w.tag})</span>
+                                    {w.opStatus && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${w.opStatus.color}`}>
+                                        {w.opStatus.shortBadge}
+                                      </span>
+                                    )}
+                                  </div>
                                   {w.meta?.isMultiDay && (
-                                    <span className="text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                    <span className="text-[9px] text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
                                       {format(parseISO(w.meta.startDate), 'd/M')}-{format(parseISO(w.meta.endDate), 'd/M')}
                                     </span>
                                   )}
@@ -858,10 +1211,17 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>งานผสม Bulk ({dayMixing.length} ล็อต)</span>
                               </div>
                               {dayMixing.map(m => (
-                                <div key={m.id} className="text-[11px] text-blue-800 pl-5 flex items-center justify-between">
-                                  <span>• <strong>{m.title}</strong> <span className="text-blue-600">[{m.tag}]</span></span>
+                                <div key={m.id} className="text-[11px] text-blue-800 pl-5 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{m.title}</strong> <span className="text-blue-600">[{m.tag}]</span></span>
+                                    {m.opStatus && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${m.opStatus.color}`}>
+                                        {m.opStatus.shortBadge}
+                                      </span>
+                                    )}
+                                  </div>
                                   {m.meta?.isMultiDay && (
-                                    <span className="text-[9px] text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                    <span className="text-[9px] text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
                                       {format(parseISO(m.meta.startDate), 'd/M')}-{format(parseISO(m.meta.endDate), 'd/M')}
                                     </span>
                                   )}
@@ -878,10 +1238,17 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>ไลน์บรรจุ & POF ({dayPacking.length} ล็อต)</span>
                               </div>
                               {dayPacking.map(p => (
-                                <div key={p.id} className="text-[11px] text-emerald-800 pl-5 flex items-center justify-between">
-                                  <span>• <strong>{p.title}</strong> <span className="text-emerald-700 font-semibold">{p.tag}</span></span>
+                                <div key={p.id} className="text-[11px] text-emerald-800 pl-5 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{p.title}</strong> <span className="text-emerald-700 font-semibold">{p.tag}</span></span>
+                                    {p.opStatus && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${p.opStatus.color}`}>
+                                        {p.opStatus.shortBadge}
+                                      </span>
+                                    )}
+                                  </div>
                                   {p.meta?.isMultiDay && (
-                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded font-medium ml-1.5">
+                                    <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
                                       {format(parseISO(p.meta.startDate), 'd/M')}-{format(parseISO(p.meta.endDate), 'd/M')}
                                     </span>
                                   )}
@@ -898,8 +1265,15 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 <span>กำหนดส่งมอบ FG ({dayFgDue.length} ล็อต)</span>
                               </div>
                               {dayFgDue.map(f => (
-                                <div key={f.id} className="text-[11px] text-rose-800 pl-5">
-                                  • <strong>{f.title}</strong> <span className="text-rose-700 font-bold">[{f.tag}]</span>
+                                <div key={f.id} className="text-[11px] text-rose-800 pl-5 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{f.title}</strong> <span className="text-rose-700 font-bold">[{f.tag}]</span></span>
+                                    {f.opStatus && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${f.opStatus.color}`}>
+                                        {f.opStatus.shortBadge}
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               ))}
                             </div>
@@ -997,13 +1371,20 @@ export function RollingMasterRadar({ startDateStr, onSelectLot }: RollingMasterR
                                 </div>
                               </div>
 
-                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
-                                item.status === 'RECEIVED'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-300'
-                              }`}>
-                                {item.status === 'RECEIVED' ? '✓ รับแล้ว' : '⏳ รอส่งมอบ'}
-                              </span>
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                {item.status === 'RECEIVED' && item.qc_status === 'PASSED' && (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-300">
+                                    🛡️ QC Pass
+                                  </span>
+                                )}
+                                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                                  item.status === 'RECEIVED'
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}>
+                                  {item.status === 'RECEIVED' ? '✓ รับแล้ว' : '⏳ รอส่งมอบ'}
+                                </span>
+                              </div>
                             </div>
                           </div>
                         )
