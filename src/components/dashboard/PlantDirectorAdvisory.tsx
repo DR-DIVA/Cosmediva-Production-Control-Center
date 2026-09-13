@@ -18,6 +18,10 @@ import {
   Copy, 
   RefreshCw, 
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  Minimize2,
   Send,
   SlidersHorizontal,
   Flame,
@@ -36,6 +40,7 @@ export interface PlantDirectorDirective {
   pillar: 'SUPPLY_CHAIN' | 'SHOPFLOOR' | 'QC_GATE' | 'CUSTOMER_OTIF'
   pillarLabel: string
   pillarIcon: React.ElementType
+  topic?: string
   severity: 'CRITICAL' | 'WARNING' | 'OPPORTUNITY'
   title: string
   lotNo?: string
@@ -73,6 +78,8 @@ export function PlantDirectorAdvisory({
   const [searchQuery, setSearchQuery] = useState('')
   const [isCopied, setIsCopied] = useState(false)
   const [theme, setTheme] = useState<'night' | 'light'>('night')
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
 
   React.useEffect(() => {
     if (propTheme) {
@@ -155,6 +162,7 @@ export function PlantDirectorAdvisory({
             pillar: 'SUPPLY_CHAIN',
             pillarLabel: 'จัดซื้อ ➔ ฝ่ายผลิต',
             pillarIcon: Truck,
+            topic: 'วัตถุดิบเข้าช้ากว่าคิวงาน',
             severity: 'CRITICAL',
             title: `วัตถุดิบเข้าช้ากว่าคิวงาน: ${rm.rm_name || rm.rm_code}`,
             lotNo,
@@ -175,6 +183,7 @@ export function PlantDirectorAdvisory({
           pillar: 'SUPPLY_CHAIN',
           pillarLabel: 'จัดซื้อ ➔ คลัง RM',
           pillarIcon: Truck,
+          topic: 'แจ้งเตือนเลื่อนส่งมอบ',
           severity: 'WARNING',
           title: `แจ้งเตือนเลื่อนส่งมอบ: ${rm.rm_name || rm.rm_code} (${rm.supplier || 'Supplier'})`,
           poNo: rm.po_no,
@@ -216,6 +225,7 @@ export function PlantDirectorAdvisory({
           pillar: 'SHOPFLOOR',
           pillarLabel: 'ฝ่ายผลิต ➔ วางแผน',
           pillarIcon: Scale,
+          topic: 'คิวงานค้างรอทบทวนวันผลิต',
           severity: 'CRITICAL',
           title: `คิวงานค้างรอทบทวนวันผลิต: LOT ${lotNo} (${sku})`,
           lotNo,
@@ -254,6 +264,7 @@ export function PlantDirectorAdvisory({
           pillar: 'SHOPFLOOR',
           pillarLabel: 'ฝ่ายผสม & ซ่อมบำรุง',
           pillarIcon: Beaker,
+          topic: 'ตรวจพบจุดคอขวด หน้างานชั่งสาร ผสม หรือบรรจุ',
           severity: 'WARNING',
           title: `ตรวจพบจุดคอขวดงานผสม Bulk: ${data.tanks} ถัง ในวันเดียว`,
           problemStatement: `วันที่ ${new Date(dayStr).toLocaleDateString('th-TH')} มีคิวผสมแน่นหนาถึง ${data.tanks} ถัง (เกี่ยวข้องกับ LOT: ${Array.from(data.lots).join(', ')}) เสี่ยงต่อการใช้ถังผสมและระบบความร้อน/ทำความสะอาดไม่ทัน`,
@@ -279,17 +290,23 @@ export function PlantDirectorAdvisory({
       qcWaitingLogs.slice(0, 2).forEach(l => {
         const lotNo = l.production_lots?.lot_no || 'N/A'
         const sku = l.production_lots?.products?.sku || 'SKU'
+        const isHold = l.qc_status === 'HOLD'
         list.push({
           id: `qc-waiting-${l.id}`,
           pillar: 'QC_GATE',
           pillarLabel: 'ฝ่าย QC ➔ บรรจุ',
           pillarIcon: ShieldCheck,
-          severity: 'WARNING',
-          title: `เร่งรัดผลตรวจแล็บ Bulk: LOT ${lotNo} (${sku})`,
+          topic: isHold ? 'ติดปัญหา NC/ Hold/ Reprocess' : 'เร่งรัดผลตรวจ QC (RM, PM, Bulk, FG)',
+          severity: isHold ? 'CRITICAL' : 'WARNING',
+          title: isHold ? `ติดปัญหา QC Hold: LOT ${lotNo} (${sku})` : `เร่งรัดผลตรวจแล็บ Bulk: LOT ${lotNo} (${sku})`,
           lotNo,
           sku,
-          problemStatement: `เนื้อ Bulk ของ LOT ${lotNo} อยู่ระหว่างรอผลตรวจแล็บ (QC Gate) ก่อนอนุญาตให้จ่ายสารเข้าสู่ไลน์บรรจุ`,
-          directorDirective: `ขอให้หัวหน้าแล็บ QC เร่งติดตามผลวิเคราะห์ทางกายภาพและจุลชีววิทยา (Microbial/pH/Viscosity) และออกเอกสาร COA ปล่อยผ่าน (Release) ก่อนเวลาเดินไลน์บรรจุ 4 ชั่วโมง`,
+          problemStatement: isHold 
+            ? `เนื้อ Bulk ของ LOT ${lotNo} ติดสถานะ QC HOLD อยู่ระหว่างรอผลตรวจซ้ำหรือแนวทางแก้ไข Reprocess` 
+            : `เนื้อ Bulk ของ LOT ${lotNo} อยู่ระหว่างรอผลตรวจแล็บ (QC Gate) ก่อนอนุญาตให้จ่ายสารเข้าสู่ไลน์บรรจุ`,
+          directorDirective: isHold 
+            ? `ขอให้ QA และ R&D เร่งประชุมวินิจฉัยสูตรแก้ไข Bulk ร่วมกับฝ่ายผลิตทันที และอัปเดตสถานะในระบบ`
+            : `ขอให้หัวหน้าแล็บ QC เร่งติดตามผลวิเคราะห์ทางกายภาพและจุลชีววิทยา (Microbial/pH/Viscosity) และออกเอกสาร COA ปล่อยผ่าน (Release) ก่อนเวลาเดินไลน์บรรจุ 4 ชั่วโมง`,
           actionItems: [
             { dept: 'ฝ่ายประกันคุณภาพ (QC/QA)', action: `เร่งรันผลแล็บและบันทึกสถานะ QC Pass ในระบบ` },
             { dept: 'ฝ่ายบรรจุ (Packing)', action: `เตรียมความพร้อมเครื่องจักรและกล่องบรรจุภัณฑ์รอรับ Bulk` }
@@ -315,6 +332,7 @@ export function PlantDirectorAdvisory({
             pillar: 'CUSTOMER_OTIF',
             pillarLabel: 'ส่งมอบ FG ➔ ฝ่ายขาย',
             pillarIcon: Gift,
+            topic: 'กำหนดส่งมอบกระชั้นชิด',
             severity: 'CRITICAL',
             title: `กำหนดส่งมอบกระชั้นชิด (อีก ${diffDays} วัน): LOT ${lotNo}`,
             lotNo,
@@ -362,13 +380,14 @@ export function PlantDirectorAdvisory({
         const matchSku = d.sku ? d.sku.toLowerCase().includes(q) : false
         const matchPo = d.poNo ? d.poNo.toLowerCase().includes(q) : false
         const matchTitle = d.title.toLowerCase().includes(q)
+        const matchTopic = d.topic ? d.topic.toLowerCase().includes(q) : false
         const matchPillar = d.pillarLabel.toLowerCase().includes(q)
         const matchProblem = d.problemStatement.toLowerCase().includes(q)
         const matchDirective = d.directorDirective.toLowerCase().includes(q)
         const matchAction = d.actionItems.some(a => 
           a.dept.toLowerCase().includes(q) || a.action.toLowerCase().includes(q)
         )
-        return matchLot || matchSku || matchPo || matchTitle || matchPillar || matchProblem || matchDirective || matchAction
+        return matchLot || matchSku || matchPo || matchTitle || matchTopic || matchPillar || matchProblem || matchDirective || matchAction
       })
     }
     return list
@@ -376,6 +395,39 @@ export function PlantDirectorAdvisory({
 
   const criticalCount = directives.filter(d => d.severity === 'CRITICAL').length
   const warningCount = directives.filter(d => d.severity === 'WARNING').length
+
+  const toggleExpandDirective = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  const handleExpandAll = () => {
+    const allIds = filteredDirectives.map(d => d.id)
+    setExpandedIds(new Set(allIds))
+  }
+
+  const handleCollapseAll = () => {
+    setExpandedIds(new Set())
+  }
+
+  const toggleCollapseCategory = (key: string) => {
+    setCollapsedCategories(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+      } else {
+        next.add(key)
+      }
+      return next
+    })
+  }
 
   // Copy morning briefing to clipboard
   const handleCopyBriefing = () => {
@@ -388,7 +440,8 @@ export function PlantDirectorAdvisory({
     const header = `👑 [ข้อสั่งการและสรุปประชุมเช้าจาก Plant Director]${filterNote}\n📅 วันที่: ${new Date().toLocaleDateString('th-TH')}\n==============================\n`
     const body = listToCopy.map((d, idx) => {
       const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
-      return `${idx + 1}. ${sevIcon} ${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.: ${d.directorDirective}\n`
+      const topicTag = d.topic ? `[${d.topic}] ` : ''
+      return `${idx + 1}. ${sevIcon} ${topicTag}${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.: ${d.directorDirective}\n`
     }).join('\n')
     const footer = `\n==============================\n📌 ขอให้ทุกฝ่ายถือปฏิบัติตามข้อสั่งการอย่างเคร่งครัด\nCosmeFlow AI Operations Intelligence`
 
@@ -504,50 +557,143 @@ export function PlantDirectorAdvisory({
           </div>
         </div>
 
-        {/* Toolbar: Pillar Filter Tabs & Search Input */}
-        <div className={`flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mt-4 pt-3 border-t text-xs ${
-          isNight ? 'border-slate-800/70' : 'border-[#E6DEC8]'
-        }`}>
-          {/* Pillar Filter Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className={`text-[11px] font-semibold flex items-center gap-1 mr-1 ${
-              isNight ? 'text-slate-400' : 'text-slate-500'
-            }`}>
-              <SlidersHorizontal className={`w-3 h-3 ${isNight ? 'text-[#D4AF37]' : 'text-[#B8860B]'}`} /> มุมมองสายงาน:
-            </span>
-            {[
-              { key: 'ALL', label: 'ทั้งหมด', count: directives.length },
-              { key: 'SUPPLY_CHAIN', label: '📦 จัดซื้อ ➔ ผลิต', count: directives.filter(d => d.pillar === 'SUPPLY_CHAIN').length },
-              { key: 'SHOPFLOOR', label: '⚖️ คิวผลิต & หน้างาน', count: directives.filter(d => d.pillar === 'SHOPFLOOR').length },
-              { key: 'QC_GATE', label: '🛡️ แล็บ QC ➔ บรรจุ', count: directives.filter(d => d.pillar === 'QC_GATE').length },
-              { key: 'CUSTOMER_OTIF', label: '🎯 ส่งมอบ FG ลูกค้า', count: directives.filter(d => d.pillar === 'CUSTOMER_OTIF').length }
-            ].map(tab => (
+        {/* 5 Workstream Group Frames / Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 mt-5">
+          {[
+            {
+              key: 'ALL' as const,
+              emoji: '👑',
+              label: 'ทั้งหมด',
+              sublabel: 'ภาพรวมทุกสายงาน',
+              count: directives.length,
+              critical: criticalCount,
+              warning: warningCount
+            },
+            {
+              key: 'SUPPLY_CHAIN' as const,
+              emoji: '📦',
+              label: 'จัดซื้อ ➔ ผลิต',
+              sublabel: 'วัตถุดิบเลื่อน / ปรับคิวชั่ง',
+              count: directives.filter(d => d.pillar === 'SUPPLY_CHAIN').length,
+              critical: directives.filter(d => d.pillar === 'SUPPLY_CHAIN' && d.severity === 'CRITICAL').length,
+              warning: directives.filter(d => d.pillar === 'SUPPLY_CHAIN' && d.severity === 'WARNING').length
+            },
+            {
+              key: 'SHOPFLOOR' as const,
+              emoji: '⚖️',
+              label: 'คิวผลิต & หน้างาน',
+              sublabel: 'ค้างทบทวน / คอขวดผสม-บรรจุ',
+              count: directives.filter(d => d.pillar === 'SHOPFLOOR').length,
+              critical: directives.filter(d => d.pillar === 'SHOPFLOOR' && d.severity === 'CRITICAL').length,
+              warning: directives.filter(d => d.pillar === 'SHOPFLOOR' && d.severity === 'WARNING').length
+            },
+            {
+              key: 'QC_GATE' as const,
+              emoji: '🛡️',
+              label: 'แล็บ QC ➔ บรรจุ',
+              sublabel: 'เร่งตรวจ Bulk / NC & Hold',
+              count: directives.filter(d => d.pillar === 'QC_GATE').length,
+              critical: directives.filter(d => d.pillar === 'QC_GATE' && d.severity === 'CRITICAL').length,
+              warning: directives.filter(d => d.pillar === 'QC_GATE' && d.severity === 'WARNING').length
+            },
+            {
+              key: 'CUSTOMER_OTIF' as const,
+              emoji: '🎯',
+              label: 'ส่งมอบ FG ลูกค้า',
+              sublabel: 'ครบกำหนดส่งกระชั้นชิด',
+              count: directives.filter(d => d.pillar === 'CUSTOMER_OTIF').length,
+              critical: directives.filter(d => d.pillar === 'CUSTOMER_OTIF' && d.severity === 'CRITICAL').length,
+              warning: directives.filter(d => d.pillar === 'CUSTOMER_OTIF' && d.severity === 'WARNING').length
+            }
+          ].map(card => {
+            const isSelected = activeFilter === card.key
+            return (
               <button
-                key={tab.key}
+                key={card.key}
                 type="button"
-                onClick={() => setActiveFilter(tab.key as any)}
-                className={`px-3 py-1 rounded-lg font-bold text-xs transition flex items-center gap-1.5 ${
-                  activeFilter === tab.key
-                    ? (isNight ? 'bg-[#D4AF37] text-slate-950 shadow-sm' : 'bg-[#0B192C] text-white shadow-md')
-                    : (isNight 
-                        ? 'bg-slate-800/60 text-slate-300 hover:bg-slate-700/80 hover:text-white border border-slate-700/60'
-                        : 'bg-white text-slate-700 hover:bg-slate-100 hover:text-slate-900 border border-slate-200 shadow-sm')
+                onClick={() => setActiveFilter(card.key)}
+                className={`text-left p-3 md:p-3.5 rounded-2xl border transition-all duration-200 relative overflow-hidden group flex flex-col justify-between ${
+                  card.key === 'ALL' ? 'col-span-2 sm:col-span-1' : ''
+                } ${
+                  isSelected
+                    ? isNight
+                      ? 'bg-gradient-to-b from-amber-500/25 via-slate-900 to-slate-900 border-[#D4AF37] ring-2 ring-[#D4AF37]/70 shadow-lg shadow-amber-950/40 text-white'
+                      : 'bg-gradient-to-b from-amber-50 to-amber-100/70 border-[#B8860B] ring-2 ring-[#B8860B]/70 shadow-md text-slate-900'
+                    : isNight
+                      ? 'bg-slate-900/80 hover:bg-slate-800/80 border-slate-800 hover:border-slate-700 text-slate-300'
+                      : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700 shadow-sm'
                 }`}
               >
-                <span>{tab.label}</span>
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
-                  activeFilter === tab.key 
-                    ? (isNight ? 'bg-slate-950/30 text-slate-900' : 'bg-white/20 text-white')
-                    : (isNight ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600')
-                }`}>
-                  {tab.count}
-                </span>
-              </button>
-            ))}
-          </div>
+                {/* Top: Emoji + Label + Active pill */}
+                <div className="flex items-center justify-between gap-1 w-full">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-base md:text-lg shrink-0 leading-none">{card.emoji}</span>
+                    <span className={`text-xs font-black truncate ${
+                      isSelected 
+                        ? (isNight ? 'text-amber-300' : 'text-amber-950')
+                        : (isNight ? 'text-slate-200 group-hover:text-white' : 'text-slate-800')
+                    }`}>
+                      {card.label}
+                    </span>
+                  </div>
+                  {isSelected && (
+                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
+                      isNight ? 'bg-[#D4AF37] text-slate-950' : 'bg-[#B8860B] text-white'
+                    }`}>
+                      กำลังดู
+                    </span>
+                  )}
+                </div>
 
+                {/* Count and Status breakdown */}
+                <div className="mt-2.5 flex items-baseline justify-between gap-1">
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-2xl md:text-3xl font-black font-mono leading-none ${
+                      isSelected
+                        ? (isNight ? 'text-white' : 'text-slate-950')
+                        : (isNight ? 'text-slate-200' : 'text-slate-800')
+                    }`}>
+                      {card.count}
+                    </span>
+                    <span className={`text-[11px] font-semibold ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      ประเด็น
+                    </span>
+                  </div>
+
+                  {/* Critical / Warning badges */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {card.critical > 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-300 border border-rose-500/40" title="ด่วนที่สุด">
+                        🚨 {card.critical}
+                      </span>
+                    )}
+                    {card.warning > 0 && (
+                      <span className="text-[10px] font-black px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/40" title="เฝ้าระวัง">
+                        ⚠️ {card.warning}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Subtitle */}
+                <p className={`text-[10px] mt-1.5 font-medium truncate ${
+                  isSelected 
+                    ? (isNight ? 'text-amber-200/90 font-semibold' : 'text-amber-900 font-semibold')
+                    : (isNight ? 'text-slate-400' : 'text-slate-500')
+                }`}>
+                  {card.sublabel}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Toolbar: Search Input & Expand/Collapse All Buttons */}
+        <div className={`flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 mt-4 pt-3 border-t text-xs ${
+          isNight ? 'border-slate-800/70' : 'border-[#E6DEC8]'
+        }`}>
           {/* Search Box */}
-          <div className="relative min-w-[280px] lg:min-w-[360px] w-full lg:w-auto">
+          <div className="relative flex-1 min-w-[240px]">
             <Search className={`w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none ${
               isNight ? 'text-amber-400/80' : 'text-slate-400'
             }`} />
@@ -555,8 +701,8 @@ export function PlantDirectorAdvisory({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="ค้นหารหัสงาน (LOT, PO, SKU), หน้างาน หรือชื่อสาร..."
-              className={`w-full pl-9 pr-8 py-1.5 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/50 transition shadow-inner ${
+              placeholder="ค้นหารหัสงาน (LOT, PO, SKU), หน้างาน หรือหัวข้อประเด็น..."
+              className={`w-full pl-9 pr-8 py-2 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-[#D4AF37]/50 transition shadow-inner ${
                 isNight 
                   ? 'bg-slate-950/80 border border-slate-700/80 text-white placeholder:text-slate-400 focus:border-[#D4AF37]' 
                   : 'bg-white border border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-[#D4AF37] shadow-sm'
@@ -574,6 +720,46 @@ export function PlantDirectorAdvisory({
                 <X className="w-3.5 h-3.5" />
               </button>
             )}
+          </div>
+
+          {/* Expand All / Collapse All Controls */}
+          <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExpandAll}
+              className={`text-xs px-2.5 py-1.5 h-auto rounded-xl flex items-center gap-1 font-bold border transition ${
+                isNight 
+                  ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white' 
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-900 shadow-sm'
+              }`}
+              title="ขยายทุกการ์ดเพื่อดูรายละเอียดเต็ม"
+            >
+              <Maximize2 className="w-3.5 h-3.5 text-amber-500" />
+              <span>ขยายทั้งหมด</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleCollapseAll}
+              className={`text-xs px-2.5 py-1.5 h-auto rounded-xl flex items-center gap-1 font-bold border transition ${
+                isNight 
+                  ? 'bg-slate-800/80 hover:bg-slate-700 text-slate-200 border-slate-700 hover:text-white' 
+                  : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 hover:text-slate-900 shadow-sm'
+              }`}
+              title="ย่อทุกการ์ดเหลือแบบกระชับ (Accordion)"
+            >
+              <Minimize2 className="w-3.5 h-3.5 text-slate-400" />
+              <span>ย่อทั้งหมด</span>
+            </Button>
+
+            <span className={`text-[11px] font-semibold px-2.5 py-1 rounded-lg border ml-1 ${
+              isNight ? 'bg-slate-900/60 text-slate-400 border-slate-800' : 'bg-slate-100 text-slate-600 border-slate-200'
+            }`}>
+              แสดง {filteredDirectives.length} รายการ
+            </span>
           </div>
         </div>
 
@@ -601,7 +787,7 @@ export function PlantDirectorAdvisory({
         )}
       </CardHeader>
 
-      <CardContent className="p-4 md:p-6 space-y-4">
+      <CardContent className="p-4 md:p-6 space-y-5">
         {filteredDirectives.length === 0 ? (
           <div className={`p-8 text-center rounded-xl border ${
             isNight ? 'text-slate-400 bg-slate-900/40 border-slate-800' : 'text-slate-500 bg-white border-slate-200'
@@ -630,184 +816,365 @@ export function PlantDirectorAdvisory({
             )}
           </div>
         ) : (
-          <div className="flex flex-col space-y-3.5">
-            {filteredDirectives.map((d, index) => {
-              const PillarIcon = d.pillarIcon
-              const isCritical = d.severity === 'CRITICAL'
-              const isWarning = d.severity === 'WARNING'
+          <div className="flex flex-col space-y-5">
+            {[
+              {
+                pillar: 'SUPPLY_CHAIN' as const,
+                emoji: '📦',
+                label: 'จัดซื้อ ➔ ผลิต',
+                title: 'สายงานจัดซื้อ ➔ ผลิต (Supply Chain ➔ Production)',
+                desc: 'วัตถุดิบและบรรจุภัณฑ์เลื่อนเข้า กระทบคิวชั่งสารและเริ่มผลิต',
+                borderColorNight: 'border-amber-500/40',
+                borderColorLight: 'border-amber-300',
+                headerBgNight: 'bg-gradient-to-r from-amber-950/40 via-slate-900/90 to-slate-900/50',
+                headerBgLight: 'bg-gradient-to-r from-amber-50 via-orange-50/40 to-slate-50',
+                accentColor: 'text-amber-400'
+              },
+              {
+                pillar: 'SHOPFLOOR' as const,
+                emoji: '⚖️',
+                label: 'คิวผลิต & หน้างาน',
+                title: 'สายงานคิวผลิต & หน้างานชั่ง ผสม บรรจุ (Shopfloor Operations)',
+                desc: 'คิวงานค้างเลยกำหนดรอทบทวนวันผลิต และจุดตรวจพบคอขวดหน้างานชั่ง-ผสม-บรรจุ',
+                borderColorNight: 'border-blue-500/40',
+                borderColorLight: 'border-blue-300',
+                headerBgNight: 'bg-gradient-to-r from-blue-950/40 via-slate-900/90 to-slate-900/50',
+                headerBgLight: 'bg-gradient-to-r from-blue-50 via-sky-50/40 to-slate-50',
+                accentColor: 'text-blue-400'
+              },
+              {
+                pillar: 'QC_GATE' as const,
+                emoji: '🛡️',
+                label: 'แล็บ QC ➔ บรรจุ',
+                title: 'สายงานตรวจสอบคุณภาพแล็บ QC ➔ ปล่อยบรรจุ (Quality Gate)',
+                desc: 'เร่งรัดผลตรวจวิเคราะห์แล็บ Bulk/RM และงานติดสถานะ NC / Hold / Reprocess',
+                borderColorNight: 'border-purple-500/40',
+                borderColorLight: 'border-purple-300',
+                headerBgNight: 'bg-gradient-to-r from-purple-950/40 via-slate-900/90 to-slate-900/50',
+                headerBgLight: 'bg-gradient-to-r from-purple-50 via-fuchsia-50/40 to-slate-50',
+                accentColor: 'text-purple-400'
+              },
+              {
+                pillar: 'CUSTOMER_OTIF' as const,
+                emoji: '🎯',
+                label: 'ส่งมอบ FG ลูกค้า',
+                title: 'สายงานส่งมอบสินค้าสำเร็จรูป (Customer OTIF Delivery)',
+                desc: 'ออเดอร์ใกล้ครบกำหนดส่งมอบลูกค้า ต้องควบคุมขั้นตอนสุดท้ายให้ทันกำหนด 100%',
+                borderColorNight: 'border-emerald-500/40',
+                borderColorLight: 'border-emerald-300',
+                headerBgNight: 'bg-gradient-to-r from-emerald-950/40 via-slate-900/90 to-slate-900/50',
+                headerBgLight: 'bg-gradient-to-r from-emerald-50 via-teal-50/40 to-slate-50',
+                accentColor: 'text-emerald-400'
+              }
+            ]
+              .filter(cat => activeFilter === 'ALL' || activeFilter === cat.pillar)
+              .map(cat => {
+                const catItems = filteredDirectives.filter(d => d.pillar === cat.pillar)
+                if (catItems.length === 0) return null
 
-              return (
-                <div
-                  key={d.id}
-                  className={`p-4 md:p-5 rounded-2xl border transition-all duration-200 relative overflow-hidden flex flex-col space-y-3 ${
-                    isNight
-                      ? isCritical
-                        ? 'bg-slate-900/95 border-rose-500/60 hover:border-rose-400 shadow-rose-950/20 shadow-md'
-                        : isWarning
-                        ? 'bg-slate-900/95 border-amber-500/50 hover:border-amber-400 shadow-amber-950/20 shadow-md'
-                        : 'bg-slate-900/95 border-emerald-500/50 hover:border-emerald-400'
-                      : isCritical
-                        ? 'bg-white border-rose-300 hover:border-rose-400 shadow-sm hover:shadow-md'
-                        : isWarning
-                        ? 'bg-white border-amber-300 hover:border-amber-400 shadow-sm hover:shadow-md'
-                        : 'bg-white border-emerald-300 hover:border-emerald-400 shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  {/* Left severity indicator bar */}
-                  <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${
-                    isCritical ? 'bg-rose-500' : isWarning ? 'bg-amber-400' : 'bg-emerald-400'
-                  }`} />
+                const isCollapsed = collapsedCategories.has(cat.pillar)
 
-                  <div className="pl-2 space-y-2.5">
-                    {/* Line 1: Header tags, order metadata, and severity */}
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {/* Number index */}
-                        <span className={`text-[11px] font-mono font-black px-2 py-0.5 rounded-md border ${
-                          isNight 
-                            ? 'text-slate-400 bg-slate-800/80 border-slate-700' 
-                            : 'text-slate-500 bg-slate-100 border-slate-200'
-                        }`}>
-                          #{index + 1}
-                        </span>
-
-                        {/* Pillar flow badge */}
-                        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg flex items-center gap-1.5 ${
-                          isCritical
-                            ? (isNight ? 'bg-rose-500/20 text-rose-300 border border-rose-500/50' : 'bg-rose-50 text-rose-700 border border-rose-200')
-                            : isWarning
-                            ? (isNight ? 'bg-amber-500/20 text-amber-300 border border-amber-500/50' : 'bg-amber-50 text-amber-700 border border-amber-200')
-                            : (isNight ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50' : 'bg-emerald-50 text-emerald-700 border border-emerald-200')
-                        }`}>
-                          <PillarIcon className="w-3.5 h-3.5" />
-                          <span>{d.pillarLabel}</span>
-                        </span>
-
-                        {d.lotNo && (
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg font-mono flex items-center gap-1 border ${
-                            isNight 
-                              ? 'text-amber-300 bg-amber-950/70 border-amber-700/60' 
-                              : 'text-amber-800 bg-amber-50 border-amber-300'
-                          }`}>
-                            <span className={isNight ? 'text-amber-400' : 'text-amber-600'}>LOT:</span> 
-                            <span className={isNight ? 'text-white font-black' : 'text-slate-900 font-black'}>{d.lotNo}</span>
-                          </span>
-                        )}
-
-                        {d.poNo && (
-                          <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg font-mono flex items-center gap-1 border ${
-                            isNight 
-                              ? 'text-cyan-300 bg-cyan-950/70 border-cyan-700/60' 
-                              : 'text-sky-800 bg-sky-50 border-sky-300'
-                          }`}>
-                            <span className={isNight ? 'text-cyan-400' : 'text-sky-600'}>PO:</span> 
-                            <span className={isNight ? 'text-white font-black' : 'text-slate-900 font-black'}>{d.poNo}</span>
-                          </span>
-                        )}
-
-                        {d.sku && (
-                          <span className={`text-[11px] font-medium px-2.5 py-0.5 rounded-lg border ${
-                            isNight 
-                              ? 'text-slate-200 bg-slate-800/90 border-slate-700' 
-                              : 'text-slate-700 bg-slate-50 border-slate-200'
-                          }`}>
-                            {d.sku}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full shrink-0 ${
-                          isCritical
-                            ? 'bg-rose-600 text-white font-black shadow-sm'
-                            : isWarning
-                            ? 'bg-amber-600 text-white font-black shadow-sm'
-                            : 'bg-emerald-600 text-white font-black shadow-sm'
-                        }`}>
-                          {isCritical ? '🚨 ด่วนที่สุด' : isWarning ? '⚠️ เฝ้าระวัง' : '✅ ปกติ'}
-                        </span>
-
-                        {d.lotNo && onSelectLot && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              const matchedLot = fgDueLots.find(l => l.lot_no === d.lotNo) || logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
-                              if (matchedLot?.id) onSelectLot(matchedLot.id)
-                            }}
-                            className={`text-[11px] font-bold flex items-center gap-1 hover:underline px-2.5 py-0.5 rounded-lg border transition ${
-                              isNight 
-                                ? 'text-[#D4AF37] hover:text-amber-300 bg-slate-800/80 border-slate-700' 
-                                : 'text-[#B8860B] hover:text-amber-800 bg-amber-50 border-amber-200'
-                            }`}
-                          >
-                            เปิดดูกราฟ LOT {d.lotNo} <ChevronRight className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Line 2: Prominent Title */}
-                    <h4 className={`font-bold text-base md:text-lg leading-snug ${
-                      isNight ? 'text-white' : 'text-slate-900'
-                    }`}>
-                      {d.title}
-                    </h4>
-
-                    {/* Line 3: ข้อเท็จจริงหน้างาน (Shopfloor Fact) */}
-                    <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                      isNight 
-                        ? 'bg-slate-950/70 border-slate-800/90 text-slate-200' 
-                        : 'bg-slate-50 border-slate-200 text-slate-700'
-                    }`}>
-                      <span className={`font-bold flex items-center gap-1.5 mb-1 ${
-                        isNight ? 'text-amber-300' : 'text-amber-800'
-                      }`}>
-                        <Search className={`w-3.5 h-3.5 ${isNight ? 'text-amber-400' : 'text-amber-600'}`} />
-                        ข้อเท็จจริงหน้างาน (Shopfloor Fact):
-                      </span>
-                      <p className={`pl-5 font-normal ${isNight ? 'text-slate-200' : 'text-slate-700'}`}>
-                        {d.problemStatement}
-                      </p>
-                    </div>
-
-                    {/* Line 4: ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide & Actions) */}
-                    <div className={`p-3.5 rounded-xl border space-y-2 ${
-                      isNight
-                        ? 'bg-gradient-to-r from-amber-950/30 via-slate-900/80 to-slate-950/90 border-[#D4AF37]/50'
-                        : 'bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/70 border-amber-300/80 shadow-sm'
-                    }`}>
-                      <div className={`flex items-center gap-1.5 text-xs font-black ${
-                        isNight ? 'text-[#D4AF37]' : 'text-amber-900'
-                      }`}>
-                        <Crown className={`w-4 h-4 ${isNight ? 'text-[#D4AF37]' : 'text-[#B8860B]'}`} />
-                        <span>ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide):</span>
-                      </div>
-                      <p className={`text-xs leading-relaxed font-medium pl-3 border-l-2 ${
-                        isNight ? 'text-amber-100/95 border-[#D4AF37]' : 'text-slate-800 border-[#D4AF37]'
-                      }`}>
-                        {d.directorDirective}
-                      </p>
-
-                      {/* Department Action Checkpoints */}
-                      <div className={`pt-2 border-t space-y-1 text-xs ${
-                        isNight ? 'border-slate-800/80' : 'border-amber-200/80'
-                      }`}>
-                        {d.actionItems.map((act, actIdx) => (
-                          <div key={actIdx} className="flex items-start gap-2 pl-1">
-                            <span className={`font-bold shrink-0 ${isNight ? 'text-amber-400' : 'text-amber-800'}`}>
-                              ➔ [{act.dept}]:
-                            </span>
-                            <span className={`leading-snug ${isNight ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
-                              {act.action}
+                return (
+                  <div
+                    key={cat.pillar}
+                    className={`rounded-2xl border overflow-hidden transition-all duration-200 ${
+                      isNight ? `${cat.borderColorNight} bg-slate-900/70` : `${cat.borderColorLight} bg-white shadow-sm`
+                    }`}
+                  >
+                    {/* Category Frame Header */}
+                    <div
+                      onClick={() => toggleCollapseCategory(cat.pillar)}
+                      className={`p-3.5 md:p-4 flex items-center justify-between gap-3 cursor-pointer select-none transition ${
+                        isNight ? cat.headerBgNight : cat.headerBgLight
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xl shrink-0 leading-none">{cat.emoji}</span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h4 className={`text-sm md:text-base font-black ${
+                              isNight ? 'text-white' : 'text-slate-900'
+                            }`}>
+                              {cat.title}
+                            </h4>
+                            <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${
+                              isNight ? 'bg-slate-800 text-amber-300 border border-slate-700' : 'bg-slate-100 text-slate-800 border border-slate-200'
+                            }`}>
+                              {catItems.length} ประเด็น
                             </span>
                           </div>
-                        ))}
+                          <p className={`text-[11px] font-normal truncate mt-0.5 ${
+                            isNight ? 'text-slate-400' : 'text-slate-600'
+                          }`}>
+                            {cat.desc}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-xs font-bold hidden sm:inline ${
+                          isNight ? 'text-slate-400' : 'text-slate-600'
+                        }`}>
+                          {isCollapsed ? 'คลิกเพื่อกางออก' : 'คลิกเพื่อย่อหมวด'}
+                        </span>
+                        <div className={`p-1.5 rounded-lg border transition ${
+                          isNight ? 'bg-slate-800 text-slate-300 border-slate-700' : 'bg-white text-slate-600 border-slate-200'
+                        }`}>
+                          {isCollapsed ? (
+                            <ChevronDown className="w-4 h-4" />
+                          ) : (
+                            <ChevronUp className="w-4 h-4" />
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {/* Frame Directives List (Accordion items) */}
+                    {!isCollapsed && (
+                      <div className={`p-3 md:p-4 space-y-2.5 border-t ${
+                        isNight ? 'border-slate-800/80 bg-slate-950/40' : 'border-slate-100 bg-slate-50/50'
+                      }`}>
+                        {catItems.map((d) => {
+                          const isExpanded = expandedIds.has(d.id)
+                          const isCritical = d.severity === 'CRITICAL'
+                          const isWarning = d.severity === 'WARNING'
+                          const globalIdx = directives.findIndex(x => x.id === d.id) + 1
+
+                          return (
+                            <div
+                              key={d.id}
+                              className={`rounded-xl border transition-all duration-200 overflow-hidden relative ${
+                                isNight
+                                  ? isCritical
+                                    ? 'bg-slate-900/95 border-rose-500/50 hover:border-rose-400 shadow-sm'
+                                    : isWarning
+                                    ? 'bg-slate-900/95 border-amber-500/40 hover:border-amber-400 shadow-sm'
+                                    : 'bg-slate-900/95 border-emerald-500/40 hover:border-emerald-400'
+                                  : isCritical
+                                    ? 'bg-white border-rose-300 hover:border-rose-400 shadow-sm'
+                                    : isWarning
+                                    ? 'bg-white border-amber-300 hover:border-amber-400 shadow-sm'
+                                    : 'bg-white border-emerald-300 hover:border-emerald-400 shadow-sm'
+                              }`}
+                            >
+                              {/* Left severity indicator bar */}
+                              <div className={`absolute top-0 left-0 bottom-0 w-1.5 ${
+                                isCritical ? 'bg-rose-500' : isWarning ? 'bg-amber-400' : 'bg-emerald-400'
+                              }`} />
+
+                              {/* Clickable Header / Summary Row */}
+                              <div
+                                onClick={() => toggleExpandDirective(d.id)}
+                                className={`pl-4 pr-3 py-2.5 md:py-3 cursor-pointer select-none transition flex flex-col gap-1.5 ${
+                                  isNight ? 'hover:bg-slate-800/50' : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                {/* Meta Row: Index, Topic badge, LOT, PO, Severity & Expand Button */}
+                                <div className="flex items-center justify-between gap-2 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {/* Index */}
+                                    <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border ${
+                                      isNight ? 'text-slate-400 bg-slate-800/90 border-slate-700' : 'text-slate-500 bg-slate-100 border-slate-200'
+                                    }`}>
+                                      #{globalIdx}
+                                    </span>
+
+                                    {/* Topic Badge */}
+                                    {d.topic && (
+                                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border ${
+                                        d.topic.includes('เลื่อน') || d.topic.includes('เข้าช้า')
+                                          ? (isNight ? 'bg-amber-500/20 text-amber-300 border-amber-500/40' : 'bg-amber-100 text-amber-800 border-amber-200')
+                                          : d.topic.includes('คอขวด') || d.topic.includes('ค้าง')
+                                          ? (isNight ? 'bg-blue-500/20 text-blue-300 border-blue-500/40' : 'bg-blue-100 text-blue-800 border-blue-200')
+                                          : d.topic.includes('NC') || d.topic.includes('Hold') || d.topic.includes('QC')
+                                          ? (isNight ? 'bg-purple-500/20 text-purple-300 border-purple-500/40' : 'bg-purple-100 text-purple-800 border-purple-200')
+                                          : (isNight ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' : 'bg-emerald-100 text-emerald-800 border-emerald-200')
+                                      }`}>
+                                        {d.topic}
+                                      </span>
+                                    )}
+
+                                    {/* LOT Badge */}
+                                    {d.lotNo && (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md font-mono flex items-center gap-1 border ${
+                                        isNight 
+                                          ? 'text-amber-300 bg-amber-950/70 border-amber-700/60' 
+                                          : 'text-amber-800 bg-amber-50 border-amber-300'
+                                      }`}>
+                                        <span className={isNight ? 'text-amber-400' : 'text-amber-600'}>LOT:</span> 
+                                        <span className={isNight ? 'text-white font-black' : 'text-slate-900 font-black'}>{d.lotNo}</span>
+                                      </span>
+                                    )}
+
+                                    {/* PO Badge */}
+                                    {d.poNo && (
+                                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md font-mono flex items-center gap-1 border ${
+                                        isNight 
+                                          ? 'text-cyan-300 bg-cyan-950/70 border-cyan-700/60' 
+                                          : 'text-sky-800 bg-sky-50 border-sky-300'
+                                      }`}>
+                                        <span className={isNight ? 'text-cyan-400' : 'text-sky-600'}>PO:</span> 
+                                        <span className={isNight ? 'text-white font-black' : 'text-slate-900 font-black'}>{d.poNo}</span>
+                                      </span>
+                                    )}
+
+                                    {/* SKU Badge */}
+                                    {d.sku && (
+                                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-md border hidden sm:inline ${
+                                        isNight ? 'text-slate-300 bg-slate-800/80 border-slate-700' : 'text-slate-700 bg-slate-100 border-slate-200'
+                                      }`}>
+                                        {d.sku}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    {/* Severity Pill */}
+                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                                      isCritical
+                                        ? 'bg-rose-600 text-white font-black'
+                                        : isWarning
+                                        ? 'bg-amber-600 text-white font-black'
+                                        : 'bg-emerald-600 text-white font-black'
+                                    }`}>
+                                      {isCritical ? '🚨 ด่วนที่สุด' : isWarning ? '⚠️ เฝ้าระวัง' : '✅ ปกติ'}
+                                    </span>
+
+                                    {/* Accordion Expand / Collapse toggle button */}
+                                    <span className={`text-[11px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1 border transition ${
+                                      isExpanded
+                                        ? (isNight ? 'bg-[#D4AF37] text-slate-950 border-[#D4AF37]' : 'bg-slate-900 text-white border-slate-900')
+                                        : (isNight ? 'bg-slate-800/90 text-[#D4AF37] border-slate-700 hover:bg-slate-700' : 'bg-slate-100 text-[#B8860B] border-slate-200 hover:bg-slate-200')
+                                    }`}>
+                                      {isExpanded ? (
+                                        <>
+                                          <span>ย่อรายละเอียด</span>
+                                          <ChevronUp className="w-3.5 h-3.5" />
+                                        </>
+                                      ) : (
+                                        <>
+                                          <span>คลิกดูรายละเอียด</span>
+                                          <ChevronDown className="w-3.5 h-3.5" />
+                                        </>
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* Title */}
+                                <h5 className={`font-bold text-sm md:text-base leading-snug ${
+                                  isNight ? 'text-white' : 'text-slate-900'
+                                }`}>
+                                  {d.title}
+                                </h5>
+
+                                {/* Collapsed Teaser: One-line snapshot */}
+                                {!isExpanded && (
+                                  <p className={`text-xs truncate font-medium ${
+                                    isNight ? 'text-slate-400' : 'text-slate-600'
+                                  }`}>
+                                    <span className={isNight ? 'text-amber-400 font-bold' : 'text-amber-700 font-bold'}>➔ ข้อสั่งการ: </span>
+                                    {d.directorDirective}
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Expanded Detailed Content */}
+                              {isExpanded && (
+                                <div className={`px-4 pb-4 pt-2 border-t space-y-3 ${
+                                  isNight ? 'border-slate-800/90 bg-slate-950/60' : 'border-slate-200/80 bg-slate-50/70'
+                                }`}>
+                                  {/* Shopfloor Fact */}
+                                  <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                                    isNight 
+                                      ? 'bg-slate-900/90 border-slate-800 text-slate-200' 
+                                      : 'bg-white border-slate-200 text-slate-700 shadow-sm'
+                                  }`}>
+                                    <span className={`font-bold flex items-center gap-1.5 mb-1 ${
+                                      isNight ? 'text-amber-300' : 'text-amber-800'
+                                    }`}>
+                                      <Search className={`w-3.5 h-3.5 ${isNight ? 'text-amber-400' : 'text-amber-600'}`} />
+                                      ข้อเท็จจริงหน้างาน (Shopfloor Fact):
+                                    </span>
+                                    <p className={`pl-5 font-normal ${isNight ? 'text-slate-200' : 'text-slate-700'}`}>
+                                      {d.problemStatement}
+                                    </p>
+                                  </div>
+
+                                  {/* Plant Director Guide & Action Items */}
+                                  <div className={`p-3.5 rounded-xl border space-y-2 ${
+                                    isNight
+                                      ? 'bg-gradient-to-r from-amber-950/30 via-slate-900/90 to-slate-950/90 border-[#D4AF37]/50'
+                                      : 'bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/70 border-amber-300/80 shadow-sm'
+                                  }`}>
+                                    <div className={`flex items-center gap-1.5 text-xs font-black ${
+                                      isNight ? 'text-[#D4AF37]' : 'text-amber-900'
+                                    }`}>
+                                      <Crown className={`w-4 h-4 ${isNight ? 'text-[#D4AF37]' : 'text-[#B8860B]'}`} />
+                                      <span>ข้อสั่งการและแนวทางปฏิบัติ (Plant Director Guide):</span>
+                                    </div>
+                                    <p className={`text-xs leading-relaxed font-medium pl-3 border-l-2 ${
+                                      isNight ? 'text-amber-100/95 border-[#D4AF37]' : 'text-slate-800 border-[#D4AF37]'
+                                    }`}>
+                                      {d.directorDirective}
+                                    </p>
+
+                                    {/* Department Action Checkpoints */}
+                                    <div className={`pt-2 border-t space-y-1 text-xs ${
+                                      isNight ? 'border-slate-800/80' : 'border-amber-200/80'
+                                    }`}>
+                                      {d.actionItems.map((act, actIdx) => (
+                                        <div key={actIdx} className="flex items-start gap-2 pl-1">
+                                          <span className={`font-bold shrink-0 ${isNight ? 'text-amber-400' : 'text-amber-800'}`}>
+                                            ➔ [{act.dept}]:
+                                          </span>
+                                          <span className={`leading-snug ${isNight ? 'text-slate-200' : 'text-slate-700 font-medium'}`}>
+                                            {act.action}
+                                          </span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  {/* Expanded Footer Controls */}
+                                  <div className="flex items-center justify-between pt-1 flex-wrap gap-2">
+                                    {d.lotNo && onSelectLot ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const matchedLot = fgDueLots.find(l => l.lot_no === d.lotNo) || logsList.find(l => l.production_lots?.lot_no === d.lotNo)?.production_lots
+                                          if (matchedLot?.id) onSelectLot(matchedLot.id)
+                                        }}
+                                        className={`text-[11px] font-bold flex items-center gap-1 px-3 py-1 rounded-lg border transition ${
+                                          isNight 
+                                            ? 'text-[#D4AF37] hover:text-amber-300 bg-slate-800/80 border-slate-700' 
+                                            : 'text-[#B8860B] hover:text-amber-800 bg-amber-50 border-amber-200 shadow-sm'
+                                        }`}
+                                      >
+                                        เปิดดูกราฟ LOT {d.lotNo} <ChevronRight className="w-3.5 h-3.5" />
+                                      </button>
+                                    ) : <div />}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => toggleExpandDirective(d.id)}
+                                      className={`text-[11px] font-bold flex items-center gap-1 px-2.5 py-1 rounded-lg transition ${
+                                        isNight ? 'text-slate-400 hover:text-slate-200' : 'text-slate-500 hover:text-slate-800'
+                                      }`}
+                                    >
+                                      ย่อรายละเอียด ▴
+                                    </button>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              )
-            })}
+                )
+              })}
           </div>
         )}
       </CardContent>
