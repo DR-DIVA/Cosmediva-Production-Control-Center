@@ -10,6 +10,7 @@ import {
   Truck, 
   Scale, 
   Beaker, 
+  ShieldCheck,
   Package, 
   Gift, 
   ChevronRight, 
@@ -60,7 +61,8 @@ export interface OperationalStatus {
 
 interface StreamItem {
   id: string
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE'
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE'
+  qcSubtype?: 'RM' | 'PM' | 'BULK' | 'FG'
   date: string
   title: string
   subtitle: string
@@ -76,7 +78,7 @@ interface StreamItem {
 
 function computeOperationalStatus(
   item: any,
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE',
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE',
   cellDate: string,
   todayStr: string
 ): OperationalStatus {
@@ -203,6 +205,62 @@ function computeOperationalStatus(
       type: 'planned',
       color: 'bg-slate-50 text-slate-600 border-slate-200/80',
       dotColor: 'bg-slate-400'
+    }
+  }
+
+  // Quality Control (QC): RM, PM, BULK, FG
+  if (streamType === 'QC') {
+    const subtype = item.qcSubtype || 'BULK'
+    const subLabel = subtype === 'RM' ? 'RM' : subtype === 'PM' ? 'PM' : subtype === 'BULK' ? 'Bulk' : 'FG'
+    const rawStatus = (item.status || item.qc_status || '').toUpperCase()
+
+    if (rawStatus === 'PASSED' || rawStatus === 'RELEASED' || rawStatus === 'QC_PASS' || rawStatus === 'READY' || rawStatus === 'DONE') {
+      return {
+        badge: `🛡️ ผ่าน QC (${subLabel})`,
+        shortBadge: 'ผ่าน QC',
+        type: 'qc_passed',
+        color: 'bg-emerald-50 text-emerald-700 border-emerald-200/80',
+        dotColor: 'bg-emerald-500',
+        detailsText: `ตรวจรับรองคุณภาพ ${subLabel} ผ่านเกณฑ์มาตรฐานเรียบร้อย`
+      }
+    }
+    if (rawStatus === 'HOLD' || rawStatus === 'PAUSED' || rawStatus === 'REPROCESS') {
+      return {
+        badge: `⚠️ QC HOLD (${subLabel})`,
+        shortBadge: 'QC HOLD',
+        type: 'qc_issue',
+        color: 'bg-orange-50 text-orange-700 border-orange-200/80',
+        dotColor: 'bg-orange-500',
+        detailsText: item.note || `พบประเด็นคุณภาพ ${subLabel} อยู่ระหว่างกักกัน/รอการตัดสินใจ`
+      }
+    }
+    if (rawStatus === 'REJECTED' || rawStatus === 'FAILED') {
+      return {
+        badge: `❌ QC REJECT (${subLabel})`,
+        shortBadge: 'REJECT',
+        type: 'qc_issue',
+        color: 'bg-rose-50 text-rose-700 border-rose-200/80',
+        dotColor: 'bg-rose-500',
+        detailsText: item.note || `ไม่ผ่านเกณฑ์การตรวจสอบคุณภาพ ${subLabel}`
+      }
+    }
+    if (rawStatus === 'IN_PROGRESS' || rawStatus === 'SENT_TO_QC') {
+      return {
+        badge: `🔬 กำลังตรวจ (${subLabel})`,
+        shortBadge: 'กำลังตรวจ',
+        type: 'in_progress',
+        color: 'bg-blue-50 text-blue-700 border-blue-200/80',
+        dotColor: 'bg-blue-500 animate-pulse',
+        detailsText: `ห้องปฏิบัติการ QC กำลังดำเนินการทดสอบตัวอย่าง ${subLabel}`
+      }
+    }
+    return {
+      badge: `⏳ รอตรวจ QC (${subLabel})`,
+      shortBadge: 'รอ QC',
+      type: 'qc_waiting',
+      color: 'bg-amber-50 text-amber-700 border-amber-200/80',
+      dotColor: 'bg-amber-500',
+      detailsText: rawStatus === 'QUARANTINE' ? 'กักกันในคลัง รอการสุ่มตรวจปล่อย' : `รอคิวสุ่มตรวจและทดสอบตัวอย่าง ${subLabel}`
     }
   }
 
@@ -362,6 +420,234 @@ function computeOperationalStatus(
 const TH_DAYS = ['อา.', 'จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.']
 const TH_MONTHS = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
 
+function QcPopoverContent({
+  items,
+  stream,
+  date,
+  isNight,
+  onSelectLot
+}: {
+  items: StreamItem[]
+  stream: any
+  date: any
+  isNight: boolean
+  onSelectLot?: (lotId: string) => void
+}) {
+  const [activeTab, setActiveTab] = useState<'ALL' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
+
+  const rmItems = useMemo(() => items.filter(it => it.qcSubtype === 'RM'), [items])
+  const pmItems = useMemo(() => items.filter(it => it.qcSubtype === 'PM'), [items])
+  const bulkItems = useMemo(() => items.filter(it => it.qcSubtype === 'BULK'), [items])
+  const fgItems = useMemo(() => items.filter(it => it.qcSubtype === 'FG'), [items])
+
+  const filteredItems = useMemo(() => {
+    if (activeTab === 'RM') return rmItems
+    if (activeTab === 'PM') return pmItems
+    if (activeTab === 'BULK') return bulkItems
+    if (activeTab === 'FG') return fgItems
+    return items
+  }, [activeTab, items, rmItems, pmItems, bulkItems, fgItems])
+
+  const Icon = stream.icon
+
+  return (
+    <PopoverContent
+      className={`w-[380px] sm:w-[540px] max-w-[95vw] p-4 border shadow-2xl rounded-2xl z-50 text-xs ${
+        isNight ? 'bg-[#0F172A] border-purple-800/60 text-slate-100' : 'bg-white border-purple-200 text-[#4A4238]'
+      }`}
+      align="center"
+    >
+      {/* Header */}
+      <div className={`flex items-center justify-between border-b pb-2.5 mb-3 ${
+        isNight ? 'border-slate-800' : 'border-slate-100'
+      }`}>
+        <div className="font-bold flex items-center gap-2 text-sm">
+          <Icon className={`w-4 h-4 ${stream.color}`} />
+          <span>{stream.shortLabel}</span>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${
+            isNight 
+              ? 'text-purple-300 bg-purple-950/60 border-purple-800' 
+              : 'text-purple-700 bg-purple-50 border-purple-200'
+          }`}>
+            {items.length} รายการ
+          </span>
+        </div>
+        <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
+          isNight 
+            ? 'text-purple-200 bg-purple-950/80 border-purple-700' 
+            : 'text-purple-900 bg-purple-100/80 border-purple-200'
+        }`}>
+          {date.dayName} {date.dayNum} {date.monthName}
+        </span>
+      </div>
+
+      {/* 4 Category Filter Tabs */}
+      <div className={`flex items-center gap-1 p-1 rounded-xl mb-3 overflow-x-auto ${
+        isNight ? 'bg-slate-900/90 border border-slate-800' : 'bg-slate-100/90 border border-slate-200'
+      }`}>
+        <button
+          type="button"
+          onClick={() => setActiveTab('ALL')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition shrink-0 ${
+            activeTab === 'ALL'
+              ? 'bg-purple-600 text-white shadow-xs'
+              : (isNight ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900')
+          }`}
+        >
+          ทั้งหมด ({items.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('RM')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition shrink-0 flex items-center gap-1 ${
+            activeTab === 'RM'
+              ? 'bg-amber-600 text-white shadow-xs'
+              : (isNight ? 'text-amber-300 hover:text-amber-200' : 'text-amber-800 hover:text-amber-950')
+          }`}
+        >
+          <span>🧪 วัตถุดิบ RM</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/20">{rmItems.length}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('PM')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition shrink-0 flex items-center gap-1 ${
+            activeTab === 'PM'
+              ? 'bg-cyan-600 text-white shadow-xs'
+              : (isNight ? 'text-cyan-300 hover:text-cyan-200' : 'text-cyan-800 hover:text-cyan-950')
+          }`}
+        >
+          <span>🏷️ บรรจุภัณฑ์ PM</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/20">{pmItems.length}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('BULK')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition shrink-0 flex items-center gap-1 ${
+            activeTab === 'BULK'
+              ? 'bg-blue-600 text-white shadow-xs'
+              : (isNight ? 'text-blue-300 hover:text-blue-200' : 'text-blue-800 hover:text-blue-950')
+          }`}
+        >
+          <span>🥣 เนื้อ Bulk</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/20">{bulkItems.length}</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('FG')}
+          className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition shrink-0 flex items-center gap-1 ${
+            activeTab === 'FG'
+              ? 'bg-emerald-600 text-white shadow-xs'
+              : (isNight ? 'text-emerald-300 hover:text-emerald-200' : 'text-emerald-800 hover:text-emerald-950')
+          }`}
+        >
+          <span>🎁 สำเร็จรูป FG</span>
+          <span className="px-1.5 py-0.2 rounded-full text-[9px] bg-black/20">{fgItems.length}</span>
+        </button>
+      </div>
+
+      {/* Item List */}
+      <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1 scrollbar-thin">
+        {filteredItems.length === 0 ? (
+          <div className="py-8 text-center text-slate-400 text-xs">
+            ไม่มีรายการงานตรวจ QC ในหมวดนี้
+          </div>
+        ) : (
+          filteredItems.map((it, idx) => {
+            const isHold = it.opStatus?.type === 'qc_issue'
+            const isWaiting = it.opStatus?.type === 'qc_waiting'
+            const isPassed = it.opStatus?.type === 'qc_passed'
+            const isProgress = it.opStatus?.type === 'in_progress'
+
+            return (
+              <div
+                key={it.id || idx}
+                className={`p-3 rounded-xl border space-y-1.5 transition ${
+                  isNight
+                    ? isHold
+                      ? 'bg-rose-950/40 border-rose-800'
+                      : isWaiting
+                      ? 'bg-amber-950/40 border-amber-800'
+                      : isPassed
+                      ? 'bg-emerald-950/40 border-emerald-800'
+                      : isProgress
+                      ? 'bg-blue-950/40 border-blue-800'
+                      : 'bg-slate-900 border-slate-800'
+                    : isHold 
+                    ? 'bg-rose-50/80 border-rose-300' 
+                    : isWaiting
+                    ? 'bg-amber-50/60 border-amber-200'
+                    : isPassed
+                    ? 'bg-emerald-50/50 border-emerald-200'
+                    : isProgress
+                    ? 'bg-blue-50/50 border-blue-200'
+                    : 'bg-slate-50 border-slate-200'
+                }`}
+              >
+                <div className="flex justify-between items-start gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {/* Category Badge */}
+                    <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded border ${
+                      it.qcSubtype === 'RM' ? 'bg-amber-100 text-amber-900 border-amber-300' :
+                      it.qcSubtype === 'PM' ? 'bg-cyan-100 text-cyan-900 border-cyan-300' :
+                      it.qcSubtype === 'BULK' ? 'bg-blue-100 text-blue-900 border-blue-300' :
+                      'bg-purple-100 text-purple-900 border-purple-300'
+                    }`}>
+                      {it.qcSubtype === 'RM' ? '🧪 RM' :
+                       it.qcSubtype === 'PM' ? '🏷️ PM' :
+                       it.qcSubtype === 'BULK' ? '🥣 Bulk' : '🎁 FG'}
+                    </span>
+
+                    <strong className={`font-bold text-xs ${isNight ? 'text-white' : 'text-slate-800'}`}>{it.title}</strong>
+
+                    {it.opStatus && (
+                      <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full border shadow-2xs ${it.opStatus.color}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${it.opStatus.dotColor} shrink-0`} />
+                        <span>{it.opStatus.badge}</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {it.tag && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 border ${
+                      isNight ? 'bg-slate-800 text-slate-200 border-slate-700' : 'bg-white text-slate-700 border-slate-200'
+                    }`}>
+                      {it.tag}
+                    </span>
+                  )}
+                </div>
+
+                <div className={`text-[11px] font-medium ${isNight ? 'text-slate-300' : 'text-slate-600'}`}>
+                  {it.subtitle}
+                </div>
+
+                {it.opStatus?.detailsText && (
+                  <div className={`text-[10px] p-1.5 rounded-md border mt-1 flex items-center gap-1.5 ${
+                    isNight ? 'bg-slate-900/80 border-slate-800 text-slate-300' : 'bg-white/80 border-slate-200/60 text-slate-500'
+                  }`}>
+                    <Info className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    <span>{it.opStatus.detailsText}</span>
+                  </div>
+                )}
+
+                {it.lotId && onSelectLot && (
+                  <button
+                    type="button"
+                    onClick={() => onSelectLot(it.lotId!)}
+                    className="text-[10px] text-purple-600 hover:text-purple-700 font-bold hover:underline flex items-center gap-1 pt-1"
+                  >
+                    ดูกราฟล็อตนี้ <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+    </PopoverContent>
+  )
+}
+
 export function RollingMasterRadar({ 
   startDateStr, 
   onSelectLot,
@@ -426,16 +712,18 @@ export function RollingMasterRadar({
   }
 
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
-  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'PACKING' | 'FG_DUE'>('ALL')
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'PACKING' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
   const [radarData, setRadarData] = useState<{
     etaList: any[]
     logsList: any[]
     fgDueLots: any[]
+    fgInventoryList: any[]
   }>({
     etaList: [],
     logsList: [],
-    fgDueLots: []
+    fgDueLots: [],
+    fgInventoryList: []
   })
   const [selectedCell, setSelectedCell] = useState<{ dateStr: string; items: StreamItem[]; streamTitle: string } | null>(null)
 
@@ -482,20 +770,20 @@ export function RollingMasterRadar({
       const [
         { data: etaData },
         { data: logsData },
-        { data: lotsData }
+        { data: lotsData },
+        { data: fgInvData }
       ] = await Promise.all([
-        // 1. ETA RM/PM within 21 days
+        // 1. ETA RM/PM within 21 days (or received within horizon)
         supabase.from('production_lot_rms')
           .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier, bottom_remark, receive_date')
-          .gte('eta_date', horizonStartStr)
-          .lte('eta_date', horizonEndStr)
+          .or(`and(eta_date.gte.${horizonStartStr},eta_date.lte.${horizonEndStr}),and(receive_date.gte.${horizonStartStr},receive_date.lte.${horizonEndStr})`)
           .order('eta_date', { ascending: true }),
 
-        // 2. Production Schedule (Weighing, Mixing, Packing, POF) across 21 days
+        // 2. Production Schedule (Weighing, Mixing, Packing, POF, QC) across 21 days
         supabase.from('production_logs')
           .select(`
             id, status, activity_date, end_date, tank_start, tank_end, piece_quantity, note,
-            start_time, end_time, qc_status, sub_step,
+            start_time, end_time, qc_status, sub_step, tank_details, total_tanks,
             processes (process_name),
             production_lots (
               id, lot_no, planned_quantity, order_quantity, total_tanks, current_status, qc_fg_passed_carton_ranges,
@@ -512,13 +800,23 @@ export function RollingMasterRadar({
             products:sku_id (sku, product_name)
           `)
           .or(`current_status.neq.DONE,and(fg_due_date.gte.${horizonStartStr},fg_due_date.lte.${horizonEndStr})`)
-          .order('fg_due_date', { ascending: true })
+          .order('fg_due_date', { ascending: true }),
+
+        // 4. FG Inventory (Quarantine & Released within horizon)
+        supabase.from('fg_inventory')
+          .select(`
+            id, sku_id, lot_no, box_lot_no, available_qty_pcs, receive_qty_pcs, receive_qty_cartons, exp_date, qc_status, created_at, updated_at,
+            products:sku_id (sku, product_name)
+          `)
+          .or(`and(created_at.gte.${horizonStartStr}T00:00:00,created_at.lte.${horizonEndStr}T23:59:59),qc_status.eq.QUARANTINE`)
+          .order('created_at', { ascending: false })
       ])
 
       setRadarData({
         etaList: etaData || [],
         logsList: logsData || [],
-        fgDueLots: lotsData || []
+        fgDueLots: lotsData || [],
+        fgInventoryList: fgInvData || []
       })
     } catch (err) {
       console.error('Error fetching rolling radar data:', err)
@@ -533,6 +831,7 @@ export function RollingMasterRadar({
       ETA: StreamItem[]
       WEIGHING: StreamItem[]
       MIXING: StreamItem[]
+      QC: StreamItem[]
       PACKING: StreamItem[]
       FG_DUE: StreamItem[]
     }> = {}
@@ -542,6 +841,7 @@ export function RollingMasterRadar({
         ETA: [],
         WEIGHING: [],
         MIXING: [],
+        QC: [],
         PACKING: [],
         FG_DUE: []
       }
@@ -719,6 +1019,135 @@ export function RollingMasterRadar({
       }
     })
 
+    // 4. Process QC Stream (RM, PM, Bulk, FG)
+    const isMaterialPM = (code?: string) => {
+      if (!code) return false
+      const c = code.trim().toLowerCase()
+      return c.startsWith('cmd1') || c.startsWith('cmd2') || c.startsWith('p')
+    }
+
+    // A. RM and PM Inbound Quality Checks
+    radarData.etaList.forEach(item => {
+      const isPM = isMaterialPM(item.rm_code)
+      const targetDate = item.receive_date || item.eta_date
+      if (!targetDate || !map[targetDate]) return
+
+      const rawQcStatus = item.qc_status || (item.status === 'RECEIVED' ? 'WAITING' : item.status === 'READY' ? 'PASSED' : item.status)
+      const opStatus = computeOperationalStatus(
+        { ...item, qcSubtype: isPM ? 'PM' : 'RM', qc_status: rawQcStatus },
+        'QC',
+        targetDate,
+        todayDateStr
+      )
+
+      map[targetDate].QC.push({
+        id: `qc-rmpm-${item.id}`,
+        streamType: 'QC',
+        qcSubtype: isPM ? 'PM' : 'RM',
+        date: targetDate,
+        title: `${item.rm_code} (${Number(item.quantity || 0).toLocaleString()} ${item.unit || ''})`,
+        subtitle: item.rm_name || (isPM ? 'บรรจุภัณฑ์' : 'วัตถุดิบ'),
+        tag: item.po_no ? `PO: ${item.po_no}` : (isPM ? 'PM' : 'RM'),
+        quantity: item.quantity,
+        status: rawQcStatus,
+        meta: item,
+        opStatus
+      })
+    })
+
+    // B. Bulk Quality Checks (Logs with "รอ QC" or mixing tank checks)
+    radarData.logsList.forEach(log => {
+      const pName = (log.processes?.process_name || '').toLowerCase()
+      const isQcProc = pName === 'รอ qc' || pName.includes('รอ qc') || pName.includes('qc bulk')
+      const isMixingWithQc = (pName.includes('ผสม') || pName.includes('mix')) && (log.qc_status || log.tank_details)
+
+      if (isQcProc || isMixingWithQc) {
+        const lot = log.production_lots
+        const sku = lot?.products?.sku || 'SKU'
+        const pProductName = lot?.products?.product_name || ''
+        const lotNo = lot?.lot_no || 'N/A'
+        const startT = parseInt(log.tank_start) || 1
+        const endT = parseInt(log.tank_end) || startT
+        const tanksCount = Math.max(1, endT - startT + 1)
+
+        const targetDate = log.activity_date || log.end_date || todayDateStr
+        if (!map[targetDate]) return
+
+        let bulkStatus = log.qc_status || (isQcProc ? 'WAITING' : 'IN_PROGRESS')
+        if (log.tank_details && typeof log.tank_details === 'object') {
+          const vals = Object.values(log.tank_details)
+          if (vals.some((v: any) => v === 'HOLD' || v === 'PAUSED' || v === 'REPROCESS' || v?.status === 'HOLD' || v?.status === 'PAUSED')) {
+            bulkStatus = 'HOLD'
+          } else if (vals.length > 0 && vals.every((v: any) => v === 'QC_PASS' || v?.status === 'QC_PASS' || v === 'DONE' || v?.status === 'DONE')) {
+            bulkStatus = 'PASSED'
+          }
+        }
+
+        const opStatus = computeOperationalStatus(
+          { ...log, qcSubtype: 'BULK', qc_status: bulkStatus },
+          'QC',
+          targetDate,
+          todayDateStr
+        )
+
+        map[targetDate].QC.push({
+          id: `qc-bulk-${log.id}`,
+          streamType: 'QC',
+          qcSubtype: 'BULK',
+          date: targetDate,
+          title: `${sku} • LOT ${lotNo}`,
+          subtitle: pProductName || 'ตรวจคุณภาพเนื้อผสม Bulk (pH, Viscosity, Micro)',
+          tag: `${tanksCount} ถัง (${startT}-${endT})`,
+          lotNo,
+          sku,
+          lotId: lot?.id,
+          status: bulkStatus,
+          meta: log,
+          opStatus
+        })
+      }
+    })
+
+    // C. FG Quality Checks (Quarantine & Released Goods)
+    radarData.fgInventoryList.forEach(fg => {
+      const createdDateStr = fg.created_at ? fg.created_at.split('T')[0] : ''
+      const targetDate = map[createdDateStr] ? createdDateStr : (fg.qc_status === 'QUARANTINE' ? todayDateStr : createdDateStr)
+      if (!targetDate || !map[targetDate]) return
+
+      const sku = fg.products?.sku || 'SKU'
+      const lotNo = fg.lot_no || 'N/A'
+      const qtyPcs = fg.receive_qty_pcs || fg.available_qty_pcs || 0
+      const ctn = fg.receive_qty_cartons || 0
+
+      const opStatus = computeOperationalStatus(
+        { ...fg, qcSubtype: 'FG', qc_status: fg.qc_status },
+        'QC',
+        targetDate,
+        todayDateStr
+      )
+
+      map[targetDate].QC.push({
+        id: `qc-fg-${fg.id}`,
+        streamType: 'QC',
+        qcSubtype: 'FG',
+        date: targetDate,
+        title: `${sku} • LOT ${lotNo}`,
+        subtitle: fg.products?.product_name || 'ตรวจปล่อยสินค้าสำเร็จรูป (FG Release)',
+        tag: qtyPcs ? `${Number(qtyPcs).toLocaleString()} ชิ้น${ctn ? ` (${ctn} ลัง)` : ''}` : 'FG',
+        lotNo,
+        sku,
+        quantity: qtyPcs,
+        status: fg.qc_status || 'QUARANTINE',
+        meta: fg,
+        opStatus
+      })
+    })
+
+    let totalQc = 0
+    Object.values(map).forEach(day => {
+      totalQc += day.QC.length
+    })
+
     return {
       dateStreamMap: map,
       summaryCounts: {
@@ -726,6 +1155,7 @@ export function RollingMasterRadar({
         totalWeighing,
         totalMixing,
         totalMixingTanks,
+        totalQc,
         totalPacking,
         totalFgDue
       }
@@ -764,8 +1194,18 @@ export function RollingMasterRadar({
       pillColor: 'bg-blue-100/90 text-blue-900 border-blue-300/80 hover:bg-blue-200'
     },
     {
+      key: 'QC' as const,
+      label: '4. ตรวจสอบคุณภาพ QC (RM / PM / Bulk / FG)',
+      shortLabel: 'ตรวจสอบคุณภาพ QC',
+      icon: ShieldCheck,
+      color: 'text-purple-700',
+      bgColor: 'bg-purple-500/10',
+      badgeBorder: 'border-purple-300',
+      pillColor: 'bg-purple-100/90 text-purple-900 border-purple-300/80 hover:bg-purple-200'
+    },
+    {
       key: 'PACKING' as const,
-      label: '4. ไลน์บรรจุ & POF',
+      label: '5. ไลน์บรรจุ & POF',
       shortLabel: 'บรรจุ/แพ็คกิ้ง',
       icon: Package,
       color: 'text-emerald-700',
@@ -775,7 +1215,7 @@ export function RollingMasterRadar({
     },
     {
       key: 'FG_DUE' as const,
-      label: '5. กำหนดส่งมอบ (Due FG)',
+      label: '6. กำหนดส่งมอบ (Due FG)',
       shortLabel: 'ส่งมอบ FG',
       icon: Gift,
       color: 'text-rose-700',
@@ -907,7 +1347,7 @@ export function RollingMasterRadar({
               isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
             }`}>
               <span className={`text-[10px] font-bold px-1.5 ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>สายงาน:</span>
-              {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'PACKING', 'FG_DUE'] as const).map(f => (
+              {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'PACKING', 'FG_DUE'] as const).map(f => (
                 <button
                   key={f}
                   type="button"
@@ -918,7 +1358,7 @@ export function RollingMasterRadar({
                       : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
                   }`}
                 >
-                  {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
+                  {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'QC' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
                 </button>
               ))}
             </div>
@@ -926,7 +1366,7 @@ export function RollingMasterRadar({
         </div>
 
         {/* 21-Day Executive Summary Chips */}
-        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3 mt-4 pt-4 border-t ${
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 mt-4 pt-4 border-t ${
           isNight ? 'border-slate-800' : 'border-slate-100'
         }`}>
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
@@ -966,6 +1406,18 @@ export function RollingMasterRadar({
           </div>
 
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-purple-950/40 border-purple-800/60 text-purple-200' : 'bg-purple-50/70 border-purple-200/80 text-purple-900'
+          }`}>
+            <div className="flex items-center gap-2">
+              <ShieldCheck className="w-4 h-4 text-purple-400" />
+              <div>
+                <div className={`text-[10px] font-medium ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>งานตรวจ QC (21 วัน)</div>
+                <div className={`text-sm font-black ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{summaryCounts.totalQc} งานตรวจ</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-emerald-950/40 border-emerald-800/60 text-emerald-200' : 'bg-emerald-50/70 border-emerald-200/80 text-emerald-900'
           }`}>
             <div className="flex items-center gap-2">
@@ -977,7 +1429,7 @@ export function RollingMasterRadar({
             </div>
           </div>
 
-          <div className={`col-span-2 sm:col-span-1 p-2.5 rounded-xl border flex items-center justify-between ${
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight ? 'bg-rose-950/40 border-rose-800/60 text-rose-200' : 'bg-rose-50/70 border-rose-200/80 text-rose-900'
           }`}>
             <div className="flex items-center gap-2">
@@ -1120,32 +1572,52 @@ export function RollingMasterRadar({
                                             <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
                                           )}
                                           <span>
-                                            {items.length === 1
+                                            {stream.key === 'QC'
+                                              ? `${items.length} งาน QC`
+                                              : items.length === 1
                                               ? items[0].tag || items[0].lotNo || '1 งาน'
                                               : `${items.length} รายการ`}
                                           </span>
                                         </span>
-                                        {items.length === 1 && items[0].lotNo && (
-                                          <span className="text-[9px] opacity-80 truncate max-w-[55px]">
-                                            {items[0].sku}
-                                          </span>
+                                        {stream.key === 'QC' ? (
+                                          <div className="flex items-center gap-0.5 text-[8px] opacity-85 font-semibold truncate max-w-[62px]">
+                                            {items.some(i => i.qcSubtype === 'RM') && <span>RM</span>}
+                                            {items.some(i => i.qcSubtype === 'PM') && <span>•PM</span>}
+                                            {items.some(i => i.qcSubtype === 'BULK') && <span>•Bulk</span>}
+                                            {items.some(i => i.qcSubtype === 'FG') && <span>•FG</span>}
+                                          </div>
+                                        ) : (
+                                          items.length === 1 && items[0].lotNo && (
+                                            <span className="text-[9px] opacity-80 truncate max-w-[55px]">
+                                              {items[0].sku}
+                                            </span>
+                                          )
                                         )}
                                       </PopoverTrigger>
 
-                                      <PopoverContent
-                                        className="w-[360px] sm:w-[480px] max-w-[95vw] p-4 bg-white border border-[#D4AF37]/40 shadow-2xl rounded-2xl z-50 text-xs text-[#4A4238]"
-                                        align="center"
-                                      >
-                                        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
-                                          <div className="font-bold flex items-center gap-2 text-sm">
-                                            <Icon className={`w-4 h-4 ${stream.color}`} />
-                                            <span>{stream.shortLabel}</span>
-                                            <span className="text-xs font-bold text-slate-500">({items.length} รายการ)</span>
-                                          </div>
-                                          <span className="text-[11px] font-bold text-amber-900 bg-amber-100/80 border border-amber-200 px-2.5 py-0.5 rounded-full">
-                                            {d.dayName} {d.dayNum} {d.monthName}
-                                          </span>
-                                        </div>
+                                       {stream.key === 'QC' ? (
+                                         <QcPopoverContent
+                                           items={items}
+                                           stream={stream}
+                                           date={d}
+                                           isNight={isNight}
+                                           onSelectLot={onSelectLot}
+                                         />
+                                       ) : (
+                                         <PopoverContent
+                                           className="w-[360px] sm:w-[480px] max-w-[95vw] p-4 bg-white border border-[#D4AF37]/40 shadow-2xl rounded-2xl z-50 text-xs text-[#4A4238]"
+                                           align="center"
+                                         >
+                                           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 mb-3">
+                                             <div className="font-bold flex items-center gap-2 text-sm">
+                                               <Icon className={`w-4 h-4 ${stream.color}`} />
+                                               <span>{stream.shortLabel}</span>
+                                               <span className="text-xs font-bold text-slate-500">({items.length} รายการ)</span>
+                                             </div>
+                                             <span className="text-[11px] font-bold text-amber-900 bg-amber-100/80 border border-amber-200 px-2.5 py-0.5 rounded-full">
+                                               {d.dayName} {d.dayNum} {d.monthName}
+                                             </span>
+                                           </div>
 
                                         <div className="space-y-2">
                                           {items.map((it, itIdx) => {
@@ -1292,8 +1764,9 @@ export function RollingMasterRadar({
                                             )
                                           })}
                                         </div>
-                                      </PopoverContent>
-                                    </Popover>
+                                       </PopoverContent>
+                                     )}
+                                     </Popover>
                                   ) : (
                                     <span className="text-slate-300 text-xs font-light">-</span>
                                   )}
@@ -1317,10 +1790,11 @@ export function RollingMasterRadar({
                     const dayEta = dateStreamMap[d.dateStr]?.ETA || []
                     const dayWeighing = dateStreamMap[d.dateStr]?.WEIGHING || []
                     const dayMixing = dateStreamMap[d.dateStr]?.MIXING || []
+                    const dayQc = dateStreamMap[d.dateStr]?.QC || []
                     const dayPacking = dateStreamMap[d.dateStr]?.PACKING || []
                     const dayFgDue = dateStreamMap[d.dateStr]?.FG_DUE || []
 
-                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayPacking.length + dayFgDue.length
+                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayPacking.length + dayFgDue.length
 
                     if (totalDayTasks === 0) return null
 
@@ -1423,6 +1897,32 @@ export function RollingMasterRadar({
                                   {m.meta?.isMultiDay && (
                                     <span className="text-[9px] text-blue-700 bg-blue-50 border border-blue-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
                                       {format(parseISO(m.meta.startDate), 'd/M')}-{format(parseISO(m.meta.endDate), 'd/M')}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* QC */}
+                          {dayQc.length > 0 && (
+                            <div className="p-2 rounded-xl bg-purple-50/70 border border-purple-200/70 space-y-1">
+                              <div className="font-bold text-purple-900 flex items-center gap-1.5 text-[11px]">
+                                <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                                <span>ตรวจสอบคุณภาพ QC ({dayQc.length} รายการ)</span>
+                              </div>
+                              {dayQc.map(q => (
+                                <div key={q.id} className="text-[11px] text-purple-800 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-purple-100 text-purple-900 border-purple-200">
+                                      {q.qcSubtype || 'QC'}
+                                    </span>
+                                    <span>• <strong>{q.title}</strong></span>
+                                    {q.tag && <span className="text-purple-600 font-medium">[{q.tag}]</span>}
+                                  </div>
+                                  {q.opStatus && (
+                                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${q.opStatus.color}`}>
+                                      {q.opStatus.shortBadge}
                                     </span>
                                   )}
                                 </div>
