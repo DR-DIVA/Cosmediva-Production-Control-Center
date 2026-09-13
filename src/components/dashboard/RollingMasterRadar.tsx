@@ -1329,127 +1329,128 @@ export function RollingMasterRadar({
       <CardHeader className={`border-b border-[#D4AF37]/25 p-5 md:p-6 transition-colors duration-300 ${
         isNight ? 'bg-[#0F172A]' : 'bg-gradient-to-b from-[#FAF8F5] to-white'
       }`}>
-        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-          <div className="min-w-0">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-xs shrink-0">
-                <Compass className="w-6 h-6 text-[#D4AF37] animate-spin-slow" />
+        {/* Tier 1: Radar Title, Date Horizon & Theme Toggle */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-xs shrink-0">
+              <Compass className="w-6 h-6 text-[#D4AF37] animate-spin-slow" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className={`text-xl md:text-2xl font-black tracking-tight ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
+                  21-Day Rolling Master Radar
+                </h2>
+                <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
+                  เรดาร์แผนงาน 3 สัปดาห์ (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)
+                </span>
               </div>
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2.5">
-                  <h2 className={`text-xl md:text-2xl font-black whitespace-nowrap tracking-tight ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
-                    21-Day Rolling Master Radar
-                  </h2>
-                  <span className="text-xs font-bold text-amber-800 bg-amber-100/90 border border-amber-300/80 px-2.5 py-0.5 rounded-full shadow-xs whitespace-nowrap">
-                    เรดาร์แผนงาน 3 สัปดาห์ (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)
+              <div className={`text-xs font-medium flex flex-wrap items-center gap-2 mt-1 ${isNight ? 'text-slate-300' : 'text-[#8B7355]'}`}>
+                <div className="flex items-center gap-1.5 whitespace-nowrap">
+                  <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
+                  <span>
+                    หน้าต่างแผนงาน: <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[20]?.dayNum} {horizonDates[20]?.monthName} 2026</strong>
                   </span>
                 </div>
-                <div className={`text-xs font-medium flex flex-wrap items-center gap-2 mt-1 ${isNight ? 'text-slate-300' : 'text-[#8B7355]'}`}>
-                  <div className="flex items-center gap-1.5 whitespace-nowrap">
-                    <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
-                    <span>
-                      หน้าต่างแผนงาน: <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[0]?.dayNum} {horizonDates[0]?.monthName}</strong> ➔ <strong className={isNight ? 'text-amber-300' : 'text-[#4A4238]'}>{horizonDates[20]?.dayNum} {horizonDates[20]?.monthName} 2026</strong>
-                    </span>
-                  </div>
-                  <span className="text-slate-300 hidden sm:inline">•</span>
-                  <span className="text-emerald-700 font-semibold flex items-center gap-1 whitespace-nowrap">
-                    <CheckCircle2 className="w-3.5 h-3.5" /> ซิงค์อัตโนมัติทุกวัน (Auto Rolling)
-                  </span>
-                </div>
+                <span className="text-slate-300 hidden sm:inline">•</span>
+                <span className="text-emerald-700 font-semibold flex items-center gap-1 whitespace-nowrap">
+                  <CheckCircle2 className="w-3.5 h-3.5" /> ซิงค์อัตโนมัติทุกวัน (Auto Rolling)
+                </span>
               </div>
             </div>
           </div>
 
-          {/* View Switcher Controls & Theme Toggle */}
-          <div className="flex flex-wrap items-center gap-2 self-stretch xl:self-auto shrink-0">
-            {/* Change Theme Button (21-Day Radar) */}
-            {handleToggleRadar && (
-              <button
-                type="button"
-                onClick={handleToggleRadar}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs transition active:scale-95 border cursor-pointer select-none ${
-                  isNight
-                    ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
-                    : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 hover:text-slate-900 shadow-xs'
-                }`}
-                title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (21-Day Radar)' : 'เปลี่ยนเป็นโหมดมืด (21-Day Radar)'}
-              >
-                {isNight ? (
-                  <>
-                    <Sun className="w-3.5 h-3.5 text-amber-400" />
-                    <span>โหมดสว่าง (Light)</span>
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-3.5 h-3.5 text-indigo-600" />
-                    <span>โหมดมืด (Night)</span>
-                  </>
-                )}
-              </button>
-            )}
+          {/* Change Theme Button (21-Day Radar) */}
+          {handleToggleRadar && (
+            <button
+              type="button"
+              onClick={handleToggleRadar}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-bold text-xs transition active:scale-95 border cursor-pointer select-none shrink-0 ${
+                isNight
+                  ? 'bg-slate-800/90 hover:bg-slate-700 text-amber-300 border-slate-700 hover:text-amber-200 shadow-sm'
+                  : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300 hover:text-slate-900 shadow-xs'
+              }`}
+              title={isNight ? 'เปลี่ยนเป็นโหมดสว่าง (21-Day Radar)' : 'เปลี่ยนเป็นโหมดมืด (21-Day Radar)'}
+            >
+              {isNight ? (
+                <>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
+                  <span>โหมดสว่าง (Light)</span>
+                </>
+              ) : (
+                <>
+                  <Moon className="w-3.5 h-3.5 text-indigo-600" />
+                  <span>โหมดมืด (Night)</span>
+                </>
+              )}
+            </button>
+          )}
+        </div>
 
-            {/* View Mode Buttons */}
-            <div className={`flex items-center p-1 rounded-xl border shadow-inner ${
-              isNight ? 'bg-slate-900/90 border-slate-700' : 'bg-slate-100/90 border-slate-200'
-            }`}>
-              <button
-                type="button"
-                onClick={() => setViewMode('timeline')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'timeline'
-                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
-                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
-                }`}
-              >
-                <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
-                Timeline Horizon
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('daily')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'daily'
-                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
-                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
-                }`}
-              >
-                <ListOrdered className="w-3.5 h-3.5 text-[#D4AF37]" />
-                Daily Worklist
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('logistics')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'logistics'
-                    ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
-                    : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
-                }`}
-              >
-                <Truck className="w-3.5 h-3.5 text-[#D4AF37]" />
-                ETA Logistics
-              </button>
-            </div>
+        {/* Tier 2: Dedicated Control Toolbar (View Mode Switcher + Stream Filter Pills) */}
+        <div className={`flex flex-col lg:flex-row lg:items-center justify-between gap-3 mt-4 pt-3.5 border-t ${
+          isNight ? 'border-slate-800/80' : 'border-[#D4AF37]/20'
+        }`}>
+          {/* View Mode Buttons */}
+          <div className={`flex items-center p-1 rounded-xl border shadow-inner shrink-0 ${
+            isNight ? 'bg-slate-900/90 border-slate-700' : 'bg-slate-100/90 border-slate-200'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setViewMode('timeline')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'timeline'
+                  ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                  : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Timeline Horizon</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('daily')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'daily'
+                  ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                  : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
+              }`}
+            >
+              <ListOrdered className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>Daily Worklist</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('logistics')}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'logistics'
+                  ? (isNight ? 'bg-slate-800 text-amber-300 shadow-sm border border-slate-700' : 'bg-white text-[#4A4238] shadow-sm border border-slate-200')
+                  : (isNight ? 'text-slate-400 hover:text-white' : 'text-slate-500 hover:text-[#4A4238]')
+              }`}
+            >
+              <Truck className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>ETA Logistics</span>
+            </button>
+          </div>
 
-            {/* Stream Filter Pills */}
-            <div className={`flex flex-wrap items-center gap-1 p-1 rounded-xl border text-xs ${
-              isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
-            }`}>
-              <span className={`text-[10px] font-bold px-1.5 ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>สายงาน:</span>
-              {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'PACKING', 'FG_DUE'] as const).map(f => (
-                <button
-                  key={f}
-                  type="button"
-                  onClick={() => setStreamFilter(f)}
-                  className={`px-2 py-1 rounded-md text-[11px] font-semibold transition ${
-                    streamFilter === f
-                      ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs'
-                      : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
-                  }`}
-                >
-                  {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'QC' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
-                </button>
-              ))}
-            </div>
+          {/* Stream Filter Pills */}
+          <div className={`flex flex-wrap items-center gap-1 p-1 rounded-xl border text-xs ${
+            isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
+          }`}>
+            <span className={`text-[11px] font-bold px-2 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>สายงาน:</span>
+            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'PACKING', 'FG_DUE'] as const).map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setStreamFilter(f)}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
+                  streamFilter === f
+                    ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs'
+                    : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
+                }`}
+              >
+                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'ของเข้า' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'QC' : f === 'PACKING' ? 'บรรจุ' : 'ส่งมอบ'}
+              </button>
+            ))}
           </div>
         </div>
 
