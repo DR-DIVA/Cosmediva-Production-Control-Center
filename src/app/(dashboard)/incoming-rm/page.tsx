@@ -49,6 +49,8 @@ type RMItem = {
   top_remark?: string | null;
   remark?: string | null;
   received_qty?: number | null;
+  released_date?: string | null;
+  updated_at?: string | null;
   production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
 };
 
@@ -476,10 +478,13 @@ export default function RMControlCenterPage() {
     
     if (newQcStatus === 'PASSED') {
       updates.status = 'READY';
+      updates.released_date = new Date().toISOString();
     } else if (newQcStatus === 'REJECTED') {
       updates.status = 'REJECTED';
+      updates.released_date = null;
     } else {
       updates.status = 'RECEIVED';
+      updates.released_date = null;
     }
 
     const { error } = await supabase
@@ -1723,15 +1728,30 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="text-sm table-fixed w-full">
+                  <Table className="text-sm min-w-[1300px]">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[10%]">SKU / LOT</TableHead>
-                        <TableHead>คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)</TableHead>
-                        <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
-                        <TableHead>{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
-                        <TableHead>Required Qty</TableHead>
-                        <TableHead className="w-[10%] p-0">
+                        <TableHead className="w-[130px]">SKU / LOT</TableHead>
+                        <TableHead className="w-[120px]">คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)</TableHead>
+                        <TableHead className="w-[110px]">PO No.</TableHead>
+                        <TableHead className="w-[110px]">Control No.</TableHead>
+                        <TableHead className="w-[110px]">{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
+                        <TableHead className="min-w-[180px]">{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
+                        <TableHead className="w-[110px]">Required Qty</TableHead>
+                        <TableHead 
+                          className="w-[140px] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
+                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                        >
+                          <div className="flex items-center gap-1">
+                            <span>ETA</span>
+                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[120px]">วันที่คลังรับเข้า</TableHead>
+                        <TableHead className="w-[130px]">วันที่ QC pass</TableHead>
+                        <TableHead className="w-[130px] p-0">
                           <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
                             <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
                               <div className="flex items-center gap-2">
@@ -1751,93 +1771,161 @@ export default function RMControlCenterPage() {
                             </SelectContent>
                           </Select>
                         </TableHead>
-                        <TableHead 
-                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
-                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>ETA</span>
-                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
-                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
-                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                          </div>
-                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => {
-                        let targetDate: Date | null = null;
-                        if (item.production_lots?.production_logs) {
-                          const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
-                          const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
-                          if (targetLogs.length > 0) {
-                            targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-                            targetDate = new Date(targetLogs[0].activity_date);
-                          }
-                        }
-                        
-                        const etaDate = item.eta_date ? new Date(item.eta_date) : null;
-                        
-                        let etaStatus: 'on-time' | 'at-risk' | 'delayed' | null = null;
-                        if (targetDate && etaDate) {
-                          const tDate = new Date(targetDate.toDateString()).getTime();
-                          const eDate = new Date(etaDate.toDateString()).getTime();
-                          const diffDays = (tDate - eDate) / (1000 * 60 * 60 * 24);
-                          
-                          if (diffDays < 0) {
-                            etaStatus = 'delayed';
-                          } else if (diffDays <= 3) {
-                            etaStatus = 'at-risk';
-                          } else {
-                            etaStatus = 'on-time';
-                          }
-                        }
-
-                        return (
-                        <TableRow key={item.id}>
-                          <TableCell>
-                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
-                          </TableCell>
-                          <TableCell className="text-slate-600 font-medium">
-                            {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
-                          </TableCell>
-                          <TableCell>{item.rm_code}</TableCell>
-                          <TableCell>
-                            <div>{item.rm_name}</div>
-                            {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
-                              <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
-                                {item.bottom_remark.split('/')[0].trim()}
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
-                          <TableCell>{getStatusBadge(item.status)}</TableCell>
-                          <TableCell>
-                            {etaDate ? (
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-slate-700">{etaDate.toLocaleDateString('th-TH')}</span>
-                                {etaStatus === 'delayed' && (
-                                  <div className="flex items-center gap-1 text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
-                                    <AlertTriangle className="w-3 h-3" /> ไม่ทัน{mainTab === 'rm' ? 'ชั่ง' : 'บรรจุ'}
-                                  </div>
-                                )}
-                                {etaStatus === 'at-risk' && (
-                                  <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
-                                    <AlertTriangle className="w-3 h-3" /> เสี่ยงล่าช้า
-                                  </div>
-                                )}
-                                {etaStatus === 'on-time' && (
-                                  <div className="flex items-center gap-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
-                                    <CheckCircle2 className="w-3 h-3" /> ทันเวลา
-                                  </div>
-                                )}
-                              </div>
-                            ) : '-'}
+                      {filteredItems.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={11} className="h-32 text-center text-slate-400 text-sm">
+                            ไม่พบรายการวัตถุดิบ/บรรจุภัณฑ์ตามเงื่อนไขที่เลือก
                           </TableCell>
                         </TableRow>
-                        );
-                      })}
+                      ) : (
+                        filteredItems.map((item) => {
+                          let targetDate: Date | null = null;
+                          if (item.production_lots?.production_logs) {
+                            const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
+                            const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
+                            if (targetLogs.length > 0) {
+                              targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+                              targetDate = new Date(targetLogs[0].activity_date);
+                            }
+                          }
+                          
+                          const etaDate = item.eta_date ? new Date(item.eta_date) : null;
+                          
+                          let etaStatus: 'on-time' | 'at-risk' | 'delayed' | null = null;
+                          if (targetDate && etaDate) {
+                            const tDate = new Date(targetDate.toDateString()).getTime();
+                            const eDate = new Date(etaDate.toDateString()).getTime();
+                            const diffDays = (tDate - eDate) / (1000 * 60 * 60 * 24);
+                            
+                            if (diffDays < 0) {
+                              etaStatus = 'delayed';
+                            } else if (diffDays <= 3) {
+                              etaStatus = 'at-risk';
+                            } else {
+                              etaStatus = 'on-time';
+                            }
+                          }
+
+                          return (
+                          <TableRow key={item.id}>
+                            <TableCell>
+                              <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
+                              <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            </TableCell>
+                            <TableCell className="text-slate-600 font-medium">
+                              {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
+                            </TableCell>
+                            <TableCell className="font-semibold text-[#D4AF37] text-xs">
+                              {item.po_no || '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.control_no ? (
+                                <span className="font-mono font-bold text-xs text-purple-700 bg-purple-50 px-2 py-0.5 rounded border border-purple-200/60 inline-block">
+                                  {item.control_no}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 text-xs">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-medium text-purple-700">{item.rm_code}</TableCell>
+                            <TableCell>
+                              <div className="line-clamp-2 break-words" title={item.rm_name}>{item.rm_name}</div>
+                              {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
+                                <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
+                                  {item.bottom_remark.split('/')[0].trim()}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell className="font-semibold">{item.quantity} {item.unit}</TableCell>
+                            <TableCell>
+                              {etaDate ? (
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-slate-700">{etaDate.toLocaleDateString('th-TH')}</span>
+                                  {etaStatus === 'delayed' && (
+                                    <div className="flex items-center gap-1 text-[10px] text-red-600 bg-red-50 px-1.5 py-0.5 rounded border border-red-200">
+                                      <AlertTriangle className="w-3 h-3" /> ไม่ทัน{mainTab === 'rm' ? 'ชั่ง' : 'บรรจุ'}
+                                    </div>
+                                  )}
+                                  {etaStatus === 'at-risk' && (
+                                    <div className="flex items-center gap-1 text-[10px] text-orange-600 bg-orange-50 px-1.5 py-0.5 rounded border border-orange-200">
+                                      <AlertTriangle className="w-3 h-3" /> เสี่ยงล่าช้า
+                                    </div>
+                                  )}
+                                  {etaStatus === 'on-time' && (
+                                    <div className="flex items-center gap-1 text-[10px] text-green-600 bg-green-50 px-1.5 py-0.5 rounded border border-green-200">
+                                      <CheckCircle2 className="w-3 h-3" /> ทันเวลา
+                                    </div>
+                                  )}
+                                </div>
+                              ) : '-'}
+                            </TableCell>
+                            <TableCell>
+                              {item.receive_date ? (() => {
+                                const d = new Date(item.receive_date.endsWith('Z') || item.receive_date.includes('+') ? item.receive_date : item.receive_date + 'Z');
+                                return (
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-slate-700 text-xs">{d.toLocaleDateString('th-TH')}</span>
+                                    <span className="text-[11px] text-slate-500">{d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
+                                  </div>
+                                );
+                              })() : (
+                                <span className="text-slate-400 text-xs">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              {(() => {
+                                const rawDate = item.released_date || (item.qc_status === 'PASSED' ? item.updated_at : null);
+                                if (rawDate && (item.qc_status === 'PASSED' || item.status === 'READY' || item.status === 'QC_PASS')) {
+                                  const d = new Date(rawDate.endsWith('Z') || rawDate.includes('+') ? rawDate : rawDate + 'Z');
+                                  return (
+                                    <div className="flex flex-col">
+                                      <span className="font-medium text-green-700 text-xs flex items-center gap-1">
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-green-600 shrink-0" />
+                                        {d.toLocaleDateString('th-TH')}
+                                      </span>
+                                      <span className="text-[11px] text-slate-500 pl-4.5">{d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
+                                    </div>
+                                  );
+                                }
+                                if (item.qc_status === 'PASSED' || item.status === 'READY' || item.status === 'QC_PASS') {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded">
+                                      <CheckCircle2 className="w-3 h-3 text-green-600" /> ผ่านแล้ว
+                                    </span>
+                                  );
+                                }
+                                if (item.qc_status === 'HOLD') {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded">
+                                      ⚠️ QC HOLD
+                                    </span>
+                                  );
+                                }
+                                if (item.qc_status === 'REJECTED') {
+                                  return (
+                                    <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
+                                      ✕ REJECTED
+                                    </span>
+                                  );
+                                }
+                                if (item.receive_date) {
+                                  return (
+                                    <span className="text-[11px] font-medium text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
+                                      รอผลตรวจ QC
+                                    </span>
+                                  );
+                                }
+                                return <span className="text-slate-400 text-xs">-</span>;
+                              })()}
+                            </TableCell>
+                            <TableCell>{getStatusBadge(item.status)}</TableCell>
+                          </TableRow>
+                          );
+                        })
+                      )}
                     </TableBody>
                   </Table>
                 </div>
