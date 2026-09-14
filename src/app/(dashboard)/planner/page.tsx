@@ -32,7 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { format, differenceInDays, startOfDay, addDays } from "date-fns"
+import { format, differenceInDays, startOfDay, addDays, isSameDay } from "date-fns"
 import { createClient } from "@supabase/supabase-js"
 import { toast } from "sonner"
 import { getUsers } from '@/app/actions/users'
@@ -386,8 +386,10 @@ export default function PlannerPage() {
       let updateData: any = { [field]: value }
       const existingLog = logs.find(l => l.id === logId)
       
-      if (field === 'activity_date' && value && existingLog && !existingLog.end_date) {
-        updateData.end_date = value 
+      if (field === 'activity_date' && value && existingLog) {
+        if (!existingLog.end_date || existingLog.end_date === existingLog.activity_date) {
+          updateData.end_date = value 
+        }
       }
       
       if (field === 'tank_start' || field === 'tank_end') {
@@ -423,8 +425,27 @@ export default function PlannerPage() {
     // If date hasn't changed, do nothing
     if (currentVal === newDateValue) return
 
-    // It's an existing plan date being modified -> Open Reschedule Modal to track reason
-    const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+    // Parse existing plan change info
+    const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
+
+    // Check if this date adjustment is during initial plan setup:
+    // 1. Task created today (same-day session as opening queue)
+    // 2. OR task activity_date is still the untouched automated default creation date
+    // AND has never had a genuine reschedule recorded on a subsequent day
+    const createdAt = log.created_at ? new Date(log.created_at) : null
+    const isCreatedToday = createdAt ? isSameDay(createdAt, new Date()) : false
+    const isDefaultCreationDate = createdAt && log.activity_date
+      ? format(createdAt, 'yyyy-MM-dd') === log.activity_date
+      : false
+
+    const isInitialSetup = (isCreatedToday || isDefaultCreationDate || !currentVal) && !planInfo.isRescheduled
+
+    if (isInitialSetup) {
+      handleUpdateLogDirect(log.id, field, newDateValue)
+      return
+    }
+
+    // It's an existing plan date being modified on a subsequent day -> Open Reschedule Modal to track reason
     setRescheduleModal({
       isOpen: true,
       logId: log.id,
@@ -442,7 +463,7 @@ export default function PlannerPage() {
   }
 
   const handleOpenRescheduleDetail = (log: any, lot: any, process: any) => {
-    const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+    const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
     setRescheduleModal({
       isOpen: true,
       logId: log.id,
@@ -555,7 +576,7 @@ export default function PlannerPage() {
     const taskHistory = logs.map(log => {
       const lot = lots.find(l => l.id === log.production_lot_id);
       const process = processes.find(p => p.id === log.process_id);
-      const planInfo = parsePlanChangeInfo(log.note, log.activity_date);
+      const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at);
       const isRescheduled = planInfo.isRescheduled;
       return {
         id: `log-${log.id}`,
@@ -1462,7 +1483,7 @@ export default function PlannerPage() {
                               </div>
                             </TableCell>
                             {(() => {
-                              const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+                              const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
                               return (
                                 <>
                                   <TableCell className="py-2">

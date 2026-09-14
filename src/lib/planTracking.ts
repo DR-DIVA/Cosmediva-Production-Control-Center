@@ -28,7 +28,7 @@ export function getPlanCategoryLabel(categoryId?: string): string {
 /**
  * Parses plan rescheduling tracking metadata from production_logs note
  */
-export function parsePlanChangeInfo(note?: string | null, activityDate?: string | null): PlanChangeInfo {
+export function parsePlanChangeInfo(note?: string | null, activityDate?: string | null, createdAt?: string | null): PlanChangeInfo {
   const result: PlanChangeInfo = {
     isRescheduled: false
   }
@@ -40,6 +40,17 @@ export function parsePlanChangeInfo(note?: string | null, activityDate?: string 
   if (match && match[1]) {
     try {
       const data = JSON.parse(match[1])
+
+      // If the date change occurred on the exact same date as task creation with no custom reason,
+      // it was an initial plan setup when the queue was first opened, NOT an actual reschedule.
+      if (createdAt && data.originalDate) {
+        const cDate = typeof createdAt === 'string' ? createdAt.slice(0, 10) : ''
+        const uDate = data.updatedAt ? data.updatedAt.slice(0, 10) : ''
+        if (cDate && (data.originalDate === cDate || uDate === cDate) && (!data.reason || data.reason.trim() === '')) {
+          return result
+        }
+      }
+
       result.isRescheduled = true
       result.originalDate = data.originalDate || ''
       result.revisedDate = data.revisedDate || activityDate || ''

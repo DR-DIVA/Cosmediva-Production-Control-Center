@@ -347,7 +347,7 @@ function computeOperationalStatus(
   const endTime = formatTime(log.end_time)
 
   // Parse plan rescheduling tracking & clean user comments
-  const planInfo = parsePlanChangeInfo(log.note, log.activity_date)
+  const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
   const userComment = extractUserComment(log.note)
   const note = userComment || undefined
 

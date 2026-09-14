@@ -267,7 +267,7 @@ export function PlantDirectorAdvisory({
         const first = tks[0]
         const sku = first.production_lots?.products?.sku || 'SKU'
         const lotId = first.production_lots?.id
-        const pPlan = parsePlanChangeInfo(first.note, first.activity_date)
+        const pPlan = parsePlanChangeInfo(first.note, first.activity_date, first.created_at)
 
         list.push({
           id: `floor-overdue-${lotNo}`,
