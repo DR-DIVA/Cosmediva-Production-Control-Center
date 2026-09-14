@@ -1136,7 +1136,7 @@ export function RollingMasterRadar({
       ] = await Promise.all([
         // 1. ETA RM/PM within 21 days (or received within horizon)
         supabase.from('production_lot_rms')
-          .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier, bottom_remark, receive_date')
+          .select('id, rm_code, rm_name, po_no, eta_date, status, qc_status, quantity, unit, supplier, bottom_remark, receive_date, control_no, remark, received_qty')
           .or(`and(eta_date.gte.${horizonStartStr},eta_date.lte.${horizonEndStr}),and(receive_date.gte.${horizonStartStr},receive_date.lte.${horizonEndStr})`)
           .order('eta_date', { ascending: true }),
 
@@ -1266,18 +1266,19 @@ export function RollingMasterRadar({
          const isRescheduled = dInfo.isDelayed || item.status === 'DELAYED'
          const opStatus = computeOperationalStatus(item, 'ETA', d, todayDateStr)
 
-         map[d].ETA.push({
-           id: item.id,
-           streamType: 'ETA',
-           date: d,
-           title: `${item.rm_code} (${item.quantity || 0} ${item.unit || ''})`,
-           subtitle: item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์',
-           tag: item.po_no ? `PO: ${item.po_no}` : undefined,
-           quantity: item.quantity,
-           status: item.status,
-           meta: { ...item, delayInfo: dInfo, isDelayed: isRescheduled },
-           opStatus
-         })
+          const displayQty = item.received_qty != null ? item.received_qty : item.quantity;
+          map[d].ETA.push({
+            id: item.id,
+            streamType: 'ETA',
+            date: d,
+            title: `${item.rm_code} (${Number(displayQty || 0).toLocaleString()} ${item.unit || ''})`,
+            subtitle: item.rm_name || item.supplier || 'วัตถุดิบ/บรรจุภัณฑ์',
+            tag: item.control_no ? `Ctrl: ${item.control_no}` : (item.po_no ? `PO: ${item.po_no}` : undefined),
+            quantity: displayQty,
+            status: item.status,
+            meta: { ...item, delayInfo: dInfo, isDelayed: isRescheduled },
+            opStatus
+          })
        }
     })
 
@@ -1634,15 +1635,16 @@ export function RollingMasterRadar({
         todayDateStr
       )
 
+      const displayQty = item.received_qty != null ? item.received_qty : item.quantity;
       map[targetDate].QC.push({
         id: `qc-rmpm-${item.id}`,
         streamType: 'QC',
         qcSubtype: isPM ? 'PM' : 'RM',
         date: targetDate,
-        title: `${item.rm_code} (${Number(item.quantity || 0).toLocaleString()} ${item.unit || ''})`,
+        title: `${item.rm_code} (${Number(displayQty || 0).toLocaleString()} ${item.unit || ''})`,
         subtitle: item.rm_name || (isPM ? 'บรรจุภัณฑ์' : 'วัตถุดิบ'),
-        tag: item.po_no ? `PO: ${item.po_no}` : (isPM ? 'PM' : 'RM'),
-        quantity: item.quantity,
+        tag: item.control_no ? `Ctrl: ${item.control_no}` : (item.po_no ? `PO: ${item.po_no}` : (isPM ? 'PM' : 'RM')),
+        quantity: displayQty,
         status: rawQcStatus,
         meta: item,
         opStatus
@@ -2483,6 +2485,36 @@ export function RollingMasterRadar({
                                                   </div>
                                                 )}
 
+                                                {/* Warehouse Receive Info Box (for ETA or QC RM/PM items) */}
+                                                {(it.streamType === 'ETA' || it.streamType === 'QC') && (it.meta?.control_no || it.meta?.received_qty != null || it.meta?.remark) && (
+                                                  <div className="p-2 rounded-lg bg-emerald-50/80 border border-emerald-200/90 text-emerald-950 text-[10px] space-y-1 mt-1 shadow-xs">
+                                                    <div className="font-bold flex items-center justify-between gap-1 text-emerald-900 flex-wrap">
+                                                      <span className="flex items-center gap-1">
+                                                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 shrink-0"></span>
+                                                        <span>ข้อมูลรับเข้าคลัง</span>
+                                                      </span>
+                                                      {it.meta?.control_no && (
+                                                        <span className="font-mono font-bold text-purple-700 bg-purple-100 px-1.5 py-0.5 rounded text-[9px] border border-purple-200">
+                                                          Ctrl: {it.meta.control_no}
+                                                        </span>
+                                                      )}
+                                                    </div>
+                                                    {it.meta?.received_qty != null && (
+                                                      <div className="text-slate-700 pl-2.5 text-[10px]">
+                                                        ยอดรับจริง: <strong className="text-emerald-800">{Number(it.meta.received_qty).toLocaleString()} {it.meta.unit || ''}</strong>
+                                                        {it.meta.received_qty !== it.meta.quantity && (
+                                                          <span className="text-slate-400 ml-1.5 line-through">(ยอด PO: {Number(it.meta.quantity).toLocaleString()})</span>
+                                                        )}
+                                                      </div>
+                                                    )}
+                                                    {it.meta?.remark && (
+                                                      <div className="text-emerald-900 pl-2.5 text-[10px] italic border-l-2 border-emerald-400">
+                                                        💬 หมายเหตุรับเข้า: &ldquo;{it.meta.remark}&rdquo;
+                                                      </div>
+                                                    )}
+                                                  </div>
+                                                )}
+
                                                 {/* Plan Rescheduled Alert Box (for Manufacturing items) */}
                                                 {it.opStatus?.rescheduledInfo?.isRescheduled && (
                                                   <div className="p-2 rounded-lg bg-purple-50/95 border border-purple-200/90 text-purple-900 text-[10px] space-y-1 mt-1 shadow-xs">
@@ -2890,6 +2922,11 @@ export function RollingMasterRadar({
                               <div>
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-extrabold text-[#4A4238] text-sm">{item.rm_code}</span>
+                                  {item.control_no && (
+                                    <span className="text-[10px] font-mono font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200">
+                                      Ctrl: {item.control_no}
+                                    </span>
+                                  )}
                                   {item.po_no && (
                                     <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md">
                                       PO: {item.po_no}
@@ -2919,14 +2956,25 @@ export function RollingMasterRadar({
                                     เหตุผล: {dInfo.reason}
                                   </div>
                                 )}
+                                {item.remark && (
+                                  <div className="text-[10px] text-purple-800 mt-1 bg-purple-50 px-2 py-0.5 rounded border border-purple-200/80 inline-flex items-center gap-1">
+                                    <span className="font-bold">💬 หมายเหตุรับเข้า:</span>
+                                    <span>{item.remark}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
                             <div className="flex items-center gap-3 sm:self-center pl-14 sm:pl-0">
                               <div className="text-right">
                                 <div className="font-black text-[#4A4238] text-sm">
-                                  {Number(item.quantity || 0).toLocaleString()} {item.unit || 'หน่วย'}
+                                  {Number(item.received_qty != null ? item.received_qty : item.quantity || 0).toLocaleString()} {item.unit || 'หน่วย'}
                                 </div>
+                                {item.received_qty != null && item.received_qty !== item.quantity && (
+                                  <div className="text-[10px] text-slate-400 line-through">
+                                    PO: {Number(item.quantity || 0).toLocaleString()} {item.unit || ''}
+                                  </div>
+                                )}
                                 <div className="text-[10px] text-slate-400">
                                   {item.supplier ? `Supplier: ${item.supplier}` : 'รอรับเข้าคลัง RM'}
                                 </div>

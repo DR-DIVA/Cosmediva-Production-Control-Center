@@ -1182,8 +1182,25 @@ export default function QCQueuePage() {
                                 {item.bottom_remark.split('/')[0].trim()}
                               </div>
                             )}
+                            {item.remark && (
+                              <div className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200/70 px-1.5 py-0.5 rounded mt-1 flex items-start gap-1 max-w-[200px]" title={item.remark}>
+                                <span className="font-bold shrink-0">💬 หมายเหตุรับเข้า:</span>
+                                <span className="truncate">{item.remark}</span>
+                              </div>
+                            )}
                           </td>
-                          <td className="px-4 py-3">{item.quantity} {item.unit}</td>
+                          <td className="px-4 py-3">
+                            {item.received_qty != null ? (
+                              <div>
+                                <div className="font-bold text-slate-800">{Number(item.received_qty).toLocaleString()} {item.unit}</div>
+                                {item.received_qty !== item.quantity && (
+                                  <div className="text-[10px] text-slate-400 line-through">PO: {Number(item.quantity).toLocaleString()} {item.unit}</div>
+                                )}
+                              </div>
+                            ) : (
+                              <span>{item.quantity} {item.unit}</span>
+                            )}
+                          </td>
                           <td className="px-4 py-3">{item.po_no}</td>
                           <td className="px-4 py-3">
                             <Badge variant="outline" className={
@@ -1431,8 +1448,25 @@ export default function QCQueuePage() {
                                     {item.bottom_remark.split('/')[0].trim()}
                                   </div>
                                 )}
+                                {item.remark && (
+                                  <div className="text-[10px] text-purple-700 bg-purple-50 border border-purple-200/70 px-1.5 py-0.5 rounded mt-1 flex items-start gap-1 max-w-[200px]" title={item.remark}>
+                                    <span className="font-bold shrink-0">💬 หมายเหตุรับเข้า:</span>
+                                    <span className="truncate">{item.remark}</span>
+                                  </div>
+                                )}
                               </td>
-                              <td className="px-4 py-3">{item.quantity} {item.unit}</td>
+                              <td className="px-4 py-3">
+                                {item.received_qty != null ? (
+                                  <div>
+                                    <div className="font-bold text-slate-800">{Number(item.received_qty).toLocaleString()} {item.unit}</div>
+                                    {item.received_qty !== item.quantity && (
+                                      <div className="text-[10px] text-slate-400 line-through">PO: {Number(item.quantity).toLocaleString()} {item.unit}</div>
+                                    )}
+                                  </div>
+                                ) : (
+                                  <span>{item.quantity} {item.unit}</span>
+                                )}
+                              </td>
                               <td className="px-4 py-3">
                                 <Badge variant="outline" className={
                                   item.qc_status === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' :
