@@ -284,7 +284,15 @@ export default function RMControlCenterPage() {
 
     const updates: any = { status: newStatus };
     if (newStatus === 'PENDING_DELIVERY') {
+      if (!confirm('ยืนยันยกเลิกการรับเข้าและเปลี่ยนสถานะกลับเป็น "Ordered รอรับเข้า" หรือไม่? (ข้อมูลวันที่รับเข้าและ Control No. จะถูกล้าง)')) {
+        return;
+      }
       updates.receive_date = null;
+      updates.control_no = null;
+      updates.received_qty = null;
+      updates.qc_status = null;
+    } else if (newStatus === 'WAITING_QC') {
+      updates.qc_status = 'QUARANTINED';
     }
     
     const { error } = await supabase
@@ -295,7 +303,13 @@ export default function RMControlCenterPage() {
     if (error) {
       toast.error('อัปเดตสถานะไม่สำเร็จ');
     } else {
-      toast.success('อัปเดตสถานะเรียบร้อยแล้ว');
+      if (newStatus === 'WAITING_QC') {
+        toast.success('แจ้งสุ่ม QC เรียบร้อยแล้ว (สถานะ: Quarantined แจ้งสุ่ม)');
+      } else if (newStatus === 'PENDING_DELIVERY') {
+        toast.success('เปลี่ยนสถานะเป็น Ordered รอรับเข้า เรียบร้อยแล้ว');
+      } else {
+        toast.success('อัปเดตสถานะเรียบร้อยแล้ว');
+      }
       fetchItems();
     }
   };
@@ -511,8 +525,8 @@ export default function RMControlCenterPage() {
       quantity: item.quantity || 0,
       unit: item.unit || '',
       eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : '',
-      edit_reason: dInfo.reason || '',
-      delay_category: dInfo.category || 'SUPPLIER_PROD'
+      edit_reason: dInfo.reason || (item.status === 'REJECTED' ? 'เปิดรอบส่งมอบใหม่หลัง QC ไม่ผ่าน' : ''),
+      delay_category: dInfo.category || (item.status === 'REJECTED' ? 'QUALITY_ISSUE_REMAKE' : 'SUPPLIER_PROD')
     });
     setIsEditModalOpen(true);
   };
@@ -528,6 +542,16 @@ export default function RMControlCenterPage() {
     const originalEta = editingItem.eta_date || '';
     const newEta = editForm.eta_date || '';
     const isEtaChanged = originalEta !== newEta;
+
+    // Rule 5: Revised ETA must not be in the past or today
+    if (isEtaChanged && newEta) {
+      const today = new Date();
+      const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      if (newEta <= todayStr) {
+        toast.error('วันที่คาดว่าจะเข้าใหม่ (Revised ETA) ต้องไม่เป็นวันในอดีตหรือวันปัจจุบัน กรุณาระบุวันล่วงหน้า');
+        return;
+      }
+    }
 
     const formattedRemark = formatDelayRemark(editingItem.bottom_remark, {
       originalEta: originalCommittedEta(editingItem),
@@ -548,7 +572,17 @@ export default function RMControlCenterPage() {
       bottom_remark: formattedRemark
     };
 
-    if (isEtaChanged || editingItem.status === 'DELAYED') {
+    // Rule 7: If the item was REJECTED by QC and purchasing opens a new delivery round
+    if (editingItem.status === 'REJECTED') {
+      updatePayload.status = 'REVISED';
+      updatePayload.control_no = null;
+      updatePayload.receive_date = null;
+      updatePayload.received_qty = null;
+      updatePayload.qc_status = null;
+      updatePayload.released_date = null;
+    } else if (editingItem.status === 'REVISED') {
+      updatePayload.status = 'REVISED';
+    } else if (isEtaChanged || editingItem.status === 'DELAYED') {
       updatePayload.status = 'DELAYED';
     }
 
@@ -557,7 +591,11 @@ export default function RMControlCenterPage() {
     if (error) {
       toast.error('แก้ไขข้อมูลไม่สำเร็จ: ' + error.message);
     } else {
-      toast.success('บันทึกการแก้ไขและสาเหตุเรียบร้อยแล้ว');
+      if (editingItem.status === 'REJECTED') {
+        toast.success('เปิดรอบส่งมอบใหม่สำเร็จ! สถานะเปลี่ยนเป็น "Revised รอรับเข้ารอบใหม่" รอคลังรับเข้าและออก Control No. ใหม่');
+      } else {
+        toast.success('บันทึกการแก้ไขและสาเหตุเรียบร้อยแล้ว');
+      }
       setIsEditModalOpen(false);
       fetchItems();
     }
@@ -670,14 +708,26 @@ export default function RMControlCenterPage() {
 
   const getStatusBadge = (status: string) => {
     switch (status) {
-      case 'PENDING_DELIVERY': return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">Ordered</Badge>;
-      case 'RECEIVED': return <Badge variant="outline" className="bg-[#D4AF37]/ text-[#D4AF37] border-[#D4AF37]/30">Received</Badge>;
-      case 'WAITING_QC': return <Badge variant="outline" className="bg-yellow-50 text-yellow-600 border-yellow-200">QC Pending</Badge>;
-      case 'QC_PASS': return <Badge variant="outline" className="bg-green-50 text-green-600 border-green-200">QC Passed</Badge>;
-      case 'READY': return <Badge variant="outline" className="bg-teal-50 text-teal-600 border-teal-200">Released</Badge>;
-      case 'DELAYED': return <Badge variant="outline" className="bg-orange-50 text-orange-600 border-orange-200">Delayed</Badge>;
-      case 'REJECTED': return <Badge variant="outline" className="bg-red-50 text-red-600 border-red-200">Rejected</Badge>;
-      default: return <Badge variant="secondary">{status}</Badge>;
+      case 'PENDING_DELIVERY':
+      case 'ORDERED':
+        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 font-medium whitespace-nowrap">Ordered รอรับเข้า</Badge>;
+      case 'RECEIVED':
+        return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 font-medium whitespace-nowrap">Received รับของแล้ว</Badge>;
+      case 'WAITING_QC':
+      case 'QUARANTINED':
+        return <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-300 font-medium whitespace-nowrap">Quarantined แจ้งสุ่ม</Badge>;
+      case 'QC_PASS':
+      case 'READY':
+      case 'PASSED':
+        return <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300 font-medium whitespace-nowrap">QC Passed</Badge>;
+      case 'DELAYED':
+        return <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-300 font-medium whitespace-nowrap">Delayed เข้าล่าช้า</Badge>;
+      case 'REJECTED':
+        return <Badge variant="outline" className="bg-red-50 text-red-700 border-red-300 font-medium whitespace-nowrap">Rejected ไม่ผ่าน</Badge>;
+      case 'REVISED':
+        return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-300 font-medium whitespace-nowrap">Revised รอรับเข้ารอบใหม่</Badge>;
+      default:
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
@@ -704,8 +754,12 @@ export default function RMControlCenterPage() {
 
   const filteredItems = typeFilteredItems.filter(item => {
     if (statusFilter !== 'ALL') {
-      if (statusFilter === 'READY') {
+      if (statusFilter === 'QC_PASS' || statusFilter === 'READY') {
         if (item.status !== 'READY' && item.status !== 'QC_PASS' && item.status !== 'PASSED') return false;
+      } else if (statusFilter === 'WAITING_QC' || statusFilter === 'QUARANTINED') {
+        if (item.status !== 'WAITING_QC' && item.status !== 'QUARANTINED') return false;
+      } else if (statusFilter === 'PENDING_DELIVERY' || statusFilter === 'ORDERED') {
+        if (item.status !== 'PENDING_DELIVERY' && item.status !== 'ORDERED') return false;
       } else {
         if (item.status !== statusFilter) return false;
       }
@@ -714,9 +768,17 @@ export default function RMControlCenterPage() {
       return false;
     }
     const term = searchQuery.toLowerCase();
-    const statusTh = item.status === 'PENDING_DELIVERY' ? 'รอรับเข้า' : item.status === 'RECEIVED' ? 'รับของแล้ว' : item.status === 'WAITING_QC' ? 'รอตรวจ qc' : item.status === 'PASSED' ? 'ผ่าน' : item.status === 'REJECTED' ? 'ไม่ผ่าน' : item.status === 'QUARANTINED' ? 'กักกัน' : '';
+    const statusTh = 
+      (item.status === 'PENDING_DELIVERY' || item.status === 'ORDERED') ? 'ordered รอรับเข้า' :
+      item.status === 'RECEIVED' ? 'received รับของแล้ว' :
+      (item.status === 'WAITING_QC' || item.status === 'QUARANTINED') ? 'quarantined แจ้งสุ่ม รอตรวจ' :
+      (item.status === 'READY' || item.status === 'QC_PASS' || item.status === 'PASSED') ? 'qc passed ผ่าน' :
+      item.status === 'DELAYED' ? 'delayed เข้าล่าช้า' :
+      item.status === 'REJECTED' ? 'rejected ไม่ผ่าน' :
+      item.status === 'REVISED' ? 'revised รอรับเข้ารอบใหม่' : '';
     return (
       (item.po_no || '').toLowerCase().includes(term) ||
+      (item.control_no || '').toLowerCase().includes(term) ||
       (item.rm_code || '').toLowerCase().includes(term) ||
       (item.rm_name || '').toLowerCase().includes(term) ||
       (item.lot_product || '').toLowerCase().includes(term) ||
@@ -772,10 +834,10 @@ export default function RMControlCenterPage() {
   };
 
   // Executive Material Supply Chain Calculations
-  const pendingDeliveryItems = typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY');
-  const receivedItems = typeFilteredItems.filter(i => i.status === 'RECEIVED' || i.status === 'WAITING_QC');
+  const pendingDeliveryItems = typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY' || i.status === 'ORDERED' || i.status === 'DELAYED' || i.status === 'REVISED');
+  const receivedItems = typeFilteredItems.filter(i => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.status === 'QUARANTINED');
   const readyItems = typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED');
-  const rejectedItems = typeFilteredItems.filter(i => i.status === 'REJECTED' || i.status === 'QUARANTINED');
+  const rejectedItems = typeFilteredItems.filter(i => i.status === 'REJECTED');
 
   const pendingWeight = pendingDeliveryItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
   const receivedWeight = receivedItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
@@ -1159,16 +1221,16 @@ export default function RMControlCenterPage() {
                   <CardContent><div className="text-3xl font-bold text-[#D4AF37]">{activeItemsCount}</div></CardContent>
                 </Card>
                 <Card className="bg-orange-50 border-orange-100">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-orange-800">รอของเข้า (Pending)</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-orange-600">{typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY').length}</div></CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-orange-800">รอของเข้า (Ordered / Delayed / Revised)</CardTitle></CardHeader>
+                  <CardContent><div className="text-3xl font-bold text-orange-600">{typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY' || i.status === 'ORDERED' || i.status === 'DELAYED' || i.status === 'REVISED').length}</div></CardContent>
                 </Card>
                 <Card className="bg-yellow-50 border-yellow-100">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-800">รอตรวจ QC</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-yellow-600">{typeFilteredItems.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED').length}</div></CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-yellow-800">รับแล้ว / แจ้งสุ่ม QC</CardTitle></CardHeader>
+                  <CardContent><div className="text-3xl font-bold text-yellow-600">{typeFilteredItems.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED' || i.status === 'QUARANTINED').length}</div></CardContent>
                 </Card>
                 <Card className="bg-green-50 border-green-100">
-                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-800">พร้อมใช้ผลิต (Released)</CardTitle></CardHeader>
-                  <CardContent><div className="text-3xl font-bold text-green-600">{typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS').length}</div></CardContent>
+                  <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-green-800">QC ผ่าน / พร้อมใช้ผลิต (QC Passed)</CardTitle></CardHeader>
+                  <CardContent><div className="text-3xl font-bold text-green-600">{typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED').length}</div></CardContent>
                 </Card>
              </div>
              
@@ -1303,14 +1365,14 @@ export default function RMControlCenterPage() {
                               </div>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="ALL">All Status</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
-                              <SelectItem value="RECEIVED">Received</SelectItem>
-                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
                               <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="READY">Released</SelectItem>
-                              <SelectItem value="DELAYED">Delayed</SelectItem>
-                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableHead>
@@ -1376,7 +1438,7 @@ export default function RMControlCenterPage() {
                             ) : '-'}
                           </TableCell>
                           <TableCell>
-                            <div className="flex items-center justify-end">
+                            <div className="flex items-center justify-end gap-1">
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -1391,18 +1453,18 @@ export default function RMControlCenterPage() {
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => openEditModal(item)} 
-                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
-                                title="แก้ไขรายการ / เลื่อน ETA"
+                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REJECTED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REJECTED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : item.status === 'REJECTED' ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50 ring-1 ring-purple-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                                title={item.status === 'REJECTED' ? "เปิดรอบส่งมอบใหม่ (Revise Delivery หลัง QC ไม่ผ่าน)" : "แก้ไขรายการ / เลื่อน ETA"}
                               >
-                                <Edit className="w-4 h-4" />
+                                {item.status === 'REJECTED' ? <RefreshCw className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
                               </Button>
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
                                 onClick={() => handleDelete(item.id)} 
-                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
+                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : 'text-red-400 hover:text-red-600 hover:bg-red-50'}`}
                                 title="ลบรายการ"
                               >
                                  <Trash2 className="w-4 h-4" />
@@ -1426,11 +1488,11 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">Receiving Plan (รอรับของเข้า)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="text-sm table-fixed w-full">
+                  <Table className="text-sm min-w-[1250px]">
                     <TableHeader>
                       <TableRow>
                         <TableHead 
-                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
+                          className="w-[110px] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
                           onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
                         >
                           <div className="flex items-center gap-1">
@@ -1440,25 +1502,25 @@ export default function RMControlCenterPage() {
                              <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
                           </div>
                         </TableHead>
-                        <TableHead className="w-[10%] p-0">
+                        <TableHead className="w-[120px] p-0">
                           <div className="flex flex-col px-2 py-1 gap-1 w-full h-full justify-center">
                             <span className="font-semibold text-slate-500">PO No.</span>
                             <Input 
                               placeholder="ค้นหา PO..." 
-                              value={poSearch}
+                              value={poSearch} 
                               onChange={(e) => setPoSearch(e.target.value)}
                               className="h-6 text-[10px] w-full bg-slate-50 border-slate-200 px-1"
                             />
                           </div>
                         </TableHead>
-                        <TableHead className="w-[12%]">Supplier</TableHead>
-                        <TableHead className="w-[10%]">SKU / LOT</TableHead>
-                        <TableHead className="w-[10%]">Code</TableHead>
-                        <TableHead className="w-[15%]">Name</TableHead>
-                        <TableHead className="w-[8%]">Qty</TableHead>
-                        <TableHead className="w-[8%]">Warehouse</TableHead>
-                        <TableHead className="w-[9%]">Receive Date</TableHead>
-                        <TableHead className="w-[10%] p-0">
+                        <TableHead className="w-[160px]">Supplier</TableHead>
+                        <TableHead className="w-[130px]">SKU / LOT</TableHead>
+                        <TableHead className="w-[110px]">Code</TableHead>
+                        <TableHead className="min-w-[180px]">Name</TableHead>
+                        <TableHead className="w-[110px]">Qty</TableHead>
+                        <TableHead className="w-[90px]">Warehouse</TableHead>
+                        <TableHead className="w-[130px]">Receive Date</TableHead>
+                        <TableHead className="w-[175px] p-0">
                           <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
                             <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
                               <div className="flex items-center gap-2">
@@ -1467,14 +1529,14 @@ export default function RMControlCenterPage() {
                               </div>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="ALL">All Status</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
-                              <SelectItem value="RECEIVED">Received</SelectItem>
-                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
                               <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="READY">Released</SelectItem>
-                              <SelectItem value="DELAYED">Delayed</SelectItem>
-                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableHead>
@@ -1540,37 +1602,99 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            {item.status === 'RECEIVED' ? (
-                              <div className="flex items-center gap-1.5">
-                                <Badge className="bg-emerald-100 text-emerald-800 hover:bg-emerald-100 border border-emerald-300 font-medium text-xs py-1">
-                                  รับของแล้ว
-                                </Badge>
-                                {(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') && (
-                                  <Button 
-                                    variant="ghost" 
-                                    size="sm" 
-                                    onClick={() => openReceiveModal(item)}
-                                    className="h-7 w-7 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded"
-                                    title="แก้ไขข้อมูลรับเข้า / Control No. / ยอดจริง / หมายเหตุ"
-                                  >
-                                    <Edit className="w-3.5 h-3.5" />
-                                  </Button>
-                                )}
-                              </div>
-                            ) : (
-                              <Select 
-                                value={item.status || ''} 
-                                onValueChange={(val) => handleStatusChange(item, val as string)} 
-                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED') || !(currentUser?.toUpperCase().startsWith('MM') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                              >
-                                <SelectTrigger className="w-[120px] h-8 text-xs"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PENDING_DELIVERY">รอรับเข้า</SelectItem>
-                                  {item.status === 'DELAYED' && <SelectItem value="DELAYED">ล่าช้า (รอรับเข้า)</SelectItem>}
-                                  <SelectItem value="RECEIVED">รับของแล้ว</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            )}
+                            {(() => {
+                              const canWarehouseEdit = currentUser?.toUpperCase().startsWith('MM') || 
+                                                       currentUser?.toUpperCase().startsWith('WH') || 
+                                                       currentUser?.toUpperCase().startsWith('ADMIN') || 
+                                                       userRole === 'admin';
+
+                              if (!canWarehouseEdit) {
+                                return getStatusBadge(item.status);
+                              }
+
+                              if (item.status === 'READY' || item.status === 'QC_PASS' || item.status === 'PASSED') {
+                                return getStatusBadge('QC_PASS');
+                              }
+
+                              if (item.status === 'REJECTED') {
+                                return getStatusBadge('REJECTED');
+                              }
+
+                              if (item.status === 'RECEIVED') {
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    <Select 
+                                      value="RECEIVED" 
+                                      onValueChange={(val) => val && handleStatusChange(item, val)}
+                                    >
+                                      <SelectTrigger className="w-[155px] h-8 text-xs font-semibold bg-emerald-50 text-emerald-800 border-emerald-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                        <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม 📢</SelectItem>
+                                        <SelectItem value="PENDING_DELIVERY">ยกเลิกรับเข้า (รอรับใหม่)</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={() => openReceiveModal(item)}
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded shrink-0"
+                                      title="แก้ไขข้อมูลรับเข้า / Control No. / ยอดจริง / หมายเหตุ"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                );
+                              }
+
+                              if (item.status === 'WAITING_QC' || item.status === 'QUARANTINED') {
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    <Select 
+                                      value="WAITING_QC" 
+                                      onValueChange={(val) => val && handleStatusChange(item, val)}
+                                    >
+                                      <SelectTrigger className="w-[155px] h-8 text-xs font-semibold bg-amber-50 text-amber-800 border-amber-300">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                                        <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={() => openReceiveModal(item)}
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded shrink-0"
+                                      title="แก้ไขข้อมูลรับเข้า / Control No. / ยอดจริง / หมายเหตุ"
+                                    >
+                                      <Edit className="w-3.5 h-3.5" />
+                                    </Button>
+                                  </div>
+                                );
+                              }
+
+                              const currentVal = item.status === 'DELAYED' ? 'DELAYED' : (item.status === 'REVISED' ? 'REVISED' : 'PENDING_DELIVERY');
+                              const currentLabel = item.status === 'DELAYED' ? 'Delayed เข้าล่าช้า' : (item.status === 'REVISED' ? 'Revised รอรับเข้ารอบใหม่' : 'Ordered รอรับเข้า');
+
+                              return (
+                                <Select 
+                                  value={currentVal} 
+                                  onValueChange={(val) => val && handleStatusChange(item, val)}
+                                >
+                                  <SelectTrigger className="w-[155px] h-8 text-xs font-medium">
+                                    <SelectValue>{currentLabel}</SelectValue>
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value={currentVal}>{currentLabel}</SelectItem>
+                                    <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              );
+                            })()}
                           </TableCell>
                         </TableRow>
                       ))}
@@ -1586,10 +1710,10 @@ export default function RMControlCenterPage() {
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">QC Status (รายการรอตรวจ)</CardTitle></CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="text-sm table-fixed w-full">
+                  <Table className="text-sm table-fixed w-full min-w-[1100px]">
                     <TableHeader className="bg-[#F8F6F0]">
                       <TableRow className="border-b border-slate-200">
-                        <TableHead className="font-semibold text-slate-700 px-6 py-4">
+                        <TableHead className="font-semibold text-slate-700 px-6 py-4 w-[12%]">
                           <div className="flex items-center space-x-1 cursor-pointer hover:text-purple-700" onClick={() => {
                             if (qcReceiveDateSort === 'asc') setQcReceiveDateSort('desc');
                             else if (qcReceiveDateSort === 'desc') setQcReceiveDateSort(null);
@@ -1599,13 +1723,13 @@ export default function RMControlCenterPage() {
                             {qcReceiveDateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : qcReceiveDateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700">
+                        <TableHead className="font-semibold text-slate-700 w-[10%]">
                           <div className="flex flex-col space-y-1 mt-1 mb-1">
                             <span>PO No.</span>
                             <input type="text" placeholder="ค้นหา PO..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={qcPoSearch} onChange={(e) => setQcPoSearch(e.target.value)} />
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 text-purple-700">
+                        <TableHead className="font-semibold text-slate-700 text-purple-700 w-[12%]">
                           <div className="flex items-center space-x-1 cursor-pointer hover:text-purple-900" onClick={() => {
                             if (qcControlNoSort === 'asc') setQcControlNoSort('desc');
                             else if (qcControlNoSort === 'desc') setQcControlNoSort(null);
@@ -1615,15 +1739,35 @@ export default function RMControlCenterPage() {
                             {qcControlNoSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : qcControlNoSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700">SKU / LOT</TableHead>
-                        <TableHead className="font-semibold text-slate-700">
+                        <TableHead className="font-semibold text-slate-700 w-[10%]">SKU / LOT</TableHead>
+                        <TableHead className="font-semibold text-slate-700 w-[10%]">
                           <div className="flex flex-col space-y-1 mt-1 mb-1">
                             <span>Code</span>
                             <input type="text" placeholder="ค้นหา Code..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={qcCodeSearch} onChange={(e) => setQcCodeSearch(e.target.value)} />
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-72">Name</TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-44">
+                        <TableHead className="font-semibold text-slate-700 w-[18%]">Name</TableHead>
+                        <TableHead className="w-[14%] p-0">
+                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-2 focus:ring-0">
+                              <div className="flex items-center gap-1.5">
+                                <span>Status</span>
+                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                              </div>
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableHead>
+                        <TableHead className="font-semibold text-slate-700 w-[14%]">
                           <div className="flex flex-col space-y-1 mt-1 mb-1">
                             <span>QC Status</span>
                             <Select value={qcStatusSearch} onValueChange={(val) => setQcStatusSearch(val || 'ALL')}>
@@ -1643,7 +1787,7 @@ export default function RMControlCenterPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY')
+                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY' && i.status !== 'DELAYED' && i.status !== 'REVISED')
                         .filter(i => qcPoSearch ? (i.po_no || '').toLowerCase().includes(qcPoSearch.toLowerCase()) : true)
                         .filter(i => qcCodeSearch ? (i.rm_code || '').toLowerCase().includes(qcCodeSearch.toLowerCase()) : true)
                         .filter(i => qcStatusSearch !== 'ALL' ? (i.qc_status || 'QUARANTINED') === qcStatusSearch : true)
@@ -1658,7 +1802,6 @@ export default function RMControlCenterPage() {
                             const tb = new Date(b.receive_date || 0).getTime();
                             return qcReceiveDateSort === 'asc' ? ta - tb : tb - ta;
                           }
-                          // Default sort
                           return new Date(b.receive_date || 0).getTime() - new Date(a.receive_date || 0).getTime();
                         })
                         .map((item, index) => (
@@ -1707,14 +1850,34 @@ export default function RMControlCenterPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                             <div className={`inline-flex items-center justify-center w-[140px] h-9 text-xs font-medium rounded-md shadow-sm ${getQcColor(item.qc_status || 'QUARANTINED')}`}>
-                               {item.qc_status || 'QUARANTINED'}
-                             </div>
+                            {getStatusBadge(item.status)}
+                          </TableCell>
+                          <TableCell>
+                            {(currentUser?.toUpperCase().startsWith('QC') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? (
+                              <Select 
+                                value={item.qc_status || 'QUARANTINED'} 
+                                onValueChange={(val) => val && handleQcStatusChange(item, val)}
+                              >
+                                <SelectTrigger className={`w-[130px] h-8 text-xs font-semibold ${getQcColor(item.qc_status || 'QUARANTINED')}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="QUARANTINED">QUARANTINED</SelectItem>
+                                  <SelectItem value="PASSED">PASSED</SelectItem>
+                                  <SelectItem value="HOLD">HOLD</SelectItem>
+                                  <SelectItem value="REJECTED">REJECTED</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            ) : (
+                              <div className={`inline-flex items-center justify-center w-[130px] h-8 text-xs font-medium rounded-md shadow-sm ${getQcColor(item.qc_status || 'QUARANTINED')}`}>
+                                {item.qc_status || 'QUARANTINED'}
+                              </div>
+                            )}
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY').length === 0 && (
-                        <TableRow><TableCell colSpan={5} className="text-center py-12 text-slate-500 bg-white">ไม่มีรายการรอตรวจ QC</TableCell></TableRow>
+                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY' && i.status !== 'DELAYED' && i.status !== 'REVISED').length === 0 && (
+                        <TableRow><TableCell colSpan={8} className="text-center py-12 text-slate-500 bg-white">ไม่มีรายการรอตรวจ QC</TableCell></TableRow>
                       )}
                     </TableBody>
                   </Table>
@@ -1751,23 +1914,23 @@ export default function RMControlCenterPage() {
                         </TableHead>
                         <TableHead className="w-[120px]">วันที่คลังรับเข้า</TableHead>
                         <TableHead className="w-[130px]">วันที่ QC pass</TableHead>
-                        <TableHead className="w-[130px] p-0">
+                        <TableHead className="w-[155px] p-0">
                           <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
-                              <div className="flex items-center gap-2">
+                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-3 focus:ring-0">
+                              <div className="flex items-center gap-1.5">
                                 <span>Status</span>
                                 <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
                               </div>
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="ALL">All Status</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered</SelectItem>
-                              <SelectItem value="RECEIVED">Received</SelectItem>
-                              <SelectItem value="WAITING_QC">QC Pending</SelectItem>
+                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
                               <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="READY">Released</SelectItem>
-                              <SelectItem value="DELAYED">Delayed</SelectItem>
-                              <SelectItem value="REJECTED">Rejected</SelectItem>
+                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
                             </SelectContent>
                           </Select>
                         </TableHead>
@@ -1904,17 +2067,31 @@ export default function RMControlCenterPage() {
                                     </span>
                                   );
                                 }
-                                if (item.qc_status === 'REJECTED') {
+                                if (item.qc_status === 'REJECTED' || item.status === 'REJECTED') {
                                   return (
                                     <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded">
                                       ✕ REJECTED
                                     </span>
                                   );
                                 }
-                                if (item.receive_date) {
+                                if (item.status === 'REVISED') {
                                   return (
                                     <span className="text-[11px] font-medium text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5 rounded">
-                                      รอผลตรวจ QC
+                                      รอรับเข้ารอบใหม่
+                                    </span>
+                                  );
+                                }
+                                if (item.status === 'WAITING_QC' || item.qc_status === 'QUARANTINED') {
+                                  return (
+                                    <span className="text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
+                                      Quarantined แจ้งสุ่ม
+                                    </span>
+                                  );
+                                }
+                                if (item.receive_date) {
+                                  return (
+                                    <span className="text-[11px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded">
+                                      รับแล้ว (รอตรวจ)
                                     </span>
                                   );
                                 }
@@ -2271,6 +2448,15 @@ export default function RMControlCenterPage() {
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3.5 py-2 text-xs">
+            {editingItem?.status === 'REJECTED' && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-800 flex items-start gap-2.5">
+                <AlertTriangle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <div className="font-bold text-red-900">รายการนี้ถูก QC ตรวจไม่ผ่าน (Rejected)</div>
+                  <div className="text-slate-600">เมื่อระบุวัน ETA ใหม่และบันทึก ระบบจะปรับสถานะเป็น <strong>"Revised รอรับเข้ารอบใหม่"</strong> พร้อมรีเซ็ตเลข Control No. เพื่อให้ฝ่ายคลังรับเข้าเป็นล็อตส่งใหม่เมื่อสินค้ามาถึง</div>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-slate-700">PO No.</Label>
               <Input value={editForm.po_no} onChange={e => setEditForm({...editForm, po_no: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
@@ -2309,7 +2495,10 @@ export default function RMControlCenterPage() {
             )}
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-rose-700">Revised ETA</Label>
-              <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="col-span-3 text-xs font-mono font-bold text-rose-900 border-rose-300" />
+              <div className="col-span-3 space-y-1">
+                <Input type="date" value={editForm.eta_date} onChange={e => setEditForm({...editForm, eta_date: e.target.value})} className="text-xs font-mono font-bold text-rose-900 border-rose-300 bg-white" />
+                <p className="text-[10px] text-slate-500">* ต้องระบุวันล่วงหน้า (ไม่เป็นวันในอดีตหรือวันปัจจุบัน)</p>
+              </div>
             </div>
 
             {/* Mandatory Reason Section */}
