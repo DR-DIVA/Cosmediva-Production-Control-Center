@@ -223,8 +223,16 @@ export default function QCQueuePage() {
     }
     
     // Update rm item
-    const updates: any = { qc_status: rmStatusAction }
-    if (rmStatusAction === 'PASSED') updates.status = 'READY'
+    const updates: any = { 
+      qc_status: rmStatusAction,
+      qc_inspector: currentUser,
+      qc_note: reasonText.trim() || activeRm.remark || null,
+      updated_at: new Date().toISOString()
+    }
+    if (rmStatusAction === 'PASSED') {
+      updates.status = 'READY'
+      updates.released_date = new Date().toISOString()
+    }
     if (rmStatusAction === 'REJECTED') updates.status = 'REJECTED'
     
     await supabase.from('production_lot_rms').update(updates).eq('id', activeRm.id)
@@ -263,7 +271,7 @@ export default function QCQueuePage() {
     const { data } = await supabase.from('production_lot_rms')
       .select('*, production_lots(lot_no, products:sku_id(sku))')
       .not('qc_status', 'is', null)
-      .order('id', { ascending: false })
+      .order('updated_at', { ascending: false })
       .limit(1000)
       
     if (data) {
@@ -624,7 +632,10 @@ export default function QCQueuePage() {
         available_qty_pcs, 
         exp_date, 
         qc_status, 
+        qc_inspector,
+        note,
         updated_at,
+        created_at,
         products:sku_id(sku, product_name)
       `)
       .neq('qc_status', 'QUARANTINE')
@@ -650,7 +661,12 @@ export default function QCQueuePage() {
       if (statusAction === 'FAILED') newQcStatus = 'REJECTED'
 
       // Update FG inventory status
-      const { error: fgError } = await supabase.from('fg_inventory').update({ qc_status: newQcStatus }).eq('id', activeFg.id)
+      const { error: fgError } = await supabase.from('fg_inventory').update({ 
+        qc_status: newQcStatus,
+        qc_inspector: currentUser,
+        note: reasonText.trim() || null,
+        updated_at: new Date().toISOString()
+      }).eq('id', activeFg.id)
       if (fgError) throw fgError
 
       if (statusAction === 'QC_PASS') {
@@ -1242,22 +1258,32 @@ export default function QCQueuePage() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => {
-                      const worksheet = XLSX.utils.json_to_sheet(rmTodayHistory.map((h: any) => {
-                          return {
-                            'อัปเดตล่าสุด': h.updated_at ? new Date(h.updated_at).toLocaleString('th-TH') : '-',
-                            'LOT No.': h.production_lots?.lot_no || '-',
-                            'วันที่รับเข้า': h.receive_date ? new Date(h.receive_date).toLocaleDateString('th-TH') : '-',
-                            'รหัส': h.rm_code,
-                            'ชื่อวัตถุดิบ': h.rm_name,
-                            'จำนวน': h.quantity,
-                            'หน่วย': h.unit,
-                            'PO No.': h.po_no,
-                            'สถานะ QC': h.qc_status
-                          }
-                        }))
-                        const workbook = XLSX.utils.book_new()
-                        XLSX.utils.book_append_sheet(workbook, worksheet, "QC RM History")
-                        XLSX.writeFile(workbook, "QC_RM_History.xlsx")
+                      const csvData = [
+                        ["เวลา", "ผู้ตรวจสอบ", "LOT No.", "SKU", "Control No.", "รหัสวัตถุดิบ", "ชื่อวัตถุดิบ", "สถานะ QC", "หมายเหตุ"],
+                        ...rmTodayHistory
+                          .filter(item => {
+                            const term = searchQuery.toLowerCase();
+                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                              (item.rm_name || "").toLowerCase().includes(term) || 
+                                              (item.control_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                            return matchTerm && !isPM;
+                          })
+                          .map((h: any) => [
+                            new Date(h.updated_at || h.released_date || h.created_at).toLocaleString('th-TH'),
+                            h.qc_inspector?.split('@')[0] || h.qc_inspector || 'qcchj1801',
+                            h.production_lots?.lot_no || '-',
+                            h.production_lots?.products?.sku || '-',
+                            h.control_no || '-',
+                            h.rm_code || '-',
+                            h.rm_name || '-',
+                            h.qc_status || h.status || '-',
+                            cleanDisplayNote(h.qc_note || h.remark) || '-'
+                          ])
+                      ];
+                      downloadCSV(csvData, `rm_qc_history_${new Date().toISOString().split('T')[0]}.csv`);
                     }}
                     disabled={rmTodayHistory.length === 0}
                   >
@@ -1265,7 +1291,16 @@ export default function QCQueuePage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  {rmTodayHistory.length === 0 ? (
+                  {rmTodayHistory.filter(item => { 
+                    const term = searchQuery.toLowerCase(); 
+                    const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                    const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                      (item.rm_name || "").toLowerCase().includes(term) || 
+                                      (item.control_no || "").toLowerCase().includes(term) || 
+                                      (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                      (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                    return matchTerm && !isPM; 
+                  }).length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                       ไม่มีประวัติการตรวจสอบ
                     </div>
@@ -1274,46 +1309,56 @@ export default function QCQueuePage() {
                       <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
-                            <th className="px-4 py-3 font-medium w-72">รหัส / ชื่อวัตถุดิบ</th>
-                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
-                            <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
+                            <th className="px-4 py-3 font-medium">เวลา</th>
+                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
+                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">Control No. / วัตถุดิบ</th>
+                            <th className="px-4 py-3 font-medium">สถานะ</th>
+                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {rmTodayHistory.filter(item => { 
                             const term = searchQuery.toLowerCase(); 
                             const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
-                            return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && !isPM; 
-                          }).map((item, idx) => (
-                            <tr key={idx} className="hover:bg-[#F8F6F0]">
-                              <td className="px-4 py-3">
-                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                              (item.rm_name || "").toLowerCase().includes(term) || 
+                                              (item.control_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                            return matchTerm && !isPM; 
+                          }).map((item, idx) => {
+                            let statusColor = "bg-slate-100 text-slate-700"
+                            const st = item.qc_status || item.status
+                            if (st === 'PASSED' || st === 'READY' || st === 'QC_PASS') statusColor = "bg-green-100 text-green-700"
+                            if (st === 'HOLD' || st === 'PAUSED') statusColor = "bg-orange-100 text-orange-700"
+                            if (st === 'REJECTED' || st === 'FAILED') statusColor = "bg-red-100 text-red-700"
+                            if (st === 'QUARANTINED' || st === 'WAITING') statusColor = "bg-yellow-100 text-yellow-700"
+
+                            return (
+                            <tr key={item.id || idx} className="hover:bg-[#F8F6F0]">
+                              <td className="px-4 py-3">{new Date(item.updated_at || item.released_date || item.created_at).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                              <td className="px-4 py-3">{item.qc_inspector?.split('@')[0] || item.qc_inspector || 'qcchj1801'}</td>
+                              <td className="px-4 py-3 font-medium text-[#D4AF37]">
+                                {item.production_lots?.lot_no || '-'} <span className="text-slate-400 font-normal text-xs ml-1">({item.production_lots?.products?.sku || '-'})</span>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="text-indigo-600 font-semibold">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
-                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
-                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
-                                    {item.bottom_remark.split('/')[0].trim()}
-                                  </div>
-                                )}
+                                <div className="font-semibold text-purple-700">{item.control_no || '-'}</div>
+                                <div className="text-xs text-slate-500 line-clamp-1" title={item.rm_name}>
+                                  <span className="font-medium text-slate-700">{item.rm_code}</span> - {item.rm_name}
+                                </div>
                               </td>
                               <td className="px-4 py-3">
-                                <Badge variant="outline" className={
-                                  item.qc_status === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' :
-                                  item.qc_status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
-                                  'bg-yellow-100 text-yellow-700 border-yellow-200'
-                                }>
-                                  {item.qc_status}
+                                <Badge variant="secondary" className={statusColor}>
+                                  {item.qc_status || item.status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-500">
-                                {item.updated_at ? new Date(item.updated_at).toLocaleTimeString('th-TH') : '-'}
+                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
+                                {cleanDisplayNote(item.qc_note || item.remark) || '-'}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -1503,9 +1548,53 @@ export default function QCQueuePage() {
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>ประวัติการตรวจสอบแบบต่อเนื่อง (PM)</CardTitle>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => {
+                      const csvData = [
+                        ["เวลา", "ผู้ตรวจสอบ", "LOT No.", "SKU", "Control No.", "รหัสบรรจุภัณฑ์", "ชื่อบรรจุภัณฑ์", "สถานะ QC", "หมายเหตุ"],
+                        ...rmTodayHistory
+                          .filter(item => {
+                            const term = searchQuery.toLowerCase();
+                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                              (item.rm_name || "").toLowerCase().includes(term) || 
+                                              (item.control_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                            return matchTerm && isPM;
+                          })
+                          .map((h: any) => [
+                            new Date(h.updated_at || h.released_date || h.created_at).toLocaleString('th-TH'),
+                            h.qc_inspector?.split('@')[0] || h.qc_inspector || 'qcchj1801',
+                            h.production_lots?.lot_no || '-',
+                            h.production_lots?.products?.sku || '-',
+                            h.control_no || '-',
+                            h.rm_code || '-',
+                            h.rm_name || '-',
+                            h.qc_status || h.status || '-',
+                            cleanDisplayNote(h.qc_note || h.remark) || '-'
+                          ])
+                      ];
+                      downloadCSV(csvData, `pm_qc_history_${new Date().toISOString().split('T')[0]}.csv`);
+                    }}
+                    disabled={rmTodayHistory.length === 0}
+                  >
+                    Export Excel
+                  </Button>
                 </CardHeader>
                 <CardContent>
-                  {rmTodayHistory.filter(i => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2')).length === 0 ? (
+                  {rmTodayHistory.filter(item => { 
+                    const term = searchQuery.toLowerCase(); 
+                    const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                    const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                      (item.rm_name || "").toLowerCase().includes(term) || 
+                                      (item.control_no || "").toLowerCase().includes(term) || 
+                                      (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                      (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                    return matchTerm && isPM; 
+                  }).length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                       ไม่มีประวัติการตรวจสอบ
                     </div>
@@ -1514,51 +1603,63 @@ export default function QCQueuePage() {
                       <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">SKU / LOT No.</th>
-                            <th className="px-4 py-3 font-medium">รหัส / ชื่อบรรจุภัณฑ์</th>
-                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
-                            <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
+                            <th className="px-4 py-3 font-medium">เวลา</th>
+                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
+                            <th className="px-4 py-3 font-medium">LOT No.</th>
+                            <th className="px-4 py-3 font-medium">Control No. / บรรจุภัณฑ์</th>
+                            <th className="px-4 py-3 font-medium">สถานะ</th>
+                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {rmTodayHistory.filter(item => { 
                             const term = searchQuery.toLowerCase(); 
                             const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
-                            return ((item.rm_code || "").toLowerCase().includes(term) || (item.production_lots?.lot_no || "").toLowerCase().includes(term)) && isPM; 
-                          }).map((item, idx) => (
-                            <tr key={idx} className="hover:bg-[#F8F6F0]">
-                              <td className="px-4 py-3">
-                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
+                                              (item.rm_name || "").toLowerCase().includes(term) || 
+                                              (item.control_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
+                                              (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
+                            return matchTerm && isPM; 
+                          }).map((item, idx) => {
+                            let statusColor = "bg-slate-100 text-slate-700"
+                            const st = item.qc_status || item.status
+                            if (st === 'PASSED' || st === 'READY' || st === 'QC_PASS') statusColor = "bg-green-100 text-green-700"
+                            if (st === 'HOLD' || st === 'PAUSED') statusColor = "bg-orange-100 text-orange-700"
+                            if (st === 'REJECTED' || st === 'FAILED') statusColor = "bg-red-100 text-red-700"
+                            if (st === 'QUARANTINED' || st === 'WAITING') statusColor = "bg-yellow-100 text-yellow-700"
+
+                            return (
+                            <tr key={item.id || idx} className="hover:bg-[#F8F6F0]">
+                              <td className="px-4 py-3">{new Date(item.updated_at || item.released_date || item.created_at).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                              <td className="px-4 py-3">{item.qc_inspector?.split('@')[0] || item.qc_inspector || 'qcchj1801'}</td>
+                              <td className="px-4 py-3 font-medium text-[#D4AF37]">
+                                {item.production_lots?.lot_no || '-'} <span className="text-slate-400 font-normal text-xs ml-1">({item.production_lots?.products?.sku || '-'})</span>
                               </td>
                               <td className="px-4 py-3">
-                                {item.rm_code?.startsWith('CMD2') ? (
-                                  <Badge className="bg-pink-100 text-pink-700 border-pink-200 mb-1" variant="outline">[CMD2]</Badge>
-                                ) : (
-                                  <Badge className="bg-blue-100 text-blue-700 border-blue-200 mb-1" variant="outline">[CMD1]</Badge>
-                                )}
-                                <span className="text-purple-600 font-semibold ml-2">{item.rm_code}</span>
-                                <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
-                                {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
-                                  <div className="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded-sm mt-1 leading-tight whitespace-normal max-w-[150px]" title={item.bottom_remark}>
-                                    {item.bottom_remark.split('/')[0].trim()}
-                                  </div>
-                                )}
+                                <div className="font-semibold text-purple-700 flex items-center gap-1.5">
+                                  {item.control_no || '-'}
+                                  {item.rm_code?.startsWith('CMD2') ? (
+                                    <Badge className="bg-pink-100 text-pink-700 border-pink-200 text-[10px] px-1 py-0" variant="outline">[CMD2]</Badge>
+                                  ) : item.rm_code?.startsWith('CMD1') ? (
+                                    <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] px-1 py-0" variant="outline">[CMD1]</Badge>
+                                  ) : null}
+                                </div>
+                                <div className="text-xs text-slate-500 line-clamp-1" title={item.rm_name}>
+                                  <span className="font-medium text-slate-700">{item.rm_code}</span> - {item.rm_name}
+                                </div>
                               </td>
                               <td className="px-4 py-3">
-                                <Badge variant="outline" className={
-                                  item.qc_status === 'PASSED' ? 'bg-green-100 text-green-700 border-green-200' :
-                                  item.qc_status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
-                                  'bg-yellow-100 text-yellow-700 border-yellow-200'
-                                }>
-                                  {item.qc_status}
+                                <Badge variant="secondary" className={statusColor}>
+                                  {item.qc_status || item.status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-500">
-                                {item.updated_at ? new Date(item.updated_at).toLocaleTimeString('th-TH') : '-'}
+                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
+                                {cleanDisplayNote(item.qc_note || item.remark) || '-'}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
@@ -2051,16 +2152,26 @@ export default function QCQueuePage() {
                     size="sm" 
                     onClick={() => {
                       const csvData = [
-                        ["สินค้า / SKU", "ชื่อสินค้า", "LOT No.", "Box Lot", "จำนวน (ชิ้น)", "สถานะ QC", "เวลาอัปเดต"],
-                        ...fgTodayHistory.map(h => [
-                          h.products?.sku || '-',
-                          h.products?.product_name || '-',
-                          h.lot_no,
-                          h.box_lot_no || '-',
-                          h.available_qty_pcs,
-                          h.qc_status,
-                          h.updated_at ? new Date(h.updated_at).toLocaleString('th-TH') : '-'
-                        ])
+                        ["เวลา", "ผู้ตรวจสอบ", "LOT No.", "SKU", "ชื่อสินค้า", "Box Lot", "จำนวน (ชิ้น)", "สถานะ QC", "หมายเหตุ"],
+                        ...fgTodayHistory
+                          .filter(item => { 
+                            const term = searchQuery.toLowerCase(); 
+                            return (item.products?.sku || "").toLowerCase().includes(term) || 
+                                   (item.products?.product_name || "").toLowerCase().includes(term) || 
+                                   (item.lot_no || "").toLowerCase().includes(term) || 
+                                   (item.box_lot_no || "").toLowerCase().includes(term); 
+                          })
+                          .map(h => [
+                            new Date(h.updated_at || h.created_at).toLocaleString('th-TH'),
+                            h.qc_inspector?.split('@')[0] || h.qc_inspector || 'qcchj1801',
+                            h.lot_no || '-',
+                            h.products?.sku || '-',
+                            h.products?.product_name || '-',
+                            h.box_lot_no || '-',
+                            h.available_qty_pcs ?? '-',
+                            h.qc_status || '-',
+                            cleanDisplayNote(h.note) || '-'
+                          ])
                       ]
                       downloadCSV(csvData, `fg_qc_history_${new Date().toISOString().split('T')[0]}.csv`)
                     }}
@@ -2070,7 +2181,13 @@ export default function QCQueuePage() {
                   </Button>
                 </CardHeader>
                 <CardContent>
-                  {fgTodayHistory.length === 0 ? (
+                  {fgTodayHistory.filter(item => { 
+                    const term = searchQuery.toLowerCase(); 
+                    return (item.products?.sku || "").toLowerCase().includes(term) || 
+                           (item.products?.product_name || "").toLowerCase().includes(term) || 
+                           (item.lot_no || "").toLowerCase().includes(term) || 
+                           (item.box_lot_no || "").toLowerCase().includes(term); 
+                  }).length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                       ไม่มีประวัติการตรวจสอบ
                     </div>
@@ -2079,40 +2196,52 @@ export default function QCQueuePage() {
                       <table className="w-full text-sm text-left table-fixed">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">สินค้า / SKU</th>
+                            <th className="px-4 py-3 font-medium">เวลา</th>
+                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
                             <th className="px-4 py-3 font-medium">LOT No.</th>
-                            <th className="px-4 py-3 font-medium">Box Lot</th>
-                            <th className="px-4 py-3 font-medium">สถานะ QC</th>
-                            <th className="px-4 py-3 font-medium">เวลาอัปเดต</th>
+                            <th className="px-4 py-3 font-medium">Box Lot / จำนวน</th>
+                            <th className="px-4 py-3 font-medium">สถานะ</th>
+                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {fgTodayHistory.filter(item => { const term = searchQuery.toLowerCase(); return (item.products?.sku || "").toLowerCase().includes(term) || (item.lot_no || "").toLowerCase().includes(term); }).map((item, idx) => (
-                            <tr key={idx} className="hover:bg-[#F8F6F0]">
+                          {fgTodayHistory.filter(item => { 
+                            const term = searchQuery.toLowerCase(); 
+                            return (item.products?.sku || "").toLowerCase().includes(term) || 
+                                   (item.products?.product_name || "").toLowerCase().includes(term) || 
+                                   (item.lot_no || "").toLowerCase().includes(term) || 
+                                   (item.box_lot_no || "").toLowerCase().includes(term); 
+                          }).map((item, idx) => {
+                            let statusColor = "bg-slate-100 text-slate-700"
+                            if (item.qc_status === 'RELEASED' || item.qc_status === 'QC_PASS' || item.qc_status === 'PASSED') statusColor = "bg-green-100 text-green-700"
+                            if (item.qc_status === 'HOLD' || item.qc_status === 'PAUSED') statusColor = "bg-orange-100 text-orange-700"
+                            if (item.qc_status === 'REJECTED' || item.qc_status === 'FAILED') statusColor = "bg-red-100 text-red-700"
+                            if (item.qc_status === 'QUARANTINE' || item.qc_status === 'WAITING') statusColor = "bg-yellow-100 text-yellow-700"
+
+                            return (
+                            <tr key={item.id || idx} className="hover:bg-[#F8F6F0]">
+                              <td className="px-4 py-3">{new Date(item.updated_at || item.created_at).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}</td>
+                              <td className="px-4 py-3">{item.qc_inspector?.split('@')[0] || item.qc_inspector || 'qcchj1801'}</td>
                               <td className="px-4 py-3 font-medium text-[#D4AF37]">
-                                {item.products?.sku}
-                                <div className="text-xs font-normal text-slate-500 mt-1 line-clamp-1">{item.products?.product_name}</div>
-                              </td>
-                              <td className="px-4 py-3 font-medium text-slate-700">{item.lot_no}</td>
-                              <td className="px-4 py-3">
-                                <Badge variant="outline" className="bg-slate-100 border-slate-300 text-slate-700">
-                                  {item.box_lot_no || '-'}
-                                </Badge>
+                                {item.lot_no} <span className="text-slate-400 font-normal text-xs ml-1">({item.products?.sku || '-'})</span>
                               </td>
                               <td className="px-4 py-3">
-                                <Badge variant="outline" className={
-                                  item.qc_status === 'RELEASED' ? 'bg-green-100 text-green-700 border-green-200' :
-                                  item.qc_status === 'REJECTED' ? 'bg-red-100 text-red-700 border-red-200' :
-                                  'bg-slate-100 text-slate-700'
-                                }>
+                                <div className="font-semibold text-slate-800">Box: {item.box_lot_no || item.lot_no}</div>
+                                <div className="text-xs text-slate-500 font-medium">
+                                  {item.available_qty_pcs != null ? `${Number(item.available_qty_pcs).toLocaleString()} ชิ้น` : '-'}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <Badge variant="secondary" className={statusColor}>
                                   {item.qc_status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-500">
-                                {item.updated_at ? new Date(item.updated_at).toLocaleTimeString('th-TH') : '-'}
+                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
+                                {cleanDisplayNote(item.note) || '-'}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </div>
