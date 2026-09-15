@@ -351,13 +351,17 @@ function computeOperationalStatus(
   const userComment = extractUserComment(log.note)
   const note = userComment || undefined
 
+  const isPof = procName.includes('pof') || procName.includes('ลงลัง') || procName.includes('อุโมงค์')
+
   const streamVerb = 
     streamType === 'WEIGHING' ? 'ชั่งสาร' : 
-    streamType === 'MIXING' ? 'ผสม Bulk' : 'บรรจุ'
+    streamType === 'MIXING' ? 'ผสม Bulk' : 
+    isPof ? 'ลงลัง/POF' : 'บรรจุ'
 
   const streamShortVerb = 
     streamType === 'WEIGHING' ? 'ชั่ง' : 
-    streamType === 'MIXING' ? 'ผสม' : 'บรรจุ'
+    streamType === 'MIXING' ? 'ผสม' : 
+    isPof ? 'ลงลัง/POF' : 'บรรจุ'
 
   // QC checks
   if (procName.includes('qc pass') || qcStatus === 'PASSED') {
@@ -470,13 +474,17 @@ function computeOperationalStatus(
 
   // Waiting / Planned (Overdue past scheduled date)
   if (cellDate < todayStr) {
+    const overdueLabel = isPof ? '⚠️ แผนค้าง POF (รอทบทวนวัน)' : '⚠️ แผนค้าง (รอทบทวนวัน)'
+    const overdueDetails = isPof 
+      ? 'เลยวันตามแผนงานลงลัง/POF แล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่'
+      : 'เลยวันตามแผนงานแล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่'
     return {
-      badge: '⚠️ แผนค้าง (รอทบทวนวัน)',
-      shortBadge: 'แผนค้าง',
+      badge: overdueLabel,
+      shortBadge: isPof ? 'แผนค้าง POF' : 'แผนค้าง',
       type: 'overdue',
       color: 'bg-amber-50 text-amber-700 border-amber-200/80',
       dotColor: 'bg-amber-500',
-      detailsText: 'เลยวันตามแผนงานแล้ว กรุณาฝ่ายวางแผนทบทวนและปรับวันใหม่',
+      detailsText: overdueDetails,
       rescheduledInfo: planInfo.isRescheduled ? planInfo : undefined
     }
   }
@@ -1348,18 +1356,21 @@ export function RollingMasterRadar({
               opStatus
             })
           } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
+            const rawProcName = log.processes?.process_name || (pName.includes('pof') ? 'รอ POF' : pName.includes('ลงลัง') ? 'ลงลัง' : 'บรรจุ')
+            const isPofProc = pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')
+            const processBadge = isPofProc ? 'รอ POF / ลงลัง' : 'บรรจุ'
             const opStatus = computeOperationalStatus(log, 'PACKING', hd.dateStr, todayDateStr)
             map[hd.dateStr].PACKING.push({
               id: `${log.id}-${hd.dateStr}`,
               streamType: 'PACKING',
               date: hd.dateStr,
               title: `${sku} • LOT ${lotNo}`,
-              subtitle: pProductName || 'บรรจุและแพ็คเกจจิ้ง',
+              subtitle: pProductName ? `${pProductName} • [${rawProcName || processBadge}]` : (rawProcName || processBadge),
               tag: log.piece_quantity ? `${Number(log.piece_quantity).toLocaleString()} ชิ้น` : `ถัง ${startT}-${endT}`,
               lotNo,
               sku,
               lotId: lot?.id,
-              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay, rawProcName },
               opStatus
             })
           }
