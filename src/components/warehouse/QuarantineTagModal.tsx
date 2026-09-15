@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -156,7 +156,9 @@ export function QuarantineTagModal({
     return list;
   }, [boxCount, printAllSequence, previewIndex, qtyPerBox, totalQty]);
 
-  // Print handler
+  const printContainerRef = useRef<HTMLDivElement>(null);
+
+  // Print handler via isolated iframe to ensure ONLY the 100x80mm tags print without background website
   const handlePrint = () => {
     if (onSavedMetadata) {
       onSavedMetadata({
@@ -165,7 +167,181 @@ export function QuarantineTagModal({
         mfgLot: mfgLot || '-'
       });
     }
-    window.print();
+
+    const container = printContainerRef.current;
+    if (!container) {
+      window.print();
+      return;
+    }
+
+    // Clean up any existing iframe
+    const existingFrame = document.getElementById('quarantine-print-iframe');
+    if (existingFrame) existingFrame.remove();
+
+    const iframe = document.createElement('iframe');
+    iframe.id = 'quarantine-print-iframe';
+    iframe.style.position = 'fixed';
+    iframe.style.top = '-9999px';
+    iframe.style.left = '-9999px';
+    iframe.style.width = '100mm';
+    iframe.style.height = '80mm';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document || iframe.contentDocument;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    const contentHtml = container.innerHTML;
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Quarantine Tag - ${controlNo || 'COSMEDIVA'}</title>
+          <style>
+            @page {
+              size: 100mm 80mm;
+              margin: 0;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body {
+              width: 100mm;
+              margin: 0;
+              padding: 0;
+              background: #ffffff;
+              color: #000000;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+            .quarantine-tag-print-page {
+              width: 100mm;
+              height: 80mm;
+              max-width: 100mm;
+              max-height: 80mm;
+              box-sizing: border-box;
+              padding: 2.5mm;
+              page-break-after: always;
+              break-after: page;
+              page-break-inside: avoid;
+              break-inside: avoid;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              background: #ffffff;
+              overflow: hidden;
+            }
+            .quarantine-tag-print-page:last-child {
+              page-break-after: auto;
+              break-after: auto;
+            }
+            .tag-border {
+              width: 100%;
+              height: 100%;
+              border: 2px solid #000000;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              box-sizing: border-box;
+            }
+            .tag-header {
+              border-bottom: 2px solid #000000;
+              text-align: center;
+              font-weight: bold;
+              letter-spacing: 1px;
+              padding: 3px 0;
+              font-size: 13pt;
+              text-transform: uppercase;
+            }
+            .tag-body {
+              flex: 1;
+              padding: 6px 10px;
+              display: flex;
+              flex-direction: column;
+              justify-content: space-between;
+              font-size: 9pt;
+              line-height: 1.35;
+            }
+            .tag-row {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+            }
+            .tag-row-start {
+              display: flex;
+              align-items: flex-start;
+            }
+            .label-col {
+              width: 72px;
+              font-weight: bold;
+              flex-shrink: 0;
+              font-size: 9.5pt;
+            }
+            .colon-col {
+              width: 10px;
+              text-align: center;
+              flex-shrink: 0;
+            }
+            .val-col {
+              flex: 1;
+              font-size: 9pt;
+            }
+            .val-bold {
+              font-weight: bold;
+            }
+            .val-mono {
+              font-family: monospace;
+              font-weight: bold;
+            }
+            .tag-banner {
+              border-top: 2px solid #000000;
+              text-align: center;
+              font-weight: bold;
+              letter-spacing: 0.5px;
+              padding: 3px 0;
+              font-size: 11pt;
+            }
+            .tag-rev {
+              border-top: 1px solid #000000;
+              text-align: center;
+              font-size: 7.5pt;
+              font-family: monospace;
+              padding: 2px 0;
+              color: #000000;
+            }
+          </style>
+        </head>
+        <body>
+          ${contentHtml}
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    // Trigger print directly inside the iframe
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (err) {
+        console.error("Iframe print error, falling back to window.print():", err);
+        window.print();
+      }
+      setTimeout(() => {
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
+      }, 3000);
+    }, 400);
   };
 
   if (!open) return null;
@@ -576,144 +752,121 @@ export function QuarantineTagModal({
         </DialogContent>
       </Dialog>
 
-      {/* 2. Hidden on screen, VISIBLE on Print: Pure 100x80mm Thermal Sticker Print Engine */}
-      <div className="hidden print:block font-sans text-black">
-        <style dangerouslySetInnerHTML={{ __html: `
-          @media print {
-            @page {
-              size: 100mm 80mm;
-              margin: 0;
-            }
-            body {
-              margin: 0;
-              padding: 0;
-              background: #ffffff !important;
-              color: #000000 !important;
-            }
-            .quarantine-tag-print-page {
-              width: 100mm;
-              height: 80mm;
-              max-width: 100mm;
-              max-height: 80mm;
-              box-sizing: border-box;
-              padding: 2.5mm;
-              page-break-after: always;
-              break-after: page;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              background: #ffffff;
-            }
-            .quarantine-tag-print-page:last-child {
-              page-break-after: auto;
-              break-after: auto;
-            }
-          }
-        `}} />
-
+      {/* 2. Hidden on screen, used strictly by isolated iframe print engine */}
+      <div ref={printContainerRef} style={{ display: 'none' }}>
         {tagsToPrint.map((tag, idx) => (
           <div key={idx} className="quarantine-tag-print-page">
-            <div className="w-full h-full border-2 border-black flex flex-col justify-between box-sizing">
+            <div className="tag-border">
               {/* Header */}
-              <div className="border-b-2 border-black text-center font-bold tracking-wider py-1 text-[13pt] uppercase">
+              <div className="tag-header">
                 COSMEDIVA
               </div>
 
               {/* Main Information */}
-              <div className="flex-1 p-2 flex flex-col justify-between text-[9pt] leading-[1.35] font-normal">
+              <div className="tag-body">
                 {/* Name */}
-                <div className="flex items-start">
-                  <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Name</span>
-                  <span className="w-2 text-center shrink-0">:</span>
-                  <span className="flex-1 font-bold text-[9pt] line-clamp-2 leading-tight">
+                <div className="tag-row-start">
+                  <span className="label-col">Name</span>
+                  <span className="colon-col">:</span>
+                  <span className="val-col val-bold" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
                     {name || '-'}
                   </span>
                 </div>
 
                 {/* Code */}
-                <div className="flex items-center">
-                  <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Code</span>
-                  <span className="w-2 text-center shrink-0">:</span>
-                  <span className="flex-1 font-mono font-bold text-[9.5pt] tracking-tight">
-                    {code || '-'}
-                  </span>
+                <div className="tag-row">
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <span className="label-col">Code</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col val-mono" style={{ fontSize: '9.5pt' }}>
+                      {code || '-'}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Control No. + Barcode */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center flex-1">
-                    <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Control No.</span>
-                    <span className="w-2 text-center shrink-0">:</span>
-                    <span className="font-mono font-bold text-[10pt] tracking-tight">
+                <div className="tag-row">
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                    <span className="label-col">Control No.</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col val-mono" style={{ fontSize: '10.5pt' }}>
                       {controlNo || '-'}
                     </span>
                   </div>
                   {controlNo && (
-                    <div className="shrink-0 pl-1">
+                    <div style={{ flexShrink: 0, paddingLeft: '4px' }}>
                       <Code128Barcode value={controlNo} height={22} width={120} />
                     </div>
                   )}
                 </div>
 
                 {/* Supplier + Lot */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center flex-1 truncate">
-                    <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Supplier</span>
-                    <span className="w-2 text-center shrink-0">:</span>
-                    <span className="font-medium truncate text-[9pt]">{supplier || '-'}</span>
+                <div className="tag-row">
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                    <span className="label-col">Supplier</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {supplier || '-'}
+                    </span>
                   </div>
-                  <span className="font-medium shrink-0 text-[8.5pt] pl-2">
+                  <span style={{ flexShrink: 0, paddingLeft: '8px', fontSize: '8.5pt' }}>
                     Lot.{mfgLot || '-'}
                   </span>
                 </div>
 
                 {/* Total Qty + Breakdown */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Total Qty.</span>
-                    <span className="w-2 text-center shrink-0">:</span>
-                    <span className="font-bold text-[9pt]">{totalQty || 0}{unit}</span>
+                <div className="tag-row">
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="label-col">Total Qty.</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col val-bold">
+                      {totalQty ? Number(totalQty).toLocaleString() : 0}{unit}
+                    </span>
                   </div>
-                  <span className="font-bold text-[8.5pt]">
-                    ({boxCount}กล่อง x {tag.boxQty}{unit})
+                  <span style={{ fontWeight: 'bold', fontSize: '8.5pt' }}>
+                    ({boxCount}กล่อง x {tag.boxQty ? Number(tag.boxQty).toLocaleString() : 0}{unit})
                   </span>
                 </div>
 
                 {/* Qty./unit + of N */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Qty./unit</span>
-                    <span className="w-2 text-center shrink-0">:</span>
-                    <span className="font-bold text-[9pt]">{tag.boxQty} {unit}</span>
+                <div className="tag-row">
+                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                    <span className="label-col">Qty./unit</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col val-bold">
+                      {tag.boxQty ? Number(tag.boxQty).toLocaleString() : 0} {unit}
+                    </span>
                   </div>
-                  <div className="flex items-center font-bold text-[10pt]">
-                    <span className="font-normal text-[8.5pt] mr-3">of</span>
+                  <div style={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '10pt' }}>
+                    <span style={{ fontWeight: 'normal', fontSize: '8.5pt', marginRight: '8px' }}>of</span>
                     <span>{tag.boxIndex}</span>
-                    <span className="mx-1 font-normal text-slate-600">/</span>
+                    <span style={{ margin: '0 4px', fontWeight: 'normal', color: '#666' }}>/</span>
                     <span>{tag.totalBoxes}</span>
                   </div>
                 </div>
 
                 {/* Received by + Date */}
-                <div className="flex items-center justify-between pt-0.5">
-                  <div className="flex items-center truncate">
-                    <span className="w-[68px] font-bold shrink-0 text-[9.5pt]">Received by</span>
-                    <span className="w-2 text-center shrink-0">:</span>
-                    <span className="font-medium truncate text-[8.5pt]">{receivedBy || '-'}</span>
+                <div className="tag-row" style={{ paddingTop: '2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                    <span className="label-col">Received by</span>
+                    <span className="colon-col">:</span>
+                    <span className="val-col" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '8.5pt' }}>
+                      {receivedBy || '-'}
+                    </span>
                   </div>
-                  <span className="font-medium shrink-0 text-[8.5pt] pl-2">
+                  <span style={{ flexShrink: 0, paddingLeft: '8px', fontSize: '8.5pt' }}>
                     รับเข้า {receivedDate || '-'}
                   </span>
                 </div>
               </div>
 
               {/* Tag Banner */}
-              <div className="border-t-2 border-black text-center font-bold tracking-wide py-0.5 text-[11pt]">
+              <div className="tag-banner">
                 Quarantine : กักกัน
               </div>
 
               {/* Doc Rev Bottom line */}
-              <div className="border-t border-black text-center text-[7.5pt] text-black py-0.5 font-mono">
+              <div className="tag-rev">
                 {docRev}
               </div>
             </div>
