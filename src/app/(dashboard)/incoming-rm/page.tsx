@@ -54,6 +54,50 @@ type RMItem = {
   production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
 };
 
+function ColumnSearchInput({
+  title,
+  placeholder,
+  value,
+  onChange,
+  onClear,
+  sortElement
+}: {
+  title: string;
+  placeholder?: string;
+  value: string;
+  onChange: (val: string) => void;
+  onClear: () => void;
+  sortElement?: React.ReactNode;
+}) {
+  return (
+    <div className="flex flex-col gap-1 w-full py-1">
+      <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+        <span className="truncate" title={title}>{title}</span>
+        {sortElement}
+      </div>
+      <div className="relative">
+        <Input
+          type="text"
+          placeholder={placeholder || `ค้นหา...`}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-6 text-[11px] w-full bg-white border-slate-200 pl-1.5 pr-4 py-0 font-normal placeholder:text-slate-400 focus:bg-white shadow-none"
+        />
+        {value && (
+          <button
+            type="button"
+            onClick={onClear}
+            className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+            title="ล้างค่า"
+          >
+            <X className="w-3 h-3" />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function RMControlCenterPage() {
   const supabase = createClient();
   const [items, setItems] = useState<RMItem[]>([]);
@@ -66,15 +110,68 @@ export default function RMControlCenterPage() {
   const [selectedLotId, setSelectedLotId] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
-  const [poSearch, setPoSearch] = useState('');
   const [etaSort, setEtaSort] = useState<'asc' | 'desc' | null>(null);
-  
-  // QC View Filters
+
+  // Column search states for Purchasing View
+  const [puSearch, setPuSearch] = useState({
+    po: '',
+    supplier: '',
+    po_date: '',
+    eta: '',
+    code: '',
+    name: '',
+    qty: ''
+  });
+
+  // Column search states for Warehouse View
+  const [whSearch, setWhSearch] = useState({
+    eta: '',
+    po: '',
+    supplier: '',
+    sku_lot: '',
+    code: '',
+    name: '',
+    qty: '',
+    warehouse: '',
+    receive_date: ''
+  });
+
+  // Column search states for QC View
+  const [qcSearch, setQcSearch] = useState({
+    receive_date: '',
+    po: '',
+    control_no: '',
+    sku_lot: '',
+    code: '',
+    name: ''
+  });
   const [qcReceiveDateSort, setQcReceiveDateSort] = useState<'asc' | 'desc' | null>(null);
-  const [qcPoSearch, setQcPoSearch] = useState('');
   const [qcControlNoSort, setQcControlNoSort] = useState<'asc' | 'desc' | null>(null);
-  const [qcCodeSearch, setQcCodeSearch] = useState('');
   const [qcStatusSearch, setQcStatusSearch] = useState('ALL');
+
+  // Column search states for Planning View
+  const [planSearch, setPlanSearch] = useState({
+    sku_lot: '',
+    queue_date: '',
+    po: '',
+    control_no: '',
+    code: '',
+    name: '',
+    qty: '',
+    eta: '',
+    receive_date: '',
+    qc_date: ''
+  });
+
+  const clearPuSearch = () => setPuSearch({ po: '', supplier: '', po_date: '', eta: '', code: '', name: '', qty: '' });
+  const clearWhSearch = () => setWhSearch({ eta: '', po: '', supplier: '', sku_lot: '', code: '', name: '', qty: '', warehouse: '', receive_date: '' });
+  const clearQcSearch = () => setQcSearch({ receive_date: '', po: '', control_no: '', sku_lot: '', code: '', name: '' });
+  const clearPlanSearch = () => setPlanSearch({ sku_lot: '', queue_date: '', po: '', control_no: '', code: '', name: '', qty: '', eta: '', receive_date: '', qc_date: '' });
+
+  const puActiveCount = Object.values(puSearch).filter(Boolean).length;
+  const whActiveCount = Object.values(whSearch).filter(Boolean).length;
+  const qcActiveCount = Object.values(qcSearch).filter(Boolean).length;
+  const planActiveCount = Object.values(planSearch).filter(Boolean).length;
 
   const [currentUser, setCurrentUser] = useState('');
   const [userRole, setUserRole] = useState('user');
@@ -857,9 +954,6 @@ export default function RMControlCenterPage() {
         if (item.status !== statusFilter) return false;
       }
     }
-    if (poSearch && !((item.po_no || '').toLowerCase().includes(poSearch.toLowerCase()))) {
-      return false;
-    }
     const term = searchQuery.toLowerCase();
     const statusTh = 
       (item.status === 'PENDING_DELIVERY' || item.status === 'ORDERED') ? 'ordered รอรับเข้า' :
@@ -888,6 +982,153 @@ export default function RMControlCenterPage() {
       }
       return 0;
     });
+
+  // 1. Purchasing View Filtered Items
+  const purchasingItems = filteredItems.filter(item => {
+    if (puSearch.po && !(item.po_no || '').toLowerCase().includes(puSearch.po.toLowerCase())) return false;
+    if (puSearch.supplier && !(item.supplier || '').toLowerCase().includes(puSearch.supplier.toLowerCase())) return false;
+    if (puSearch.po_date) {
+      const pDateStr = item.po_date ? new Date(item.po_date).toLocaleDateString('th-TH') : '';
+      if (!pDateStr.toLowerCase().includes(puSearch.po_date.toLowerCase()) && !(item.po_date || '').toLowerCase().includes(puSearch.po_date.toLowerCase())) return false;
+    }
+    if (puSearch.eta) {
+      const etaStr = item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '';
+      if (!etaStr.toLowerCase().includes(puSearch.eta.toLowerCase()) && !(item.eta_date || '').toLowerCase().includes(puSearch.eta.toLowerCase())) return false;
+    }
+    if (puSearch.code && !(item.rm_code || '').toLowerCase().includes(puSearch.code.toLowerCase())) return false;
+    if (puSearch.name && !(item.rm_name || '').toLowerCase().includes(puSearch.name.toLowerCase()) && !(item.remark || '').toLowerCase().includes(puSearch.name.toLowerCase())) return false;
+    if (puSearch.qty && !String(item.quantity || '').toLowerCase().includes(puSearch.qty.toLowerCase()) && !String(item.received_qty || '').toLowerCase().includes(puSearch.qty.toLowerCase()) && !(item.unit || '').toLowerCase().includes(puSearch.qty.toLowerCase())) return false;
+    return true;
+  });
+
+  // 2. Warehouse View Filtered Items
+  const warehouseItems = filteredItems.filter(item => {
+    if (whSearch.eta) {
+      const etaStr = item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '';
+      if (!etaStr.toLowerCase().includes(whSearch.eta.toLowerCase()) && !(item.eta_date || '').toLowerCase().includes(whSearch.eta.toLowerCase())) return false;
+    }
+    if (whSearch.po && !(item.po_no || '').toLowerCase().includes(whSearch.po.toLowerCase())) return false;
+    if (whSearch.supplier && !(item.supplier || '').toLowerCase().includes(whSearch.supplier.toLowerCase())) return false;
+    if (whSearch.sku_lot) {
+      const sku = item.production_lots?.products?.sku || '';
+      const lot = item.production_lots?.lot_no || '';
+      const term = whSearch.sku_lot.toLowerCase();
+      if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
+    }
+    if (whSearch.code && !(item.rm_code || '').toLowerCase().includes(whSearch.code.toLowerCase())) return false;
+    if (whSearch.name) {
+      const term = whSearch.name.toLowerCase();
+      const n = (item.rm_name || '').toLowerCase();
+      const rem = (item.remark || '').toLowerCase();
+      const bRem = (item.bottom_remark || '').toLowerCase();
+      if (!n.includes(term) && !rem.includes(term) && !bRem.includes(term)) return false;
+    }
+    if (whSearch.qty && !String(item.quantity || '').toLowerCase().includes(whSearch.qty.toLowerCase()) && !String(item.received_qty || '').toLowerCase().includes(whSearch.qty.toLowerCase()) && !(item.unit || '').toLowerCase().includes(whSearch.qty.toLowerCase())) return false;
+    if (whSearch.warehouse && !(item.warehouse || '').toLowerCase().includes(whSearch.warehouse.toLowerCase())) return false;
+    if (whSearch.receive_date) {
+      const term = whSearch.receive_date.toLowerCase();
+      const recStr = item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '';
+      const ctrl = item.control_no || '';
+      if (!recStr.toLowerCase().includes(term) && !(item.receive_date || '').toLowerCase().includes(term) && !ctrl.toLowerCase().includes(term)) return false;
+    }
+    return true;
+  });
+
+  // 3. QC View Filtered Items
+  const qcItems = filteredItems
+    .filter(i => i.status !== 'PENDING_DELIVERY' && i.status !== 'DELAYED' && i.status !== 'REVISED')
+    .filter(item => {
+      if (qcSearch.receive_date) {
+        const term = qcSearch.receive_date.toLowerCase();
+        const recStr = item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '';
+        if (!recStr.toLowerCase().includes(term) && !(item.receive_date || '').toLowerCase().includes(term)) return false;
+      }
+      if (qcSearch.po && !(item.po_no || '').toLowerCase().includes(qcSearch.po.toLowerCase())) return false;
+      if (qcSearch.control_no && !(item.control_no || '').toLowerCase().includes(qcSearch.control_no.toLowerCase())) return false;
+      if (qcSearch.sku_lot) {
+        const sku = item.production_lots?.products?.sku || '';
+        const lot = item.production_lots?.lot_no || '';
+        const term = qcSearch.sku_lot.toLowerCase();
+        if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
+      }
+      if (qcSearch.code && !(item.rm_code || '').toLowerCase().includes(qcSearch.code.toLowerCase())) return false;
+      if (qcSearch.name) {
+        const term = qcSearch.name.toLowerCase();
+        const n = (item.rm_name || '').toLowerCase();
+        const rem = (item.remark || '').toLowerCase();
+        const bRem = (item.bottom_remark || '').toLowerCase();
+        if (!n.includes(term) && !rem.includes(term) && !bRem.includes(term)) return false;
+      }
+      if (qcStatusSearch !== 'ALL' && (item.qc_status || 'QUARANTINED') !== qcStatusSearch) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      if (qcControlNoSort) {
+        const ca = a.control_no || '';
+        const cb = b.control_no || '';
+        return qcControlNoSort === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
+      }
+      if (qcReceiveDateSort) {
+        const ta = new Date(a.receive_date || 0).getTime();
+        const tb = new Date(b.receive_date || 0).getTime();
+        return qcReceiveDateSort === 'asc' ? ta - tb : tb - ta;
+      }
+      return new Date(b.receive_date || 0).getTime() - new Date(a.receive_date || 0).getTime();
+    });
+
+  // 4. Planning View Filtered Items
+  const planningItems = filteredItems.map(item => {
+    let targetDate: Date | null = null;
+    if (item.production_lots?.production_logs) {
+      const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
+      const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
+      if (targetLogs.length > 0) {
+        targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
+        targetDate = new Date(targetLogs[0].activity_date);
+      }
+    }
+    return { ...item, targetDate };
+  }).filter(item => {
+    if (planSearch.sku_lot) {
+      const sku = item.production_lots?.products?.sku || '';
+      const lot = item.production_lots?.lot_no || '';
+      const term = planSearch.sku_lot.toLowerCase();
+      if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
+    }
+    if (planSearch.queue_date) {
+      const qDateStr = item.targetDate ? item.targetDate.toLocaleDateString('th-TH') : '';
+      if (!qDateStr.toLowerCase().includes(planSearch.queue_date.toLowerCase())) return false;
+    }
+    if (planSearch.po && !(item.po_no || '').toLowerCase().includes(planSearch.po.toLowerCase())) return false;
+    if (planSearch.control_no && !(item.control_no || '').toLowerCase().includes(planSearch.control_no.toLowerCase())) return false;
+    if (planSearch.code && !(item.rm_code || '').toLowerCase().includes(planSearch.code.toLowerCase())) return false;
+    if (planSearch.name) {
+      const term = planSearch.name.toLowerCase();
+      const n = (item.rm_name || '').toLowerCase();
+      const rem = (item.remark || '').toLowerCase();
+      const bRem = (item.bottom_remark || '').toLowerCase();
+      if (!n.includes(term) && !rem.includes(term) && !bRem.includes(term)) return false;
+    }
+    if (planSearch.qty && !String(item.quantity || '').toLowerCase().includes(planSearch.qty.toLowerCase()) && !(item.unit || '').toLowerCase().includes(planSearch.qty.toLowerCase())) return false;
+    if (planSearch.eta) {
+      const term = planSearch.eta.toLowerCase();
+      const etaStr = item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '';
+      if (!etaStr.toLowerCase().includes(term) && !(item.eta_date || '').toLowerCase().includes(term)) return false;
+    }
+    if (planSearch.receive_date) {
+      const term = planSearch.receive_date.toLowerCase();
+      const recStr = item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '';
+      if (!recStr.toLowerCase().includes(term) && !(item.receive_date || '').toLowerCase().includes(term)) return false;
+    }
+    if (planSearch.qc_date) {
+      const term = planSearch.qc_date.toLowerCase();
+      const rawDate = item.released_date || (item.qc_status === 'PASSED' ? item.updated_at : null);
+      const qcDateStr = rawDate ? new Date(rawDate).toLocaleDateString('th-TH') : '';
+      const qcStatus = (item.qc_status || '').toLowerCase();
+      if (!qcDateStr.toLowerCase().includes(term) && !qcStatus.includes(term) && !'ผ่านแล้ว'.includes(term)) return false;
+    }
+    return true;
+  });
 
   const exportToCSV = () => {
     const headers = ['PO No', 'Supplier', 'PO Date', 'ETA', 'Code', 'Name', 'Warehouse', 'Qty', 'Unit', 'LOT/Job', 'PR', 'Status'];
@@ -1418,63 +1659,138 @@ export default function RMControlCenterPage() {
 
             <Card className="shadow-sm">
               <CardContent className="p-0">
+                {puActiveCount > 0 && (
+                  <div className="flex items-center justify-between px-4 py-2 bg-amber-50/70 border-b border-amber-200/50">
+                    <span className="text-xs text-amber-800 font-medium">
+                      🔍 กำลังค้นหาในคอลัมน์ ({puActiveCount} คอลัมน์) — พบ {purchasingItems.length} จาก {filteredItems.length} รายการ
+                    </span>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearPuSearch} 
+                      className="h-6 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                    >
+                      <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์
+                    </Button>
+                  </div>
+                )}
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="text-sm table-fixed w-full">
+                  <Table className="text-sm min-w-[1250px]">
                     <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead className="w-[10%] p-0">
-                          <div className="flex flex-col px-2 py-1 gap-1 w-full h-full justify-center">
-                            <span className="font-semibold text-slate-500">PO No.</span>
-                            <Input 
-                              placeholder="ค้นหา PO..." 
-                              value={poSearch}
-                              onChange={(e) => setPoSearch(e.target.value)}
-                              className="h-6 text-[10px] w-full bg-slate-50 border-slate-200 px-1"
-                            />
-                          </div>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="PO No."
+                            placeholder="ค้นหา PO..."
+                            value={puSearch.po}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, po: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, po: '' }))}
+                          />
                         </TableHead>
-                        <TableHead className="w-[12%]">Supplier</TableHead>
-                        <TableHead>PO Date</TableHead>
-                        <TableHead 
-                          className="w-[8%] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
-                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>ETA</span>
-                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
-                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
-                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                          </div>
+                        <TableHead className="w-[160px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Supplier"
+                            placeholder="ค้นหา Supplier..."
+                            value={puSearch.supplier}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, supplier: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, supplier: '' }))}
+                          />
                         </TableHead>
-                        <TableHead className="w-[10%]">Code</TableHead>
-                        <TableHead className="w-[15%]">Name</TableHead>
-                        <TableHead className="w-[8%]">Qty</TableHead>
-                        <TableHead className="w-[10%] p-0">
-                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
-                              <div className="flex items-center gap-2">
-                                <span>Status</span>
-                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="PO Date"
+                            placeholder="ค้นหา วันที่..."
+                            value={puSearch.po_date}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, po_date: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, po_date: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[115px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="ETA"
+                            placeholder="ค้นหา ETA..."
+                            value={puSearch.eta}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, eta: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, eta: '' }))}
+                            sortElement={
+                              <div 
+                                className="cursor-pointer hover:text-[#D4AF37] transition-colors p-0.5 rounded"
+                                onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                                title="เรียงตาม ETA"
+                              >
+                                {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                               </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
-                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
-                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
-                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
-                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
-                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            }
+                          />
                         </TableHead>
-                        <TableHead>File</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Code"
+                            placeholder="ค้นหา Code..."
+                            value={puSearch.code}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, code: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, code: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[180px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Name"
+                            placeholder="ค้นหา Name / หมายเหตุ..."
+                            value={puSearch.name}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, name: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, name: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Qty"
+                            placeholder="ค้นหา Qty..."
+                            value={puSearch.qty}
+                            onChange={(val) => setPuSearch(prev => ({ ...prev, qty: val }))}
+                            onClear={() => setPuSearch(prev => ({ ...prev, qty: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[155px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+                              <span>Status</span>
+                              <Filter className={`w-3 h-3 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                            </div>
+                            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-[11px] w-full bg-white border-slate-200 px-1.5 py-0 font-normal">
+                                <SelectValue placeholder="ทุกสถานะ" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                                <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                                <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                                <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                                <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                                <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                                <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[60px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <span className="text-xs font-semibold text-slate-700">File</span>
+                            <div className="h-6"></div>
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <span className="text-xs font-semibold text-slate-700 text-right">จัดการ</span>
+                            <div className="h-6"></div>
+                          </div>
+                        </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => (
+                      {purchasingItems.map((item) => (
                         <TableRow key={item.id} className="hover:bg-[#F8F6F0]/">
                           <TableCell className="font-medium text-[#D4AF37]">{item.po_no || '-'}</TableCell>
                           <TableCell className="line-clamp-2 break-words text-wrap" title={item.supplier}>{item.supplier || '-'}</TableCell>
@@ -1572,7 +1888,7 @@ export default function RMControlCenterPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredItems.length === 0 && (
+                      {purchasingItems.length === 0 && (
                         <TableRow><TableCell colSpan={10} className="text-center py-8 text-slate-500">ไม่พบข้อมูล</TableCell></TableRow>
                       )}
                     </TableBody>
@@ -1584,65 +1900,143 @@ export default function RMControlCenterPage() {
 
           <TabsContent value="warehouse" className="space-y-6">
              <Card className="shadow-sm">
-              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">Receiving Plan (รอรับของเข้า)</CardTitle></CardHeader>
+              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base text-slate-700">Receiving Plan (รอรับของเข้า)</CardTitle>
+                {whActiveCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearWhSearch} 
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                  >
+                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({whActiveCount})
+                  </Button>
+                )}
+              </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
                   <Table className="text-sm min-w-[1250px]">
-                    <TableHeader>
+                    <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead 
-                          className="w-[110px] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
-                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>ETA</span>
-                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
-                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
-                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                          </div>
-                        </TableHead>
-                        <TableHead className="w-[120px] p-0">
-                          <div className="flex flex-col px-2 py-1 gap-1 w-full h-full justify-center">
-                            <span className="font-semibold text-slate-500">PO No.</span>
-                            <Input 
-                              placeholder="ค้นหา PO..." 
-                              value={poSearch} 
-                              onChange={(e) => setPoSearch(e.target.value)}
-                              className="h-6 text-[10px] w-full bg-slate-50 border-slate-200 px-1"
-                            />
-                          </div>
-                        </TableHead>
-                        <TableHead className="w-[160px]">Supplier</TableHead>
-                        <TableHead className="w-[130px]">SKU / LOT</TableHead>
-                        <TableHead className="w-[110px]">Code</TableHead>
-                        <TableHead className="min-w-[180px]">Name</TableHead>
-                        <TableHead className="w-[110px]">Qty</TableHead>
-                        <TableHead className="w-[90px]">Warehouse</TableHead>
-                        <TableHead className="w-[130px]">Receive Date</TableHead>
-                        <TableHead className="w-[175px] p-0">
-                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-4 focus:ring-0">
-                              <div className="flex items-center gap-2">
-                                <span>Status</span>
-                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                        <TableHead className="w-[115px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="ETA"
+                            placeholder="ค้นหา ETA..."
+                            value={whSearch.eta}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, eta: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, eta: '' }))}
+                            sortElement={
+                              <div 
+                                className="cursor-pointer hover:text-[#D4AF37] transition-colors p-0.5 rounded"
+                                onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                                title="เรียงตาม ETA"
+                              >
+                                {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                               </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
-                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
-                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
-                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
-                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
-                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            }
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="PO No."
+                            placeholder="ค้นหา PO..."
+                            value={whSearch.po}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, po: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, po: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[160px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Supplier"
+                            placeholder="ค้นหา Supplier..."
+                            value={whSearch.supplier}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, supplier: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, supplier: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="SKU / LOT"
+                            placeholder="ค้นหา SKU/LOT..."
+                            value={whSearch.sku_lot}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, sku_lot: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, sku_lot: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Code"
+                            placeholder="ค้นหา Code..."
+                            value={whSearch.code}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, code: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, code: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[180px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Name"
+                            placeholder="ค้นหา Name / หมายเหตุ..."
+                            value={whSearch.name}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, name: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, name: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Qty"
+                            placeholder="ค้นหา Qty..."
+                            value={whSearch.qty}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, qty: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, qty: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[100px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Warehouse"
+                            placeholder="ค้นหา คลัง..."
+                            value={whSearch.warehouse}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, warehouse: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, warehouse: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[150px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Receive Date / Control"
+                            placeholder="ค้นหา วันที่/Control..."
+                            value={whSearch.receive_date}
+                            onChange={(val) => setWhSearch(prev => ({ ...prev, receive_date: val }))}
+                            onClear={() => setWhSearch(prev => ({ ...prev, receive_date: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[175px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+                              <span>Status</span>
+                              <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                            </div>
+                            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-[11px] w-full bg-white border-slate-200 px-1.5 py-0 font-normal">
+                                <SelectValue placeholder="ทุกสถานะ" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                                <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                                <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                                <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                                <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                                <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                                <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.map((item) => (
+                      {warehouseItems.map((item) => (
                         <TableRow key={item.id}>
                           <TableCell className="font-semibold text-orange-600">
                             {item.eta_date ? (
@@ -1806,71 +2200,139 @@ export default function RMControlCenterPage() {
 
           <TabsContent value="qc" className="space-y-6">
              <Card className="shadow-sm">
-              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">QC Status (รายการรอตรวจ)</CardTitle></CardHeader>
+              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base text-slate-700">QC Status (รายการรอตรวจ)</CardTitle>
+                {qcActiveCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearQcSearch} 
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                  >
+                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({qcActiveCount})
+                  </Button>
+                )}
+              </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
-                  <Table className="text-sm table-fixed w-full min-w-[1100px]">
-                    <TableHeader className="bg-[#F8F6F0]">
+                  <Table className="text-sm min-w-[1250px]">
+                    <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow className="border-b border-slate-200">
-                        <TableHead className="font-semibold text-slate-700 px-6 py-4 w-[12%]">
-                          <div className="flex items-center space-x-1 cursor-pointer hover:text-purple-700" onClick={() => {
-                            if (qcReceiveDateSort === 'asc') setQcReceiveDateSort('desc');
-                            else if (qcReceiveDateSort === 'desc') setQcReceiveDateSort(null);
-                            else { setQcReceiveDateSort('asc'); setQcControlNoSort(null); }
-                          }}>
-                            <span>Receive Date</span>
-                            {qcReceiveDateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : qcReceiveDateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
-                          </div>
-                        </TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-[10%]">
-                          <div className="flex flex-col space-y-1 mt-1 mb-1">
-                            <span>PO No.</span>
-                            <input type="text" placeholder="ค้นหา PO..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={qcPoSearch} onChange={(e) => setQcPoSearch(e.target.value)} />
-                          </div>
-                        </TableHead>
-                        <TableHead className="font-semibold text-slate-700 text-purple-700 w-[12%]">
-                          <div className="flex items-center space-x-1 cursor-pointer hover:text-purple-900" onClick={() => {
-                            if (qcControlNoSort === 'asc') setQcControlNoSort('desc');
-                            else if (qcControlNoSort === 'desc') setQcControlNoSort(null);
-                            else { setQcControlNoSort('asc'); setQcReceiveDateSort(null); }
-                          }}>
-                            <span>Control No.</span>
-                            {qcControlNoSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : qcControlNoSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : <ArrowUpDown className="w-3 h-3 text-slate-400" />}
-                          </div>
-                        </TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-[10%]">SKU / LOT</TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-[10%]">
-                          <div className="flex flex-col space-y-1 mt-1 mb-1">
-                            <span>Code</span>
-                            <input type="text" placeholder="ค้นหา Code..." className="text-xs font-normal border rounded px-1.5 py-1 w-24 bg-white" value={qcCodeSearch} onChange={(e) => setQcCodeSearch(e.target.value)} />
-                          </div>
-                        </TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-[18%]">Name</TableHead>
-                        <TableHead className="w-[14%] p-0">
-                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-2 focus:ring-0">
-                              <div className="flex items-center gap-1.5">
-                                <span>Status</span>
-                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                        <TableHead className="w-[140px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Receive Date"
+                            placeholder="ค้นหา วันที่..."
+                            value={qcSearch.receive_date}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, receive_date: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, receive_date: '' }))}
+                            sortElement={
+                              <div 
+                                className="cursor-pointer hover:text-purple-700 transition-colors p-0.5 rounded"
+                                onClick={() => {
+                                  if (qcReceiveDateSort === 'asc') setQcReceiveDateSort('desc');
+                                  else if (qcReceiveDateSort === 'desc') setQcReceiveDateSort(null);
+                                  else { setQcReceiveDateSort('asc'); setQcControlNoSort(null); }
+                                }}
+                                title="เรียงตาม Receive Date"
+                              >
+                                {qcReceiveDateSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : 
+                                 qcReceiveDateSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : 
+                                 <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                               </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
-                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
-                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
-                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
-                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
-                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            }
+                          />
                         </TableHead>
-                        <TableHead className="font-semibold text-slate-700 w-[14%]">
-                          <div className="flex flex-col space-y-1 mt-1 mb-1">
-                            <span>QC Status</span>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="PO No."
+                            placeholder="ค้นหา PO..."
+                            value={qcSearch.po}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, po: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, po: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Control No."
+                            placeholder="ค้นหา Control No..."
+                            value={qcSearch.control_no}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, control_no: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, control_no: '' }))}
+                            sortElement={
+                              <div 
+                                className="cursor-pointer hover:text-purple-900 transition-colors p-0.5 rounded"
+                                onClick={() => {
+                                  if (qcControlNoSort === 'asc') setQcControlNoSort('desc');
+                                  else if (qcControlNoSort === 'desc') setQcControlNoSort(null);
+                                  else { setQcControlNoSort('asc'); setQcReceiveDateSort(null); }
+                                }}
+                                title="เรียงตาม Control No."
+                              >
+                                {qcControlNoSort === 'asc' ? <ArrowUp className="w-3 h-3 text-purple-600" /> : 
+                                 qcControlNoSort === 'desc' ? <ArrowDown className="w-3 h-3 text-purple-600" /> : 
+                                 <ArrowUpDown className="w-3 h-3 text-slate-400" />}
+                              </div>
+                            }
+                          />
+                        </TableHead>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="SKU / LOT"
+                            placeholder="ค้นหา SKU/LOT..."
+                            value={qcSearch.sku_lot}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, sku_lot: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, sku_lot: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Code"
+                            placeholder="ค้นหา Code..."
+                            value={qcSearch.code}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, code: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, code: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[180px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Name"
+                            placeholder="ค้นหา Name / หมายเหตุ..."
+                            value={qcSearch.name}
+                            onChange={(val) => setQcSearch(prev => ({ ...prev, name: val }))}
+                            onClear={() => setQcSearch(prev => ({ ...prev, name: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[155px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+                              <span>Status</span>
+                              <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                            </div>
+                            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-[11px] w-full bg-white border-slate-200 px-1.5 py-0 font-normal">
+                                <SelectValue placeholder="ทุกสถานะ" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                                <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                                <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                                <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                                <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                                <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                                <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </TableHead>
+                        <TableHead className="w-[145px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+                              <span>QC Status</span>
+                              <Filter className={`w-3 h-3 ${qcStatusSearch !== 'ALL' ? 'text-purple-600 fill-purple-600' : 'text-slate-400'}`} />
+                            </div>
                             <Select value={qcStatusSearch} onValueChange={(val) => setQcStatusSearch(val || 'ALL')}>
-                              <SelectTrigger className="h-6 text-xs w-full bg-white px-2 py-0 border">
+                              <SelectTrigger className="h-6 text-[11px] w-full bg-white border-slate-200 px-1.5 py-0 font-normal">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -1886,24 +2348,7 @@ export default function RMControlCenterPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY' && i.status !== 'DELAYED' && i.status !== 'REVISED')
-                        .filter(i => qcPoSearch ? (i.po_no || '').toLowerCase().includes(qcPoSearch.toLowerCase()) : true)
-                        .filter(i => qcCodeSearch ? (i.rm_code || '').toLowerCase().includes(qcCodeSearch.toLowerCase()) : true)
-                        .filter(i => qcStatusSearch !== 'ALL' ? (i.qc_status || 'QUARANTINED') === qcStatusSearch : true)
-                        .sort((a, b) => {
-                          if (qcControlNoSort) {
-                            const ca = a.control_no || '';
-                            const cb = b.control_no || '';
-                            return qcControlNoSort === 'asc' ? ca.localeCompare(cb) : cb.localeCompare(ca);
-                          }
-                          if (qcReceiveDateSort) {
-                            const ta = new Date(a.receive_date || 0).getTime();
-                            const tb = new Date(b.receive_date || 0).getTime();
-                            return qcReceiveDateSort === 'asc' ? ta - tb : tb - ta;
-                          }
-                          return new Date(b.receive_date || 0).getTime() - new Date(a.receive_date || 0).getTime();
-                        })
-                        .map((item, index) => (
+                      {qcItems.map((item, index) => (
                         <TableRow key={item.id} className={`${index % 2 === 0 ? 'bg-white' : 'bg-[#F8F6F0]/'} hover:bg-purple-50/50 transition-colors border-b border-slate-100`}>
                           <TableCell className="px-6">
                             {item.receive_date ? (() => {
@@ -1975,7 +2420,7 @@ export default function RMControlCenterPage() {
                           </TableCell>
                         </TableRow>
                       ))}
-                      {filteredItems.filter(i => i.status !== 'PENDING_DELIVERY' && i.status !== 'DELAYED' && i.status !== 'REVISED').length === 0 && (
+                      {qcItems.length === 0 && (
                         <TableRow><TableCell colSpan={8} className="text-center py-12 text-slate-500 bg-white">ไม่มีรายการรอตรวจ QC</TableCell></TableRow>
                       )}
                     </TableBody>
@@ -1987,73 +2432,160 @@ export default function RMControlCenterPage() {
 
           <TabsContent value="planning" className="space-y-6">
              <Card className="shadow-sm">
-              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4"><CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle></CardHeader>
+              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle>
+                {planActiveCount > 0 && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={clearPlanSearch} 
+                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                  >
+                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({planActiveCount})
+                  </Button>
+                )}
+              </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
                   <Table className="text-sm min-w-[1300px]">
-                    <TableHeader>
+                    <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead className="w-[130px]">SKU / LOT</TableHead>
-                        <TableHead className="w-[120px]">คิว{mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)</TableHead>
-                        <TableHead className="w-[110px]">PO No.</TableHead>
-                        <TableHead className="w-[110px]">Control No.</TableHead>
-                        <TableHead className="w-[110px]">{mainTab === 'rm' ? 'RM' : 'PM'} Code</TableHead>
-                        <TableHead className="min-w-[180px]">{mainTab === 'rm' ? 'RM' : 'PM'} Name</TableHead>
-                        <TableHead className="w-[110px]">Required Qty</TableHead>
-                        <TableHead 
-                          className="w-[140px] cursor-pointer hover:bg-slate-50 transition-colors select-none group" 
-                          onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
-                        >
-                          <div className="flex items-center gap-1">
-                            <span>ETA</span>
-                            {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
-                             etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
-                             <ArrowUpDown className="w-3 h-3 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" />}
-                          </div>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="SKU / LOT"
+                            placeholder="ค้นหา SKU/LOT..."
+                            value={planSearch.sku_lot}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, sku_lot: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, sku_lot: '' }))}
+                          />
                         </TableHead>
-                        <TableHead className="w-[120px]">วันที่คลังรับเข้า</TableHead>
-                        <TableHead className="w-[130px]">วันที่ QC pass</TableHead>
-                        <TableHead className="w-[155px] p-0">
-                          <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
-                            <SelectTrigger className="h-full w-full border-0 bg-transparent shadow-none font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 rounded-none px-3 focus:ring-0">
-                              <div className="flex items-center gap-1.5">
-                                <span>Status</span>
-                                <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                        <TableHead className="w-[125px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title={`คิว${mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ'} (วันที่)`}
+                            placeholder="ค้นหา วันที่คิว..."
+                            value={planSearch.queue_date}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, queue_date: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, queue_date: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="PO No."
+                            placeholder="ค้นหา PO..."
+                            value={planSearch.po}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, po: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, po: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Control No."
+                            placeholder="ค้นหา Control No..."
+                            value={planSearch.control_no}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, control_no: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, control_no: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[120px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title={`${mainTab === 'rm' ? 'RM' : 'PM'} Code`}
+                            placeholder="ค้นหา Code..."
+                            value={planSearch.code}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, code: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, code: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="min-w-[180px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title={`${mainTab === 'rm' ? 'RM' : 'PM'} Name`}
+                            placeholder="ค้นหา Name / หมายเหตุ..."
+                            value={planSearch.name}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, name: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, name: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[110px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="Required Qty"
+                            placeholder="ค้นหา Qty..."
+                            value={planSearch.qty}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, qty: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, qty: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[140px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="ETA"
+                            placeholder="ค้นหา ETA..."
+                            value={planSearch.eta}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, eta: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, eta: '' }))}
+                            sortElement={
+                              <div 
+                                className="cursor-pointer hover:text-[#D4AF37] transition-colors p-0.5 rounded"
+                                onClick={() => setEtaSort(prev => prev === 'asc' ? 'desc' : prev === 'desc' ? null : 'asc')}
+                                title="เรียงตาม ETA"
+                              >
+                                {etaSort === 'asc' ? <ArrowUp className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 etaSort === 'desc' ? <ArrowDown className="w-3 h-3 text-[#D4AF37]" /> : 
+                                 <ArrowUpDown className="w-3 h-3 text-slate-400" />}
                               </div>
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
-                              <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
-                              <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
-                              <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
-                              <SelectItem value="QC_PASS">QC Passed</SelectItem>
-                              <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
-                              <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
-                              <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
-                            </SelectContent>
-                          </Select>
+                            }
+                          />
+                        </TableHead>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="วันที่คลังรับเข้า"
+                            placeholder="ค้นหา วันที่รับ..."
+                            value={planSearch.receive_date}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, receive_date: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, receive_date: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[130px] p-2 align-top">
+                          <ColumnSearchInput 
+                            title="วันที่ QC pass"
+                            placeholder="ค้นหา สถานะ/วันที่..."
+                            value={planSearch.qc_date}
+                            onChange={(val) => setPlanSearch(prev => ({ ...prev, qc_date: val }))}
+                            onClear={() => setPlanSearch(prev => ({ ...prev, qc_date: '' }))}
+                          />
+                        </TableHead>
+                        <TableHead className="w-[155px] p-2 align-top">
+                          <div className="flex flex-col gap-1 w-full py-1">
+                            <div className="flex items-center justify-between gap-1 text-xs font-semibold text-slate-700">
+                              <span>Status</span>
+                              <Filter className={`w-3.5 h-3.5 ${statusFilter !== 'ALL' ? 'text-[#D4AF37] fill-[#D4AF37]' : 'text-slate-400'}`} />
+                            </div>
+                            <Select value={statusFilter} onValueChange={(val) => setStatusFilter(val || 'ALL')}>
+                              <SelectTrigger className="h-6 text-[11px] w-full bg-white border-slate-200 px-1.5 py-0 font-normal">
+                                <SelectValue placeholder="ทุกสถานะ" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="ALL">All Status (ทั้งหมด)</SelectItem>
+                                <SelectItem value="PENDING_DELIVERY">Ordered รอรับเข้า</SelectItem>
+                                <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                <SelectItem value="WAITING_QC">Quarantined แจ้งสุ่ม</SelectItem>
+                                <SelectItem value="QC_PASS">QC Passed</SelectItem>
+                                <SelectItem value="DELAYED">Delayed เข้าล่าช้า</SelectItem>
+                                <SelectItem value="REJECTED">Rejected ไม่ผ่าน</SelectItem>
+                                <SelectItem value="REVISED">Revised รอรับเข้ารอบใหม่</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredItems.length === 0 ? (
+                      {planningItems.length === 0 ? (
                         <TableRow>
                           <TableCell colSpan={11} className="h-32 text-center text-slate-400 text-sm">
                             ไม่พบรายการวัตถุดิบ/บรรจุภัณฑ์ตามเงื่อนไขที่เลือก
                           </TableCell>
                         </TableRow>
                       ) : (
-                        filteredItems.map((item) => {
-                          let targetDate: Date | null = null;
-                          if (item.production_lots?.production_logs) {
-                            const processName = mainTab === 'rm' ? 'ชั่งสาร' : 'บรรจุ';
-                            const targetLogs = item.production_lots.production_logs.filter((l: any) => l.processes?.process_name === processName);
-                            if (targetLogs.length > 0) {
-                              targetLogs.sort((a: any, b: any) => new Date(a.activity_date).getTime() - new Date(b.activity_date).getTime());
-                              targetDate = new Date(targetLogs[0].activity_date);
-                            }
-                          }
-                          
+                        planningItems.map((item) => {
+                          const targetDate = item.targetDate;
                           const etaDate = item.eta_date ? new Date(item.eta_date) : null;
                           
                           let etaStatus: 'on-time' | 'at-risk' | 'delayed' | null = null;
