@@ -204,7 +204,7 @@ export default function RMControlCenterPage() {
   const [receivingItem, setReceivingItem] = useState<RMItem | null>(null);
   const [receiveRmCode, setReceiveRmCode] = useState('');
   const [receiveRmName, setReceiveRmName] = useState('');
-  const [receiveWarehouse, setReceiveWarehouse] = useState('WH-PM');
+  const [receiveWarehouse, setReceiveWarehouse] = useState('MMPM');
   const [receivePoNo, setReceivePoNo] = useState('');
   const [receiveSupplier, setReceiveSupplier] = useState('');
   const [receivePoQty, setReceivePoQty] = useState('');
@@ -218,11 +218,55 @@ export default function RMControlCenterPage() {
 
   // Customer Supplied PM State
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
-  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
+  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
 
   // Customer Supplied RM (R4) State
   const [isR4ModalOpen, setIsR4ModalOpen] = useState(false);
   const [r4Form, setR4Form] = useState({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+
+  // Product SKUs for intelligent code-to-SKU mapping
+  const [productSkus, setProductSkus] = useState<string[]>([]);
+
+  const extractSkuFromCode = (code?: string, knownSkus: string[] = productSkus): string | null => {
+    if (!code) return null;
+    const cleanCode = code.toUpperCase().trim();
+    
+    // 1. Try matching known SKUs directly (longest first)
+    if (knownSkus && knownSkus.length > 0) {
+      const cAlnum = cleanCode.replace(/[^A-Z0-9]/g, '');
+      for (const s of knownSkus) {
+        const sAlnum = s.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (sAlnum && cAlnum.includes(sAlnum)) {
+          return s;
+        }
+      }
+    }
+
+    // 2. Standard pattern: CMD2-<SKU_PART>-<SUFFIX> or R4-<SKU_PART>-...
+    // e.g. CMD2-JHD318-O2 -> JHD-318, CMD2-OFT001-L1 -> OFT-001
+    const parts = cleanCode.split('-');
+    if (parts.length >= 2) {
+      const middle = parts[1];
+      const m = middle.match(/^([A-Z]+)(\d+)$/);
+      if (m) {
+        return `${m[1]}-${m[2]}`;
+      }
+      return middle;
+    }
+
+    return null;
+  };
+
+  const getDisplaySku = (item: RMItem): string => {
+    if (item.production_lots?.products?.sku) {
+      return item.production_lots.products.sku;
+    }
+    return extractSkuFromCode(item.rm_code, productSkus) || '-';
+  };
+
+  const getDisplayLot = (item: RMItem): string => {
+    return item.production_lots?.lot_no || item.lot_product || '-';
+  };
 
   const fetchItems = async () => {
     setLoading(true);
@@ -252,6 +296,11 @@ export default function RMControlCenterPage() {
   useEffect(() => {
     fetchItems();
     fetchLots();
+    supabase.from('products').select('sku').then(({ data }) => {
+      if (data) {
+        setProductSkus(data.map((p: any) => p.sku).filter(Boolean).sort((a: string, b: string) => b.length - a.length));
+      }
+    });
     supabase.auth.getUser().then(({ data }) => {
       if (data?.user?.email) {
         setUserRole(data.user?.user_metadata?.role || 'user');
@@ -522,7 +571,7 @@ export default function RMControlCenterPage() {
     setIsReceiveModalOpen(true);
     setReceiveRmCode(item.rm_code || '');
     setReceiveRmName(item.rm_name || '');
-    setReceiveWarehouse(item.warehouse || 'WH-PM');
+    setReceiveWarehouse(item.warehouse || 'MMPM');
     setReceivePoNo(item.po_no || '');
     setReceiveSupplier(item.supplier || '');
     setReceivePoQty(item.quantity != null ? item.quantity.toString() : '');
@@ -635,7 +684,7 @@ export default function RMControlCenterPage() {
     const updates: any = { 
       rm_code: receiveRmCode.trim(),
       rm_name: receiveRmName.trim(),
-      warehouse: receiveWarehouse.trim() || 'WH-PM',
+      warehouse: receiveWarehouse.trim() || 'MMPM',
       po_no: receivePoNo.trim(),
       supplier: receiveSupplier.trim() || null,
       quantity: parseFloat(receivePoQty) || receivingItem.quantity,
@@ -714,7 +763,7 @@ export default function RMControlCenterPage() {
       supplier: item.supplier || '',
       rm_code: item.rm_code || '',
       rm_name: item.rm_name || '',
-      warehouse: item.warehouse || 'WH-PM',
+      warehouse: item.warehouse || 'MMPM',
       quantity: item.quantity || 0,
       unit: item.unit || '',
       eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : '',
@@ -759,7 +808,7 @@ export default function RMControlCenterPage() {
       supplier: editForm.supplier,
       rm_code: editForm.rm_code,
       rm_name: editForm.rm_name,
-      warehouse: editForm.warehouse || 'WH-PM',
+      warehouse: editForm.warehouse || 'MMPM',
       quantity: editForm.quantity,
       unit: editForm.unit,
       eta_date: editForm.eta_date || null,
@@ -814,7 +863,7 @@ export default function RMControlCenterPage() {
 
   const openCmd2Modal = async () => {
     setIsCmd2ModalOpen(true);
-    setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
+    setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
     
     try {
       const prefix = 'P';
@@ -867,8 +916,32 @@ export default function RMControlCenterPage() {
 
     setUploading(true);
     
-    // Generate pseudo PO/PR number
-    const fakePo = `PM-CMD2-${Date.now().toString().slice(-6)}`;
+    // Generate pseudo PO/PR number: PMYYMMAAA
+    // PM คือวัสดุ, YY คือเลขสองหลักสุดท้ายปี ค.ศ. (2026=26), MM คือเลขเดือน (เช่น 09), AAA คือลำดับการคีย์รับเข้าในเดือนนั้น (001 เป็นต้นไป)
+    const d = new Date();
+    const yy = d.getFullYear().toString().slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const monthPrefix = `PM${yy}${mm}`;
+
+    const { data: poList } = await supabase
+      .from('production_lot_rms')
+      .select('po_no')
+      .like('po_no', `${monthPrefix}%`);
+
+    let nextSeq = 1;
+    if (poList && poList.length > 0) {
+      const seqs = poList
+        .map((p: any) => {
+          if (!p.po_no) return 0;
+          const numPart = p.po_no.replace(monthPrefix, '');
+          return parseInt(numPart, 10);
+        })
+        .filter((n: number) => !isNaN(n) && n > 0);
+      if (seqs.length > 0) {
+        nextSeq = Math.max(...seqs) + 1;
+      }
+    }
+    const fakePo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     
     // If no code is provided, generate a pseudo one
     const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
@@ -883,7 +956,7 @@ export default function RMControlCenterPage() {
       quantity: qtyVal,
       received_qty: qtyVal,
       unit: 'pcs',
-      warehouse: cmd2Form.warehouse,
+      warehouse: cmd2Form.warehouse || 'MMPM',
       lot_product: cmd2Form.lotProduct,
       control_no: cmd2Form.controlNo.trim() || undefined,
       status: 'RECEIVED',
@@ -895,9 +968,9 @@ export default function RMControlCenterPage() {
     if (error) {
       toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ');
     } else {
-      toast.success('รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ!');
+      toast.success(`รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsCmd2ModalOpen(false);
-      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
+      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
       fetchItems();
     }
   };
@@ -957,8 +1030,31 @@ export default function RMControlCenterPage() {
 
     setUploading(true);
     
-    // Generate pseudo PO/PR number for R4
-    const fakePo = `RM-R4-${Date.now().toString().slice(-6)}`;
+    // Generate pseudo PO/PR number: RMYYMMAAA
+    const d = new Date();
+    const yy = d.getFullYear().toString().slice(2);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const monthPrefix = `RM${yy}${mm}`;
+
+    const { data: poList } = await supabase
+      .from('production_lot_rms')
+      .select('po_no')
+      .like('po_no', `${monthPrefix}%`);
+
+    let nextSeq = 1;
+    if (poList && poList.length > 0) {
+      const seqs = poList
+        .map((p: any) => {
+          if (!p.po_no) return 0;
+          const numPart = p.po_no.replace(monthPrefix, '');
+          return parseInt(numPart, 10);
+        })
+        .filter((n: number) => !isNaN(n) && n > 0);
+      if (seqs.length > 0) {
+        nextSeq = Math.max(...seqs) + 1;
+      }
+    }
+    const fakePo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     
     // If no code is provided, generate a pseudo one
     const cleanCustomer = r4Form.customerName.replace(/[^a-zA-Z0-9]/g, '').substring(0,3).toUpperCase() || 'CUS';
@@ -986,7 +1082,7 @@ export default function RMControlCenterPage() {
     if (error) {
       toast.error('บันทึกข้อมูลวัตถุดิบลูกค้าไม่สำเร็จ: ' + error.message);
     } else {
-      toast.success('รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ!');
+      toast.success(`รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsR4ModalOpen(false);
       setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
       fetchItems();
@@ -1068,6 +1164,7 @@ export default function RMControlCenterPage() {
       (item.lot_product || '').toLowerCase().includes(term) ||
       (item.supplier || '').toLowerCase().includes(term) ||
       (item.production_lots?.products?.sku || '').toLowerCase().includes(term) ||
+      (extractSkuFromCode(item.rm_code, productSkus) || '').toLowerCase().includes(term) ||
       (item.production_lots?.lot_no || '').toLowerCase().includes(term) ||
       statusTh.includes(term)
     );
@@ -1107,8 +1204,8 @@ export default function RMControlCenterPage() {
     if (whSearch.po && !(item.po_no || '').toLowerCase().includes(whSearch.po.toLowerCase())) return false;
     if (whSearch.supplier && !(item.supplier || '').toLowerCase().includes(whSearch.supplier.toLowerCase())) return false;
     if (whSearch.sku_lot) {
-      const sku = item.production_lots?.products?.sku || '';
-      const lot = item.production_lots?.lot_no || '';
+      const sku = getDisplaySku(item);
+      const lot = getDisplayLot(item);
       const term = whSearch.sku_lot.toLowerCase();
       if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
     }
@@ -1143,8 +1240,8 @@ export default function RMControlCenterPage() {
       if (qcSearch.po && !(item.po_no || '').toLowerCase().includes(qcSearch.po.toLowerCase())) return false;
       if (qcSearch.control_no && !(item.control_no || '').toLowerCase().includes(qcSearch.control_no.toLowerCase())) return false;
       if (qcSearch.sku_lot) {
-        const sku = item.production_lots?.products?.sku || '';
-        const lot = item.production_lots?.lot_no || '';
+        const sku = getDisplaySku(item);
+        const lot = getDisplayLot(item);
         const term = qcSearch.sku_lot.toLowerCase();
         if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
       }
@@ -1187,8 +1284,8 @@ export default function RMControlCenterPage() {
     return { ...item, targetDate };
   }).filter(item => {
     if (planSearch.sku_lot) {
-      const sku = item.production_lots?.products?.sku || '';
-      const lot = item.production_lots?.lot_no || '';
+      const sku = getDisplaySku(item);
+      const lot = getDisplayLot(item);
       const term = planSearch.sku_lot.toLowerCase();
       if (!sku.toLowerCase().includes(term) && !lot.toLowerCase().includes(term)) return false;
     }
@@ -1703,12 +1800,12 @@ export default function RMControlCenterPage() {
                           
                           return (
                             <TableRow key={item.id} className="bg-white">
-                              <TableCell>
-                                <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                                <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                              <TableCell className="whitespace-nowrap">
+                                <div className="text-sm font-bold text-[#D4AF37]">{getDisplaySku(item)}</div>
+                                <div className="text-xs text-slate-500 font-medium mt-0.5">{getDisplayLot(item)}</div>
                               </TableCell>
-                              <TableCell>
-                                <div className="font-medium text-slate-700">{item.rm_code}</div>
+                              <TableCell className="whitespace-nowrap font-medium text-slate-700">
+                                {item.rm_code}
                               </TableCell>
                               <TableCell>
                                 <div className="text-xs text-slate-500 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
@@ -1780,7 +1877,7 @@ export default function RMControlCenterPage() {
                   <Table className="text-sm min-w-[1250px]">
                     <TableHeader className="bg-[#F8F6F0]/">
                       <TableRow>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[140px] min-w-[130px] p-2 align-top">
                           <ColumnSearchInput 
                             title="PO No."
                             placeholder="ค้นหา PO..."
@@ -1827,7 +1924,7 @@ export default function RMControlCenterPage() {
                             }
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[160px] min-w-[150px] p-2 align-top">
                           <ColumnSearchInput 
                             title="Code"
                             placeholder="ค้นหา Code..."
@@ -1894,7 +1991,7 @@ export default function RMControlCenterPage() {
                     <TableBody>
                       {purchasingItems.map((item) => (
                         <TableRow key={item.id} className="hover:bg-[#F8F6F0]/">
-                          <TableCell className="font-medium text-[#D4AF37]">{item.po_no || '-'}</TableCell>
+                          <TableCell className="font-medium text-[#D4AF37] whitespace-nowrap">{item.po_no || '-'}</TableCell>
                           <TableCell className="line-clamp-2 break-words text-wrap" title={item.supplier}>{item.supplier || '-'}</TableCell>
                           <TableCell>{item.po_date ? new Date(item.po_date).toLocaleDateString('th-TH') : '-'}</TableCell>
                           <TableCell>
@@ -1922,7 +2019,7 @@ export default function RMControlCenterPage() {
                               );
                             })()}
                           </TableCell>
-                          <TableCell>{item.rm_code}</TableCell>
+                          <TableCell className="whitespace-nowrap font-medium text-slate-700">{item.rm_code}</TableCell>
                           <TableCell>
                             <div className="line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                             {item.remark && (
@@ -2040,7 +2137,7 @@ export default function RMControlCenterPage() {
                             }
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[140px] min-w-[130px] p-2 align-top">
                           <ColumnSearchInput 
                             title="PO No."
                             placeholder="ค้นหา PO..."
@@ -2067,7 +2164,7 @@ export default function RMControlCenterPage() {
                             onClear={() => setWhSearch(prev => ({ ...prev, sku_lot: '' }))}
                           />
                         </TableHead>
-                        <TableHead className="w-[110px] p-2 align-top">
+                        <TableHead className="w-[160px] min-w-[150px] p-2 align-top">
                           <ColumnSearchInput 
                             title="Code"
                             placeholder="ค้นหา Code..."
@@ -2148,13 +2245,13 @@ export default function RMControlCenterPage() {
                               </div>
                             ) : '-'}
                           </TableCell>
-                          <TableCell>{item.po_no}</TableCell>
+                          <TableCell className="whitespace-nowrap font-medium text-slate-700">{item.po_no}</TableCell>
                           <TableCell className="line-clamp-2 break-words text-wrap">{item.supplier}</TableCell>
-                          <TableCell>
-                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="text-sm font-bold text-[#D4AF37]">{getDisplaySku(item)}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{getDisplayLot(item)}</div>
                           </TableCell>
-                          <TableCell className="font-medium text-slate-700">{item.rm_code}</TableCell>
+                          <TableCell className="whitespace-nowrap font-medium text-slate-700">{item.rm_code}</TableCell>
                           <TableCell>
                             <div className="text-slate-600 line-clamp-2 break-words text-wrap" title={item.rm_name}>{item.rm_name}</div>
                             {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
@@ -2344,7 +2441,7 @@ export default function RMControlCenterPage() {
                             }
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[140px] min-w-[130px] p-2 align-top">
                           <ColumnSearchInput 
                             title="PO No."
                             placeholder="ค้นหา PO..."
@@ -2386,7 +2483,7 @@ export default function RMControlCenterPage() {
                             onClear={() => setQcSearch(prev => ({ ...prev, sku_lot: '' }))}
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[160px] min-w-[150px] p-2 align-top">
                           <ColumnSearchInput 
                             title="Code"
                             placeholder="ค้นหา Code..."
@@ -2465,7 +2562,7 @@ export default function RMControlCenterPage() {
                               <span className="text-slate-400 text-sm">-</span>
                             )}
                           </TableCell>
-                          <TableCell className="font-medium text-slate-700">{item.po_no}</TableCell>
+                          <TableCell className="font-medium text-slate-700 whitespace-nowrap">{item.po_no}</TableCell>
                           <TableCell>
                             <div className="font-bold text-purple-700">{item.control_no || '-'}</div>
                             {item.received_qty != null && (
@@ -2474,11 +2571,11 @@ export default function RMControlCenterPage() {
                               </div>
                             )}
                           </TableCell>
-                          <TableCell>
-                            <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                            <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="text-sm font-bold text-[#D4AF37]">{getDisplaySku(item)}</div>
+                            <div className="text-xs text-slate-500 font-medium mt-0.5">{getDisplayLot(item)}</div>
                           </TableCell>
-                          <TableCell className="font-medium text-purple-700">
+                          <TableCell className="font-medium text-purple-700 whitespace-nowrap">
                              {item.rm_code}
                           </TableCell>
                           <TableCell>
@@ -2570,7 +2667,7 @@ export default function RMControlCenterPage() {
                             onClear={() => setPlanSearch(prev => ({ ...prev, queue_date: '' }))}
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[140px] min-w-[130px] p-2 align-top">
                           <ColumnSearchInput 
                             title="PO No."
                             placeholder="ค้นหา PO..."
@@ -2588,7 +2685,7 @@ export default function RMControlCenterPage() {
                             onClear={() => setPlanSearch(prev => ({ ...prev, control_no: '' }))}
                           />
                         </TableHead>
-                        <TableHead className="w-[120px] p-2 align-top">
+                        <TableHead className="w-[160px] min-w-[150px] p-2 align-top">
                           <ColumnSearchInput 
                             title={`${mainTab === 'rm' ? 'RM' : 'PM'} Code`}
                             placeholder="ค้นหา Code..."
@@ -2707,14 +2804,14 @@ export default function RMControlCenterPage() {
 
                           return (
                           <TableRow key={item.id}>
-                            <TableCell>
-                              <div className="text-sm font-bold text-[#D4AF37]">{item.production_lots?.products?.sku || '-'}</div>
-                              <div className="text-xs text-slate-500 font-medium mt-0.5">{item.production_lots?.lot_no || '-'}</div>
+                            <TableCell className="whitespace-nowrap">
+                              <div className="text-sm font-bold text-[#D4AF37]">{getDisplaySku(item)}</div>
+                              <div className="text-xs text-slate-500 font-medium mt-0.5">{getDisplayLot(item)}</div>
                             </TableCell>
                             <TableCell className="text-slate-600 font-medium">
                               {targetDate ? targetDate.toLocaleDateString('th-TH') : '-'}
                             </TableCell>
-                            <TableCell className="font-semibold text-[#D4AF37] text-xs">
+                            <TableCell className="font-semibold text-[#D4AF37] text-xs whitespace-nowrap">
                               {item.po_no || '-'}
                             </TableCell>
                             <TableCell>
@@ -2726,7 +2823,7 @@ export default function RMControlCenterPage() {
                                 <span className="text-slate-400 text-xs">-</span>
                               )}
                             </TableCell>
-                            <TableCell className="font-medium text-purple-700">{item.rm_code}</TableCell>
+                            <TableCell className="font-medium text-purple-700 whitespace-nowrap">{item.rm_code}</TableCell>
                             <TableCell>
                               <div className="line-clamp-2 break-words" title={item.rm_name}>{item.rm_name}</div>
                               {item.bottom_remark && item.bottom_remark.toUpperCase().includes('FOR') && (
@@ -3002,7 +3099,7 @@ export default function RMControlCenterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>คลังสินค้า (Warehouse)</Label>
-                <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} placeholder="WH-PM" />
+                <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} placeholder="MMPM" />
               </div>
               <div className="space-y-2">
                 <Label>Control No. (เลขคุมรับเข้า)</Label>
@@ -3141,7 +3238,7 @@ export default function RMControlCenterPage() {
                   <Input 
                     value={receiveWarehouse} 
                     onChange={e => setReceiveWarehouse(e.target.value)} 
-                    placeholder="เช่น WH-PM, MMRM" 
+                    placeholder="เช่น MMPM, MMRM" 
                     className="text-xs bg-white font-medium" 
                   />
                 </div>
@@ -3437,7 +3534,7 @@ export default function RMControlCenterPage() {
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-slate-700">Warehouse</Label>
-              <Input value={editForm.warehouse} onChange={e => setEditForm({...editForm, warehouse: e.target.value})} className="col-span-3 text-xs bg-slate-50" placeholder="เช่น WH-PM, MMRM" />
+              <Input value={editForm.warehouse} onChange={e => setEditForm({...editForm, warehouse: e.target.value})} className="col-span-3 text-xs bg-slate-50" placeholder="เช่น MMPM, MMRM" />
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-slate-700">Quantity</Label>
