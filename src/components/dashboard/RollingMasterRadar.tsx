@@ -19,6 +19,7 @@ import {
   Beaker, 
   ShieldCheck,
   Package, 
+  PackageOpen,
   Gift, 
   ChevronRight, 
   ChevronLeft, 
@@ -96,7 +97,7 @@ export interface BulkStockInfo {
 
 interface StreamItem {
   id: string
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE'
   qcSubtype?: 'RM' | 'PM' | 'BULK' | 'IPC' | 'FG'
   date: string
   title: string
@@ -115,7 +116,7 @@ interface StreamItem {
 
 function computeOperationalStatus(
   item: any,
-  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE',
+  streamType: 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE',
   cellDate: string,
   todayStr: string
 ): OperationalStatus {
@@ -351,7 +352,7 @@ function computeOperationalStatus(
   const userComment = extractUserComment(log.note)
   const note = userComment || undefined
 
-  const isPof = procName.includes('pof') || procName.includes('ลงลัง') || procName.includes('อุโมงค์')
+  const isPof = streamType === 'POF' || procName.includes('pof') || procName.includes('ลงลัง') || procName.includes('อุโมงค์')
 
   const streamVerb = 
     streamType === 'WEIGHING' ? 'ชั่งสาร' : 
@@ -1067,7 +1068,7 @@ export function RollingMasterRadar({
   }
 
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
-  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'FG_DUE'>('ALL')
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE'>('ALL')
   const [loading, setLoading] = useState(true)
   const [radarData, setRadarData] = useState<{
     etaList: any[]
@@ -1236,6 +1237,7 @@ export function RollingMasterRadar({
       QA: StreamItem[]
       BULK_STOCK: StreamItem[]
       PACKING: StreamItem[]
+      POF: StreamItem[]
       FG_DUE: StreamItem[]
     }> = {}
 
@@ -1248,6 +1250,7 @@ export function RollingMasterRadar({
         QA: [],
         BULK_STOCK: [],
         PACKING: [],
+        POF: [],
         FG_DUE: []
       }
     })
@@ -1261,6 +1264,7 @@ export function RollingMasterRadar({
     let totalBulkStockTanks = 0
     let totalBulkStockLots = 0
     let totalPacking = 0
+    let totalPof = 0
     let totalFgDue = 0
 
     const todayDateStr = horizonDates[6]?.dateStr || format(new Date(), 'yyyy-MM-dd')
@@ -1317,7 +1321,9 @@ export function RollingMasterRadar({
         } else if (pName.includes('ผสม') || pName.includes('mix')) {
           totalMixing++
           totalMixingTanks += tanksCount
-        } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
+        } else if (pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')) {
+          totalPof++
+        } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('รอบรรจุ')) {
           totalPacking++
         }
       }
@@ -1355,17 +1361,31 @@ export function RollingMasterRadar({
               meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
               opStatus
             })
-          } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('pof') || pName.includes('ลงลัง')) {
-            const rawProcName = log.processes?.process_name || (pName.includes('pof') ? 'รอ POF' : pName.includes('ลงลัง') ? 'ลงลัง' : 'บรรจุ')
-            const isPofProc = pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')
-            const processBadge = isPofProc ? 'รอ POF / ลงลัง' : 'บรรจุ'
+          } else if (pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')) {
+            const rawProcName = log.processes?.process_name || 'ลงลัง/POF'
+            const opStatus = computeOperationalStatus(log, 'POF', hd.dateStr, todayDateStr)
+            map[hd.dateStr].POF.push({
+              id: `${log.id}-${hd.dateStr}`,
+              streamType: 'POF',
+              date: hd.dateStr,
+              title: `${sku} • LOT ${lotNo}`,
+              subtitle: pProductName ? `${pProductName} • [${rawProcName}]` : rawProcName,
+              tag: log.piece_quantity ? `${Number(log.piece_quantity).toLocaleString()} ชิ้น` : `ถัง ${startT}-${endT}`,
+              lotNo,
+              sku,
+              lotId: lot?.id,
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay, rawProcName },
+              opStatus
+            })
+          } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('รอบรรจุ')) {
+            const rawProcName = log.processes?.process_name || 'บรรจุ'
             const opStatus = computeOperationalStatus(log, 'PACKING', hd.dateStr, todayDateStr)
             map[hd.dateStr].PACKING.push({
               id: `${log.id}-${hd.dateStr}`,
               streamType: 'PACKING',
               date: hd.dateStr,
               title: `${sku} • LOT ${lotNo}`,
-              subtitle: pProductName ? `${pProductName} • [${rawProcName || processBadge}]` : (rawProcName || processBadge),
+              subtitle: pProductName ? `${pProductName} • [${rawProcName}]` : rawProcName,
               tag: log.piece_quantity ? `${Number(log.piece_quantity).toLocaleString()} ชิ้น` : `ถัง ${startT}-${endT}`,
               lotNo,
               sku,
@@ -1866,6 +1886,7 @@ export function RollingMasterRadar({
         totalBulkStockTanks,
         totalBulkStockLots,
         totalPacking,
+        totalPof,
         totalFgDue
       }
     }
@@ -1934,7 +1955,7 @@ export function RollingMasterRadar({
     },
     {
       key: 'PACKING' as const,
-      label: '7. ไลน์บรรจุ & POF',
+      label: '7. งานบรรจุ (Primary Packing)',
       shortLabel: 'บรรจุ/แพ็คกิ้ง',
       icon: Package,
       color: 'text-emerald-700',
@@ -1943,8 +1964,18 @@ export function RollingMasterRadar({
       pillColor: 'bg-emerald-100/90 text-emerald-900 border-emerald-300/80 hover:bg-emerald-200'
     },
     {
+      key: 'POF' as const,
+      label: '8. งานลงลัง / POF (Secondary)',
+      shortLabel: 'ลงลัง/POF',
+      icon: PackageOpen,
+      color: 'text-teal-700',
+      bgColor: 'bg-teal-500/10',
+      badgeBorder: 'border-teal-300',
+      pillColor: 'bg-teal-100/90 text-teal-900 border-teal-300/80 hover:bg-teal-200'
+    },
+    {
       key: 'FG_DUE' as const,
-      label: '8. คลัง FG & กำหนดส่งมอบ (Due FG)',
+      label: '9. คลัง FG & กำหนดส่งมอบ (Due FG)',
       shortLabel: 'คลัง FG & ส่งมอบ',
       icon: Gift,
       color: 'text-pink-700',
@@ -2078,7 +2109,7 @@ export function RollingMasterRadar({
             isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
           }`}>
             <span className={`text-[11px] font-bold px-2 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>สายงาน:</span>
-            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'QA', 'BULK_STOCK', 'PACKING', 'FG_DUE'] as const).map(f => (
+            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'QA', 'BULK_STOCK', 'PACKING', 'POF', 'FG_DUE'] as const).map(f => (
               <button
                 key={f}
                 type="button"
@@ -2089,14 +2120,14 @@ export function RollingMasterRadar({
                     : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
                 }`}
               >
-                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC' : f === 'QA' ? 'ประกัน QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : 'คลัง FG'}
+                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC' : f === 'QA' ? 'ประกัน QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : f === 'POF' ? 'ลงลัง/POF' : 'คลัง FG'}
               </button>
             ))}
           </div>
         </div>
 
-        {/* 21-Day Executive Summary Chips (8 Streams) */}
-        <div className={`grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-2.5 mt-4 pt-4 border-t ${
+        {/* 21-Day Executive Summary Chips (9 Streams) */}
+        <div className={`grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-2 sm:gap-2.5 mt-4 pt-4 border-t ${
           isNight ? 'border-slate-800' : 'border-slate-100'
         }`}>
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
@@ -2183,8 +2214,20 @@ export function RollingMasterRadar({
             <div className="flex items-center gap-2 min-w-0">
               <Package className="w-4 h-4 text-emerald-400 shrink-0" />
               <div className="min-w-0">
-                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>ไลน์บรรจุ & POF (21 วัน)</div>
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>งานบรรจุ (21 วัน)</div>
                 <div className={`text-sm font-black truncate ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{summaryCounts.totalPacking} รอบงาน</div>
+              </div>
+            </div>
+          </div>
+
+          <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
+            isNight ? 'bg-teal-950/40 border-teal-800/60 text-teal-200' : 'bg-teal-50/70 border-teal-200/80 text-teal-900'
+          }`}>
+            <div className="flex items-center gap-2 min-w-0">
+              <PackageOpen className="w-4 h-4 text-teal-400 shrink-0" />
+              <div className="min-w-0">
+                <div className={`text-[10px] font-medium truncate ${isNight ? 'text-teal-300' : 'text-teal-700'}`}>งานลงลัง/POF (21 วัน)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-teal-100' : 'text-teal-900'}`}>{summaryCounts.totalPof} รอบงาน</div>
               </div>
             </div>
           </div>
@@ -2641,9 +2684,10 @@ export function RollingMasterRadar({
                     const dayQa = dateStreamMap[d.dateStr]?.QA || []
                     const dayBulkStock = dateStreamMap[d.dateStr]?.BULK_STOCK || []
                     const dayPacking = dateStreamMap[d.dateStr]?.PACKING || []
+                    const dayPof = dateStreamMap[d.dateStr]?.POF || []
                     const dayFgDue = dateStreamMap[d.dateStr]?.FG_DUE || []
 
-                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayQa.length + dayBulkStock.length + dayPacking.length + dayFgDue.length
+                    const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayQa.length + dayBulkStock.length + dayPacking.length + dayPof.length + dayFgDue.length
 
                     if (totalDayTasks === 0) return null
 
@@ -2839,7 +2883,7 @@ export function RollingMasterRadar({
                             <div className="p-2 rounded-xl bg-emerald-50/70 border border-emerald-200/70 space-y-1">
                               <div className="font-bold text-emerald-900 flex items-center gap-1.5 text-[11px]">
                                 <Package className="w-3.5 h-3.5 text-emerald-700" />
-                                <span>ไลน์บรรจุ & POF ({dayPacking.length} ล็อต)</span>
+                                <span>งานบรรจุ ({dayPacking.length} รายการ)</span>
                               </div>
                               {dayPacking.map(p => (
                                 <div key={p.id} className="text-[11px] text-emerald-800 pl-5 flex items-center justify-between gap-1.5">
@@ -2853,6 +2897,33 @@ export function RollingMasterRadar({
                                   </div>
                                   {p.meta?.isMultiDay && (
                                     <span className="text-[9px] text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
+                                      {format(parseISO(p.meta.startDate), 'd/M')}-{format(parseISO(p.meta.endDate), 'd/M')}
+                                    </span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* POF / Cartoning */}
+                          {dayPof.length > 0 && (
+                            <div className="p-2 rounded-xl bg-teal-50/70 border border-teal-200/70 space-y-1">
+                              <div className="font-bold text-teal-900 flex items-center gap-1.5 text-[11px]">
+                                <PackageOpen className="w-3.5 h-3.5 text-teal-700" />
+                                <span>งานลงลัง / POF ({dayPof.length} รายการ)</span>
+                              </div>
+                              {dayPof.map(p => (
+                                <div key={p.id} className="text-[11px] text-teal-800 pl-5 flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span>• <strong>{p.title}</strong> <span className="text-teal-700 font-semibold">{p.tag}</span></span>
+                                    {p.opStatus && (
+                                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${p.opStatus.color}`}>
+                                        {p.opStatus.shortBadge}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {p.meta?.isMultiDay && (
+                                    <span className="text-[9px] text-teal-700 bg-teal-50 border border-teal-200/80 px-1.5 py-0.5 rounded font-medium shrink-0">
                                       {format(parseISO(p.meta.startDate), 'd/M')}-{format(parseISO(p.meta.endDate), 'd/M')}
                                     </span>
                                   )}
