@@ -18,8 +18,9 @@ import {
   LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, 
   Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, 
   Scissors, Plus, X, TrendingUp, Layers, RefreshCw, ShieldCheck, CheckSquare, 
-  Sparkles, Clock, ArrowUpRight
+  Sparkles, Clock, ArrowUpRight, Printer
 } from 'lucide-react';
+import { QuarantineTagModal, QuarantineTagData } from "@/components/warehouse/QuarantineTagModal";
 import { 
   DELAY_CATEGORIES, 
   formatDelayRemark, 
@@ -254,19 +255,113 @@ export default function RMControlCenterPage() {
   const [receiveEditReason, setReceiveEditReason] = useState('');
   const [isGeneratingControlNo, setIsGeneratingControlNo] = useState(false);
 
+  // Quarantine Tag State (100x80mm)
+  const [isQuarantineTagOpen, setIsQuarantineTagOpen] = useState(false);
+  const [quarantineTagData, setQuarantineTagData] = useState<QuarantineTagData | null>(null);
+
+  // Receive Modal Additional Packaging Fields
+  const [receiveBoxCount, setReceiveBoxCount] = useState('1');
+  const [receiveQtyPerBox, setReceiveQtyPerBox] = useState('');
+  const [receiveMfgLot, setReceiveMfgLot] = useState('-');
+
   // Customer Supplied PM State & Quick Search Selector
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
-  const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
+  const [cmd2Form, setCmd2Form] = useState({ 
+    pmCode: '', 
+    pmName: '', 
+    quantity: '', 
+    customerName: '', 
+    lotProduct: '', 
+    warehouse: 'MMPM', 
+    controlNo: '',
+    boxCount: '1',
+    qtyPerBox: '',
+    mfgLot: '-'
+  });
   const [cmd2SearchQuery, setCmd2SearchQuery] = useState('');
   const [isCmd2SearchOpen, setIsCmd2SearchOpen] = useState(false);
   const cmd2QtyInputRef = useRef<HTMLInputElement>(null);
 
   // Customer Supplied RM (R4) State & Quick Search Selector
   const [isR4ModalOpen, setIsR4ModalOpen] = useState(false);
-  const [r4Form, setR4Form] = useState({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+  const [r4Form, setR4Form] = useState({ 
+    rmCode: '', 
+    rmName: '', 
+    quantity: '', 
+    unit: 'KG', 
+    customerName: '', 
+    lotProduct: '', 
+    warehouse: 'MMRM', 
+    controlNo: '',
+    boxCount: '1',
+    qtyPerBox: '',
+    mfgLot: '-'
+  });
   const [r4SearchQuery, setR4SearchQuery] = useState('');
   const [isR4SearchOpen, setIsR4SearchOpen] = useState(false);
   const r4QtyInputRef = useRef<HTMLInputElement>(null);
+
+  const handleCmd2QuantityChange = (qtyStr: string) => {
+    const q = parseFloat(qtyStr) || 0;
+    const b = parseInt(cmd2Form.boxCount, 10) || 1;
+    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    setCmd2Form(prev => ({ ...prev, quantity: qtyStr, qtyPerBox: perBox }));
+  };
+
+  const handleCmd2BoxCountChange = (boxStr: string) => {
+    const b = parseInt(boxStr, 10) || 1;
+    const q = parseFloat(cmd2Form.quantity) || 0;
+    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    setCmd2Form(prev => ({ ...prev, boxCount: boxStr, qtyPerBox: perBox }));
+  };
+
+  const handleR4QuantityChange = (qtyStr: string) => {
+    const q = parseFloat(qtyStr) || 0;
+    const b = parseInt(r4Form.boxCount, 10) || 1;
+    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    setR4Form(prev => ({ ...prev, quantity: qtyStr, qtyPerBox: perBox }));
+  };
+
+  const handleR4BoxCountChange = (boxStr: string) => {
+    const b = parseInt(boxStr, 10) || 1;
+    const q = parseFloat(r4Form.quantity) || 0;
+    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    setR4Form(prev => ({ ...prev, boxCount: boxStr, qtyPerBox: perBox }));
+  };
+
+  const openQuarantineTagForItem = (item: RMItem) => {
+    let bCount = 1;
+    let perBox = item.received_qty != null ? item.received_qty : item.quantity;
+    let lot = '-';
+
+    const text = `${item.remark || ''} ${item.bottom_remark || ''}`;
+    const boxMatch = text.match(/(\d+)\s*(?:กล่อง|ลัง|pack|box|ถัง|ถุง)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+    if (boxMatch) {
+      bCount = parseInt(boxMatch[1], 10) || 1;
+      perBox = parseFloat(boxMatch[2]) || perBox;
+    }
+
+    const lotMatch = text.match(/Lot[:.\s]*([A-Za-z0-9\-_./]+)/i);
+    if (lotMatch) {
+      lot = lotMatch[1];
+    }
+
+    setQuarantineTagData({
+      name: item.rm_name,
+      code: item.rm_code,
+      controlNo: item.control_no || '',
+      supplier: item.supplier || '',
+      totalQty: item.received_qty != null ? item.received_qty : item.quantity,
+      unit: item.unit || (item.rm_code.startsWith('R4') ? 'KG' : 'ชิ้น'),
+      boxCount: bCount,
+      qtyPerBox: perBox,
+      mfgLot: lot,
+      receivedBy: currentUser || 'คลังสินค้า',
+      receivedDate: item.receive_date || new Date().toISOString(),
+      docRev: item.rm_code?.startsWith('R') ? 'RM-WT-001A Rev.02' : 'PM-WT-001A Rev.02'
+    });
+    setIsQuarantineTagOpen(true);
+  };
 
   // Product SKUs for intelligent code-to-SKU mapping
   const [productSkus, setProductSkus] = useState<string[]>([]);
@@ -759,6 +854,29 @@ export default function RMControlCenterPage() {
     setReceiveRemarkInput(item.remark || '');
     setReceiveEditReason('');
 
+    // Extract packaging breakdown from remark if any
+    let bCount = '1';
+    let pBox = '';
+    let lot = '-';
+    if (item.remark) {
+      const bMatch = item.remark.match(/(\d+)\s*(?:กล่อง|ลัง|pack|box|ถัง|ถุง)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+      if (bMatch) {
+        bCount = bMatch[1];
+        pBox = bMatch[2];
+      }
+      const lMatch = item.remark.match(/Lot[:.\s]*([A-Za-z0-9\-_./]+)/i);
+      if (lMatch) {
+        lot = lMatch[1];
+      }
+    }
+    const curQty = item.received_qty != null ? item.received_qty : item.quantity;
+    if (!pBox && curQty) {
+      pBox = Math.ceil(curQty / (parseInt(bCount, 10) || 1)).toString();
+    }
+    setReceiveBoxCount(bCount);
+    setReceiveQtyPerBox(pBox);
+    setReceiveMfgLot(lot);
+
     if (item.control_no) {
       setControlNoInput(item.control_no);
       setIsGeneratingControlNo(false);
@@ -803,7 +921,7 @@ export default function RMControlCenterPage() {
     }
   };
 
-  const confirmReceive = async () => {
+  const confirmReceive = async (andPrintTag: boolean = false) => {
     if (!receivingItem) return;
 
     if (!receiveRmCode.trim()) {
@@ -851,6 +969,11 @@ export default function RMControlCenterPage() {
       ? new Date(`${receiveDateInput}T12:00:00Z`).toISOString() 
       : (receivingItem.receive_date || nowIso);
 
+    const bCount = parseInt(receiveBoxCount, 10) || 1;
+    const pBox = parseFloat(receiveQtyPerBox) || Math.ceil(parsedQty / bCount);
+    const mfgLotStr = receiveMfgLot && receiveMfgLot.trim() ? receiveMfgLot.trim() : '-';
+    const pkgStr = `(${bCount}กล่อง x ${pBox}${receiveUnit.trim()})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+
     const updates: any = { 
       rm_code: receiveRmCode.trim(),
       rm_name: receiveRmName.trim(),
@@ -872,6 +995,12 @@ export default function RMControlCenterPage() {
     }
 
     let finalRemark = receiveRemarkInput.trim();
+    if (finalRemark.includes('กล่อง x')) {
+      finalRemark = finalRemark.replace(/\(\d+\s*กล่อง\s*x\s*\d+[^)]*\)/, pkgStr);
+    } else {
+      finalRemark = finalRemark ? `${finalRemark} • ${pkgStr}` : pkgStr;
+    }
+
     if (receiveEditReason.trim()) {
       const editor = currentUser || 'User';
       const todayShort = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
@@ -895,6 +1024,24 @@ export default function RMControlCenterPage() {
       setIsReceiveModalOpen(false);
       setReceivingItem(null);
       fetchItems();
+
+      if (andPrintTag) {
+        setQuarantineTagData({
+          name: receiveRmName.trim(),
+          code: receiveRmCode.trim(),
+          controlNo: controlNoInput.trim(),
+          supplier: receiveSupplier.trim(),
+          totalQty: parsedQty,
+          unit: receiveUnit.trim(),
+          boxCount: bCount,
+          qtyPerBox: pBox,
+          mfgLot: mfgLotStr,
+          receivedBy: currentUser || 'คลังสินค้า',
+          receivedDate: formattedReceiveDate,
+          docRev: receiveRmCode.trim().startsWith('R') ? 'RM-WT-001A Rev.02' : 'PM-WT-001A Rev.02'
+        });
+        setIsQuarantineTagOpen(true);
+      }
     }
   };
 
@@ -1035,7 +1182,18 @@ export default function RMControlCenterPage() {
     setIsCmd2ModalOpen(true);
     setCmd2SearchQuery('');
     setIsCmd2SearchOpen(false);
-    setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
+    setCmd2Form({ 
+      pmCode: '', 
+      pmName: '', 
+      quantity: '', 
+      customerName: '', 
+      lotProduct: '', 
+      warehouse: 'MMPM', 
+      controlNo: '',
+      boxCount: '1',
+      qtyPerBox: '',
+      mfgLot: '-'
+    });
     
     try {
       const prefix = 'P';
@@ -1119,6 +1277,11 @@ export default function RMControlCenterPage() {
     const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
     
     const qtyVal = parseFloat(cmd2Form.quantity) || 0;
+    const bCount = parseInt(cmd2Form.boxCount, 10) || 1;
+    const pBox = parseFloat(cmd2Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+    const mfgLotStr = cmd2Form.mfgLot && cmd2Form.mfgLot.trim() ? cmd2Form.mfgLot.trim() : '-';
+    const pkgStr = `(${bCount}กล่อง x ${pBox}ชิ้น)${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
       pr_no: fakePo,
@@ -1132,7 +1295,8 @@ export default function RMControlCenterPage() {
       lot_product: cmd2Form.lotProduct,
       control_no: cmd2Form.controlNo.trim() || undefined,
       status: 'RECEIVED',
-      receive_date: new Date().toISOString()
+      receive_date: new Date().toISOString(),
+      remark: pkgStr
     });
 
     setUploading(false);
@@ -1142,7 +1306,36 @@ export default function RMControlCenterPage() {
     } else {
       toast.success(`รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsCmd2ModalOpen(false);
-      setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
+
+      // Auto open Quarantine Tag Modal with full packaging & barcode
+      setQuarantineTagData({
+        name: cmd2Form.pmName,
+        code: fakeCode,
+        controlNo: cmd2Form.controlNo.trim() || '',
+        supplier: cmd2Form.customerName,
+        totalQty: qtyVal,
+        unit: 'ชิ้น',
+        boxCount: bCount,
+        qtyPerBox: pBox,
+        mfgLot: mfgLotStr,
+        receivedBy: currentUser || 'คลังสินค้า',
+        receivedDate: new Date().toISOString(),
+        docRev: 'PM-WT-001A Rev.02'
+      });
+      setIsQuarantineTagOpen(true);
+
+      setCmd2Form({ 
+        pmCode: '', 
+        pmName: '', 
+        quantity: '', 
+        customerName: '', 
+        lotProduct: '', 
+        warehouse: 'MMPM', 
+        controlNo: '',
+        boxCount: '1',
+        qtyPerBox: '',
+        mfgLot: '-'
+      });
       fetchItems();
     }
   };
@@ -1151,7 +1344,19 @@ export default function RMControlCenterPage() {
     setIsR4ModalOpen(true);
     setR4SearchQuery('');
     setIsR4SearchOpen(false);
-    setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+    setR4Form({ 
+      rmCode: '', 
+      rmName: '', 
+      quantity: '', 
+      unit: 'KG', 
+      customerName: '', 
+      lotProduct: '', 
+      warehouse: 'MMRM', 
+      controlNo: '',
+      boxCount: '1',
+      qtyPerBox: '',
+      mfgLot: '-'
+    });
     
     try {
       const prefix = 'R';
@@ -1234,6 +1439,10 @@ export default function RMControlCenterPage() {
     const cleanCustomer = r4Form.customerName.replace(/[^a-zA-Z0-9]/g, '').substring(0,3).toUpperCase() || 'CUS';
     const fakeCode = r4Form.rmCode.trim() || `R4-${cleanCustomer}-${Date.now().toString().slice(-4)}`;
     const qtyVal = parseFloat(r4Form.quantity) || 0;
+    const bCount = parseInt(r4Form.boxCount, 10) || 1;
+    const pBox = parseFloat(r4Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+    const mfgLotStr = r4Form.mfgLot && r4Form.mfgLot.trim() ? r4Form.mfgLot.trim() : '-';
+    const pkgStr = `(${bCount}กล่อง x ${pBox}${r4Form.unit || 'KG'})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
 
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
@@ -1248,7 +1457,8 @@ export default function RMControlCenterPage() {
       lot_product: r4Form.lotProduct,
       control_no: r4Form.controlNo.trim() || undefined,
       status: 'RECEIVED',
-      receive_date: new Date().toISOString()
+      receive_date: new Date().toISOString(),
+      remark: pkgStr
     });
 
     setUploading(false);
@@ -1258,7 +1468,37 @@ export default function RMControlCenterPage() {
     } else {
       toast.success(`รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsR4ModalOpen(false);
-      setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+
+      // Auto open Quarantine Tag Modal
+      setQuarantineTagData({
+        name: r4Form.rmName,
+        code: fakeCode,
+        controlNo: r4Form.controlNo.trim() || '',
+        supplier: r4Form.customerName,
+        totalQty: qtyVal,
+        unit: r4Form.unit || 'KG',
+        boxCount: bCount,
+        qtyPerBox: pBox,
+        mfgLot: mfgLotStr,
+        receivedBy: currentUser || 'คลังสินค้า',
+        receivedDate: new Date().toISOString(),
+        docRev: 'RM-WT-001A Rev.02'
+      });
+      setIsQuarantineTagOpen(true);
+
+      setR4Form({ 
+        rmCode: '', 
+        rmName: '', 
+        quantity: '', 
+        unit: 'KG', 
+        customerName: '', 
+        lotProduct: '', 
+        warehouse: 'MMRM', 
+        controlNo: '',
+        boxCount: '1',
+        qtyPerBox: '',
+        mfgLot: '-'
+      });
       fetchItems();
     }
   };
@@ -2457,9 +2697,15 @@ export default function RMControlCenterPage() {
                                   <span className="font-medium text-slate-700 text-sm">{d.toLocaleDateString('th-TH')}</span>
                                   <span className="text-xs text-slate-500">{d.toLocaleTimeString('th-TH', {hour: '2-digit', minute:'2-digit'})} น.</span>
                                   {item.control_no && (
-                                    <span className="font-mono font-bold text-xs text-purple-700 mt-1 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200/60 inline-block w-fit">
-                                      {item.control_no}
-                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => openQuarantineTagForItem(item)}
+                                      className="font-mono font-bold text-xs text-purple-700 mt-1 bg-purple-50 hover:bg-purple-100 hover:border-purple-300 px-1.5 py-0.5 rounded border border-purple-200/60 inline-flex items-center gap-1 w-fit transition-colors group cursor-pointer shadow-xs"
+                                      title="คลิกเพื่อพิมพ์ป้ายกักกัน (Quarantine Tag 100x80 มม.)"
+                                    >
+                                      <Printer className="w-3 h-3 text-purple-500 group-hover:text-purple-700" />
+                                      <span>{item.control_no}</span>
+                                    </button>
                                   )}
                                 </div>
                               );
@@ -2505,6 +2751,15 @@ export default function RMControlCenterPage() {
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
+                                      onClick={() => openQuarantineTagForItem(item)}
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded shrink-0"
+                                      title="พิมพ์ป้ายกักกัน (Quarantine Tag 100x80 มม.)"
+                                    >
+                                      <Printer className="w-3.5 h-3.5 text-purple-600" />
+                                    </Button>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
                                       onClick={() => openReceiveModal(item)}
                                       className="h-7 w-7 p-0 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded shrink-0"
                                       title="แก้ไขข้อมูลรับเข้า / Control No. / ยอดจริง / หมายเหตุ"
@@ -2530,6 +2785,15 @@ export default function RMControlCenterPage() {
                                         <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
                                       </SelectContent>
                                     </Select>
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm" 
+                                      onClick={() => openQuarantineTagForItem(item)}
+                                      className="h-7 w-7 p-0 text-slate-400 hover:text-purple-600 hover:bg-purple-50 rounded shrink-0"
+                                      title="พิมพ์ป้ายกักกัน (Quarantine Tag 100x80 มม.)"
+                                    >
+                                      <Printer className="w-3.5 h-3.5 text-purple-600" />
+                                    </Button>
                                     <Button 
                                       variant="ghost" 
                                       size="sm" 
@@ -3358,15 +3622,16 @@ export default function RMControlCenterPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>จำนวน (ชิ้น) <span className="text-red-500">*</span></Label>
+                <Label>จำนวนรับเข้าทั้งหมด (ชิ้น) <span className="text-red-500">*</span></Label>
                 <Input 
                   ref={cmd2QtyInputRef}
                   required 
                   type="number" 
                   min="1" 
                   value={cmd2Form.quantity} 
-                  onChange={e => setCmd2Form({...cmd2Form, quantity: e.target.value})} 
-                  placeholder="ระบุจำนวนชิ้น"
+                  onChange={e => handleCmd2QuantityChange(e.target.value)} 
+                  placeholder="เช่น 10552"
+                  className="font-bold text-slate-800"
                 />
               </div>
               <div className="space-y-2">
@@ -3374,6 +3639,53 @@ export default function RMControlCenterPage() {
                 <Input value={cmd2Form.lotProduct} onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
               </div>
             </div>
+
+            {/* Packaging Breakdown for Quarantine Tag */}
+            <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-amber-600" />
+                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                </Label>
+                <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">
+                  {cmd2Form.quantity ? `${Number(cmd2Form.quantity).toLocaleString()} ชิ้น (${cmd2Form.boxCount || 1} กล่อง x ${cmd2Form.qtyPerBox || 0} ชิ้น)` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนกล่องทั้งหมด <span className="text-red-500">*</span></Label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={cmd2Form.boxCount} 
+                    onChange={e => handleCmd2BoxCountChange(e.target.value)} 
+                    placeholder="เช่น 8"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนชิ้น/กล่อง <span className="text-red-500">*</span></Label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={cmd2Form.qtyPerBox} 
+                    onChange={e => setCmd2Form({ ...cmd2Form, qtyPerBox: e.target.value })} 
+                    placeholder="เช่น 1319"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                  <Input 
+                    value={cmd2Form.mfgLot} 
+                    onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
+                    placeholder="เช่น 2609A หรือ -"
+                    className="text-xs bg-white font-mono" 
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>คลังสินค้า (Warehouse)</Label>
@@ -3389,10 +3701,11 @@ export default function RMControlCenterPage() {
                 />
               </div>
             </div>
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 flex items-center justify-between">
               <Button type="button" variant="outline" onClick={() => setIsCmd2ModalOpen(false)}>ยกเลิก</Button>
               <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} รับเข้า PM ทันที
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />} 
+                รับเข้า PM & พิมพ์ Quarantine Tag 🏷️
               </Button>
             </DialogFooter>
           </form>
@@ -3514,7 +3827,7 @@ export default function RMControlCenterPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>จำนวนรับเข้า <span className="text-red-500">*</span></Label>
+                <Label>จำนวนรับเข้าทั้งหมด <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
                   <Input 
                     ref={r4QtyInputRef}
@@ -3523,10 +3836,11 @@ export default function RMControlCenterPage() {
                     step="any" 
                     min="0.001" 
                     value={r4Form.quantity} 
-                    onChange={e => setR4Form({...r4Form, quantity: e.target.value})} 
+                    onChange={e => handleR4QuantityChange(e.target.value)} 
                     placeholder="0.00" 
+                    className="font-bold text-slate-800"
                   />
-                  <Input value={r4Form.unit} onChange={e => setR4Form({...r4Form, unit: e.target.value})} className="w-20 text-center uppercase" placeholder="KG" />
+                  <Input value={r4Form.unit} onChange={e => setR4Form({...r4Form, unit: e.target.value})} className="w-20 text-center uppercase font-bold" placeholder="KG" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -3534,6 +3848,54 @@ export default function RMControlCenterPage() {
                 <Input value={r4Form.lotProduct} onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
               </div>
             </div>
+
+            {/* Packaging Breakdown for Quarantine Tag */}
+            <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-emerald-600" />
+                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                </Label>
+                <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-bold">
+                  {r4Form.quantity ? `${r4Form.quantity} ${r4Form.unit || 'KG'} (${r4Form.boxCount || 1} ภาชนะ x ${r4Form.qtyPerBox || 0} ${r4Form.unit || 'KG'})` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนภาชนะ/กล่อง <span className="text-red-500">*</span></Label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={r4Form.boxCount} 
+                    onChange={e => handleR4BoxCountChange(e.target.value)} 
+                    placeholder="เช่น 1"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนต่อภาชนะ <span className="text-red-500">*</span></Label>
+                  <Input 
+                    type="number" 
+                    step="any"
+                    min="0.001" 
+                    value={r4Form.qtyPerBox} 
+                    onChange={e => setR4Form({ ...r4Form, qtyPerBox: e.target.value })} 
+                    placeholder="เช่น 25"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                  <Input 
+                    value={r4Form.mfgLot} 
+                    onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
+                    placeholder="เช่น 2609A หรือ -"
+                    className="text-xs bg-white font-mono" 
+                  />
+                </div>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>คลังสินค้า (Warehouse)</Label>
@@ -3549,10 +3911,11 @@ export default function RMControlCenterPage() {
                 />
               </div>
             </div>
-            <DialogFooter className="pt-4">
+            <DialogFooter className="pt-4 flex items-center justify-between">
               <Button type="button" variant="outline" onClick={() => setIsR4ModalOpen(false)}>ยกเลิก</Button>
               <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} รับเข้า RM ทันที
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />} 
+                รับเข้า RM & พิมพ์ Quarantine Tag 🏷️
               </Button>
             </DialogFooter>
           </form>
@@ -3691,10 +4054,17 @@ export default function RMControlCenterPage() {
                 </div>
                 <div className="relative flex items-center">
                   <Input 
-                    type="number"
+                    type="number" 
                     step="any"
                     value={receivedQtyInput} 
-                    onChange={(e) => setReceivedQtyInput(e.target.value)}
+                    onChange={(e) => {
+                      setReceivedQtyInput(e.target.value);
+                      const q = parseFloat(e.target.value) || 0;
+                      const b = parseInt(receiveBoxCount, 10) || 1;
+                      if (q > 0 && b > 0) {
+                        setReceiveQtyPerBox(Math.ceil(q / b).toString());
+                      }
+                    }}
                     placeholder="ระบุยอดรับจริง..."
                     className="pr-14 font-bold text-sm bg-white border-amber-300"
                   />
@@ -3725,6 +4095,61 @@ export default function RMControlCenterPage() {
                     value={receiveDateInput}
                     onChange={(e) => setReceiveDateInput(e.target.value)}
                     className="h-7 text-xs bg-white border-slate-300 font-mono"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2.1 บรรจุภัณฑ์ & การแบ่งกล่อง (Packaging Breakdown สำหรับ Quarantine Tag) */}
+            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-200/80 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                  <Package className="w-3.5 h-3.5 text-purple-600" />
+                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                </Label>
+                <span className="text-[10px] text-purple-800 bg-purple-100/80 px-2 py-0.5 rounded font-bold">
+                  {receivedQtyInput ? `${Number(receivedQtyInput).toLocaleString()} ${receiveUnit} (${receiveBoxCount || 1} กล่อง x ${receiveQtyPerBox || 0} ${receiveUnit})` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนกล่องทั้งหมด (Boxes)</Label>
+                  <Input 
+                    type="number" 
+                    min="1" 
+                    value={receiveBoxCount} 
+                    onChange={e => {
+                      const b = e.target.value;
+                      setReceiveBoxCount(b);
+                      const bNum = parseInt(b, 10) || 1;
+                      const curQty = parseFloat(receivedQtyInput) || parseFloat(receivePoQty) || 0;
+                      if (curQty > 0 && bNum > 0) {
+                        setReceiveQtyPerBox(Math.ceil(curQty / bNum).toString());
+                      }
+                    }}
+                    placeholder="1"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนต่อกล่อง (Qty/box)</Label>
+                  <Input 
+                    type="number" 
+                    step="any"
+                    min="0.001" 
+                    value={receiveQtyPerBox} 
+                    onChange={e => setReceiveQtyPerBox(e.target.value)}
+                    placeholder="ระบุจำนวนต่อกล่อง"
+                    className="text-xs bg-white font-bold" 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                  <Input 
+                    value={receiveMfgLot} 
+                    onChange={e => setReceiveMfgLot(e.target.value)}
+                    placeholder="เช่น 2609A หรือ -"
+                    className="text-xs bg-white font-mono" 
                   />
                 </div>
               </div>
@@ -3786,18 +4211,29 @@ export default function RMControlCenterPage() {
               </p>
             </div>
           </div>
-          <DialogFooter className="border-t pt-3 flex items-center justify-between">
+          <DialogFooter className="border-t pt-3 flex flex-col sm:flex-row items-center justify-between gap-2">
             <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
               ยกเลิก
             </Button>
-            <Button 
-              onClick={confirmReceive} 
-              disabled={isGeneratingControlNo} 
-              className="bg-[#D4AF37] hover:bg-[#B3932F] text-white font-bold"
-            >
-              {isGeneratingControlNo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              {receivingItem?.status === 'RECEIVED' || receivingItem?.status === 'WAITING_QC' ? 'บันทึกการแก้ไขข้อมูล' : 'ยืนยันรับของ'}
-            </Button>
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Button 
+                onClick={() => confirmReceive(false)} 
+                disabled={isGeneratingControlNo} 
+                variant="outline"
+                className="font-semibold border-slate-300 hover:bg-slate-50 text-slate-700"
+              >
+                {isGeneratingControlNo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2 text-emerald-600" />}
+                {receivingItem?.status === 'RECEIVED' || receivingItem?.status === 'WAITING_QC' ? 'บันทึกการแก้ไข' : 'บันทึกรับของ'}
+              </Button>
+              <Button 
+                onClick={() => confirmReceive(true)} 
+                disabled={isGeneratingControlNo} 
+                className="bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-md"
+              >
+                {isGeneratingControlNo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />}
+                บันทึกและพิมพ์ Quarantine Tag 🏷️
+              </Button>
+            </div>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -3985,6 +4421,13 @@ export default function RMControlCenterPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Quarantine Tag Modal (100x80 mm Sticker with Sequential Printing 1 of N to N of N) */}
+      <QuarantineTagModal 
+        open={isQuarantineTagOpen} 
+        onOpenChange={setIsQuarantineTagOpen} 
+        initialData={quarantineTagData} 
+      />
     </div>
   );
 }
