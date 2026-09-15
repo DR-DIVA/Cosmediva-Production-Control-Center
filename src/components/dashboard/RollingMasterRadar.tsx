@@ -108,6 +108,8 @@ interface StreamItem {
   lotNo?: string
   sku?: string
   lotId?: string
+  isFirstBatch?: boolean
+  firstBatchTank?: number
   meta?: any
   opStatus?: OperationalStatus
   qaIssue?: QaIssueInfo
@@ -258,8 +260,24 @@ function computeOperationalStatus(
     }
   }
 
-  // Quality Assurance & Incident Gate (QA): Incidents, Hold, Reprocess, Reject, NC
+  // Quality Assurance & Incident Gate (QA): Incidents, Hold, Reprocess, Reject, NC, and 1st Batch Evaluation
   if (streamType === 'QA') {
+    if (item.isFirstBatch) {
+      const isMixingInProgress = item.meta?.status === 'IN_PROGRESS' || item.status === 'IN_PROGRESS'
+      const isMixingDone = item.meta?.status === 'DONE' || item.status === 'DONE'
+      return {
+        badge: `🔬 นัดหมาย QA ร่วมประเมิน 1st Batch (MX ถัง ${item.firstBatchTank || 1})`,
+        shortBadge: `1st Batch MX`,
+        type: isMixingInProgress ? 'in_progress' : isMixingDone ? 'done' : 'planned',
+        color: isMixingInProgress 
+          ? 'bg-purple-100 text-purple-950 border-purple-400 font-bold ring-1 ring-purple-300' 
+          : isMixingDone 
+          ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+          : 'bg-purple-50 text-purple-900 border-purple-300 font-medium',
+        dotColor: isMixingInProgress ? 'bg-purple-600 animate-pulse' : isMixingDone ? 'bg-emerald-500' : 'bg-purple-400',
+        detailsText: `นัดหมายฝ่ายประกันคุณภาพ (QA) เข้าสังเกตการณ์ ตรวจสอบพารามิเตอร์ และประเมินสูตรใหม่หน้างานร่วมกับฝ่ายผสม (MX) ถัง ${item.firstBatchTank || 1}`
+      }
+    }
     if (item.qaIssue && !item.qaIssue.isResolved) {
       const itype = item.qaIssue.issueType
       return {
@@ -523,6 +541,45 @@ function formatTankRanges(tanks: number[]): string {
   return ranges.join(', ')
 }
 
+export function checkIsFirstBatch(log: any, lot: any, pName?: string): { isFirstBatch: boolean; firstBatchTank: number } {
+  const note = (log?.note || '').toLowerCase()
+  const lotNote = (lot?.note || '').toLowerCase()
+  const orderType = (lot?.order_type || '').toLowerCase()
+  const sku = (lot?.products?.sku || '').toUpperCase()
+  const proc = (pName || log?.processes?.process_name || '').toLowerCase()
+
+  const startT = Number(log?.tank_start || 1)
+  const endT = Number(log?.tank_end || startT || 1)
+
+  // 1. Explicit marker from Planner (in log.note, lot.order_type, lot.note, etc.)
+  const hasTag = 
+    note.includes('[1st_batch]') || 
+    note.includes('1st batch') || 
+    note.includes('1st_batch') ||
+    note.includes('pilot batch') ||
+    note.includes('ผลิตครั้งแรก') ||
+    lotNote.includes('[1st_batch]') ||
+    lotNote.includes('1st batch') ||
+    orderType.includes('first') ||
+    orderType.includes('1st') ||
+    log?.is_first_batch === true ||
+    lot?.is_first_batch === true
+
+  // 2. Specific business rule for PAMH-008:
+  // "สำหรับงาน PAMH-008 ในคิวผสม ถัง 1 จะเป็น 1st batch เสมอค่ะ"
+  const isPamh008Tank1 = sku.includes('PAMH-008') && (startT <= 1 && endT >= 1) && (proc.includes('ผสม') || proc.includes('mix'))
+
+  if (isPamh008Tank1) {
+    return { isFirstBatch: true, firstBatchTank: 1 }
+  }
+
+  if (hasTag && (proc.includes('ผสม') || proc.includes('mix'))) {
+    return { isFirstBatch: true, firstBatchTank: startT }
+  }
+
+  return { isFirstBatch: false, firstBatchTank: 1 }
+}
+
 function QcDetailDialog({
   isOpen,
   onClose,
@@ -554,8 +611,8 @@ function QcDetailDialog({
 
   const { items, stream, date } = data
 
-  const qaIssues = items.filter(it => it.qaIssue || it.opStatus?.type === 'qc_issue')
-  const pendingQaIssues = qaIssues.filter(it => it.qaIssue ? !it.qaIssue.isResolved : true)
+  const qaIssues = items.filter(it => it.qaIssue || it.opStatus?.type === 'qc_issue' || it.isFirstBatch)
+  const pendingQaIssues = qaIssues.filter(it => it.isFirstBatch ? false : (it.qaIssue ? !it.qaIssue.isResolved : true))
   const rmItems = items.filter(it => it.qcSubtype === 'RM')
   const pmItems = items.filter(it => it.qcSubtype === 'PM')
   const bulkItems = items.filter(it => it.qcSubtype === 'BULK')
@@ -779,6 +836,80 @@ function QcDetailDialog({
             ) : (
               <div className="space-y-2.5">
                 {qaIssues.map((it, idx) => {
+                  if (it.isFirstBatch) {
+                    const isMixingInProgress = it.meta?.status === 'IN_PROGRESS'
+                    return (
+                      <div
+                        key={it.id || idx}
+                        className={`p-4 rounded-2xl border transition space-y-2.5 ${
+                          isNight
+                            ? 'bg-purple-950/40 border-purple-800'
+                            : 'bg-purple-50/80 border-purple-300'
+                        }`}
+                      >
+                        <div className="flex justify-between items-start gap-2 flex-wrap sm:flex-nowrap">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-black px-2.5 py-0.5 rounded-md border bg-purple-600 text-white border-purple-700 shadow-xs">
+                              [🔬 1ST BATCH]
+                            </span>
+                            <span className="text-[11px] font-extrabold px-2 py-0.5 rounded-md border bg-purple-100 text-purple-900 border-purple-300">
+                              BULK MIXING
+                            </span>
+                            <strong className={`font-bold text-sm ${isNight ? 'text-white' : 'text-slate-900'}`}>
+                              {it.title}
+                            </strong>
+                            <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border shadow-2xs ${
+                              isMixingInProgress
+                                ? 'bg-purple-100 text-purple-950 border-purple-400'
+                                : 'bg-slate-100 text-slate-700 border-slate-300'
+                            }`}>
+                              🔬 ถัง {it.firstBatchTank || 1} • {isMixingInProgress ? 'กำลังผสมหน้างาน 🟢' : 'ตามแผน ⏳'}
+                            </span>
+                          </div>
+                          <span className="text-xs font-medium text-purple-800 bg-purple-100 px-2 py-0.5 rounded-md">
+                            ห้องผสม Bulk
+                          </span>
+                        </div>
+
+                        <div className={`text-xs p-3 rounded-xl border leading-relaxed ${
+                          isNight ? 'bg-slate-900/80 border-slate-800 text-slate-200' : 'bg-white border-purple-200 text-slate-700'
+                        }`}>
+                          <div className="font-semibold text-purple-900 dark:text-purple-300 mb-1 flex items-center gap-1.5">
+                            <span className="text-sm">🔬</span>
+                            <span>ภารกิจฝ่ายประกันคุณภาพ (QA) ร่วมประเมิน 1st Batch:</span>
+                          </div>
+                          <p className="text-[11px] text-purple-900 leading-relaxed mb-2">
+                            ฝ่ายประกันคุณภาพ (QA) ต้องเข้าร่วมสังเกตการณ์ ตรวจสอบขั้นตอนการผสม การเติมสาร อุณหภูมิ และเวลาการกวน พร้อมประเมิน In-Process Control (IPC) ถัง {it.firstBatchTank || 1} ร่วมกับช่างผสมหน้างาน
+                          </p>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10.5px] bg-purple-50/60 p-2.5 rounded-lg border border-purple-200/80">
+                            <div>• <strong>สินค้า:</strong> {it.subtitle}</div>
+                            <div>• <strong>จุดตรวจ:</strong> ห้องผสม Bulk / ถัง {it.firstBatchTank || 1}</div>
+                            <div>• <strong>ช่วงแผนผสม:</strong> {it.meta?.startDate ? format(parseISO(it.meta.startDate), 'd MMM') : ''} - {it.meta?.endDate ? format(parseISO(it.meta.endDate), 'd MMM yyyy') : ''}</div>
+                            <div>• <strong>สถานะฝ่ายผสม:</strong> {it.meta?.status === 'IN_PROGRESS' ? 'กำลังผสมอยู่หน้างาน (IN PROGRESS) 🟢' : it.meta?.status === 'DONE' ? 'ผสมเสร็จสิ้นแล้ว ✓' : 'ตามแผนงาน (PLANNED) ⏳'}</div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+                          <div className="text-[11px] text-purple-700 font-medium">
+                            กำหนดการประเมินตรงตามคิวผสมของฝ่ายผลิตหน้างาน
+                          </div>
+                          {it.lotId && onSelectLot && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose()
+                                onSelectLot(it.lotId!)
+                              }}
+                              className="text-xs text-purple-700 hover:text-purple-900 font-bold hover:underline flex items-center gap-1 cursor-pointer"
+                            >
+                              ดูกราฟล็อตนี้ <ChevronRight className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  }
+
                   const qa = it.qaIssue
                   const issueType = qa?.issueType || 'HOLD'
                   const scope = qa?.scope || it.qcSubtype || 'BULK'
@@ -1261,6 +1392,7 @@ export function RollingMasterRadar({
     let totalMixingTanks = 0
     let totalQc = 0
     let totalPendingQa = 0
+    let totalFirstBatch = 0
     let totalBulkStockTanks = 0
     let totalBulkStockLots = 0
     let totalPacking = 0
@@ -1321,6 +1453,10 @@ export function RollingMasterRadar({
         } else if (pName.includes('ผสม') || pName.includes('mix')) {
           totalMixing++
           totalMixingTanks += tanksCount
+          const fbCheck = checkIsFirstBatch(log, lot, pName)
+          if (fbCheck.isFirstBatch) {
+            totalFirstBatch++
+          }
         } else if (pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')) {
           totalPof++
         } else if (pName.includes('บรรจุ') || pName.includes('packing') || pName.includes('รอบรรจุ')) {
@@ -1347,6 +1483,7 @@ export function RollingMasterRadar({
               opStatus
             })
           } else if (pName.includes('ผสม') || pName.includes('mix')) {
+            const { isFirstBatch, firstBatchTank } = checkIsFirstBatch(log, lot, pName)
             const opStatus = computeOperationalStatus(log, 'MIXING', hd.dateStr, todayDateStr)
             map[hd.dateStr].MIXING.push({
               id: `${log.id}-${hd.dateStr}`,
@@ -1354,13 +1491,41 @@ export function RollingMasterRadar({
               date: hd.dateStr,
               title: `${sku} • LOT ${lotNo}`,
               subtitle: pProductName || 'ผสมเนื้อ Bulk',
-              tag: `${tanksCount} ถัง (${startT}-${endT})`,
+              tag: isFirstBatch ? `${tanksCount} ถัง (${startT}-${endT}) • 🔬 1st Batch` : `${tanksCount} ถัง (${startT}-${endT})`,
               lotNo,
               sku,
               lotId: lot?.id,
-              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay },
+              isFirstBatch,
+              firstBatchTank,
+              meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay, isFirstBatch, firstBatchTank },
               opStatus
             })
+
+            // Also surface in QA stream as an on-site 1st Batch evaluation appointment
+            if (isFirstBatch) {
+              const qaOpStatus = computeOperationalStatus(
+                { ...log, isFirstBatch: true, firstBatchTank },
+                'QA',
+                hd.dateStr,
+                todayDateStr
+              )
+              map[hd.dateStr].QA.push({
+                id: `qa-1st-batch-${log.id}-${hd.dateStr}`,
+                streamType: 'QA',
+                qcSubtype: 'BULK',
+                date: hd.dateStr,
+                title: `${sku} • LOT ${lotNo}`,
+                subtitle: pProductName ? `${pProductName} • [ร่วมประเมิน 1st Batch หน้างาน]` : 'ร่วมประเมินกระบวนการผลิต 1st Batch กับ MX',
+                tag: `🔬 1st Batch (ถัง ${firstBatchTank})`,
+                lotNo,
+                sku,
+                lotId: lot?.id,
+                isFirstBatch: true,
+                firstBatchTank,
+                meta: { ...log, startDate: effectiveStart, endDate: effectiveEnd, isMultiDay, isFirstBatch: true, firstBatchTank, processName: 'ผสม Bulk' },
+                opStatus: qaOpStatus
+              })
+            }
           } else if (pName.includes('pof') || pName.includes('ลงลัง') || pName.includes('อุโมงค์')) {
             const rawProcName = log.processes?.process_name || 'ลงลัง/POF'
             const opStatus = computeOperationalStatus(log, 'POF', hd.dateStr, todayDateStr)
@@ -1883,6 +2048,7 @@ export function RollingMasterRadar({
         totalMixingTanks,
         totalQc,
         totalPendingQa,
+        totalFirstBatch,
         totalBulkStockTanks,
         totalBulkStockLots,
         totalPacking,
@@ -2180,17 +2346,47 @@ export function RollingMasterRadar({
 
           <div className={`p-2.5 rounded-xl border flex items-center justify-between ${
             isNight 
-              ? (summaryCounts.totalPendingQa > 0 ? 'bg-rose-950/50 border-rose-700/80 text-rose-200' : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200')
-              : (summaryCounts.totalPendingQa > 0 ? 'bg-rose-50/80 border-rose-300/90 text-rose-950' : 'bg-emerald-50/60 border-emerald-200/80 text-emerald-900')
+              ? (summaryCounts.totalPendingQa > 0 
+                  ? 'bg-rose-950/50 border-rose-700/80 text-rose-200' 
+                  : summaryCounts.totalFirstBatch > 0
+                  ? 'bg-purple-950/50 border-purple-700/80 text-purple-200'
+                  : 'bg-emerald-950/30 border-emerald-800/50 text-emerald-200')
+              : (summaryCounts.totalPendingQa > 0 
+                  ? 'bg-rose-50/80 border-rose-300/90 text-rose-950' 
+                  : summaryCounts.totalFirstBatch > 0
+                  ? 'bg-purple-50/80 border-purple-300/90 text-purple-950'
+                  : 'bg-emerald-50/60 border-emerald-200/80 text-emerald-900')
           }`}>
             <div className="flex items-center gap-2 min-w-0">
-              <AlertTriangle className={`w-4 h-4 shrink-0 ${summaryCounts.totalPendingQa > 0 ? 'text-rose-500 animate-bounce' : 'text-emerald-500'}`} />
+              <AlertTriangle className={`w-4 h-4 shrink-0 ${
+                summaryCounts.totalPendingQa > 0 
+                  ? 'text-rose-500 animate-bounce' 
+                  : summaryCounts.totalFirstBatch > 0
+                  ? 'text-purple-600'
+                  : 'text-emerald-500'
+              }`} />
               <div className="min-w-0">
-                <div className={`text-[10px] font-medium truncate flex items-center gap-1 ${summaryCounts.totalPendingQa > 0 ? (isNight ? 'text-rose-300' : 'text-rose-700') : (isNight ? 'text-emerald-300' : 'text-emerald-700')}`}>
+                <div className={`text-[10px] font-medium truncate flex items-center gap-1 ${
+                  summaryCounts.totalPendingQa > 0 
+                    ? (isNight ? 'text-rose-300' : 'text-rose-700') 
+                    : summaryCounts.totalFirstBatch > 0
+                    ? (isNight ? 'text-purple-300' : 'text-purple-700')
+                    : (isNight ? 'text-emerald-300' : 'text-emerald-700')
+                }`}>
                   <span>ประกัน QA (Gate)</span>
                 </div>
-                <div className={`text-sm font-black truncate ${summaryCounts.totalPendingQa > 0 ? (isNight ? 'text-rose-200 font-black' : 'text-rose-700 font-black') : (isNight ? 'text-emerald-200' : 'text-emerald-800')}`}>
-                  {summaryCounts.totalPendingQa > 0 ? `รอ QA: ${summaryCounts.totalPendingQa}` : '✅ ปกติ (0 เคส)'}
+                <div className={`text-sm font-black truncate ${
+                  summaryCounts.totalPendingQa > 0 
+                    ? (isNight ? 'text-rose-200 font-black' : 'text-rose-700 font-black') 
+                    : summaryCounts.totalFirstBatch > 0
+                    ? (isNight ? 'text-purple-200 font-black' : 'text-purple-900 font-black')
+                    : (isNight ? 'text-emerald-200' : 'text-emerald-800')
+                }`}>
+                  {summaryCounts.totalPendingQa > 0 
+                    ? `รอ QA: ${summaryCounts.totalPendingQa}${summaryCounts.totalFirstBatch > 0 ? ` • 🔬 1st: ${summaryCounts.totalFirstBatch}` : ''}` 
+                    : summaryCounts.totalFirstBatch > 0
+                    ? `🔬 1st Batch: ${summaryCounts.totalFirstBatch} รอบ`
+                    : '✅ ปกติ (0 เคส)'}
                 </div>
               </div>
             </div>
@@ -2342,6 +2538,7 @@ export function RollingMasterRadar({
                               const allDone = items.length > 0 && items.every(it => it.opStatus?.type === 'done' || it.opStatus?.type === 'qc_passed')
                               const hasQaIssue = items.some(it => it.qaIssue && !it.qaIssue.isResolved)
                               const qaPendingCount = items.filter(it => it.qaIssue && !it.qaIssue.isResolved).length
+                              const has1stBatch = items.some(it => it.isFirstBatch)
 
                               return (
                                 <div
@@ -2351,35 +2548,7 @@ export function RollingMasterRadar({
                                   }`}
                                 >
                                   {hasItems ? (
-                                    stream.key === 'QA' ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => setQcModalData({ items, stream, date: d })}
-                                        className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 cursor-pointer relative ${
-                                          qaPendingCount > 0
-                                            ? 'bg-rose-100/95 text-rose-950 border-rose-400 font-black ring-2 ring-rose-400'
-                                            : 'bg-emerald-50/90 text-emerald-950 border-emerald-300 font-medium'
-                                        }`}
-                                      >
-                                        {qaPendingCount > 0 && (
-                                          <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600 animate-ping" title="พบปัญหาคุณภาพรอ QA ประเมิน" />
-                                        )}
-                                        <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
-                                          {qaPendingCount > 0 ? (
-                                            <span className="text-rose-700 font-black flex items-center gap-0.5">⚠️ รอ QA ({qaPendingCount})</span>
-                                          ) : (
-                                            <span className="text-emerald-700 font-bold flex items-center gap-0.5">✓ ปกติ ({items.length})</span>
-                                          )}
-                                        </span>
-                                        <div className="flex items-center gap-0.5 text-[8px] opacity-85 font-semibold truncate max-w-[62px]">
-                                          {items.some(i => i.qcSubtype === 'RM') && <span>RM</span>}
-                                          {items.some(i => i.qcSubtype === 'PM') && <span>•PM</span>}
-                                          {items.some(i => i.qcSubtype === 'BULK') && <span>•Bulk</span>}
-                                          {items.some(i => i.qcSubtype === 'IPC') && <span>•IPC</span>}
-                                          {items.some(i => i.qcSubtype === 'FG') && <span>•FG</span>}
-                                        </div>
-                                      </button>
-                                    ) : stream.key === 'QC' ? (
+                                    stream.key === 'QC' ? (
                                       <button
                                         type="button"
                                         onClick={() => setQcModalData({ items, stream, date: d })}
@@ -2420,7 +2589,15 @@ export function RollingMasterRadar({
                                       <Popover>
                                         <PopoverTrigger
                                           className={`w-full h-full p-1.5 rounded-lg border flex flex-col items-center justify-center gap-0.5 text-center shadow-2xs transition-transform hover:scale-105 active:scale-95 relative ${
-                                            hasDelayed
+                                            stream.key === 'QA'
+                                              ? (qaPendingCount > 0
+                                                  ? 'bg-rose-100/95 text-rose-950 border-rose-400 font-black ring-2 ring-rose-400'
+                                                  : has1stBatch
+                                                  ? 'bg-gradient-to-br from-purple-100 via-indigo-50 to-purple-100 text-purple-950 border-purple-400 font-black ring-2 ring-purple-300 shadow-xs'
+                                                  : allDone
+                                                  ? 'bg-emerald-50/90 text-emerald-950 border-emerald-300 font-medium'
+                                                  : 'bg-rose-50/80 text-rose-900 border-rose-200 font-medium')
+                                              : hasDelayed
                                               ? 'bg-amber-100/95 text-amber-950 border-amber-400 font-bold'
                                               : hasInProgress
                                               ? 'bg-blue-50/90 text-blue-950 border-blue-400/80 font-bold ring-1 ring-blue-300'
@@ -2429,38 +2606,63 @@ export function RollingMasterRadar({
                                               : stream.pillColor
                                           }`}
                                         >
-                                          {hasInProgress && (
-                                            <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" title="กำลังดำเนินการ (In Progress)" />
-                                          )}
-                                          <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
-                                            {hasDelayed && (
-                                              <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
-                                            )}
-                                            {hasInProgress && !hasDelayed && (
-                                              <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
-                                            )}
-                                            {allDone && (
-                                              <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
-                                            )}
-                                            <span>
-                                              {stream.key === 'BULK_STOCK'
-                                                ? (items.length === 1 && items[0].bulkStock
-                                                    ? `ถัง ${formatTankRanges(items[0].bulkStock.tanks)}`
-                                                    : `${items.length} ล็อต Bulk`)
-                                                : items.length === 1
-                                                ? items[0].tag || items[0].lotNo || '1 งาน'
-                                                : `${items.length} รายการ`}
-                                            </span>
-                                          </span>
-                                          {items.length === 1 && items[0].lotNo && (
-                                            <span className="text-[9px] opacity-80 truncate max-w-[55px]">
-                                              {items[0].sku}
-                                            </span>
-                                          )}
-                                          {items.length > 1 && stream.key === 'BULK_STOCK' && (
-                                            <span className="text-[8px] opacity-90 font-bold truncate max-w-[62px] text-cyan-800">
-                                              {items.reduce((acc, it) => acc + (it.bulkStock?.tanks.length || 0), 0)} ถัง
-                                            </span>
+                                          {stream.key === 'QA' ? (
+                                            <>
+                                              {qaPendingCount > 0 && (
+                                                <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-rose-600 animate-ping" title="พบปัญหาคุณภาพรอ QA ประเมิน" />
+                                              )}
+                                              {has1stBatch && qaPendingCount === 0 && (
+                                                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-purple-600 animate-pulse" title="งาน 1st Batch: QA ร่วมประเมินหน้างาน" />
+                                              )}
+                                              <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
+                                                {qaPendingCount > 0 ? (
+                                                  <span className="text-rose-700 font-black flex items-center gap-0.5">⚠️ รอ QA ({qaPendingCount})</span>
+                                                ) : has1stBatch ? (
+                                                  <span className="text-purple-950 font-black flex items-center gap-0.5">🔬 1st Batch</span>
+                                                ) : (
+                                                  <span className="text-emerald-700 font-bold flex items-center gap-0.5">✓ ปกติ ({items.length})</span>
+                                                )}
+                                              </span>
+                                              <span className="text-[8.5px] font-bold opacity-90 truncate max-w-[60px] text-purple-900">
+                                                {has1stBatch ? (items.find(i => i.isFirstBatch)?.sku || 'QA') : (qaPendingCount > 0 ? 'รอปลดล็อค' : 'QA Gate')}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              {hasInProgress && (
+                                                <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-blue-600 animate-ping" title="กำลังดำเนินการ (In Progress)" />
+                                              )}
+                                              <span className="font-extrabold text-[11px] leading-tight flex items-center justify-center gap-1">
+                                                {hasDelayed && (
+                                                  <span className="text-[10px]" title="มีรายการล่าช้า/เลื่อนส่ง">⚠️</span>
+                                                )}
+                                                {hasInProgress && !hasDelayed && (
+                                                  <span className="text-[9px] text-blue-700 font-bold" title="กำลังดำเนินการ">▶</span>
+                                                )}
+                                                {allDone && (
+                                                  <span className="text-[9px] text-emerald-700 font-bold" title="เสร็จสิ้นทั้งหมด">✓</span>
+                                                )}
+                                                <span>
+                                                  {stream.key === 'BULK_STOCK'
+                                                    ? (items.length === 1 && items[0].bulkStock
+                                                        ? `ถัง ${formatTankRanges(items[0].bulkStock.tanks)}`
+                                                        : `${items.length} ล็อต Bulk`)
+                                                    : items.length === 1
+                                                    ? items[0].tag || items[0].lotNo || '1 งาน'
+                                                    : `${items.length} รายการ`}
+                                                </span>
+                                              </span>
+                                              {items.length === 1 && items[0].lotNo && (
+                                                <span className="text-[9px] opacity-80 truncate max-w-[55px]">
+                                                  {items[0].sku}
+                                                </span>
+                                              )}
+                                              {items.length > 1 && stream.key === 'BULK_STOCK' && (
+                                                <span className="text-[8px] opacity-90 font-bold truncate max-w-[62px] text-cyan-800">
+                                                  {items.reduce((acc, it) => acc + (it.bulkStock?.tanks.length || 0), 0)} ถัง
+                                                </span>
+                                              )}
+                                            </>
                                           )}
                                         </PopoverTrigger>
 
@@ -2569,6 +2771,62 @@ export function RollingMasterRadar({
                                                   </div>
                                                 )}
 
+                                                {/* 1st Batch Collaboration Alert Box (for MX and QA) */}
+                                                {it.isFirstBatch && (
+                                                  <div className="p-2.5 rounded-xl bg-gradient-to-br from-purple-50 via-indigo-50/50 to-white border border-purple-300/90 text-purple-950 text-[10px] space-y-1.5 mt-1 shadow-xs">
+                                                    <div className="font-bold flex items-center justify-between gap-1 text-purple-950 flex-wrap">
+                                                      <span className="flex items-center gap-1.5">
+                                                        <span className="text-xs">🔬</span>
+                                                        <span className="font-black text-purple-950 text-[11px]">
+                                                          {it.streamType === 'QA' 
+                                                            ? `ภารกิจ QA: ร่วมประเมินกระบวนการผลิต 1st Batch (ถัง ${it.firstBatchTank || 1})`
+                                                            : `งานผลิต 1st Batch (ถัง ${it.firstBatchTank || 1}): QA ร่วมประเมินหน้างาน`}
+                                                        </span>
+                                                      </span>
+                                                      <span className="text-[9px] font-black bg-purple-200/90 text-purple-900 px-2 py-0.5 rounded-full border border-purple-300">
+                                                        {it.streamType === 'QA' ? 'QA Gate' : 'MX Alert'}
+                                                      </span>
+                                                    </div>
+
+                                                    <div className="text-[10px] text-purple-900 leading-relaxed pl-2 border-l-2 border-purple-500 space-y-1">
+                                                      {it.streamType === 'QA' ? (
+                                                        <>
+                                                          <p className="font-bold text-purple-950">👉 ข้อกำหนดฝ่ายประกันคุณภาพ (QA):</p>
+                                                          <p>
+                                                            ต้องเข้าร่วมสังเกตการณ์ ตรวจสอบขั้นตอนการผสม การเติมสาร อุณหภูมิ และเวลาการกวน พร้อมประเมิน In-Process Control (IPC) ถัง {it.firstBatchTank || 1} ร่วมกับฝ่ายผสมหน้างานตลอดกระบวนการ
+                                                          </p>
+                                                          <div className="bg-white/90 p-2 rounded-lg border border-purple-200/90 mt-1 space-y-1 text-[9.5px] text-purple-950 font-medium">
+                                                            <div className="flex items-center justify-between">
+                                                              <span>• <strong>จุดตรวจ:</strong> ห้องผสม Bulk / ถัง {it.firstBatchTank || 1}</span>
+                                                              <span className="font-bold text-purple-700 bg-purple-100 px-1.5 py-0.2 rounded border border-purple-200">IPC Testing</span>
+                                                            </div>
+                                                            <div>
+                                                              • <strong>พารามิเตอร์ที่ต้องประเมิน:</strong> ลำดับการเติมสารเคมี, อุณหภูมิการหลอม, ความเร็วรอบกวน (RPM), เวลาการกวน และลักษณะเนื้อสัมผัส Bulk
+                                                            </div>
+                                                            <div>
+                                                              • <strong>ช่วงแผนผสม:</strong> {it.meta?.startDate ? format(parseISO(it.meta.startDate), 'd MMM') : ''} - {it.meta?.endDate ? format(parseISO(it.meta.endDate), 'd MMM yyyy') : ''} ({it.meta?.isMultiDay ? 'ต่อเนื่องหลายวัน' : '1 วัน'})
+                                                            </div>
+                                                            <div>
+                                                              • <strong>สถานะฝ่ายผสม (MX):</strong> {it.meta?.status === 'IN_PROGRESS' ? 'กำลังผสมอยู่หน้างาน (IN PROGRESS) 🟢' : it.meta?.status === 'DONE' ? 'ผสมเสร็จสิ้นแล้ว ✓' : 'ตามแผนงาน (PLANNED) ⏳'}
+                                                            </div>
+                                                          </div>
+                                                        </>
+                                                      ) : (
+                                                        <>
+                                                          <p className="font-bold text-purple-950">👉 แจ้งเตือนฝ่ายผสม (MX):</p>
+                                                          <p>
+                                                            คิวงานนี้มีถัง {it.firstBatchTank || 1} เป็นงานผลิตครั้งแรก (1st Batch) ต้องประสานงานฝ่าย QA เข้าประเมินร่วมกันหน้างาน ตรวจสอบพารามิเตอร์และบันทึกกระบวนการผลิตก่อนและระหว่างเดินเครื่อง
+                                                          </p>
+                                                          <div className="bg-white/90 p-2 rounded-lg border border-purple-200/90 mt-1 text-[9.5px] text-purple-950 font-medium space-y-0.5">
+                                                            <div>• <strong>ผู้ร่วมประเมิน:</strong> ฝ่ายประกันคุณภาพ (QA Inspector) ประจำจุดผสมถัง {it.firstBatchTank || 1}</div>
+                                                            <div>• <strong>เอกสารที่ต้องเตรียม:</strong> Batch Manufacturing Record (BMR) & แบบฟอร์มประเมิน 1st Batch</div>
+                                                          </div>
+                                                        </>
+                                                      )}
+                                                    </div>
+                                                  </div>
+                                                )}
+
                                                 {/* Plan Rescheduled Alert Box (for Manufacturing items) */}
                                                 {it.opStatus?.rescheduledInfo?.isRescheduled && (
                                                   <div className="p-2 rounded-lg bg-purple-50/95 border border-purple-200/90 text-purple-900 text-[10px] space-y-1 mt-1 shadow-xs">
@@ -2654,6 +2912,27 @@ export function RollingMasterRadar({
                                             )
                                           })}
                                         </div>
+
+                                        {stream.key === 'QA' && (
+                                          <div className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-2 mt-2">
+                                            <button
+                                              type="button"
+                                              onClick={() => setQcModalData({ items, stream, date: d })}
+                                              className="text-[10.5px] text-purple-700 hover:text-purple-900 font-bold flex items-center gap-1 hover:underline cursor-pointer"
+                                            >
+                                              <span>🔍 เปิดหน้ารวมตรวจ QA Gateway</span>
+                                            </button>
+                                            <a
+                                              href="/issues"
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="text-[10.5px] text-rose-600 hover:text-rose-800 font-bold flex items-center gap-1 hover:underline"
+                                            >
+                                              <span>ระบบจัดการปัญหา QA</span>
+                                              <ArrowUpRight className="w-3 h-3" />
+                                            </a>
+                                          </div>
+                                        )}
                                         </PopoverContent>
                                       </Popover>
                                     )
@@ -2829,18 +3108,26 @@ export function RollingMasterRadar({
                               <div className="font-bold text-rose-950 flex items-center justify-between text-[11px]">
                                 <div className="flex items-center gap-1.5">
                                   <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-                                  <span>ประกันคุณภาพ QA ({dayQa.length} ประเด็นรอประเมิน)</span>
+                                  <span>ประกันคุณภาพ QA ({dayQa.length} {dayQa.some(q => q.isFirstBatch) ? 'ภารกิจ/ประเด็น' : 'ประเด็นรอประเมิน'})</span>
                                 </div>
                                 <span className="text-[9px] font-bold text-rose-800 bg-rose-100 px-1.5 py-0.2 rounded">QA Gate</span>
                               </div>
                               {dayQa.map(qa => (
                                 <div key={qa.id} className="text-[11px] text-rose-900 pl-5 flex items-center justify-between gap-1.5 flex-wrap">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded border bg-rose-100 text-rose-900 border-rose-300">
-                                      {qa.qaIssue ? `QA: ${qa.qaIssue.issueType}` : 'QA'}
+                                    <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border ${
+                                      qa.isFirstBatch
+                                        ? 'bg-purple-100 text-purple-900 border-purple-300'
+                                        : 'bg-rose-100 text-rose-900 border-rose-300'
+                                    }`}>
+                                      {qa.isFirstBatch ? '🔬 1st Batch' : (qa.qaIssue ? `QA: ${qa.qaIssue.issueType}` : 'QA')}
                                     </span>
                                     <span>• <strong>{qa.title}</strong></span>
-                                    {qa.tag && <span className="text-rose-700 font-medium">[{qa.tag}]</span>}
+                                    {qa.tag && (
+                                      <span className={`font-medium ${qa.isFirstBatch ? 'text-purple-700' : 'text-rose-700'}`}>
+                                        [{qa.tag}]
+                                      </span>
+                                    )}
                                   </div>
                                   {qa.opStatus && (
                                     <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border shadow-2xs ${qa.opStatus.color}`}>

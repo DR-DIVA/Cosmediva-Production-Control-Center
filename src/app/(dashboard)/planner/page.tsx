@@ -90,7 +90,8 @@ export default function PlannerPage() {
     capacity_min: "", capacity_max: "", pcs_per_carton: "",
     order_quantity: "", po_no: "", order_type: "MTS",
     fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
-    mfg_date: "", exp_date: "", product_name: ""
+    mfg_date: "", exp_date: "", product_name: "",
+    is_first_batch: false
   })
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
@@ -204,6 +205,11 @@ export default function PlannerPage() {
   }
 
   const handleEditLot = (lot: any) => {
+    const rawOrderType = lot.order_type || "MTS"
+    const isFirstBatch = rawOrderType.includes('[1ST_BATCH]') || 
+      (lot.products?.sku || '').includes('PAMH-008')
+    const cleanOrderType = rawOrderType.replace(/\[1ST_BATCH\]/g, '').trim() || 'MTS'
+
     setNewLot({
       id: lot.id,
       product_id: lot.sku_id,
@@ -217,14 +223,15 @@ export default function PlannerPage() {
       pcs_per_carton: lot.pcs_per_carton?.toString() || "",
       order_quantity: lot.order_quantity?.toString() || "",
       po_no: lot.po_no || "",
-      order_type: lot.order_type || "MTS",
+      order_type: cleanOrderType,
       fg_due_date: lot.fg_due_date || "",
       fg_due_date_start: lot.planned_start_date || "",
       new_sku_name: "",
       unit: "pc",
       mfg_date: "",
       exp_date: "",
-      product_name: lot.products?.product_name || ""
+      product_name: lot.products?.product_name || "",
+      is_first_batch: isFirstBatch
     })
     setIsDialogOpen(true)
   }
@@ -318,7 +325,9 @@ export default function PlannerPage() {
         pcs_per_carton: newLot.pcs_per_carton ? parseInt(newLot.pcs_per_carton) : null,
         order_quantity: parseFloat(newLot.order_quantity),
         po_no: newLot.po_no,
-        order_type: newLot.order_type,
+        order_type: newLot.is_first_batch 
+          ? `${(newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim()} [1ST_BATCH]`
+          : (newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim(),
         fg_due_date: newLot.fg_due_date || null,
         planned_start_date: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null
       }
@@ -523,6 +532,31 @@ export default function PlannerPage() {
     const { logId, field, newDate } = rescheduleModal
     setRescheduleModal(null)
     await handleUpdateLogDirect(logId, field, newDate)
+  }
+
+  const handleToggleFirstBatch = async (log: any, lot: any) => {
+    if (!canEdit) return
+    const currentNote = log.note || ''
+    const hasTag = currentNote.toLowerCase().includes('[1st_batch]')
+    let newNote = ''
+    if (hasTag) {
+      newNote = currentNote.replace(/\[1st_batch[^\]]*\]/gi, '').trim()
+    } else {
+      const tankNum = log.tank_start || 1
+      newNote = currentNote ? `${currentNote}\n[1ST_BATCH: ถัง ${tankNum}]` : `[1ST_BATCH: ถัง ${tankNum}]`
+    }
+
+    // Optimistic update
+    setLogs(logs.map(l => l.id === log.id ? { ...l, note: newNote } : l))
+
+    try {
+      const { error } = await supabase.from('production_logs').update({ note: newNote }).eq('id', log.id)
+      if (error) throw error
+      toast.success(hasTag ? 'ยกเลิกสถานะ 1st Batch เรียบร้อย' : `กำหนดเป็น 1st Batch (ถัง ${log.tank_start || 1}) เรียบร้อย ระบบจะแจ้งเตือน QA และ MX บนเรดาร์ 21 วัน`)
+    } catch (err: any) {
+      toast.error('อัปเดตไม่สำเร็จ: ' + err.message)
+      fetchData()
+    }
   }
 
   const getSortedLotLogs = (lotId: string) => {
@@ -825,7 +859,8 @@ export default function PlannerPage() {
                 capacity_min: "", capacity_max: "", pcs_per_carton: "",
                 order_quantity: "", po_no: "", order_type: "MTS",
                 fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
-                mfg_date: "", exp_date: "", product_name: ""
+                mfg_date: "", exp_date: "", product_name: "",
+                is_first_batch: false
               })
               setIsDialogOpen(true)
             }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
@@ -1480,6 +1515,32 @@ export default function PlannerPage() {
                                 <span className="text-xs text-slate-500">-</span>
                                 <Input disabled={!canEdit} type="number" className="w-12 h-6 text-xs px-1 text-center bg-white" value={log.tank_end || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_end", e.target.value)} />
                                 <span className="text-xs text-slate-500">)</span>
+
+                                {process?.process_name?.includes('ผสม') && (() => {
+                                  const isAutoPamh = (lot?.products?.sku || '').includes('PAMH-008') && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
+                                  const hasBatchTag = (log.note || '').toLowerCase().includes('[1st_batch]') || (lot?.order_type || '').includes('[1ST_BATCH]')
+                                  const is1stBatch = isAutoPamh || hasBatchTag
+
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={!canEdit}
+                                      onClick={() => handleToggleFirstBatch(log, lot)}
+                                      title={isAutoPamh 
+                                        ? "งาน PAMH-008 ถัง 1 กำหนดเป็น 1st Batch โดยอัตโนมัติตามข้อกำหนด" 
+                                        : "คลิกเพื่อเปิด/ปิด สถานะ 1st Batch เพื่อแจ้งเตือน QA เข้าประเมินร่วมกับ MX บนเรดาร์ 21 วัน"}
+                                      className={cn(
+                                        "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border transition-all cursor-pointer select-none shrink-0 ml-1.5",
+                                        is1stBatch
+                                          ? "bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 shadow-2xs ring-1 ring-purple-300"
+                                          : "bg-slate-100 hover:bg-purple-50 text-slate-400 hover:text-purple-700 border-slate-200 hover:border-purple-300"
+                                      )}
+                                    >
+                                      <span>🔬</span>
+                                      <span>{is1stBatch ? (isAutoPamh ? '1st Batch (Auto) ✓' : '1st Batch ✓') : '+ 1st Batch'}</span>
+                                    </button>
+                                  )
+                                })()}
                               </div>
                             </TableCell>
                             {(() => {
@@ -1820,6 +1881,24 @@ export default function PlannerPage() {
                   <SelectItem value="MTO">MTO (Make to Order)</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="flex items-start gap-2.5 p-3 rounded-xl border border-purple-200 bg-purple-50/70 col-span-2 md:col-span-4">
+              <input
+                type="checkbox"
+                id="is_first_batch"
+                checked={newLot.is_first_batch || false}
+                onChange={e => setNewLot({...newLot, is_first_batch: e.target.checked})}
+                className="w-4 h-4 mt-0.5 rounded text-purple-600 focus:ring-purple-500 border-purple-300 cursor-pointer"
+              />
+              <div className="flex flex-col cursor-pointer select-none" onClick={() => setNewLot({...newLot, is_first_batch: !newLot.is_first_batch})}>
+                <Label htmlFor="is_first_batch" className="text-xs font-bold text-purple-950 cursor-pointer flex items-center gap-1.5">
+                  <span>🔬 ออเดอร์ผลิตครั้งแรก (1st Batch / Pilot Batch)</span>
+                </Label>
+                <span className="text-[10.5px] text-purple-800 font-normal mt-0.5">
+                  ระบบจะแจ้งเตือนฝ่ายประกันคุณภาพ (QA) เพื่อเข้าร่วมสังเกตการณ์และประเมินขั้นตอนการผสมกับฝ่ายผสม (MX) ถัง 1 บนเรดาร์ 21 วัน
+                </span>
+              </div>
             </div>
 
             {(!newLot.order_type || newLot.order_type === 'MTS') ? (
