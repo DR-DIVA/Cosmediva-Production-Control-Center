@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createClient } from "@/utils/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -97,6 +97,44 @@ function ColumnSearchInput({
     </div>
   );
 }
+
+// Pre-configured BOM & Customer packaging catalog (includes SMART.MM BOMs like JHD-301)
+const DEFAULT_CMD2_PRESETS = [
+  // JHD-301 - น้ำตบ (BOM from SMART.MM)
+  { code: 'CMD2-JHD301-K1', name: 'ขวดปิแอร์สีชา 100 ML', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-O1', name: 'ฝาขวดปิแอร์สีดำ', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-N1', name: 'จุกในพลาสติกใส', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-B1', name: 'กล่องสกรีน NAWANNA LOVELY ESSENCE 100 ML', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-BL1', name: 'กล่องสกรีน NAWANNA LOVELY ESSENCE 100 ML (พิมพ์ Lot ที่กล่อง)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-BL9', name: 'กล่องสกรีน NAWANNA LOVELY ESSENCE 100 ML (พิมพ์Lot 009/26)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-BL10', name: 'กล่องสกรีน NAWANNA LOVELY ESSENCE 100 ML (พิมพ์Lot 010/26)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD301-BL11', name: 'กล่องสกรีน NAWANNA LOVELY ESSENCE 100 ML (พิมพ์Lot 011/26)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD1-SH300MM-T3', name: 'ชริ้งค์แบบม้วน POF หน้ากว้างขนาด 300มม. (12MIC)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+  { code: 'CMD2-JHD015-C1', name: 'ลังลูกฟูกไม่สกรีน ขนาด 46.5 x 46.5 x 30.5 cm.', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-301' },
+
+  // JHD-318
+  { code: 'CMD2-JHD318-O2', name: 'ฝาปิดกระปุก NT (โมลใหม่) 100 G. สีดำ', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-318' },
+  { code: 'CMD2-JHD318-JL9', name: 'กระปุก NT (โมลใหม่) สีน้ำตาลแดง สกรีน NAWANNA DOSE SEED BODY MAHAD AURA GLOW CREAM 100 G.(พิมพ์ LOT 009/26)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-318' },
+
+  // JHD-309
+  { code: 'CMD2-JHD309-J1', name: 'กระปุก', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-309' },
+  { code: 'CMD2-JHD309-O2', name: 'ฝาปิดกระปุกพลาสติกสีดำปั๊มโลโก้ NAWANNA 15 G.', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-309' },
+  { code: 'CMD2-JHD309-N2', name: 'ลิ้นในกระปุกพลาสติกสีขาว 15 G.(ปั้มโลโก้)', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-309' },
+
+  // JHD-317
+  { code: 'CMD2-JHD317-O1', name: 'ฝาครอบแคปซูลสีดำ', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-317' },
+  { code: 'CMD2-JHD317-K1', name: 'ขวดแคปซูลสีชา สกรีน NAWANNA DOSE SEED BODY MAHAD AURA SERUM 30 ML', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-317' },
+
+  // JHD-088
+  { code: 'CMD2-JHD088-K2', name: 'ขวดพลาสติกสีฟ้าใส สกรีน MY BO FACIAL WHITENING ESSENSE 60 ML.', supplier: 'คุณนัตตี้ (VRP)', unit: 'pcs', warehouse: 'MMPM', sku: 'JHD-088' },
+
+  // PAMH-008
+  { code: 'CMD2-PAMH008-B3', name: 'กล่องแบบ KITTY สกรีน AM HERB TRIPLEGUARD AQUA SUN SERUM SPF 50+ PA++++ 30 ML', supplier: 'บ.ชบา เอลลิแกนซ์', unit: 'pcs', warehouse: 'MMPM', sku: 'PAMH-008' },
+  { code: 'CMD2-PAMH008-N4', name: 'จุกในปากแหลมสีขาว', supplier: 'บ.ชบา เอลลิแกนซ์', unit: 'pcs', warehouse: 'MMPM', sku: 'PAMH-008' },
+
+  // OFT-001
+  { code: 'CMD2-OFT001-L1', name: 'หลอดพลาสติกสีขาว สกรีน SIORA HYA-INSTANT ABSORB HAND CREAM 30 G', supplier: 'คุณฝน', unit: 'pcs', warehouse: 'MMPM', sku: 'OFT-001' },
+];
 
 export default function RMControlCenterPage() {
   const supabase = createClient();
@@ -216,13 +254,19 @@ export default function RMControlCenterPage() {
   const [receiveEditReason, setReceiveEditReason] = useState('');
   const [isGeneratingControlNo, setIsGeneratingControlNo] = useState(false);
 
-  // Customer Supplied PM State
+  // Customer Supplied PM State & Quick Search Selector
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
   const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
+  const [cmd2SearchQuery, setCmd2SearchQuery] = useState('');
+  const [isCmd2SearchOpen, setIsCmd2SearchOpen] = useState(false);
+  const cmd2QtyInputRef = useRef<HTMLInputElement>(null);
 
-  // Customer Supplied RM (R4) State
+  // Customer Supplied RM (R4) State & Quick Search Selector
   const [isR4ModalOpen, setIsR4ModalOpen] = useState(false);
   const [r4Form, setR4Form] = useState({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+  const [r4SearchQuery, setR4SearchQuery] = useState('');
+  const [isR4SearchOpen, setIsR4SearchOpen] = useState(false);
+  const r4QtyInputRef = useRef<HTMLInputElement>(null);
 
   // Product SKUs for intelligent code-to-SKU mapping
   const [productSkus, setProductSkus] = useState<string[]>([]);
@@ -266,6 +310,132 @@ export default function RMControlCenterPage() {
 
   const getDisplayLot = (item: RMItem): string => {
     return item.production_lots?.lot_no || item.lot_product || '-';
+  };
+
+  // Combined master catalog of packaging parts (presets + DB)
+  const cmd2PartOptions = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; supplier: string; unit: string; warehouse: string; sku?: string }>();
+
+    DEFAULT_CMD2_PRESETS.forEach(p => {
+      map.set(`${p.code.toUpperCase()}|${p.name.trim()}`, p);
+    });
+
+    items.forEach(it => {
+      const code = (it.rm_code || '').trim();
+      const name = (it.rm_name || '').trim();
+      const sup = (it.supplier || '').trim();
+      if (!code && !name) return;
+
+      const isPm = code.toUpperCase().startsWith('CMD') || it.warehouse === 'MMPM' || it.warehouse === 'WH-PM';
+      if (isPm) {
+        const key = `${code.toUpperCase()}|${name}`;
+        const existing = map.get(key);
+        if (!existing) {
+          map.set(key, {
+            code,
+            name,
+            supplier: sup,
+            unit: it.unit || 'pcs',
+            warehouse: it.warehouse || 'MMPM',
+            sku: extractSkuFromCode(code) || undefined
+          });
+        } else if (!existing.supplier && sup) {
+          existing.supplier = sup;
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [items, productSkus]);
+
+  const filteredCmd2Options = useMemo(() => {
+    const q = cmd2SearchQuery.trim().toLowerCase();
+    if (!q) return cmd2PartOptions;
+    return cmd2PartOptions.filter(opt =>
+      opt.code.toLowerCase().includes(q) ||
+      opt.name.toLowerCase().includes(q) ||
+      (opt.supplier && opt.supplier.toLowerCase().includes(q)) ||
+      (opt.sku && opt.sku.toLowerCase().includes(q))
+    );
+  }, [cmd2PartOptions, cmd2SearchQuery]);
+
+  // Combined master catalog of RM parts
+  const r4PartOptions = useMemo(() => {
+    const map = new Map<string, { code: string; name: string; supplier: string; unit: string; warehouse: string }>();
+
+    items.forEach(it => {
+      const code = (it.rm_code || '').trim();
+      const name = (it.rm_name || '').trim();
+      const sup = (it.supplier || '').trim();
+      if (!code && !name) return;
+
+      const isRm = code.toUpperCase().startsWith('R4') || it.warehouse === 'MMRM' || it.warehouse === 'WH-RM';
+      if (isRm) {
+        const key = `${code.toUpperCase()}|${name}`;
+        if (!map.has(key)) {
+          map.set(key, {
+            code,
+            name,
+            supplier: sup,
+            unit: it.unit || 'KG',
+            warehouse: it.warehouse || 'MMRM',
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values()).sort((a, b) => (a.code || '').localeCompare(b.code || ''));
+  }, [items]);
+
+  const filteredR4Options = useMemo(() => {
+    const q = r4SearchQuery.trim().toLowerCase();
+    if (!q) return r4PartOptions;
+    return r4PartOptions.filter(opt =>
+      opt.code.toLowerCase().includes(q) ||
+      opt.name.toLowerCase().includes(q) ||
+      (opt.supplier && opt.supplier.toLowerCase().includes(q))
+    );
+  }, [r4PartOptions, r4SearchQuery]);
+
+  const uniqueCustomerList = useMemo(() => {
+    const set = new Set<string>();
+    cmd2PartOptions.forEach(p => p.supplier && set.add(p.supplier.trim()));
+    r4PartOptions.forEach(p => p.supplier && set.add(p.supplier.trim()));
+    items.forEach(it => it.supplier && set.add(it.supplier.trim()));
+    return Array.from(set).filter(Boolean).sort();
+  }, [cmd2PartOptions, r4PartOptions, items]);
+
+  const handleSelectCmd2Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string }) => {
+    setCmd2Form(prev => ({
+      ...prev,
+      customerName: opt.supplier || prev.customerName,
+      pmCode: opt.code,
+      pmName: opt.name,
+      warehouse: opt.warehouse || 'MMPM',
+    }));
+    setCmd2SearchQuery(`${opt.code} - ${opt.name}`);
+    setIsCmd2SearchOpen(false);
+    toast.success(`เลือก ${opt.code} สำเร็จ! ดึงข้อมูลพาร์ทให้อัตโนมัติ`);
+    setTimeout(() => {
+      cmd2QtyInputRef.current?.focus();
+    }, 100);
+  };
+
+  const handleSelectR4Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string }) => {
+    setR4Form(prev => ({
+      ...prev,
+      customerName: opt.supplier || prev.customerName,
+      rmCode: opt.code,
+      rmName: opt.name,
+      unit: opt.unit || 'KG',
+      warehouse: opt.warehouse || 'MMRM',
+    }));
+    setR4SearchQuery(`${opt.code} - ${opt.name}`);
+    setIsR4SearchOpen(false);
+    toast.success(`เลือก ${opt.code} สำเร็จ! ดึงข้อมูลวัตถุดิบให้อัตโนมัติ`);
+    setTimeout(() => {
+      r4QtyInputRef.current?.focus();
+    }, 100);
   };
 
   const fetchItems = async () => {
@@ -863,6 +1033,8 @@ export default function RMControlCenterPage() {
 
   const openCmd2Modal = async () => {
     setIsCmd2ModalOpen(true);
+    setCmd2SearchQuery('');
+    setIsCmd2SearchOpen(false);
     setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'MMPM', controlNo: '' });
     
     try {
@@ -977,6 +1149,8 @@ export default function RMControlCenterPage() {
 
   const openR4Modal = async () => {
     setIsR4ModalOpen(true);
+    setR4SearchQuery('');
+    setIsR4SearchOpen(false);
     setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
     
     try {
@@ -3064,17 +3238,113 @@ export default function RMControlCenterPage() {
 
       {/* Customer Supplied PM Modal */}
       <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-lg w-full">
+        <DialogContent className="sm:max-w-md md:max-w-xl w-full">
           <DialogHeader>
             <DialogTitle className="text-[#4A4238] flex items-center gap-2">
               <Package className="w-5 h-5 text-[#D4AF37]" />
               รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCmd2Submit} className="space-y-4 py-4">
+          <form onSubmit={handleCmd2Submit} className="space-y-4 py-3">
+            {/* Quick Part Selector Dropdown */}
+            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                  ⚡ เลือกพาร์ทเดิม (ดึงชื่อลูกค้า, รหัส, และชื่อพาร์ทให้อัตโนมัติ)
+                </Label>
+                <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full font-semibold">
+                  มี {cmd2PartOptions.length} รายการ
+                </span>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Input
+                  value={cmd2SearchQuery}
+                  onChange={e => {
+                    setCmd2SearchQuery(e.target.value);
+                    setIsCmd2SearchOpen(true);
+                  }}
+                  onFocus={() => setIsCmd2SearchOpen(true)}
+                  onBlur={() => setTimeout(() => setIsCmd2SearchOpen(false), 200)}
+                  placeholder="พิมพ์ค้นหา เช่น 301, JHD, ขวด, ฝา, กล่อง, นัตตี้, CMD2..."
+                  className="pl-9 pr-8 text-xs bg-white border-amber-300 focus:border-[#D4AF37] h-9 shadow-inner placeholder:text-slate-400"
+                />
+                {cmd2SearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCmd2SearchQuery('');
+                      setIsCmd2SearchOpen(false);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="ล้างคำค้นหา"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Dropdown Options List */}
+                {isCmd2SearchOpen && (
+                  <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-amber-200 shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                    {filteredCmd2Options.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        ไม่พบพาร์ทที่ตรงกับคำค้นหา (สามารถพิมพ์กรอกข้อมูลใหม่ด้านล่างได้เลย)
+                      </div>
+                    ) : (
+                      filteredCmd2Options.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectCmd2Part(opt);
+                          }}
+                          className="p-2.5 hover:bg-amber-50 cursor-pointer transition-colors flex items-start justify-between gap-2 group"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-xs text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                {opt.code}
+                              </span>
+                              {opt.sku && (
+                                <span className="text-[10px] font-bold text-amber-800 bg-amber-100 px-1.5 py-0.5 rounded border border-amber-300">
+                                  SKU: {opt.sku}
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-500 font-medium truncate">
+                                👤 {opt.supplier || 'ลูกค้าทั่วไป'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-slate-800 group-hover:text-amber-900 line-clamp-1">
+                              {opt.name}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-[#D4AF37] font-bold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 self-center">
+                            เลือก ↵
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>ชื่อลูกค้า (Customer Name) <span className="text-red-500">*</span></Label>
-              <Input required value={cmd2Form.customerName} onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
+              <Input 
+                required 
+                list="cmd2-customer-datalist"
+                value={cmd2Form.customerName} 
+                onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} 
+                placeholder="เช่น บริษัท เอบีซี จำกัด หรือเลือกจากตัวช่วยด้านบน" 
+              />
+              <datalist id="cmd2-customer-datalist">
+                {uniqueCustomerList.map((c, i) => (
+                  <option key={i} value={c} />
+                ))}
+              </datalist>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -3089,7 +3359,15 @@ export default function RMControlCenterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>จำนวน (ชิ้น) <span className="text-red-500">*</span></Label>
-                <Input required type="number" min="1" value={cmd2Form.quantity} onChange={e => setCmd2Form({...cmd2Form, quantity: e.target.value})} />
+                <Input 
+                  ref={cmd2QtyInputRef}
+                  required 
+                  type="number" 
+                  min="1" 
+                  value={cmd2Form.quantity} 
+                  onChange={e => setCmd2Form({...cmd2Form, quantity: e.target.value})} 
+                  placeholder="ระบุจำนวนชิ้น"
+                />
               </div>
               <div className="space-y-2">
                 <Label>LOT งานผลิตอ้างอิง</Label>
@@ -3123,17 +3401,106 @@ export default function RMControlCenterPage() {
 
       {/* Customer Supplied RM (R4) Modal */}
       <Dialog open={isR4ModalOpen} onOpenChange={setIsR4ModalOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-lg w-full">
+        <DialogContent className="sm:max-w-md md:max-w-xl w-full">
           <DialogHeader>
             <DialogTitle className="text-[#4A4238] flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-[#D4AF37]" />
               รับเข้าวัตถุดิบลูกค้า (R4)
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleR4Submit} className="space-y-4 py-4">
+          <form onSubmit={handleR4Submit} className="space-y-4 py-3">
+            {/* Quick RM Selector Dropdown */}
+            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-sm space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                  ⚡ เลือกวัตถุดิบเดิม (ดึงชื่อลูกค้า, รหัส, และหน่วย ให้อัตโนมัติ)
+                </Label>
+                <span className="text-[10px] text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full font-semibold">
+                  มี {r4PartOptions.length} รายการ
+                </span>
+              </div>
+
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <Input
+                  value={r4SearchQuery}
+                  onChange={e => {
+                    setR4SearchQuery(e.target.value);
+                    setIsR4SearchOpen(true);
+                  }}
+                  onFocus={() => setIsR4SearchOpen(true)}
+                  onBlur={() => setTimeout(() => setIsR4SearchOpen(false), 200)}
+                  placeholder="พิมพ์ค้นหา เช่น สารสกัด, R4, น้ำมัน, ชาเขียว..."
+                  className="pl-9 pr-8 text-xs bg-white border-amber-300 focus:border-[#D4AF37] h-9 shadow-inner placeholder:text-slate-400"
+                />
+                {r4SearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setR4SearchQuery('');
+                      setIsR4SearchOpen(false);
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                    title="ล้างคำค้นหา"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+
+                {/* Dropdown Options List */}
+                {isR4SearchOpen && (
+                  <div className="absolute z-50 left-0 right-0 top-full mt-1.5 bg-white rounded-xl border border-amber-200 shadow-2xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                    {filteredR4Options.length === 0 ? (
+                      <div className="p-3 text-center text-xs text-slate-400">
+                        ไม่พบวัตถุดิบที่ตรงกับคำค้นหา (สามารถพิมพ์กรอกข้อมูลใหม่ด้านล่างได้เลย)
+                      </div>
+                    ) : (
+                      filteredR4Options.map((opt, idx) => (
+                        <div
+                          key={idx}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            handleSelectR4Part(opt);
+                          }}
+                          className="p-2.5 hover:bg-amber-50 cursor-pointer transition-colors flex items-start justify-between gap-2 group"
+                        >
+                          <div className="space-y-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-mono font-bold text-xs text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                {opt.code}
+                              </span>
+                              <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                                หน่วย: {opt.unit}
+                              </span>
+                              <span className="text-[11px] text-slate-500 font-medium truncate">
+                                👤 {opt.supplier || 'ลูกค้าทั่วไป'}
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-slate-800 group-hover:text-amber-900 line-clamp-1">
+                              {opt.name}
+                            </div>
+                          </div>
+                          <span className="text-[11px] text-[#D4AF37] font-bold shrink-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 self-center">
+                            เลือก ↵
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>ชื่อลูกค้า (Customer / Supplier Name) <span className="text-red-500">*</span></Label>
-              <Input required value={r4Form.customerName} onChange={e => setR4Form({...r4Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
+              <Input 
+                required 
+                list="cmd2-customer-datalist"
+                value={r4Form.customerName} 
+                onChange={e => setR4Form({...r4Form, customerName: e.target.value})} 
+                placeholder="เช่น บริษัท เอบีซี จำกัด หรือเลือกจากตัวช่วยด้านบน" 
+              />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -3149,7 +3516,16 @@ export default function RMControlCenterPage() {
               <div className="space-y-2">
                 <Label>จำนวนรับเข้า <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
-                  <Input required type="number" step="any" min="0.001" value={r4Form.quantity} onChange={e => setR4Form({...r4Form, quantity: e.target.value})} placeholder="0.00" />
+                  <Input 
+                    ref={r4QtyInputRef}
+                    required 
+                    type="number" 
+                    step="any" 
+                    min="0.001" 
+                    value={r4Form.quantity} 
+                    onChange={e => setR4Form({...r4Form, quantity: e.target.value})} 
+                    placeholder="0.00" 
+                  />
                   <Input value={r4Form.unit} onChange={e => setR4Form({...r4Form, unit: e.target.value})} className="w-20 text-center uppercase" placeholder="KG" />
                 </div>
               </div>
