@@ -220,6 +220,10 @@ export default function RMControlCenterPage() {
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
   const [cmd2Form, setCmd2Form] = useState({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
 
+  // Customer Supplied RM (R4) State
+  const [isR4ModalOpen, setIsR4ModalOpen] = useState(false);
+  const [r4Form, setR4Form] = useState({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+
   const fetchItems = async () => {
     setLoading(true);
     const { data, error } = await supabase
@@ -869,13 +873,15 @@ export default function RMControlCenterPage() {
     // If no code is provided, generate a pseudo one
     const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
     
+    const qtyVal = parseFloat(cmd2Form.quantity) || 0;
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
       pr_no: fakePo,
       supplier: cmd2Form.customerName,
       rm_code: fakeCode,
       rm_name: cmd2Form.pmName,
-      quantity: parseFloat(cmd2Form.quantity) || 0,
+      quantity: qtyVal,
+      received_qty: qtyVal,
       unit: 'pcs',
       warehouse: cmd2Form.warehouse,
       lot_product: cmd2Form.lotProduct,
@@ -892,6 +898,97 @@ export default function RMControlCenterPage() {
       toast.success('รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ!');
       setIsCmd2ModalOpen(false);
       setCmd2Form({ pmCode: '', pmName: '', quantity: '', customerName: '', lotProduct: '', warehouse: 'WH-PM', controlNo: '' });
+      fetchItems();
+    }
+  };
+
+  const openR4Modal = async () => {
+    setIsR4ModalOpen(true);
+    setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
+    
+    try {
+      const prefix = 'R';
+      const d = new Date();
+      const yy = d.getFullYear().toString().slice(2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      const dateString = `${yy}${mm}${dd}`;
+      const searchPattern = `${prefix}${dateString}-%`;
+
+      const { data, error } = await supabase
+        .from('production_lot_rms')
+        .select('control_no')
+        .like('control_no', searchPattern);
+
+      let nextNum = 1;
+      if (!error && data && data.length > 0) {
+        const nums = data
+          .map((d: any) => {
+            if (!d.control_no) return 0;
+            const parts = d.control_no.split('-');
+            return parts.length === 2 ? parseInt(parts[1], 10) : 0;
+          })
+          .filter((n: number) => !isNaN(n) && n > 0);
+        if (nums.length > 0) {
+          nextNum = Math.max(...nums) + 1;
+        }
+      }
+      setR4Form(prev => ({ ...prev, controlNo: `${prefix}${dateString}-${String(nextNum).padStart(2, '0')}` }));
+    } catch (error) {
+      console.error("Error generating control no for R4:", error);
+    }
+  };
+
+  const handleR4Submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (r4Form.controlNo.trim()) {
+      const { data: duplicateData } = await supabase
+        .from('production_lot_rms')
+        .select('id')
+        .eq('control_no', r4Form.controlNo.trim())
+        .limit(1);
+
+      if (duplicateData && duplicateData.length > 0) {
+        toast.error('Control No. นี้มีอยู่ในระบบแล้ว กรุณาใช้เลขอื่น');
+        return;
+      }
+    }
+
+    setUploading(true);
+    
+    // Generate pseudo PO/PR number for R4
+    const fakePo = `RM-R4-${Date.now().toString().slice(-6)}`;
+    
+    // If no code is provided, generate a pseudo one
+    const cleanCustomer = r4Form.customerName.replace(/[^a-zA-Z0-9]/g, '').substring(0,3).toUpperCase() || 'CUS';
+    const fakeCode = r4Form.rmCode.trim() || `R4-${cleanCustomer}-${Date.now().toString().slice(-4)}`;
+    const qtyVal = parseFloat(r4Form.quantity) || 0;
+
+    const { error } = await supabase.from('production_lot_rms').insert({
+      po_no: fakePo,
+      pr_no: fakePo,
+      supplier: r4Form.customerName,
+      rm_code: fakeCode,
+      rm_name: r4Form.rmName,
+      quantity: qtyVal,
+      received_qty: qtyVal,
+      unit: r4Form.unit || 'KG',
+      warehouse: r4Form.warehouse || 'MMRM',
+      lot_product: r4Form.lotProduct,
+      control_no: r4Form.controlNo.trim() || undefined,
+      status: 'RECEIVED',
+      receive_date: new Date().toISOString()
+    });
+
+    setUploading(false);
+
+    if (error) {
+      toast.error('บันทึกข้อมูลวัตถุดิบลูกค้าไม่สำเร็จ: ' + error.message);
+    } else {
+      toast.success('รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ!');
+      setIsR4ModalOpen(false);
+      setR4Form({ rmCode: '', rmName: '', quantity: '', unit: 'KG', customerName: '', lotProduct: '', warehouse: 'MMRM', controlNo: '' });
       fetchItems();
     }
   };
@@ -1237,8 +1334,13 @@ export default function RMControlCenterPage() {
           <Button variant="outline" onClick={exportToCSV} className="bg-white flex-shrink-0">
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
+          {mainTab === 'rm' && (
+            <Button onClick={openR4Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0">
+              + รับเข้าวัตถุดิบลูกค้า (R4)
+            </Button>
+          )}
           {mainTab === 'pm' && (
-            <Button onClick={() => setIsCmd2ModalOpen(true)} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0">
+            <Button onClick={openCmd2Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0">
               + รับเข้าวัสดุลูกค้า (CMD2)
             </Button>
           )}
@@ -2867,26 +2969,29 @@ export default function RMControlCenterPage() {
       <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
         <DialogContent className="sm:max-w-md md:max-w-lg w-full">
           <DialogHeader>
-            <DialogTitle>รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)</DialogTitle>
+            <DialogTitle className="text-[#4A4238] flex items-center gap-2">
+              <Package className="w-5 h-5 text-[#D4AF37]" />
+              รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
+            </DialogTitle>
           </DialogHeader>
           <form onSubmit={handleCmd2Submit} className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>ชื่อลูกค้า (Customer Name)</Label>
+              <Label>ชื่อลูกค้า (Customer Name) <span className="text-red-500">*</span></Label>
               <Input required value={cmd2Form.customerName} onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>รหัสบรรจุภัณฑ์ (PM Code)</Label>
-                <Input value={cmd2Form.pmCode} onChange={e => setCmd2Form({...cmd2Form, pmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้" />
+                <Input value={cmd2Form.pmCode} onChange={e => setCmd2Form({...cmd2Form, pmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (CMD2-xxx)" />
               </div>
               <div className="space-y-2">
-                <Label>ชื่อบรรจุภัณฑ์ (PM Name)</Label>
+                <Label>ชื่อบรรจุภัณฑ์ (PM Name) <span className="text-red-500">*</span></Label>
                 <Input required value={cmd2Form.pmName} onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} placeholder="เช่น กล่องใส่ครีม 50g" />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>จำนวน (ชิ้น)</Label>
+                <Label>จำนวน (ชิ้น) <span className="text-red-500">*</span></Label>
                 <Input required type="number" min="1" value={cmd2Form.quantity} onChange={e => setCmd2Form({...cmd2Form, quantity: e.target.value})} />
               </div>
               <div className="space-y-2">
@@ -2894,14 +2999,87 @@ export default function RMControlCenterPage() {
                 <Input value={cmd2Form.lotProduct} onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>คลังสินค้า (Warehouse)</Label>
-              <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>คลังสินค้า (Warehouse)</Label>
+                <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} placeholder="WH-PM" />
+              </div>
+              <div className="space-y-2">
+                <Label>Control No. (เลขคุมรับเข้า)</Label>
+                <Input 
+                  value={cmd2Form.controlNo} 
+                  onChange={e => setCmd2Form({...cmd2Form, controlNo: e.target.value})} 
+                  placeholder="P260915-01" 
+                  className="font-mono font-bold text-purple-700 bg-purple-50"
+                />
+              </div>
             </div>
             <DialogFooter className="pt-4">
               <Button type="button" variant="outline" onClick={() => setIsCmd2ModalOpen(false)}>ยกเลิก</Button>
-              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
                 {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} รับเข้า PM ทันที
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Customer Supplied RM (R4) Modal */}
+      <Dialog open={isR4ModalOpen} onOpenChange={setIsR4ModalOpen}>
+        <DialogContent className="sm:max-w-md md:max-w-lg w-full">
+          <DialogHeader>
+            <DialogTitle className="text-[#4A4238] flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+              รับเข้าวัตถุดิบลูกค้า (R4)
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleR4Submit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>ชื่อลูกค้า (Customer / Supplier Name) <span className="text-red-500">*</span></Label>
+              <Input required value={r4Form.customerName} onChange={e => setR4Form({...r4Form, customerName: e.target.value})} placeholder="เช่น บริษัท เอบีซี จำกัด" />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>รหัสวัตถุดิบ (RM Code)</Label>
+                <Input value={r4Form.rmCode} onChange={e => setR4Form({...r4Form, rmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (R4-xxx)" />
+              </div>
+              <div className="space-y-2">
+                <Label>ชื่อวัตถุดิบ (RM Name) <span className="text-red-500">*</span></Label>
+                <Input required value={r4Form.rmName} onChange={e => setR4Form({...r4Form, rmName: e.target.value})} placeholder="เช่น สารสกัดชาเขียวเข้มข้น 100%" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>จำนวนรับเข้า <span className="text-red-500">*</span></Label>
+                <div className="flex items-center gap-2">
+                  <Input required type="number" step="any" min="0.001" value={r4Form.quantity} onChange={e => setR4Form({...r4Form, quantity: e.target.value})} placeholder="0.00" />
+                  <Input value={r4Form.unit} onChange={e => setR4Form({...r4Form, unit: e.target.value})} className="w-20 text-center uppercase" placeholder="KG" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>LOT งานผลิตอ้างอิง</Label>
+                <Input value={r4Form.lotProduct} onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>คลังสินค้า (Warehouse)</Label>
+                <Input value={r4Form.warehouse} onChange={e => setR4Form({...r4Form, warehouse: e.target.value})} placeholder="MMRM" />
+              </div>
+              <div className="space-y-2">
+                <Label>Control No. (เลขคุมรับเข้า)</Label>
+                <Input 
+                  value={r4Form.controlNo} 
+                  onChange={e => setR4Form({...r4Form, controlNo: e.target.value})} 
+                  placeholder="R260915-01" 
+                  className="font-mono font-bold text-purple-700 bg-purple-50"
+                />
+              </div>
+            </div>
+            <DialogFooter className="pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsR4ModalOpen(false)}>ยกเลิก</Button>
+              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
+                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} รับเข้า RM ทันที
               </Button>
             </DialogFooter>
           </form>
