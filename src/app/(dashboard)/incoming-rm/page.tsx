@@ -89,6 +89,7 @@ export default function RMControlCenterPage() {
     supplier: '', 
     rm_code: '', 
     rm_name: '', 
+    warehouse: '',
     quantity: 0, 
     unit: '', 
     eta_date: '',
@@ -101,12 +102,21 @@ export default function RMControlCenterPage() {
   const [splittingItem, setSplittingItem] = useState<RMItem | null>(null);
   const [splitRows, setSplitRows] = useState<{ id: string, quantity: number | string, eta_date: string, bottom_remark: string }[]>([]);
 
-  // Receive Modal State
+  // Receive Modal State (Editable for ALL fields + Edit reason note)
   const [isReceiveModalOpen, setIsReceiveModalOpen] = useState(false);
   const [receivingItem, setReceivingItem] = useState<RMItem | null>(null);
+  const [receiveRmCode, setReceiveRmCode] = useState('');
+  const [receiveRmName, setReceiveRmName] = useState('');
+  const [receiveWarehouse, setReceiveWarehouse] = useState('WH-PM');
+  const [receivePoNo, setReceivePoNo] = useState('');
+  const [receiveSupplier, setReceiveSupplier] = useState('');
+  const [receivePoQty, setReceivePoQty] = useState('');
+  const [receiveUnit, setReceiveUnit] = useState('pcs');
+  const [receiveDateInput, setReceiveDateInput] = useState('');
   const [controlNoInput, setControlNoInput] = useState('');
   const [receivedQtyInput, setReceivedQtyInput] = useState('');
   const [receiveRemarkInput, setReceiveRemarkInput] = useState('');
+  const [receiveEditReason, setReceiveEditReason] = useState('');
   const [isGeneratingControlNo, setIsGeneratingControlNo] = useState(false);
 
   // Customer Supplied PM State
@@ -381,15 +391,53 @@ export default function RMControlCenterPage() {
     }
   };
 
+  const isReceiveDataModified = () => {
+    if (!receivingItem) return false;
+    const origCode = receivingItem.rm_code || '';
+    const origName = receivingItem.rm_name || '';
+    const origWh = receivingItem.warehouse || '';
+    const origPo = receivingItem.po_no || '';
+    const origSup = receivingItem.supplier || '';
+    const origQty = receivingItem.quantity != null ? String(receivingItem.quantity) : '';
+    const origUnit = receivingItem.unit || '';
+    const origControl = receivingItem.control_no || '';
+    const origRecQty = receivingItem.received_qty != null ? String(receivingItem.received_qty) : '';
+
+    const codeChanged = receiveRmCode.trim() !== origCode.trim();
+    const nameChanged = receiveRmName.trim() !== origName.trim();
+    const whChanged = receiveWarehouse.trim() !== origWh.trim();
+    const poChanged = receivePoNo.trim() !== origPo.trim();
+    const supChanged = receiveSupplier.trim() !== origSup.trim();
+    const qtyChanged = receivePoQty.trim() !== origQty.trim();
+    const unitChanged = receiveUnit.trim() !== origUnit.trim();
+    const controlChanged = origControl ? controlNoInput.trim() !== origControl.trim() : false;
+    const recQtyChanged = origRecQty ? receivedQtyInput.trim() !== origRecQty.trim() : false;
+
+    return codeChanged || nameChanged || whChanged || poChanged || supChanged || qtyChanged || unitChanged || controlChanged || recQtyChanged;
+  };
+
   const openReceiveModal = async (item: RMItem) => {
     setReceivingItem(item);
     setIsReceiveModalOpen(true);
+    setReceiveRmCode(item.rm_code || '');
+    setReceiveRmName(item.rm_name || '');
+    setReceiveWarehouse(item.warehouse || 'WH-PM');
+    setReceivePoNo(item.po_no || '');
+    setReceiveSupplier(item.supplier || '');
+    setReceivePoQty(item.quantity != null ? item.quantity.toString() : '');
+    setReceiveUnit(item.unit || 'pcs');
+    setReceiveDateInput(
+      item.receive_date 
+        ? new Date(item.receive_date).toISOString().split('T')[0] 
+        : new Date().toISOString().split('T')[0]
+    );
     setReceivedQtyInput(
       item.received_qty != null 
         ? item.received_qty.toString() 
         : (item.quantity != null ? item.quantity.toString() : '')
     );
     setReceiveRemarkInput(item.remark || '');
+    setReceiveEditReason('');
 
     if (item.control_no) {
       setControlNoInput(item.control_no);
@@ -437,6 +485,15 @@ export default function RMControlCenterPage() {
 
   const confirmReceive = async () => {
     if (!receivingItem) return;
+
+    if (!receiveRmCode.trim()) {
+      toast.error('กรุณาระบุรหัสวัตถุดิบ/บรรจุภัณฑ์');
+      return;
+    }
+    if (!receiveRmName.trim()) {
+      toast.error('กรุณาระบุชื่อรายการ');
+      return;
+    }
     if (!controlNoInput.trim()) {
       toast.error('กรุณาระบุ Control No.');
       return;
@@ -445,6 +502,14 @@ export default function RMControlCenterPage() {
     const parsedQty = parseFloat(receivedQtyInput);
     if (isNaN(parsedQty) || parsedQty < 0) {
       toast.error('กรุณาระบุยอดรับเข้าจริงที่ถูกต้อง (ตัวเลข)');
+      return;
+    }
+
+    const isModified = isReceiveDataModified();
+    const isAlreadyReceived = receivingItem.status === 'RECEIVED' || receivingItem.status === 'WAITING_QC';
+
+    if ((isModified || isAlreadyReceived) && !receiveEditReason.trim()) {
+      toast.error('กรุณาระบุ "หมายเหตุการแก้ไขข้อมูล" เพื่อบันทึกประวัติการปรับปรุง');
       return;
     }
 
@@ -461,15 +526,41 @@ export default function RMControlCenterPage() {
       return;
     }
 
+    const nowIso = new Date().toISOString();
+    const formattedReceiveDate = receiveDateInput 
+      ? new Date(`${receiveDateInput}T12:00:00Z`).toISOString() 
+      : (receivingItem.receive_date || nowIso);
+
     const updates: any = { 
-      status: 'RECEIVED',
+      rm_code: receiveRmCode.trim(),
+      rm_name: receiveRmName.trim(),
+      warehouse: receiveWarehouse.trim() || 'WH-PM',
+      po_no: receivePoNo.trim(),
+      supplier: receiveSupplier.trim() || null,
+      quantity: parseFloat(receivePoQty) || receivingItem.quantity,
+      unit: receiveUnit.trim() || 'pcs',
       control_no: controlNoInput.trim(),
       received_qty: parsedQty,
-      remark: receiveRemarkInput.trim() || null
+      receive_date: formattedReceiveDate,
+      updated_at: nowIso
     };
-    if (!receivingItem.receive_date) {
-      updates.receive_date = new Date().toISOString();
+
+    if (receivingItem.status === 'WAITING_QC') {
+      updates.status = 'WAITING_QC';
+    } else {
+      updates.status = 'RECEIVED';
     }
+
+    let finalRemark = receiveRemarkInput.trim();
+    if (receiveEditReason.trim()) {
+      const editor = currentUser || 'User';
+      const todayShort = new Date().toLocaleDateString('th-TH', { day: 'numeric', month: 'short' });
+      const editTag = `[แก้ไข ${todayShort} โดย ${editor}: ${receiveEditReason.trim()}]`;
+      if (!finalRemark.includes(editTag)) {
+        finalRemark = finalRemark ? `${finalRemark} • ${editTag}` : editTag;
+      }
+    }
+    updates.remark = finalRemark || null;
 
     const { error } = await supabase
       .from('production_lot_rms')
@@ -478,9 +569,9 @@ export default function RMControlCenterPage() {
 
     if (error) {
       console.error(error);
-      toast.error('อัปเดตสถานะไม่สำเร็จ');
+      toast.error('อัปเดตข้อมูลไม่สำเร็จ: ' + error.message);
     } else {
-      toast.success(`รับของเรียบร้อย (ยอดรับจริง: ${parsedQty.toLocaleString()} ${receivingItem.unit || ''})`);
+      toast.success(isAlreadyReceived || isModified ? 'บันทึกการแก้ไขข้อมูลเรียบร้อยแล้ว' : `รับของเรียบร้อย (ยอดรับจริง: ${parsedQty.toLocaleString()} ${receiveUnit.trim()})`);
       setIsReceiveModalOpen(false);
       setReceivingItem(null);
       fetchItems();
@@ -522,6 +613,7 @@ export default function RMControlCenterPage() {
       supplier: item.supplier || '',
       rm_code: item.rm_code || '',
       rm_name: item.rm_name || '',
+      warehouse: item.warehouse || 'WH-PM',
       quantity: item.quantity || 0,
       unit: item.unit || '',
       eta_date: item.eta_date ? new Date(item.eta_date).toISOString().split('T')[0] : '',
@@ -566,6 +658,7 @@ export default function RMControlCenterPage() {
       supplier: editForm.supplier,
       rm_code: editForm.rm_code,
       rm_name: editForm.rm_name,
+      warehouse: editForm.warehouse || 'WH-PM',
       quantity: editForm.quantity,
       unit: editForm.unit,
       eta_date: editForm.eta_date || null,
@@ -1452,10 +1545,16 @@ export default function RMControlCenterPage() {
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
-                                onClick={() => openEditModal(item)} 
-                                disabled={!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REJECTED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin')}
-                                className={`h-8 w-8 ${!(item.status === 'PENDING_DELIVERY' || item.status === 'DELAYED' || item.status === 'REJECTED' || item.status === 'REVISED') || !(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || userRole === 'admin') ? 'text-slate-300' : item.status === 'REJECTED' ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50 ring-1 ring-purple-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
-                                title={item.status === 'REJECTED' ? "เปิดรอบส่งมอบใหม่ (Revise Delivery หลัง QC ไม่ผ่าน)" : "แก้ไขรายการ / เลื่อน ETA"}
+                                onClick={() => {
+                                  if (item.status === 'RECEIVED' || item.status === 'WAITING_QC') {
+                                    openReceiveModal(item);
+                                  } else {
+                                    openEditModal(item);
+                                  }
+                                }} 
+                                disabled={!(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || currentUser?.toUpperCase().startsWith('WH') || currentUser?.toUpperCase().startsWith('MM') || userRole === 'admin')}
+                                className={`h-8 w-8 ${!(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || currentUser?.toUpperCase().startsWith('WH') || currentUser?.toUpperCase().startsWith('MM') || userRole === 'admin') ? 'text-slate-300' : item.status === 'REJECTED' ? 'text-purple-600 hover:text-purple-800 hover:bg-purple-50 ring-1 ring-purple-300' : 'text-blue-400 hover:text-blue-600 hover:bg-blue-50'}`}
+                                title={item.status === 'REJECTED' ? "เปิดรอบส่งมอบใหม่ (Revise Delivery หลัง QC ไม่ผ่าน)" : "แก้ไขรายการ / ระบุเหตุผลการแก้ไข"}
                               >
                                 {item.status === 'REJECTED' ? <RefreshCw className="w-4 h-4" /> : <Edit className="w-4 h-4" />}
                               </Button>
@@ -2277,91 +2376,244 @@ export default function RMControlCenterPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Receive Item Modal for Control No, Actual Received Qty & Remark */}
+      {/* Receive Item Modal for Control No, Actual Received Qty, All Master Fields & Remark */}
       <Dialog open={isReceiveModalOpen} onOpenChange={setIsReceiveModalOpen}>
-        <DialogContent className="sm:max-w-lg w-full">
+        <DialogContent className="sm:max-w-xl w-full max-h-[90vh] overflow-y-auto bg-white rounded-2xl border border-[#D4AF37]/30 shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Package className="w-5 h-5 text-[#D4AF37]" />
-              <span>ยืนยันการรับเข้าคลังสินค้า</span>
+            <DialogTitle className="flex items-center justify-between gap-2 border-b pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-100/70 text-amber-900 rounded-xl">
+                  <Package className="w-5 h-5 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <span className="font-bold text-slate-800 text-lg">
+                    {receivingItem?.status === 'RECEIVED' || receivingItem?.status === 'WAITING_QC' ? 'แก้ไขข้อมูลการรับเข้าคลังสินค้า' : 'ยืนยันการรับเข้าคลังสินค้า'}
+                  </span>
+                  <p className="text-xs text-slate-500 font-normal">
+                    สามารถแก้ไขข้อมูลได้ทุกช่อง โดยระบบจะบันทึกหมายเหตุการแก้ไขไว้เป็นประวัติ
+                  </p>
+                </div>
+              </div>
+              {receivingItem?.status && (
+                <Badge variant="outline" className="bg-slate-50 text-slate-700 text-xs shrink-0">
+                  {receivingItem.status}
+                </Badge>
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
-            <div className="bg-slate-50 p-3 rounded-lg border text-sm space-y-1.5">
-              <div className="grid grid-cols-3"><span className="text-slate-500">รหัสวัตถุดิบ/บรรจุภัณฑ์:</span><span className="col-span-2 font-bold text-slate-800">{receivingItem?.rm_code || '-'}</span></div>
-              <div className="grid grid-cols-3"><span className="text-slate-500">ชื่อรายการ:</span><span className="col-span-2 text-slate-700">{receivingItem?.rm_name || '-'}</span></div>
-              <div className="grid grid-cols-3"><span className="text-slate-500">คลังสินค้า:</span><span className="col-span-2 font-medium">{receivingItem?.warehouse || '-'}</span></div>
-              {receivingItem?.po_no && (
-                <div className="grid grid-cols-3"><span className="text-slate-500">เลขที่ PO:</span><span className="col-span-2 text-slate-700">{receivingItem.po_no}</span></div>
-              )}
-              {receivingItem?.supplier && (
-                <div className="grid grid-cols-3"><span className="text-slate-500">ผู้จำหน่าย (Supplier):</span><span className="col-span-2 text-slate-700">{receivingItem.supplier}</span></div>
-              )}
-            </div>
-
-            {/* 1. Actual Received Qty */}
-            <div className="space-y-1.5 bg-amber-50/50 p-3 rounded-lg border border-amber-200/60">
-              <div className="flex items-center justify-between">
-                <Label className="font-semibold text-slate-800 text-sm">
-                  ยอดรับเข้าจริง (Actual Received Qty) <span className="text-red-500">*</span>
-                </Label>
-                <span className="text-xs text-slate-500 font-medium">
-                  ยอดสั่งซื้อตาม PO: <strong className="text-slate-700">{Number(receivingItem?.quantity || 0).toLocaleString()} {receivingItem?.unit || ''}</strong>
+            {/* 1. Master Information (แก้ไขได้ทุกช่อง) */}
+            <div className="bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between pb-1 border-b border-slate-200/60">
+                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Edit className="w-3.5 h-3.5 text-[#D4AF37]" /> ข้อมูลหลัก (Master Info - แก้ไขได้ทุกช่อง)
+                </span>
+                <span className="text-[11px] text-slate-500">
+                  แก้ไขข้อมูลตามเอกสารจริงได้ทันที
                 </span>
               </div>
-              <div className="relative flex items-center">
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* รหัสวัตถุดิบ/บรรจุภัณฑ์ */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">รหัสวัตถุดิบ/บรรจุภัณฑ์ <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={receiveRmCode} 
+                    onChange={e => setReceiveRmCode(e.target.value)} 
+                    placeholder="เช่น CMD2-OFT001-N4" 
+                    className="text-xs font-mono font-bold bg-white" 
+                  />
+                </div>
+
+                {/* คลังสินค้า */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">คลังสินค้า (Warehouse) <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={receiveWarehouse} 
+                    onChange={e => setReceiveWarehouse(e.target.value)} 
+                    placeholder="เช่น WH-PM, MMRM" 
+                    className="text-xs bg-white font-medium" 
+                  />
+                </div>
+
+                {/* ชื่อรายการ */}
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">ชื่อรายการ (Material / PM Name) <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={receiveRmName} 
+                    onChange={e => setReceiveRmName(e.target.value)} 
+                    placeholder="ระบุชื่อรายการ..." 
+                    className="text-xs bg-white" 
+                  />
+                </div>
+
+                {/* เลขที่ PO */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">เลขที่ PO</Label>
+                  <Input 
+                    value={receivePoNo} 
+                    onChange={e => setReceivePoNo(e.target.value)} 
+                    placeholder="เช่น PM-CMD2-332446" 
+                    className="text-xs font-mono bg-white" 
+                  />
+                </div>
+
+                {/* ผู้จำหน่าย */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">ผู้จำหน่าย (Supplier)</Label>
+                  <Input 
+                    value={receiveSupplier} 
+                    onChange={e => setReceiveSupplier(e.target.value)} 
+                    placeholder="ระบุชื่อ Supplier..." 
+                    className="text-xs bg-white" 
+                  />
+                </div>
+
+                {/* ยอดสั่งซื้อตาม PO และ หน่วย */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">ยอดสั่งซื้อตาม PO</Label>
+                  <Input 
+                    type="number"
+                    step="any"
+                    value={receivePoQty} 
+                    onChange={e => setReceivePoQty(e.target.value)} 
+                    placeholder="0" 
+                    className="text-xs bg-white font-semibold" 
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">หน่วยนับ (Unit)</Label>
+                  <Input 
+                    value={receiveUnit} 
+                    onChange={e => setReceiveUnit(e.target.value)} 
+                    placeholder="เช่น pcs, kg, g, bot" 
+                    className="text-xs bg-white" 
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. การรับเข้าจริงและออก Control No. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Actual Received Qty */}
+              <div className="space-y-1.5 bg-amber-50/70 p-3 rounded-xl border border-amber-200/80">
+                <div className="flex items-center justify-between">
+                  <Label className="font-bold text-slate-800 text-xs">
+                    ยอดรับเข้าจริง (Actual Qty) <span className="text-red-500">*</span>
+                  </Label>
+                  <span className="text-[11px] text-slate-500">
+                    PO: <strong className="text-slate-700">{Number(receivePoQty || 0).toLocaleString()} {receiveUnit}</strong>
+                  </span>
+                </div>
+                <div className="relative flex items-center">
+                  <Input 
+                    type="number"
+                    step="any"
+                    value={receivedQtyInput} 
+                    onChange={(e) => setReceivedQtyInput(e.target.value)}
+                    placeholder="ระบุยอดรับจริง..."
+                    className="pr-14 font-bold text-sm bg-white border-amber-300"
+                  />
+                  <span className="absolute right-3 text-xs font-bold text-slate-500 pointer-events-none">
+                    {receiveUnit || 'หน่วย'}
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-500">ยอดที่นับได้จริงตามใบส่งของ</p>
+              </div>
+
+              {/* Control No. & วันที่รับเข้า */}
+              <div className="space-y-1.5 bg-purple-50/50 p-3 rounded-xl border border-purple-200/80">
+                <div className="flex items-center justify-between">
+                  <Label className="font-bold text-purple-950 text-xs">Control No. <span className="text-red-500">*</span></Label>
+                  <span className="text-[10px] text-purple-600 font-medium">รูปแบบ 2 หลัก (-01)</span>
+                </div>
                 <Input 
-                  type="number"
-                  step="any"
-                  value={receivedQtyInput} 
-                  onChange={(e) => setReceivedQtyInput(e.target.value)}
-                  placeholder="ระบุยอดรับเข้าที่นับได้จริง หรือยอดตามใบส่งของ..."
-                  className="pr-16 font-semibold text-base bg-white"
+                  value={controlNoInput} 
+                  onChange={(e) => setControlNoInput(e.target.value.toUpperCase())}
+                  placeholder="เช่น P260915-09"
+                  disabled={isGeneratingControlNo}
+                  className="font-mono font-bold text-sm text-purple-700 bg-white border-purple-300"
                 />
-                <span className="absolute right-3 text-xs font-bold text-slate-500 pointer-events-none">
-                  {receivingItem?.unit || 'หน่วย'}
-                </span>
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-[11px] text-slate-500 shrink-0 font-medium">วันที่รับ:</span>
+                  <Input 
+                    type="date"
+                    value={receiveDateInput}
+                    onChange={(e) => setReceiveDateInput(e.target.value)}
+                    className="h-7 text-xs bg-white border-slate-300 font-mono"
+                  />
+                </div>
               </div>
-              <p className="text-[11px] text-slate-500">
-                ระบุยอดรับเข้าที่นับได้จริง หรือยอดตามที่ซัพพลายเออร์จัดส่งมาจริง
-              </p>
             </div>
 
-            {/* 2. Control No. (2 digits) */}
-            <div className="space-y-1.5">
-              <Label className="font-semibold text-slate-800 text-sm">Control No.</Label>
-              <Input 
-                value={controlNoInput} 
-                onChange={(e) => setControlNoInput(e.target.value.toUpperCase())}
-                placeholder="เช่น P260914-01 หรือ R260914-01"
-                disabled={isGeneratingControlNo}
-                className="font-mono font-bold text-purple-700"
-              />
-              <p className="text-[11px] text-slate-500">ระบบสร้างเลขอัตโนมัติให้แล้ว (รูปแบบ 2 หลัก เช่น -01) สามารถแก้ไขได้หากจำเป็น</p>
-            </div>
+            {/* 3. หมายเหตุการแก้ไข (Audit / Reason) - ไฮไลท์เมื่อมีการแก้ไข */}
+            {(() => {
+              const isModified = isReceiveDataModified();
+              const isAlreadyReceived = receivingItem?.status === 'RECEIVED' || receivingItem?.status === 'WAITING_QC';
+              const isRequired = isModified || isAlreadyReceived;
 
-            {/* 3. Remarks */}
+              return (
+                <div className={`p-3.5 rounded-xl border transition-all ${
+                  isRequired ? 'bg-amber-50/70 border-amber-300 shadow-sm' : 'bg-slate-50 border-slate-200'
+                }`}>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <Label className="font-bold text-xs flex items-center gap-1.5 text-slate-800">
+                      <ShieldCheck className={`w-4 h-4 ${isRequired ? 'text-amber-600' : 'text-slate-400'}`} />
+                      <span>หมายเหตุการแก้ไขข้อมูล (Edit Reason / Revision Remark)</span>
+                      {isRequired && (
+                        <span className="text-red-600 text-xs font-bold">* จำเป็นต้องระบุ</span>
+                      )}
+                    </Label>
+                    {isModified && (
+                      <Badge className="text-[10px] py-0 px-2 font-semibold bg-amber-600 text-white hover:bg-amber-700">
+                        ตรวจพบการแก้ไขข้อมูล
+                      </Badge>
+                    )}
+                  </div>
+                  <Textarea 
+                    value={receiveEditReason} 
+                    onChange={(e) => setReceiveEditReason(e.target.value)}
+                    placeholder="ระบุเหตุผลการแก้ไขข้อมูล เช่น แก้ไขรหัสและชื่อเนื่องจากมีพิมพ์ตกจากใบสั่งซื้อ, ปรับปรุงยอดรับเข้าตามใบลดหนี้, สลับคลังจัดเก็บ..."
+                    rows={2}
+                    className="text-xs resize-none bg-white border-slate-300 focus:border-amber-400"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">
+                    ระบบจะบันทึกหมายเหตุการแก้ไขนี้แนบไว้กับประวัติข้อมูล เพื่อความโปร่งใสและตรวจสอบย้อนกลับได้
+                  </p>
+                </div>
+              );
+            })()}
+
+            {/* 4. หมายเหตุการรับเข้า / ข้อมูลแจ้งฝ่ายที่เกี่ยวข้อง (General Remarks) */}
             <div className="space-y-1.5">
-              <Label className="font-semibold text-slate-800 text-sm">
-                หมายเหตุการรับเข้า / ข้อมูลแจ้งฝ่ายที่เกี่ยวข้อง
+              <Label className="font-semibold text-slate-800 text-xs flex items-center gap-1">
+                <span>หมายเหตุการรับเข้า / ข้อมูลแจ้งฝ่ายที่เกี่ยวข้อง</span>
+                <span className="text-[10px] text-slate-400 font-normal">(แจ้ง QC / ฝ่ายผลิต / ฝ่ายวางแผน)</span>
               </Label>
               <Textarea 
                 value={receiveRemarkInput} 
                 onChange={(e) => setReceiveRemarkInput(e.target.value)}
-                placeholder="ระบุข้อมูลที่ต้องการแจ้งแล็บ QC, ฝ่ายผลิต หรือฝ่ายวางแผน เช่น ส่งมาไม่ครบขาด 50 ชิ้น, กล่องมีรอยบุบ, ขอตรวจด่วนพิเศษ ฯลฯ"
-                rows={3}
-                className="text-sm resize-none bg-white"
+                placeholder="ระบุข้อมูลที่ต้องการแจ้งแล็บ QC หรือฝ่ายผลิต เช่น ส่งมาไม่ครบขาด 50 ชิ้น, กล่องมีรอยบุบ, ขอตรวจด่วนพิเศษ..."
+                rows={2}
+                className="text-xs resize-none bg-white"
               />
-              <p className="text-[11px] text-slate-500">
+              <p className="text-[10px] text-slate-500">
                 ข้อมูลนี้จะแสดงให้ฝ่ายจัดซื้อ, คลัง, แล็บ QC และหน้า 21-Day Rolling Radar ทราบร่วมกัน
               </p>
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>ยกเลิก</Button>
-            <Button onClick={confirmReceive} disabled={isGeneratingControlNo} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
+          <DialogFooter className="border-t pt-3 flex items-center justify-between">
+            <Button variant="outline" onClick={() => setIsReceiveModalOpen(false)}>
+              ยกเลิก
+            </Button>
+            <Button 
+              onClick={confirmReceive} 
+              disabled={isGeneratingControlNo} 
+              className="bg-[#D4AF37] hover:bg-[#B3932F] text-white font-bold"
+            >
               {isGeneratingControlNo ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
-              ยืนยันรับของ
+              {receivingItem?.status === 'RECEIVED' || receivingItem?.status === 'WAITING_QC' ? 'บันทึกการแก้ไขข้อมูล' : 'ยืนยันรับของ'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -2472,6 +2724,10 @@ export default function RMControlCenterPage() {
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-slate-700">Name</Label>
               <Input value={editForm.rm_name} onChange={e => setEditForm({...editForm, rm_name: e.target.value})} className="col-span-3 text-xs bg-slate-50" />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-3">
+              <Label className="text-right font-bold text-slate-700">Warehouse</Label>
+              <Input value={editForm.warehouse} onChange={e => setEditForm({...editForm, warehouse: e.target.value})} className="col-span-3 text-xs bg-slate-50" placeholder="เช่น WH-PM, MMRM" />
             </div>
             <div className="grid grid-cols-4 items-center gap-3">
               <Label className="text-right font-bold text-slate-700">Quantity</Label>
