@@ -10,7 +10,8 @@ import {
   Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
-  ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User
+  ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User,
+  Printer
 } from 'lucide-react'
 import {
   Table,
@@ -40,6 +41,7 @@ import * as XLSX from "xlsx"
 import { cn } from "@/lib/utils"
 import { canEditRoute } from "@/lib/permissions"
 import { TaskCalendar } from "@/components/ui/TaskCalendar"
+import { TimelinePrintModal } from "@/components/planner/TimelinePrintModal"
 import { 
   PLAN_CHANGE_CATEGORIES, 
   parsePlanChangeInfo, 
@@ -80,6 +82,7 @@ export default function PlannerPage() {
   
   // Toggle Switch: Show/Hide Shopfloor Operational Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)
   const [showShopfloorHandovers, setShowShopfloorHandovers] = useState(false)
+  const [isTimelinePrintOpen, setIsTimelinePrintOpen] = useState(false)
 
   useEffect(() => {
     try {
@@ -1556,6 +1559,17 @@ export default function PlannerPage() {
               <Button size="sm" variant={filterOrderType === "MTO" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTO")} className="h-7 text-xs">MTO</Button>
             </div>
             <Input placeholder="ค้นหา PO หรือ SKU..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-64 h-9" />
+            {activeTab === "timeline" && (
+              <Button 
+                size="sm" 
+                onClick={() => setIsTimelinePrintOpen(true)} 
+                className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 shrink-0 rounded-lg"
+                title="พิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
+              >
+                <Printer className="w-3.5 h-3.5" />
+                <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
+              </Button>
+            )}
           </div>
         </div>
 
@@ -1993,7 +2007,39 @@ export default function PlannerPage() {
         )}
 
         {activeTab === "timeline" && (
-          <div className="overflow-x-auto min-h-[500px]">
+          <>
+            <div className="p-3 bg-gradient-to-r from-indigo-50/70 via-slate-50 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold shrink-0">
+                  <CalendarDays className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span>แผนผังกำหนดการผลิต (Timeline Lookahead 14 วัน)</span>
+                    <span className="text-[10.5px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-mono font-semibold">
+                      {format(timelineDates[0], 'dd MMM yyyy')} - {format(timelineDates[13], 'dd MMM yyyy')}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-0.5">
+                    แสดงคิวงานชั่งสาร ผสม บรรจุ พร้อมสถานะ 🔬 1st Batch และการปรับเลื่อนวัน 🔄
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  onClick={() => setIsTimelinePrintOpen(true)}
+                  className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 rounded-lg"
+                  title="คลิกเพื่อเปิดหน้าต่างพิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
+                </Button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto min-h-[500px]">
             <div className="min-w-[1200px] border-t border-slate-200 relative">
               <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
                 <div className="w-[250px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0]">Project / Task</div>
@@ -2092,7 +2138,8 @@ export default function PlannerPage() {
                 })}
               </div>
             </div>
-          </div>
+            </div>
+          </>
         )}
 
         {activeTab === "history" && (
@@ -2717,6 +2764,19 @@ export default function PlannerPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Timeline Print & PDF Export Modal (A4 Landscape) */}
+      <TimelinePrintModal
+        isOpen={isTimelinePrintOpen}
+        onClose={() => setIsTimelinePrintOpen(false)}
+        lots={lots}
+        logs={logs}
+        processes={processes}
+        currentUser={currentUserInfo?.employee_id || currentUser || 'PLPTB1234'}
+        initialDept={filterDept}
+        initialOrderType={filterOrderType}
+        initialShowHandovers={showShopfloorHandovers}
+      />
     </div>
   )
 }
