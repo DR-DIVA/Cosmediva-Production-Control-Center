@@ -7,8 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AlertTriangle, Loader2, Pipette, Cylinder, SprayCan, Package as BoxIcon, Inbox, Mail, PillBottle, TestTube, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Factory , PackageSearch, Box, TrendingUp, Layers, RefreshCw, Sparkles, ArrowUpRight } from 'lucide-react'
+import { AlertTriangle, Loader2, Pipette, Cylinder, SprayCan, Package as BoxIcon, Inbox, Mail, PillBottle, TestTube, ChevronDown, ChevronRight, Play, CheckCircle2, Clock, MapPin, Factory , PackageSearch, Box, TrendingUp, Layers, RefreshCw, Sparkles, ArrowUpRight, Search, X, RotateCcw, Filter } from 'lucide-react'
 import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { differenceInDays, startOfDay } from 'date-fns'
@@ -43,6 +44,14 @@ export default function PackingTasksPage() {
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [filterDate, setFilterDate] = useState<string>('')
   const [historyList, setHistoryList] = useState<any[]>([])
+  const [historyFilters, setHistoryFilters] = useState({
+    time: '',
+    user: '',
+    lot: '',
+    tank: '',
+    status: '',
+    qty: ''
+  })
 
   const [allDefects, setAllDefects] = useState<any[]>([])
   const [isDefectModalOpen, setIsDefectModalOpen] = useState(false)
@@ -199,6 +208,89 @@ export default function PackingTasksPage() {
       
       if (defects) setAllDefects(defects)
     }
+  }
+
+  const getPackingStatusText = (action: string) => {
+    if (action === 'DONE') return 'บรรจุเสร็จ'
+    if (action === 'IN_PROGRESS') return 'กำลังบรรจุ'
+    if (action === 'SENT_TO_POF') return 'ไปห้อง POF'
+    if (action === 'SENT_TO_BOX') return 'ไปลงลัง'
+    return action || '-'
+  }
+
+  const filteredHistoryList = React.useMemo(() => {
+    return historyList.filter(item => {
+      // 1. Time / Date filter
+      if (historyFilters.time.trim()) {
+        const term = historyFilters.time.toLowerCase().trim()
+        const formattedDate = new Date(item.timestamp).toLocaleString('th-TH', { 
+          year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' 
+        }).toLowerCase()
+        const rawDate = (item.timestamp || '').toLowerCase()
+        if (!formattedDate.includes(term) && !rawDate.includes(term)) return false
+      }
+      // 2. User filter
+      if (historyFilters.user.trim()) {
+        const term = historyFilters.user.toLowerCase().trim()
+        const u = (item.user || '').toLowerCase()
+        if (!u.includes(term)) return false
+      }
+      // 3. Lot / SKU filter
+      if (historyFilters.lot.trim()) {
+        const term = historyFilters.lot.toLowerCase().trim()
+        const lot = (item.lotNo || '').toLowerCase()
+        const sku = (item.sku || '').toLowerCase()
+        if (!lot.includes(term) && !sku.includes(term)) return false
+      }
+      // 4. Tank filter
+      if (historyFilters.tank.trim()) {
+        const term = historyFilters.tank.toLowerCase().trim()
+        const t = String(item.tankNum || '').toLowerCase()
+        const label = `ถังที่ ${t}`.toLowerCase()
+        if (!t.includes(term) && !label.includes(term)) return false
+      }
+      // 5. Status filter
+      if (historyFilters.status.trim()) {
+        const term = historyFilters.status.toLowerCase().trim()
+        const action = (item.action || '').toLowerCase()
+        const statusText = getPackingStatusText(item.action).toLowerCase()
+        if (!action.includes(term) && !statusText.includes(term)) return false
+      }
+      // 6. Qty filter
+      if (historyFilters.qty.trim()) {
+        const term = historyFilters.qty.toLowerCase().trim()
+        const qStr = String(item.qty || '')
+        if (!qStr.includes(term)) return false
+      }
+      return true
+    })
+  }, [historyList, historyFilters])
+
+  const isHistoryFiltered = Object.values(historyFilters).some(v => v.trim() !== '')
+  const clearHistoryFilters = () => setHistoryFilters({ time: '', user: '', lot: '', tank: '', status: '', qty: '' })
+
+  const exportToExcel = () => {
+    const listToExport = filteredHistoryList
+    if (listToExport.length === 0) {
+      toast.error('ไม่มีข้อมูลให้ Export')
+      return
+    }
+    const worksheet = XLSX.utils.json_to_sheet(listToExport.map((item: any) => {
+      const statusText = getPackingStatusText(item.action)
+
+      return {
+        'วันที่-เวลา': new Date(item.timestamp).toLocaleString('th-TH'),
+        'ผู้ดำเนินการ': item.user?.split('@')[0] || '-',
+        'LOT No.': item.lotNo || '-',
+        'SKU': item.sku || '-',
+        'ถังที่': `ถังที่ ${item.tankNum}`,
+        'สถานะ': statusText,
+        'ยอดที่ได้ (ชิ้น)': item.qty ? Number(item.qty).toLocaleString() : '-'
+      }
+    }))
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Packing History")
+    XLSX.writeFile(workbook, "Packing_Work_History.xlsx")
   }
 
   const toggleRow = (id: string) => {
@@ -1199,8 +1291,28 @@ export default function PackingTasksPage() {
 
         <TabsContent value="history">
           <Card>
-            <CardHeader>
-              <CardTitle>ประวัติการทำงานแบบต่อเนื่อง</CardTitle>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex flex-wrap justify-between items-center gap-2 w-full">
+                 <div className="flex items-center gap-2">
+                   <span>ประวัติการทำงานแบบต่อเนื่อง</span>
+                   <Badge variant="outline" className="font-mono text-xs text-slate-600 bg-slate-50">
+                     {isHistoryFiltered ? `พบ ${filteredHistoryList.length} จาก ${historyList.length} รายการ` : `ทั้งหมด ${historyList.length} รายการ`}
+                   </Badge>
+                   {isHistoryFiltered && (
+                     <Button 
+                       onClick={clearHistoryFilters} 
+                       variant="ghost" 
+                       size="sm" 
+                       className="h-7 text-xs text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50 gap-1 px-2"
+                     >
+                       <RotateCcw className="w-3 h-3" /> ล้างตัวกรอง
+                     </Button>
+                   )}
+                 </div>
+                 <Button onClick={exportToExcel} variant="outline" size="sm" className="text-emerald-700 border-emerald-500 hover:bg-emerald-50">
+                    Export Excel
+                 </Button>
+              </CardTitle>
             </CardHeader>
             <CardContent>
               {historyList.length === 0 ? (
@@ -1208,52 +1320,155 @@ export default function PackingTasksPage() {
                   ไม่มีประวัติการทำงาน
                 </div>
               ) : (
-                <div className="rounded-md border">
+                <div className="rounded-md border overflow-x-auto">
                   <table className="w-full text-sm text-left">
                     <thead className="bg-[#F8F6F0] text-slate-700">
                       <tr>
-                        <th className="px-4 py-3 font-medium">เวลา</th>
-                        <th className="px-4 py-3 font-medium">ผู้ดำเนินการ</th>
-                        <th className="px-4 py-3 font-medium">LOT No.</th>
-                        <th className="px-4 py-3 font-medium">ถังที่</th>
-                        <th className="px-4 py-3 font-medium">สถานะ</th>
-                        <th className="px-4 py-3 font-medium text-right">ยอดที่ได้ (ชิ้น)</th>
+                        <th className="px-3 py-2.5 font-medium text-xs">เวลา</th>
+                        <th className="px-3 py-2.5 font-medium text-xs">ผู้ดำเนินการ</th>
+                        <th className="px-3 py-2.5 font-medium text-xs">LOT No.</th>
+                        <th className="px-3 py-2.5 font-medium text-xs">ถังที่</th>
+                        <th className="px-3 py-2.5 font-medium text-xs">สถานะ</th>
+                        <th className="px-3 py-2.5 font-medium text-xs text-right">ยอดที่ได้ (ชิ้น)</th>
+                      </tr>
+                      {/* Column Search Filter Row */}
+                      <tr className="bg-slate-50/90 border-t border-b border-slate-200">
+                        <th className="p-1.5 min-w-[130px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.time}
+                              onChange={e => setHistoryFilters(p => ({ ...p, time: e.target.value }))}
+                              placeholder="ค้นหาเวลา/วันที่..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400"
+                            />
+                            {historyFilters.time && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, time: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                        <th className="p-1.5 min-w-[110px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.user}
+                              onChange={e => setHistoryFilters(p => ({ ...p, user: e.target.value }))}
+                              placeholder="ค้นหาผู้ทำ..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400"
+                            />
+                            {historyFilters.user && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, user: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                        <th className="p-1.5 min-w-[150px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.lot}
+                              onChange={e => setHistoryFilters(p => ({ ...p, lot: e.target.value }))}
+                              placeholder="ค้นหา LOT/SKU..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400"
+                            />
+                            {historyFilters.lot && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, lot: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                        <th className="p-1.5 min-w-[90px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.tank}
+                              onChange={e => setHistoryFilters(p => ({ ...p, tank: e.target.value }))}
+                              placeholder="เลขถัง..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400"
+                            />
+                            {historyFilters.tank && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, tank: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                        <th className="p-1.5 min-w-[110px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.status}
+                              onChange={e => setHistoryFilters(p => ({ ...p, status: e.target.value }))}
+                              placeholder="สถานะ..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400"
+                            />
+                            {historyFilters.status && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, status: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
+                        <th className="p-1.5 min-w-[100px]">
+                          <div className="relative">
+                            <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                            <Input
+                              value={historyFilters.qty}
+                              onChange={e => setHistoryFilters(p => ({ ...p, qty: e.target.value }))}
+                              placeholder="ยอดชิ้น..."
+                              className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-green-400 text-right"
+                            />
+                            {historyFilters.qty && (
+                              <button onClick={() => setHistoryFilters(p => ({ ...p, qty: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {historyList.map((item, idx) => {
-                        let statusColor = "bg-slate-100 text-slate-700"
-                        if (item.action === 'DONE') statusColor = "bg-green-100 text-green-700"
-                        if (item.action === 'IN_PROGRESS') statusColor = "bg-yellow-100 text-yellow-700"
-                        if (item.action === 'SENT_TO_POF' || item.action === 'SENT_TO_BOX') statusColor = "bg-sky-100 text-sky-700"
-                        
-                        let statusText = item.action
-                        if (item.action === 'DONE') statusText = 'บรรจุเสร็จ'
-                        if (item.action === 'IN_PROGRESS') statusText = 'กำลังบรรจุ'
-                        if (item.action === 'SENT_TO_POF') statusText = 'ไปห้อง POF'
-                        if (item.action === 'SENT_TO_BOX') statusText = 'ไปลงลัง'
+                      {filteredHistoryList.length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
+                            ไม่พบรายการที่ตรงกับเงื่อนไขการค้นหา
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredHistoryList.map((item, idx) => {
+                          let statusColor = "bg-slate-100 text-slate-700"
+                          if (item.action === 'DONE') statusColor = "bg-green-100 text-green-700"
+                          if (item.action === 'IN_PROGRESS') statusColor = "bg-yellow-100 text-yellow-700"
+                          if (item.action === 'SENT_TO_POF' || item.action === 'SENT_TO_BOX') statusColor = "bg-sky-100 text-sky-700"
+                          
+                          const statusText = getPackingStatusText(item.action)
 
-                        return (
-                          <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">{item.user?.split('@')[0]}</td>
-                            <td className="px-4 py-3 whitespace-nowrap font-medium text-[#D4AF37]">
-                              {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap font-semibold">ถังที่ {item.tankNum}</td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              <Badge variant="secondary" className={statusColor}>
-                                {statusText}
-                              </Badge>
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap text-right font-medium">
-                              {item.qty ? Number(item.qty).toLocaleString() : '-'}
-                            </td>
-                          </tr>
-                        )
-                      })}
+                          return (
+                            <tr key={`${item.taskId}-${item.tankNum}-${idx}`} className="hover:bg-[#F8F6F0]">
+                              <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                                {new Date(item.timestamp).toLocaleString('th-TH', { year: '2-digit', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-xs">{item.user?.split('@')[0]}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap font-medium text-xs text-[#D4AF37]">
+                                {item.lotNo} <span className="text-slate-400 font-normal text-xs ml-1">({item.sku})</span>
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap font-semibold text-xs">ถังที่ {item.tankNum}</td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-xs">
+                                <Badge variant="secondary" className={statusColor}>
+                                  {statusText}
+                                </Badge>
+                              </td>
+                              <td className="px-3 py-2.5 whitespace-nowrap text-right font-medium text-xs">
+                                {item.qty ? Number(item.qty).toLocaleString() : '-'}
+                              </td>
+                            </tr>
+                          )
+                        })
+                      )}
                     </tbody>
                   </table>
                 </div>

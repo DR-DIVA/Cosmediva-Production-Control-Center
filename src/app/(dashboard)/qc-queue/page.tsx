@@ -1058,20 +1058,169 @@ export default function QCQueuePage() {
         </Card>
       </div>
 
+      {/* 3. Executive 4-Station QC Workflow Menu Bar */}
+      <div className="mb-6">
+        <div className="bg-gradient-to-r from-[#2D2721] via-[#3A3228] to-[#2D2721] p-3 rounded-2xl shadow-xl border border-[#D4AF37]/35">
+          {/* Menu Bar Top Bar */}
+          <div className="flex flex-wrap items-center justify-between px-3 py-1.5 mb-3 text-xs border-b border-stone-700/60 pb-2.5 gap-2">
+            <div className="flex items-center gap-2 text-stone-300 font-medium">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#D4AF37] opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#D4AF37]"></span>
+              </span>
+              <span className="text-[#D4AF37] font-extrabold tracking-wider uppercase text-[12px] flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
+                สถานีงานตรวจสอบคุณภาพ (QC WORKSTATIONS)
+              </span>
+              <span className="hidden sm:inline text-stone-400 text-[11px]">• เลือกสถานีที่ต้องการจัดการคิวงาน</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-stone-400">สถานีที่เปิดดู:</span>
+              <Badge className="bg-[#D4AF37] text-stone-900 hover:bg-[#D4AF37] font-bold text-[11px] uppercase tracking-wide shadow-sm">
+                {activeTab === 'rm' && '1. RM วัตถุดิบ'}
+                {activeTab === 'pm' && '2. PM บรรจุภัณฑ์'}
+                {activeTab === 'bulk' && '3. Bulk งานผสม'}
+                {activeTab === 'fg' && '4. FG สำเร็จรูป'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* 4 Interactive Workstation Menu Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+            {[
+              {
+                id: 'rm',
+                number: '01',
+                title: 'คิวตรวจ RM (วัตถุดิบ)',
+                subtitle: 'Raw Materials Inbound',
+                icon: Boxes,
+                count: globalQcStats.rmPending,
+                countLabel: 'รอตรวจ',
+                activeGradient: 'from-amber-500 via-amber-600 to-yellow-600 border-amber-300 ring-2 ring-amber-400/40 shadow-amber-500/25',
+                hoverBorder: 'hover:border-amber-400/60',
+                accentColor: 'text-amber-400',
+              },
+              {
+                id: 'pm',
+                number: '02',
+                title: 'คิวตรวจ PM (บรรจุภัณฑ์)',
+                subtitle: 'Packaging Quality Audit',
+                icon: PackageOpen,
+                count: globalQcStats.pmPending,
+                countLabel: 'รอตรวจ',
+                activeGradient: 'from-blue-600 via-blue-700 to-indigo-700 border-blue-300 ring-2 ring-blue-400/40 shadow-blue-500/25',
+                hoverBorder: 'hover:border-blue-400/60',
+                accentColor: 'text-blue-400',
+              },
+              {
+                id: 'bulk',
+                number: '03',
+                title: 'คิวตรวจ Bulk (งานผสม)',
+                subtitle: 'Bulk & Compounding Lab',
+                icon: FlaskConical,
+                count: globalQcStats.bulkPendingTanks,
+                countLabel: 'ถังรอตรวจ',
+                activeGradient: 'from-indigo-600 via-indigo-700 to-purple-700 border-indigo-300 ring-2 ring-indigo-400/40 shadow-indigo-500/25',
+                hoverBorder: 'hover:border-indigo-400/60',
+                accentColor: 'text-indigo-400',
+              },
+              {
+                id: 'fg',
+                number: '04',
+                title: 'คิวตรวจ FG (สินค้าสำเร็จรูป)',
+                subtitle: 'Finished Goods Batch Release',
+                icon: ShieldCheck,
+                count: globalQcStats.fgQuarantine,
+                countLabel: 'กักกันรอ QC',
+                activeGradient: 'from-emerald-600 via-teal-700 to-emerald-800 border-emerald-300 ring-2 ring-emerald-400/40 shadow-emerald-500/25',
+                hoverBorder: 'hover:border-emerald-400/60',
+                accentColor: 'text-emerald-400',
+              },
+            ].map((station) => {
+              const isActive = activeTab === station.id
+              const StationIcon = station.icon
+              return (
+                <button
+                  key={station.id}
+                  type="button"
+                  onClick={() => setActiveTab(station.id)}
+                  className={`relative text-left p-3.5 rounded-xl transition-all duration-200 cursor-pointer select-none group border shadow-md ${
+                    isActive
+                      ? `bg-gradient-to-br ${station.activeGradient} text-white shadow-lg scale-[1.02]`
+                      : `bg-stone-800/85 hover:bg-stone-800 text-stone-200 border-stone-700/80 ${station.hoverBorder} hover:scale-[1.01]`
+                  }`}
+                >
+                  {/* Top glowing highlight line when active */}
+                  {isActive && (
+                    <div className="absolute top-0 left-3 right-3 h-1 bg-white/70 rounded-b-full shadow-[0_0_8px_rgba(255,255,255,0.8)]" />
+                  )}
+
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2.5">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 transition-transform duration-200 group-hover:scale-105 shadow-sm ${
+                        isActive
+                          ? 'bg-white/20 text-white backdrop-blur-md ring-1 ring-white/30 shadow-inner'
+                          : 'bg-stone-700/60 text-stone-300 group-hover:text-white'
+                      }`}>
+                        <StationIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <div className={`text-sm font-bold leading-tight ${isActive ? 'text-white' : 'text-white group-hover:text-[#D4AF37]'}`}>
+                          {station.title}
+                        </div>
+                        <div className={`text-[11px] mt-0.5 font-medium ${isActive ? 'text-white/80' : 'text-stone-400'}`}>
+                          {station.subtitle}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Live Count Badge */}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 shadow-xs transition-colors ${
+                      isActive
+                        ? 'bg-white text-stone-900 shadow-md font-extrabold'
+                        : station.count > 0
+                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          : 'bg-stone-700/60 text-stone-400'
+                    }`}>
+                      {station.count} {station.countLabel}
+                    </span>
+                  </div>
+
+                  {/* Bottom Bar: Action Hint & Step Number */}
+                  <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[11px]">
+                    <span className={`font-semibold flex items-center gap-1.5 ${isActive ? 'text-white' : 'text-stone-400 group-hover:text-stone-300'}`}>
+                      {isActive ? (
+                        <>
+                          <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                          กำลังเปิดดูงานนี้
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-stone-500">▶</span>
+                          คลิกเพื่อดูคิวงาน
+                        </>
+                      )}
+                    </span>
+                    <span className={`font-mono text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded ${
+                      isActive ? 'bg-black/25 text-white/95' : 'bg-stone-900/60 text-stone-400'
+                    }`}>
+                      STEP {station.number}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      </div>
+
       <Tabs defaultValue="bulk" value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="mb-6 bg-slate-100 p-1 rounded-xl">
-          <TabsTrigger value="rm" className="rounded-lg font-medium px-6 py-2">
-            คิวตรวจ RM (วัตถุดิบ)
-          </TabsTrigger>
-          <TabsTrigger value="pm" className="rounded-lg font-medium px-6 py-2">
-            คิวตรวจ PM (บรรจุภัณฑ์)
-          </TabsTrigger>
-          <TabsTrigger value="bulk" className="rounded-lg font-medium px-6 py-2">
-            คิวตรวจ Bulk (งานผสม)
-          </TabsTrigger>
-          <TabsTrigger value="fg" className="rounded-lg font-medium px-6 py-2">
-            คิวตรวจ FG (สินค้าสำเร็จรูป)
-          </TabsTrigger>
+        {/* Accessible hidden TabsList for TabsPrimitive sync */}
+        <TabsList className="hidden">
+          <TabsTrigger value="rm">RM</TabsTrigger>
+          <TabsTrigger value="pm">PM</TabsTrigger>
+          <TabsTrigger value="bulk">Bulk</TabsTrigger>
+          <TabsTrigger value="fg">FG</TabsTrigger>
         </TabsList>
 
         {/* RM / PM Placeholders */}
