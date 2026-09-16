@@ -23,10 +23,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { createClient } from '@/utils/supabase/client';
 
 export default function GembaCapturePage() {
   const router = useRouter();
+  const supabase = createClient();
   const [submitting, setSubmitting] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>('');
   
   // Master data
   const [departments, setDepartments] = useState<any[]>([]);
@@ -47,7 +50,7 @@ export default function GembaCapturePage() {
   const [observerName, setObserverName] = useState('Cost Accounting Manager');
   
   // Media handling
-  const [mediaFiles, setMediaFiles] = useState<{ url: string; name: string; type: 'PHOTO' | 'VIDEO' }[]>([]);
+  const [mediaFiles, setMediaFiles] = useState<{ file?: File; url: string; name: string; type: 'PHOTO' | 'VIDEO' }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Voice Recording simulation state
@@ -86,7 +89,6 @@ export default function GembaCapturePage() {
         setDepartments(json.data.departments || []);
         setLines(json.data.lines || []);
         setStations(json.data.stations || []);
-
         // Default to Packing department and Line 1 if available
         const pkg = json.data.departments?.find((d: any) => d.department_code === 'PKG');
         if (pkg) {
@@ -104,16 +106,19 @@ export default function GembaCapturePage() {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const newItems: any[] = [];
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       const isVideo = file.type.startsWith('video');
       const url = URL.createObjectURL(file);
-      setMediaFiles(prev => [...prev, {
+      newItems.push({
+        file,
         url,
         name: file.name,
         type: isVideo ? 'VIDEO' : 'PHOTO'
-      }]);
+      });
     }
+    setMediaFiles(prev => [...prev, ...newItems]);
     toast.success(`แนบไฟล์สำเร็จ ${files.length} รายการ`);
   };
 
@@ -232,6 +237,52 @@ export default function GembaCapturePage() {
 
     setSubmitting(true);
     try {
+      // 1. Upload media files to Supabase Storage
+      const uploadedMedia: any[] = [];
+      if (mediaFiles.length > 0) {
+        for (let i = 0; i < mediaFiles.length; i++) {
+          const m = mediaFiles[i];
+          if (m.file) {
+            setUploadProgress(`กำลังอัปโหลดไฟล์สื่อ (${i + 1}/${mediaFiles.length})...`);
+            const fileExt = m.file.name.split('.').pop() || (m.type === 'VIDEO' ? 'mp4' : 'jpg');
+            const cleanName = m.file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+            const filePath = `observations/${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${cleanName}`;
+
+            const { error: uploadError } = await supabase.storage
+              .from('gemba-media')
+              .upload(filePath, m.file, {
+                cacheControl: '3600',
+                upsert: false
+              });
+
+            if (uploadError) {
+              console.error('Storage upload error:', uploadError);
+              toast.error(`อัปโหลดไฟล์ ${m.name} ไม่สำเร็จ: ${uploadError.message}`);
+            } else {
+              const { data: { publicUrl } } = supabase.storage
+                .from('gemba-media')
+                .getPublicUrl(filePath);
+
+              uploadedMedia.push({
+                file_url: publicUrl,
+                file_name: m.name,
+                file_size: m.file.size,
+                mime_type: m.file.type,
+                media_type: m.type
+              });
+            }
+          } else if (m.url && !m.url.startsWith('blob:')) {
+            uploadedMedia.push({
+              file_url: m.url,
+              file_name: m.name,
+              media_type: m.type
+            });
+          }
+        }
+      }
+
+      setUploadProgress('กำลังส่งข้อมูลและประมวลผล AI...');
+
       const payload = {
         description,
         department_id: departmentId || null,
@@ -244,11 +295,7 @@ export default function GembaCapturePage() {
         severity,
         observer_name: observerName,
         trigger_ai: triggerAi,
-        media: mediaFiles.map(m => ({
-          file_url: m.url,
-          file_name: m.name,
-          media_type: m.type
-        }))
+        media: uploadedMedia
       };
 
       const res = await fetch('/api/improve/observations', {
@@ -270,6 +317,7 @@ export default function GembaCapturePage() {
       toast.error('ไม่สามารถบันทึกได้: ' + err.message);
     } finally {
       setSubmitting(false);
+      setUploadProgress('');
     }
   };
 
@@ -678,7 +726,7 @@ export default function GembaCapturePage() {
                 disabled={submitting}
                 className="flex-1 bg-[#D4AF37] hover:bg-[#c49f2e] text-[#2D2721] font-bold py-6 text-base shadow-md"
               >
-                {submitting ? 'กำลังบันทึกและประมวลผล...' : 'บันทึกข้อมูล (Save Observation)'}
+                {submitting ? (uploadProgress || 'กำลังบันทึกและประมวลผล...') : 'บันทึกข้อมูล (Save Observation)'}
               </Button>
             </div>
           </form>

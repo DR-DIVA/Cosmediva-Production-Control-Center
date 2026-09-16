@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect, useRef, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { 
@@ -21,7 +21,11 @@ import {
   Layers,
   Activity,
   CheckCircle2,
-  FolderPlus
+  FolderPlus,
+  Upload,
+  Trash2,
+  ExternalLink,
+  ImageIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -29,14 +33,21 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { calculateLaborLoss } from '@/lib/improve/cost-engine';
+import { createClient } from '@/utils/supabase/client';
 
 export default function ObservationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const id = resolvedParams.id;
   const router = useRouter();
+  const supabase = createClient();
 
   const [loading, setLoading] = useState(true);
   const [observation, setObservation] = useState<any>(null);
+
+  // Direct media upload state
+  const [uploadingMedia, setUploadingMedia] = useState(false);
+  const mediaInputRef = useRef<HTMLInputElement>(null);
+  const [activePreviewMedia, setActivePreviewMedia] = useState<string | null>(null);
 
   // Human Validation State
   const [decision, setDecision] = useState<'ACCEPTED' | 'EDITED' | 'REJECTED'>('ACCEPTED');
@@ -217,6 +228,104 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
     }
   };
 
+  const handleDirectMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploadingMedia(true);
+    const toastId = toast.loading(`กำลังอัปโหลดไฟล์สื่อ ${files.length} รายการไปยัง Supabase Storage...`);
+
+    try {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `observations/${id}/${Date.now()}-${Math.random().toString(36).substring(2, 7)}-${cleanName}`;
+
+        // 1. Upload to Supabase Storage bucket 'gemba-media'
+        const { error: uploadError } = await supabase.storage
+          .from('gemba-media')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (uploadError) {
+          throw new Error(`อัปโหลดไฟล์ ${file.name} ไม่สำเร็จ: ${uploadError.message}`);
+        }
+
+        // 2. Get Public CDN URL
+        const { data: { publicUrl } } = supabase.storage
+          .from('gemba-media')
+          .getPublicUrl(filePath);
+
+        // 3. Attach record to DB
+        const res = await fetch(`/api/improve/observations/${id}/media`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            file_url: publicUrl,
+            file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+            media_type: file.type.startsWith('video/') ? 'VIDEO' : 'PHOTO'
+          })
+        });
+
+        const json = await res.json();
+        if (!json.success) {
+          throw new Error(json.error || 'บันทึกรูปภาพลงฐานข้อมูลไม่สำเร็จ');
+        }
+      }
+
+      toast.success('อัปโหลดไฟล์ขึ้น Cloud และบันทึกเรียบร้อยแล้ว', { id: toastId });
+      fetchDetail();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'เกิดข้อผิดพลาดในการอัปโหลด', { id: toastId });
+    } finally {
+      setUploadingMedia(false);
+      if (mediaInputRef.current) {
+        mediaInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDeleteMedia = async (mediaId: string) => {
+    if (!confirm('ยืนยันลบไฟล์นี้หรือไม่?')) return;
+    try {
+      const res = await fetch(`/api/improve/observations/${id}/media?mediaId=${mediaId}`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('ลบไฟล์เรียบร้อย');
+        fetchDetail();
+      } else {
+        toast.error(json.error || 'ลบไม่สำเร็จ');
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleCleanDeadBlobs = async () => {
+    if (!confirm('ยืนยันล้างรายการไฟล์เก่าที่ค้างในแคช (blob:) ออกจากระบบหรือไม่?')) return;
+    try {
+      const res = await fetch(`/api/improve/observations/${id}/media`, {
+        method: 'DELETE'
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('ล้างรายการไฟล์ค้างในแคชเรียบร้อย สามารถแนบภาพ/วิดีโอใหม่ได้ทันที');
+        fetchDetail();
+      } else {
+        toast.error(json.error || 'ล้างไม่สำเร็จ');
+      }
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   if (loading) {
     return <div className="py-20 text-center text-slate-500 text-sm">กำลังโหลดข้อมูลข้อค้นพบ...</div>;
   }
@@ -305,25 +414,155 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
             </div>
 
             {/* Media Gallery */}
-            <div>
-              <Label className="text-xs text-slate-500 font-semibold uppercase">รูปภาพและคลิปหน้างาน (Photos & Videos)</Label>
-              {observation.media && observation.media.length > 0 ? (
-                <div className="grid grid-cols-2 gap-2 mt-2">
-                  {observation.media.map((m: any, idx: number) => (
-                    <div key={idx} className="aspect-video rounded-lg overflow-hidden border border-slate-200 bg-black/5 relative">
-                      {m.media_type === 'VIDEO' ? (
-                        <video src={m.file_url} controls className="w-full h-full object-cover" />
-                      ) : (
-                        <img src={m.file_url} alt={m.file_name} className="w-full h-full object-cover" />
-                      )}
-                    </div>
-                  ))}
+            <div className="space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-slate-700 font-bold uppercase flex items-center gap-1.5">
+                  <ImageIcon className="w-3.5 h-3.5 text-slate-500" />
+                  รูปภาพและคลิปหน้างาน (Photos & Videos)
+                  {observation.media?.length > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                      {observation.media.length}
+                    </span>
+                  )}
+                </Label>
+
+                {/* Direct Upload Button */}
+                <div>
+                  <input
+                    type="file"
+                    ref={mediaInputRef}
+                    onChange={handleDirectMediaUpload}
+                    multiple
+                    accept="image/*,video/*"
+                    className="hidden"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={uploadingMedia}
+                    onClick={() => mediaInputRef.current?.click()}
+                    className="h-7 text-xs px-2.5 bg-white border-amber-300 text-amber-900 hover:bg-amber-50 shadow-2xs flex items-center gap-1 font-semibold"
+                  >
+                    <Upload className="w-3 h-3 text-amber-600" />
+                    {uploadingMedia ? 'กำลังอัปโหลด...' : '+ แนบภาพ/คลิปเพิ่ม'}
+                  </Button>
                 </div>
-              ) : (
-                <div className="p-4 rounded-xl border border-dashed border-slate-200 text-center text-xs text-slate-400 mt-1">
-                  ไม่มีรูปภาพหรือวิดีโอแนบ
+              </div>
+
+              {/* Alert for legacy blob: URLs */}
+              {observation.media?.some((m: any) => m.file_url?.startsWith('blob:')) && (
+                <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start justify-between gap-3 text-xs text-amber-900">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-bold">ตรวจพบภาพที่บันทึกก่อนเชื่อมต่อ Cloud Storage:</span>
+                      <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                        ไฟล์เหล่านี้ถูกบันทึกเป็นแคชในเครื่องชั่วคราว (blob:) ทำให้บราวเซอร์ไม่สามารถโหลดได้ ท่านสามารถกดล้างรายการและกดปุ่ม <b>"+ แนบภาพ/คลิปเพิ่ม"</b> ด้านบนเพื่อนำไฟล์จริงขึ้น Cloud Storage ได้ทันทีค่ะ
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleCleanDeadBlobs}
+                    className="h-7 text-[11px] text-rose-600 hover:bg-rose-50 hover:text-rose-700 shrink-0 font-medium"
+                  >
+                    ล้างรายการไฟล์เสีย
+                  </Button>
                 </div>
               )}
+
+              {observation.media && observation.media.length > 0 ? (
+                <div className="grid grid-cols-2 gap-2.5 pt-1">
+                  {observation.media.map((m: any, idx: number) => {
+                    const isBlob = m.file_url?.startsWith('blob:');
+                    const isVideo = m.media_type === 'VIDEO' || m.mime_type?.startsWith('video/') || m.file_name?.match(/\.(mp4|mov|webm)$/i);
+
+                    if (isBlob) {
+                      return (
+                        <div key={idx} className="aspect-video rounded-xl overflow-hidden border border-dashed border-amber-300 bg-amber-50/60 p-3 flex flex-col items-center justify-center text-center relative group">
+                          <AlertTriangle className="w-6 h-6 text-amber-500 mb-1" />
+                          <span className="text-[11px] font-semibold text-amber-900 line-clamp-1 max-w-[90%]">{m.file_name || 'ไฟล์รูปภาพ'}</span>
+                          <span className="text-[9px] text-amber-700 mt-0.5 bg-amber-100/80 px-1.5 py-0.5 rounded font-mono">แคชชั่วคราว (ไม่พบบน Cloud)</span>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(m.id)}
+                            className="absolute top-1.5 right-1.5 p-1 bg-white/90 rounded-md text-slate-400 hover:text-rose-600 shadow-xs transition"
+                            title="ลบรายการนี้"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={idx} className="aspect-video rounded-xl overflow-hidden border border-slate-200 bg-slate-900 relative group shadow-2xs">
+                        {isVideo ? (
+                          <video src={m.file_url} controls className="w-full h-full object-cover" />
+                        ) : (
+                          <img
+                            src={m.file_url}
+                            alt={m.file_name || 'Gemba Observation Media'}
+                            className="w-full h-full object-cover transition duration-200 group-hover:scale-105 cursor-pointer"
+                            onClick={() => setActivePreviewMedia(m.file_url)}
+                          />
+                        )}
+
+                        {/* Hover Controls */}
+                        <div className="absolute top-1.5 right-1.5 flex items-center gap-1 opacity-90 group-hover:opacity-100 transition">
+                          {!isVideo && (
+                            <button
+                              type="button"
+                              onClick={() => setActivePreviewMedia(m.file_url)}
+                              className="p-1 bg-black/60 hover:bg-black/80 text-white rounded-md text-[10px] backdrop-blur-xs transition"
+                              title="ดูภาพขยายใหญ่"
+                            >
+                              <ImageIcon className="w-3 h-3" />
+                            </button>
+                          )}
+                          <a
+                            href={m.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 bg-black/60 hover:bg-black/80 text-white rounded-md text-[10px] backdrop-blur-xs transition"
+                            title="เปิดไฟล์ต้นฉบับในแท็บใหม่"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMedia(m.id)}
+                            className="p-1 bg-black/60 hover:bg-rose-600 text-white rounded-md text-[10px] backdrop-blur-xs transition"
+                            title="ลบไฟล์"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+
+                        {/* File Name Tag */}
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1.5 pt-3 pointer-events-none">
+                          <p className="text-[10px] text-white/90 truncate font-mono">{m.file_name || 'ภาพหลักฐาน'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="p-5 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 text-center space-y-1.5">
+                  <Camera className="w-6 h-6 text-slate-300 mx-auto" />
+                  <p className="text-xs text-slate-500 font-medium">ยังไม่มีรูปภาพหรือวิดีโอแนบในข้อค้นพบนี้</p>
+                  <p className="text-[11px] text-slate-400">ท่านสามารถกดปุ่ม "+ แนบภาพ/คลิปเพิ่ม" เพื่อแนบรูปถ่ายจากหน้างานได้ทันที</p>
+                </div>
+              )}
+
+              {/* Cloud Storage badge */}
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 bg-slate-50/80 px-2.5 py-1.5 rounded-lg border border-slate-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                <span>ระบบจัดเก็บไฟล์ผ่าน Supabase Cloud Storage (CDN) แบบ Lazy-loading ไม่เปลืองพื้นที่ฐานข้อมูลและไม่ทำให้ระบบหน่วง</span>
+              </div>
             </div>
 
             <div className="pt-2 text-[11px] text-slate-400 flex items-center justify-between border-t border-slate-100">
@@ -682,6 +921,40 @@ export default function ObservationDetailPage({ params }: { params: Promise<{ id
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox / Media Preview Modal */}
+      {activePreviewMedia && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 backdrop-blur-xs animate-in fade-in duration-150"
+          onClick={() => setActivePreviewMedia(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh] flex flex-col items-center" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={activePreviewMedia}
+              alt="Media Preview"
+              className="max-w-full max-h-[80vh] rounded-xl object-contain shadow-2xl border border-white/20"
+            />
+            <div className="flex items-center gap-3 mt-3">
+              <a
+                href={activePreviewMedia}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="px-3 py-1.5 rounded-lg bg-white/20 hover:bg-white/30 text-white text-xs font-semibold flex items-center gap-1.5 transition backdrop-blur-xs"
+              >
+                <ExternalLink className="w-3.5 h-3.5" />
+                เปิดไฟล์ต้นฉบับเต็ม
+              </a>
+              <button
+                type="button"
+                onClick={() => setActivePreviewMedia(null)}
+                className="px-3 py-1.5 rounded-lg bg-white text-slate-900 text-xs font-bold hover:bg-slate-100 transition shadow"
+              >
+                ปิดหน้าต่าง (Close)
+              </button>
+            </div>
           </div>
         </div>
       )}
