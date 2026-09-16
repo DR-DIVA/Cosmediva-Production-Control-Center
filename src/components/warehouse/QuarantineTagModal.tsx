@@ -725,31 +725,51 @@ export function QuarantineTagModal({
                   </span>
                 </div>
 
-                {/* Scale Switcher */}
-                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs shadow-xs">
+                {/* Scale Switcher & Rotation Button */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs shadow-xs">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewScale('actual')}
+                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
+                        previewScale === 'actual'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                      title="แสดงขนาดตามสัดส่วนจริง 100 x 80 มม."
+                    >
+                      📏 ขนาดจริง 100x80 มม.
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewScale('large')}
+                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
+                        previewScale === 'large'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:bg-slate-100'
+                      }`}
+                      title="ขยายขนาดใหญ่เพื่ออ่านชัดเจนเต็มหน้าต่าง"
+                    >
+                      🔍 ขยายใหญ่เต็มตา
+                    </button>
+                  </div>
+
+                  {/* Quick Rotate Button */}
                   <button
                     type="button"
-                    onClick={() => setPreviewScale('actual')}
-                    className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
-                      previewScale === 'actual'
-                        ? 'bg-amber-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
+                    onClick={() => {
+                      const nextRot = printRotation === '0' ? '90' : printRotation === '90' ? '180' : printRotation === '180' ? '270' : '0';
+                      handleRotationChange(nextRot);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 border shadow-xs cursor-pointer ${
+                      printRotation !== '0'
+                        ? 'bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-300'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50 hover:text-amber-900'
                     }`}
-                    title="แสดงขนาดตามสัดส่วนจริง 100 x 80 มม."
+                    title="คลิกเพื่อหมุนทิศทางภาพป้าย (0° -> 90° -> 180° -> 270°)"
                   >
-                    📏 ขนาดจริง 100x80 มม.
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreviewScale('large')}
-                    className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
-                      previewScale === 'large'
-                        ? 'bg-amber-600 text-white shadow-xs'
-                        : 'text-slate-600 hover:bg-slate-100'
-                    }`}
-                    title="ขยายขนาดใหญ่เพื่ออ่านชัดเจนเต็มหน้าต่าง"
-                  >
-                    🔍 ขยายใหญ่เต็มตา
+                    <RotateCw className="w-3.5 h-3.5 text-inherit" />
+                    หมุนภาพ ({printRotation === '0' ? '0° แนวนอนปกติ' : `${printRotation}°`})
                   </button>
                 </div>
 
@@ -779,12 +799,14 @@ export function QuarantineTagModal({
               </div>
 
               {/* Physical Tag Preview Card with Ruler Dimension Guides */}
-              <div className="flex flex-col items-center justify-center w-full py-2">
+              <div className="flex flex-col items-center justify-center w-full py-2 min-h-[380px]">
                 {/* Width Guide Ruler */}
                 <div className="text-[10px] text-slate-500 font-mono mb-1.5 flex items-center gap-1">
                   <span>◄</span>
                   <span className="border-b border-dashed border-slate-400 px-6 font-bold text-slate-700">
-                    ความกว้างสติ๊กเกอร์ 100 มม. (10 ซม.)
+                    {['90', '270'].includes(printRotation)
+                      ? 'ความกว้างป้ายหลังหมุน: 80 มม. (8 ซม.)'
+                      : 'ความกว้างสติ๊กเกอร์: 100 มม. (10 ซม.)'}
                   </span>
                   <span>►</span>
                 </div>
@@ -794,33 +816,58 @@ export function QuarantineTagModal({
                   <div className="text-[10px] text-slate-500 font-mono [writing-mode:vertical-rl] rotate-180 flex items-center justify-center gap-1 h-full py-4">
                     <span>◄</span>
                     <span className="border-l border-dashed border-slate-400 py-6 font-bold text-slate-700">
-                      80 มม. (8 ซม.)
+                      {['90', '270'].includes(printRotation)
+                        ? 'ความสูงหลังหมุน: 100 มม. (10 ซม.)'
+                        : 'ความสูงสติ๊กเกอร์: 80 มม. (8 ซม.)'}
                     </span>
                     <span>►</span>
                   </div>
 
-                  {/* Physical Tag Preview */}
+                  {/* Outer Frame that adjusts bounding box when rotated */}
                   <div 
-                    className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-2xl transition-all"
-                    style={previewScale === 'actual' ? {
-                      width: '100mm',
-                      height: '80mm',
-                      minWidth: '100mm',
-                      minHeight: '80mm',
-                      maxWidth: '100mm',
-                      maxHeight: '80mm',
-                      boxSizing: 'border-box',
-                      fontSize: '9.5pt',
-                      lineHeight: 1.3
-                    } : {
-                      width: '520px',
-                      maxWidth: '100%',
-                      aspectRatio: '100 / 80',
-                      boxSizing: 'border-box',
-                      fontSize: '13px',
-                      lineHeight: 1.35
-                    }}
+                    className="flex items-center justify-center transition-all duration-300"
+                    style={
+                      ['90', '270'].includes(printRotation)
+                        ? previewScale === 'actual'
+                          ? { width: '80mm', height: '100mm' }
+                          : { width: '416px', height: '520px' }
+                        : previewScale === 'actual'
+                          ? { width: '100mm', height: '80mm' }
+                          : { width: '520px', height: '416px' }
+                    }
                   >
+                    {/* Physical Tag Preview */}
+                    <div 
+                      className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-2xl transition-transform duration-300 origin-center"
+                      style={{
+                        ...(previewScale === 'actual' ? {
+                          width: '100mm',
+                          height: '80mm',
+                          minWidth: '100mm',
+                          minHeight: '80mm',
+                          maxWidth: '100mm',
+                          maxHeight: '80mm',
+                          boxSizing: 'border-box',
+                          fontSize: '9.5pt',
+                          lineHeight: 1.3
+                        } : {
+                          width: '520px',
+                          height: '416px',
+                          maxWidth: '100%',
+                          boxSizing: 'border-box',
+                          fontSize: '13px',
+                          lineHeight: 1.35
+                        }),
+                        transform:
+                          printRotation === '90'
+                            ? 'rotate(90deg)'
+                            : printRotation === '270'
+                            ? 'rotate(270deg)'
+                            : printRotation === '180'
+                            ? 'rotate(180deg)'
+                            : 'none'
+                      }}
+                    >
                     {/* Tag Header */}
                     <div className="border-b-2 border-black text-center font-bold tracking-wider py-1 text-sm sm:text-base uppercase bg-white">
                       COSMEDIVA
@@ -928,6 +975,7 @@ export function QuarantineTagModal({
                   </div>
                 </div>
               </div>
+            </div>
 
               <div className="text-[11px] text-slate-500 text-center flex flex-wrap items-center justify-center gap-2 pt-1">
                 <span>🖨️ รองรับเครื่องพิมพ์สติกเกอร์ความร้อน 100x80 มม.</span>
@@ -968,9 +1016,9 @@ export function QuarantineTagModal({
                   className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                   title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้าน"
                 >
-                  <option value="0">แนวนอนปกติ (0°)</option>
-                  <option value="90">🔄 หมุน 90° (แก้ปริ้นท์ออกแนวตั้ง)</option>
-                  <option value="270">🔄 หมุน 270° (ทวนเข็ม)</option>
+                  <option value="0">แนวนอนปกติ (0° - แนะนำสำหรับสติกเกอร์ 100x80)</option>
+                  <option value="270">🔄 หมุน 270° (ทวนเข็ม - ป้ายตั้งทางซ้าย)</option>
+                  <option value="90">🔄 หมุน 90° (ตามเข็ม - ป้ายตั้งทางขวา)</option>
                   <option value="180">↕️ กลับหัว 180°</option>
                   <option value="auto">🌐 ให้เลือกใน Chrome (Auto)</option>
                 </select>
