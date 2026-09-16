@@ -260,8 +260,12 @@ export default function RMControlCenterPage() {
   const [quarantineTagData, setQuarantineTagData] = useState<QuarantineTagData | null>(null);
 
   // Receive Modal Additional Packaging Fields
+  const [receivePackageType, setReceivePackageType] = useState('ลัง');
+  const [receiveCustomPackageType, setReceiveCustomPackageType] = useState('');
   const [receiveBoxCount, setReceiveBoxCount] = useState('1');
   const [receiveQtyPerBox, setReceiveQtyPerBox] = useState('');
+  const [receiveOddBoxCount, setReceiveOddBoxCount] = useState('0');
+  const [receiveOddQtyPerBox, setReceiveOddQtyPerBox] = useState('');
   const [receiveMfgLot, setReceiveMfgLot] = useState('-');
 
   // Customer Supplied PM State & Quick Search Selector
@@ -297,8 +301,12 @@ export default function RMControlCenterPage() {
     lotProduct: '', 
     warehouse: 'MMRM', 
     controlNo: '',
+    packageType: 'ถัง',
+    customPackageType: '',
     boxCount: '1',
     qtyPerBox: '',
+    oddBoxCount: '0',
+    oddQtyPerBox: '',
     mfgLot: '-'
   });
   const [r4SearchQuery, setR4SearchQuery] = useState('');
@@ -358,15 +366,93 @@ export default function RMControlCenterPage() {
   const handleR4QuantityChange = (qtyStr: string) => {
     const q = parseFloat(qtyStr) || 0;
     const b = parseInt(r4Form.boxCount, 10) || 1;
-    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    const oddB = parseInt(r4Form.oddBoxCount, 10) || 0;
+    let perBox = r4Form.qtyPerBox;
+    if (oddB === 0) {
+      perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    }
     setR4Form(prev => ({ ...prev, quantity: qtyStr, qtyPerBox: perBox }));
   };
 
   const handleR4BoxCountChange = (boxStr: string) => {
     const b = parseInt(boxStr, 10) || 1;
     const q = parseFloat(r4Form.quantity) || 0;
-    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    const oddB = parseInt(r4Form.oddBoxCount, 10) || 0;
+    let perBox = r4Form.qtyPerBox;
+    if (oddB === 0) {
+      perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    }
     setR4Form(prev => ({ ...prev, boxCount: boxStr, qtyPerBox: perBox }));
+  };
+
+  const handleR4AutoSplitRemainder = () => {
+    const q = parseFloat(r4Form.quantity) || 0;
+    const pBox = parseFloat(r4Form.qtyPerBox) || 0;
+    if (q <= 0 || pBox <= 0) {
+      toast.error('กรุณาระบุจำนวนรับเข้าทั้งหมด และยอดต่อภาชนะเต็มก่อน');
+      return;
+    }
+    const full = Math.floor(q / pBox);
+    const rem = parseFloat((q - full * pBox).toFixed(3));
+    if (rem > 0) {
+      setR4Form(prev => ({
+        ...prev,
+        boxCount: full > 0 ? full.toString() : '1',
+        oddBoxCount: '1',
+        oddQtyPerBox: rem.toString()
+      }));
+      toast.success(`คำนวณแบ่งเศษสำเร็จ: ${full} เต็ม + 1 เศษ (${rem} ${r4Form.unit || 'KG'})`);
+    } else {
+      setR4Form(prev => ({
+        ...prev,
+        boxCount: full.toString(),
+        oddBoxCount: '0',
+        oddQtyPerBox: '0'
+      }));
+      toast.success(`ลงตัวพอดี: ${full} เต็ม (ไม่มีเศษ)`);
+    }
+  };
+
+  const handleReceiveQuantityChange = (qtyStr: string) => {
+    setReceivedQtyInput(qtyStr);
+    const q = parseFloat(qtyStr) || 0;
+    const b = parseInt(receiveBoxCount, 10) || 1;
+    const oddB = parseInt(receiveOddBoxCount, 10) || 0;
+    if (oddB === 0 && q > 0 && b > 0) {
+      setReceiveQtyPerBox(Math.ceil(q / b).toString());
+    }
+  };
+
+  const handleReceiveBoxCountChange = (boxStr: string) => {
+    setReceiveBoxCount(boxStr);
+    const b = parseInt(boxStr, 10) || 1;
+    const q = parseFloat(receivedQtyInput) || parseFloat(receivePoQty) || 0;
+    const oddB = parseInt(receiveOddBoxCount, 10) || 0;
+    if (oddB === 0 && q > 0 && b > 0) {
+      setReceiveQtyPerBox(Math.ceil(q / b).toString());
+    }
+  };
+
+  const handleReceiveAutoSplitRemainder = () => {
+    const q = parseFloat(receivedQtyInput) || parseFloat(receivePoQty) || 0;
+    const pBox = parseFloat(receiveQtyPerBox) || 0;
+    if (q <= 0 || pBox <= 0) {
+      toast.error('กรุณาระบุยอดรับเข้าจริง และยอดต่อภาชนะเต็มก่อน');
+      return;
+    }
+    const full = Math.floor(q / pBox);
+    const rem = parseFloat((q - full * pBox).toFixed(3));
+    if (rem > 0) {
+      setReceiveBoxCount(full > 0 ? full.toString() : '1');
+      setReceiveOddBoxCount('1');
+      setReceiveOddQtyPerBox(rem.toString());
+      toast.success(`คำนวณแบ่งเศษสำเร็จ: ${full} เต็ม + 1 เศษ (${rem} ${receiveUnit})`);
+    } else {
+      setReceiveBoxCount(full.toString());
+      setReceiveOddBoxCount('0');
+      setReceiveOddQtyPerBox('0');
+      toast.success(`ลงตัวพอดี: ${full} เต็ม (ไม่มีเศษ)`);
+    }
   };
 
   const openQuarantineTagForItem = (item: RMItem) => {
@@ -910,27 +996,55 @@ export default function RMControlCenterPage() {
     setReceiveRemarkInput(item.remark || '');
     setReceiveEditReason('');
 
-    // Extract packaging breakdown from remark if any
+    // Extract packaging breakdown from remark or bottom_remark if any
     let bCount = '1';
     let pBox = '';
     let lot = '-';
-    if (item.remark) {
-      const bMatch = item.remark.match(/(\d+)\s*(?:กล่อง|ลัง|pack|box|ถัง|ถุง)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+    let pType = (item.rm_code?.startsWith('R') || item.warehouse === 'MMRM') ? 'ถัง' : 'ลัง';
+    let customPType = '';
+    let oddBCount = '0';
+    let oddPBox = '';
+
+    const text = `${item.remark || ''} ${item.bottom_remark || ''}`;
+    if (text) {
+      const bMatch = text.match(/(\d+)\s*(ลัง|กล่อง|ถัง|ถุง|หีบ|ห่อ|พาเลท|กระป๋อง|ม้วน|pack|box|[^\sxX*]+)?\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
       if (bMatch) {
         bCount = bMatch[1];
-        pBox = bMatch[2];
+        if (bMatch[2]) {
+          const matchedType = bMatch[2];
+          const stdTypes = ['ลัง', 'กล่อง', 'ถัง', 'ถุง', 'หีบ', 'ห่อ', 'พาเลท', 'กระป๋อง', 'ม้วน'];
+          if (stdTypes.includes(matchedType)) {
+            pType = matchedType;
+          } else {
+            pType = 'อื่นๆ';
+            customPType = matchedType;
+          }
+        }
+        pBox = bMatch[3];
       }
-      const lMatch = item.remark.match(/Lot[:.\s]*([A-Za-z0-9\-_./]+)/i);
+
+      const oddMatch = text.match(/\+\s*(\d+)\s*(?:[^\sxX*]+)?เศษ\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+      if (oddMatch) {
+        oddBCount = oddMatch[1];
+        oddPBox = oddMatch[2];
+      }
+
+      const lMatch = text.match(/Lot[:.\s]*([A-Za-z0-9\-_./]+)/i);
       if (lMatch) {
         lot = lMatch[1];
       }
     }
+
     const curQty = item.received_qty != null ? item.received_qty : item.quantity;
     if (!pBox && curQty) {
       pBox = Math.ceil(curQty / (parseInt(bCount, 10) || 1)).toString();
     }
+    setReceivePackageType(pType);
+    setReceiveCustomPackageType(customPType);
     setReceiveBoxCount(bCount);
     setReceiveQtyPerBox(pBox);
+    setReceiveOddBoxCount(oddBCount);
+    setReceiveOddQtyPerBox(oddPBox);
     setReceiveMfgLot(lot);
 
     if (item.control_no) {
@@ -1027,8 +1141,15 @@ export default function RMControlCenterPage() {
 
     const bCount = parseInt(receiveBoxCount, 10) || 1;
     const pBox = parseFloat(receiveQtyPerBox) || Math.ceil(parsedQty / bCount);
+    const oddBCount = parseInt(receiveOddBoxCount, 10) || 0;
+    const oddPBox = parseFloat(receiveOddQtyPerBox) || 0;
+    const effectivePkg = receivePackageType === 'อื่นๆ'
+      ? (receiveCustomPackageType.trim() || 'ลัง')
+      : (receivePackageType || (receiveRmCode.trim().startsWith('R') || receiveWarehouse === 'MMRM' ? 'ถัง' : 'ลัง'));
     const mfgLotStr = receiveMfgLot && receiveMfgLot.trim() ? receiveMfgLot.trim() : '-';
-    const pkgStr = `(${bCount}กล่อง x ${pBox}${receiveUnit.trim()})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+
+    const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ${receiveUnit.trim()}${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ${receiveUnit.trim()}` : ''}`;
+    const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
 
     const updates: any = { 
       rm_code: receiveRmCode.trim(),
@@ -1051,8 +1172,8 @@ export default function RMControlCenterPage() {
     }
 
     let finalRemark = receiveRemarkInput.trim();
-    if (finalRemark.includes('กล่อง x')) {
-      finalRemark = finalRemark.replace(/\(\d+\s*กล่อง\s*x\s*\d+[^)]*\)/, pkgStr);
+    if (finalRemark.match(/\(\d+\s*(?:ลัง|กล่อง|ถัง|ถุง|หีบ|ห่อ|พาเลท|กระป๋อง|ม้วน|[^\s)]+)\s*x\s*[^)]+\)/)) {
+      finalRemark = finalRemark.replace(/\(\d+\s*(?:ลัง|กล่อง|ถัง|ถุง|หีบ|ห่อ|พาเลท|กระป๋อง|ม้วน|[^\s)]+)\s*x\s*[^)]+\)/, pkgStr);
     } else {
       finalRemark = finalRemark ? `${finalRemark} • ${pkgStr}` : pkgStr;
     }
@@ -1089,8 +1210,11 @@ export default function RMControlCenterPage() {
           supplier: receiveSupplier.trim(),
           totalQty: parsedQty,
           unit: receiveUnit.trim(),
+          packageType: effectivePkg,
           boxCount: bCount,
           qtyPerBox: pBox,
+          oddBoxCount: oddBCount,
+          oddQtyPerBox: oddPBox,
           mfgLot: mfgLotStr,
           receivedBy: currentUser || 'คลังสินค้า',
           receivedDate: formattedReceiveDate,
@@ -1437,8 +1561,12 @@ export default function RMControlCenterPage() {
       lotProduct: '', 
       warehouse: 'MMRM', 
       controlNo: '',
+      packageType: 'ถัง',
+      customPackageType: '',
       boxCount: '1',
       qtyPerBox: '',
+      oddBoxCount: '0',
+      oddQtyPerBox: '',
       mfgLot: '-'
     });
     
@@ -1525,8 +1653,15 @@ export default function RMControlCenterPage() {
     const qtyVal = parseFloat(r4Form.quantity) || 0;
     const bCount = parseInt(r4Form.boxCount, 10) || 1;
     const pBox = parseFloat(r4Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+    const oddBCount = parseInt(r4Form.oddBoxCount, 10) || 0;
+    const oddPBox = parseFloat(r4Form.oddQtyPerBox) || 0;
+    const effectivePkg = r4Form.packageType === 'อื่นๆ' 
+      ? (r4Form.customPackageType.trim() || 'ถัง') 
+      : (r4Form.packageType || 'ถัง');
     const mfgLotStr = r4Form.mfgLot && r4Form.mfgLot.trim() ? r4Form.mfgLot.trim() : '-';
-    const pkgStr = `(${bCount}กล่อง x ${pBox}${r4Form.unit || 'KG'})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+
+    const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ${r4Form.unit || 'KG'}${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ${r4Form.unit || 'KG'}` : ''}`;
+    const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
 
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
@@ -1553,7 +1688,7 @@ export default function RMControlCenterPage() {
       toast.success(`รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsR4ModalOpen(false);
 
-      // Auto open Quarantine Tag Modal
+      // Auto open Quarantine Tag Modal with container type and odd boxes
       setQuarantineTagData({
         name: r4Form.rmName,
         code: fakeCode,
@@ -1561,8 +1696,11 @@ export default function RMControlCenterPage() {
         supplier: r4Form.customerName,
         totalQty: qtyVal,
         unit: r4Form.unit || 'KG',
+        packageType: effectivePkg,
         boxCount: bCount,
         qtyPerBox: pBox,
+        oddBoxCount: oddBCount,
+        oddQtyPerBox: oddPBox,
         mfgLot: mfgLotStr,
         receivedBy: currentUser || 'คลังสินค้า',
         receivedDate: new Date().toISOString(),
@@ -1579,8 +1717,12 @@ export default function RMControlCenterPage() {
         lotProduct: '', 
         warehouse: 'MMRM', 
         controlNo: '',
+        packageType: 'ถัง',
+        customPackageType: '',
         boxCount: '1',
         qtyPerBox: '',
+        oddBoxCount: '0',
+        oddQtyPerBox: '',
         mfgLot: '-'
       });
       fetchItems();
@@ -4081,51 +4223,199 @@ export default function RMControlCenterPage() {
             </div>
 
             {/* Packaging Breakdown for Quarantine Tag */}
-            <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-emerald-600" />
-                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
-                </Label>
-                <span className="text-[10px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-bold">
-                  {r4Form.quantity ? `${r4Form.quantity} ${r4Form.unit || 'KG'} (${r4Form.boxCount || 1} ภาชนะ x ${r4Form.qtyPerBox || 0} ${r4Form.unit || 'KG'})` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนภาชนะ/กล่อง <span className="text-red-500">*</span></Label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    value={r4Form.boxCount} 
-                    onChange={e => handleR4BoxCountChange(e.target.value)} 
-                    placeholder="เช่น 1"
-                    className="text-xs bg-white font-bold" 
-                  />
+            {(() => {
+              const effectivePkg = r4Form.packageType === 'อื่นๆ' 
+                ? (r4Form.customPackageType.trim() || 'ภาชนะ') 
+                : (r4Form.packageType || 'ถัง');
+              const fullCount = parseInt(r4Form.boxCount, 10) || 0;
+              const fullQty = parseFloat(r4Form.qtyPerBox) || 0;
+              const oddCount = parseInt(r4Form.oddBoxCount, 10) || 0;
+              const oddQty = parseFloat(r4Form.oddQtyPerBox) || 0;
+              const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
+              const targetTotal = parseFloat(r4Form.quantity) || 0;
+              const isMatch = targetTotal > 0 && Math.abs(calcTotal - targetTotal) < 0.001;
+              const totalUnits = fullCount + oddCount;
+
+              return (
+                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/90 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-emerald-200/60">
+                    <Label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-emerald-600" />
+                      ข้อมูลภาชนะบรรจุ & ยอดแบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      {targetTotal > 0 && fullQty > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleR4AutoSplitRemainder}
+                          className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-xs transition flex items-center gap-1"
+                          title="คำนวณแยกภาชนะเต็มและภาชนะเศษให้อัตโนมัติ"
+                        >
+                          ⚡ คำนวณแบ่งเศษอัตโนมัติ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Container / Packaging Type Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-emerald-950">
+                        ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        value={r4Form.packageType}
+                        onChange={e => setR4Form({ ...r4Form, packageType: e.target.value })}
+                        className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-emerald-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                      >
+                        <option value="ถัง">ถัง (Drum/Pail - แนะนำสำหรับ RM)</option>
+                        <option value="ถุง">ถุง (Bag)</option>
+                        <option value="กล่อง">กล่อง (Box)</option>
+                        <option value="ลัง">ลัง (Box/Carton)</option>
+                        <option value="หีบ">หีบ (Chest)</option>
+                        <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                        <option value="พาเลท">พาเลท (Pallet)</option>
+                        <option value="กระป๋อง">กระป๋อง (Can)</option>
+                        <option value="ม้วน">ม้วน (Roll)</option>
+                        <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
+                      </select>
+                    </div>
+
+                    {r4Form.packageType === 'อื่นๆ' ? (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-emerald-950">
+                          ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          value={r4Form.customPackageType}
+                          onChange={e => setR4Form({ ...r4Form, customPackageType: e.target.value })}
+                          placeholder="เช่น แกลลอน, กระสอบ, บาร์เรล, ปี๊บ"
+                          className="h-8 text-xs font-bold bg-white border-emerald-300"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                        <Input 
+                          value={r4Form.mfgLot} 
+                          onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
+                          placeholder="เช่น 2609A หรือ -"
+                          className="h-8 text-xs bg-white font-mono" 
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {r4Form.packageType === 'อื่นๆ' && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                      <Input 
+                        value={r4Form.mfgLot} 
+                        onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
+                        placeholder="เช่น 2609A หรือ -"
+                        className="h-8 text-xs bg-white font-mono" 
+                      />
+                    </div>
+                  )}
+
+                  {/* Full & Odd Packaging Breakdown Inputs */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Full Container Group */}
+                    <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-200/80 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                        <span>📦 {effectivePkg}เต็ม</span>
+                        <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={r4Form.boxCount} 
+                          onChange={e => handleR4BoxCountChange(e.target.value)} 
+                          placeholder="เช่น 7"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวน/{effectivePkg}เต็ม ({r4Form.unit || 'KG'}) <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          step="any"
+                          min="0.001" 
+                          value={r4Form.qtyPerBox} 
+                          onChange={e => setR4Form({ ...r4Form, qtyPerBox: e.target.value })} 
+                          placeholder="เช่น 25"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Odd Container Group */}
+                    <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
+                      <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                        <span>🟠 {effectivePkg}เศษ (Odd)</span>
+                        <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวน{effectivePkg}เศษ
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={r4Form.oddBoxCount} 
+                          onChange={e => setR4Form({ ...r4Form, oddBoxCount: e.target.value })} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวน/{effectivePkg}เศษ ({r4Form.unit || 'KG'})
+                        </Label>
+                        <Input 
+                          type="number" 
+                          step="any"
+                          min="0" 
+                          value={r4Form.oddQtyPerBox} 
+                          onChange={e => setR4Form({ ...r4Form, oddQtyPerBox: e.target.value })} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Summary and Validation */}
+                  <div className="text-xs pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
+                      <span className="text-slate-700">
+                        🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
+                      </span>
+                      {targetTotal > 0 && (
+                        isMatch ? (
+                          <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                            ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} {r4Form.unit || 'KG'} ตรงกับยอดรับเข้า
+                          </span>
+                        ) : (
+                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                            ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} (ยอดรับเข้า {targetTotal.toLocaleString()} {r4Form.unit || 'KG'})
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono pt-1">
+                      รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} {r4Form.unit || 'KG'}{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ${r4Form.unit || 'KG'}` : ''}){r4Form.mfgLot && r4Form.mfgLot !== '-' ? ` Lot.${r4Form.mfgLot}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนต่อภาชนะ <span className="text-red-500">*</span></Label>
-                  <Input 
-                    type="number" 
-                    step="any"
-                    min="0.001" 
-                    value={r4Form.qtyPerBox} 
-                    onChange={e => setR4Form({ ...r4Form, qtyPerBox: e.target.value })} 
-                    placeholder="เช่น 25"
-                    className="text-xs bg-white font-bold" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                  <Input 
-                    value={r4Form.mfgLot} 
-                    onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
-                    placeholder="เช่น 2609A หรือ -"
-                    className="text-xs bg-white font-mono" 
-                  />
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -4288,14 +4578,7 @@ export default function RMControlCenterPage() {
                     type="number" 
                     step="any"
                     value={receivedQtyInput} 
-                    onChange={(e) => {
-                      setReceivedQtyInput(e.target.value);
-                      const q = parseFloat(e.target.value) || 0;
-                      const b = parseInt(receiveBoxCount, 10) || 1;
-                      if (q > 0 && b > 0) {
-                        setReceiveQtyPerBox(Math.ceil(q / b).toString());
-                      }
-                    }}
+                    onChange={(e) => handleReceiveQuantityChange(e.target.value)}
                     placeholder="ระบุยอดรับจริง..."
                     className="pr-14 font-bold text-sm bg-white border-amber-300"
                   />
@@ -4332,59 +4615,199 @@ export default function RMControlCenterPage() {
             </div>
 
             {/* 2.1 บรรจุภัณฑ์ & การแบ่งกล่อง (Packaging Breakdown สำหรับ Quarantine Tag) */}
-            <div className="bg-purple-50/50 p-3 rounded-xl border border-purple-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-purple-600" />
-                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
-                </Label>
-                <span className="text-[10px] text-purple-800 bg-purple-100/80 px-2 py-0.5 rounded font-bold">
-                  {receivedQtyInput ? `${Number(receivedQtyInput).toLocaleString()} ${receiveUnit} (${receiveBoxCount || 1} กล่อง x ${receiveQtyPerBox || 0} ${receiveUnit})` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
-                </span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนกล่องทั้งหมด (Boxes)</Label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    value={receiveBoxCount} 
-                    onChange={e => {
-                      const b = e.target.value;
-                      setReceiveBoxCount(b);
-                      const bNum = parseInt(b, 10) || 1;
-                      const curQty = parseFloat(receivedQtyInput) || parseFloat(receivePoQty) || 0;
-                      if (curQty > 0 && bNum > 0) {
-                        setReceiveQtyPerBox(Math.ceil(curQty / bNum).toString());
-                      }
-                    }}
-                    placeholder="1"
-                    className="text-xs bg-white font-bold" 
-                  />
+            {(() => {
+              const effectivePkg = receivePackageType === 'อื่นๆ' 
+                ? (receiveCustomPackageType.trim() || 'ภาชนะ') 
+                : (receivePackageType || (receiveRmCode.trim().startsWith('R') || receiveWarehouse === 'MMRM' ? 'ถัง' : 'ลัง'));
+              const fullCount = parseInt(receiveBoxCount, 10) || 0;
+              const fullQty = parseFloat(receiveQtyPerBox) || 0;
+              const oddCount = parseInt(receiveOddBoxCount, 10) || 0;
+              const oddQty = parseFloat(receiveOddQtyPerBox) || 0;
+              const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
+              const targetTotal = parseFloat(receivedQtyInput) || parseFloat(receivePoQty) || 0;
+              const isMatch = targetTotal > 0 && Math.abs(calcTotal - targetTotal) < 0.001;
+              const totalUnits = fullCount + oddCount;
+
+              return (
+                <div className="bg-purple-50/70 p-3.5 rounded-xl border border-purple-200/90 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-purple-200/60">
+                    <Label className="text-xs font-bold text-purple-950 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-purple-600" />
+                      ข้อมูลภาชนะบรรจุ & ยอดแบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      {targetTotal > 0 && fullQty > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleReceiveAutoSplitRemainder}
+                          className="text-[10px] font-bold bg-purple-700 hover:bg-purple-800 text-white px-2 py-0.5 rounded shadow-xs transition flex items-center gap-1"
+                          title="คำนวณแยกภาชนะเต็มและภาชนะเศษให้อัตโนมัติ"
+                        >
+                          ⚡ คำนวณแบ่งเศษอัตโนมัติ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Container / Packaging Type Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-purple-950">
+                        ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        value={receivePackageType}
+                        onChange={e => setReceivePackageType(e.target.value)}
+                        className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-purple-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                      >
+                        <option value="ลัง">ลัง (Box/Carton)</option>
+                        <option value="กล่อง">กล่อง (Box)</option>
+                        <option value="ถัง">ถัง (Drum/Pail)</option>
+                        <option value="ถุง">ถุง (Bag)</option>
+                        <option value="หีบ">หีบ (Chest)</option>
+                        <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                        <option value="พาเลท">พาเลท (Pallet)</option>
+                        <option value="กระป๋อง">กระป๋อง (Can)</option>
+                        <option value="ม้วน">ม้วน (Roll)</option>
+                        <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
+                      </select>
+                    </div>
+
+                    {receivePackageType === 'อื่นๆ' ? (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-purple-950">
+                          ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          value={receiveCustomPackageType}
+                          onChange={e => setReceiveCustomPackageType(e.target.value)}
+                          placeholder="เช่น แกลลอน, กระสอบ, ซอง, หลอด"
+                          className="h-8 text-xs font-bold bg-white border-purple-300"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                        <Input 
+                          value={receiveMfgLot} 
+                          onChange={e => setReceiveMfgLot(e.target.value)} 
+                          placeholder="เช่น 2609A หรือ -"
+                          className="h-8 text-xs bg-white font-mono" 
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {receivePackageType === 'อื่นๆ' && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                      <Input 
+                        value={receiveMfgLot} 
+                        onChange={e => setReceiveMfgLot(e.target.value)} 
+                        placeholder="เช่น 2609A หรือ -"
+                        className="h-8 text-xs bg-white font-mono" 
+                      />
+                    </div>
+                  )}
+
+                  {/* Full & Odd Packaging Breakdown Inputs */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Full Container Group */}
+                    <div className="bg-white/90 p-2.5 rounded-lg border border-purple-200/80 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                        <span>📦 {effectivePkg}เต็ม</span>
+                        <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={receiveBoxCount} 
+                          onChange={e => handleReceiveBoxCountChange(e.target.value)} 
+                          placeholder="เช่น 7"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวน/{effectivePkg}เต็ม ({receiveUnit || 'หน่วย'}) <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          step="any"
+                          min="0.001" 
+                          value={receiveQtyPerBox} 
+                          onChange={e => setReceiveQtyPerBox(e.target.value)} 
+                          placeholder="เช่น 1300"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Odd Container Group */}
+                    <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
+                      <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                        <span>🟠 {effectivePkg}เศษ (Odd)</span>
+                        <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวน{effectivePkg}เศษ
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={receiveOddBoxCount} 
+                          onChange={e => setReceiveOddBoxCount(e.target.value)} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวน/{effectivePkg}เศษ ({receiveUnit || 'หน่วย'})
+                        </Label>
+                        <Input 
+                          type="number" 
+                          step="any"
+                          min="0" 
+                          value={receiveOddQtyPerBox} 
+                          onChange={e => setReceiveOddQtyPerBox(e.target.value)} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Summary and Validation */}
+                  <div className="text-xs pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
+                      <span className="text-slate-700">
+                        🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
+                      </span>
+                      {targetTotal > 0 && (
+                        isMatch ? (
+                          <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                            ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} {receiveUnit || 'หน่วย'} ตรงกับยอดรับเข้า
+                          </span>
+                        ) : (
+                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                            ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} (ยอดรับเข้า {targetTotal.toLocaleString()} {receiveUnit || 'หน่วย'})
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono pt-1">
+                      รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} {receiveUnit || 'หน่วย'}{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ${receiveUnit || 'หน่วย'}` : ''}){receiveMfgLot && receiveMfgLot !== '-' ? ` Lot.${receiveMfgLot}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนต่อกล่อง (Qty/box)</Label>
-                  <Input 
-                    type="number" 
-                    step="any"
-                    min="0.001" 
-                    value={receiveQtyPerBox} 
-                    onChange={e => setReceiveQtyPerBox(e.target.value)}
-                    placeholder="ระบุจำนวนต่อกล่อง"
-                    className="text-xs bg-white font-bold" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                  <Input 
-                    value={receiveMfgLot} 
-                    onChange={e => setReceiveMfgLot(e.target.value)}
-                    placeholder="เช่น 2609A หรือ -"
-                    className="text-xs bg-white font-mono" 
-                  />
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             {/* 3. หมายเหตุการแก้ไข (Audit / Reason) - ไฮไลท์เมื่อมีการแก้ไข */}
             {(() => {

@@ -831,8 +831,8 @@ export function QuarantineTagModal({
                       className="accent-amber-600 mt-0.5"
                     />
                     <div className="text-xs">
-                      <span className="font-bold text-slate-800">พิมพ์รันเลขครบทุกกล่อง ({boxCount} ใบ)</span>
-                      <p className="text-[11px] text-slate-500">รันพิมพ์ 1 of {boxCount}, 2 of {boxCount} ... จนครบ {boxCount} กล่อง</p>
+                      <span className="font-bold text-slate-800">พิมพ์รันเลขครบทุก{effectivePackageType} ({totalBoxCount} ใบ)</span>
+                      <p className="text-[11px] text-slate-500">รันพิมพ์ 1 of {totalBoxCount}, 2 of {totalBoxCount} ... จนครบ {totalBoxCount} {effectivePackageType}</p>
                     </div>
                   </label>
 
