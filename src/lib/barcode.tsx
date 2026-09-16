@@ -1,4 +1,5 @@
 import React from 'react';
+import QRCode from 'qrcode';
 
 // Code 128 Pattern Table (Subset B)
 const CODE128_PATTERNS = [
@@ -103,3 +104,54 @@ export function Code128Barcode({
     </div>
   );
 }
+
+export interface QRCodeProps {
+  value: string;
+  size?: number | string;
+  className?: string;
+}
+
+export function QRCodeSvg({
+  value,
+  size = 32,
+  className = ''
+}: QRCodeProps) {
+  if (!value) return null;
+
+  try {
+    const qr = QRCode.create(value.trim(), { errorCorrectionLevel: 'M' });
+    const moduleCount = qr.modules.size;
+    const margin = 1;
+    const totalSize = moduleCount + margin * 2;
+    const rects: { x: number; y: number }[] = [];
+
+    for (let r = 0; r < moduleCount; r++) {
+      for (let c = 0; c < moduleCount; c++) {
+        if (qr.modules.get(r, c)) {
+          rects.push({ x: c + margin, y: r + margin });
+        }
+      }
+    }
+
+    const pixelSize = typeof size === 'number' ? `${size}px` : size;
+
+    return (
+      <div className={`inline-flex items-center justify-center ${className}`}>
+        <svg
+          viewBox={`0 0 ${totalSize} ${totalSize}`}
+          style={{ width: pixelSize, height: pixelSize }}
+          shapeRendering="crispEdges"
+        >
+          <rect width={totalSize} height={totalSize} fill="#ffffff" />
+          {rects.map((pt, i) => (
+            <rect key={i} x={pt.x} y={pt.y} width={1} height={1} fill="#000000" />
+          ))}
+        </svg>
+      </div>
+    );
+  } catch (err) {
+    console.error('Failed to generate QRCode:', err);
+    return null;
+  }
+}
+

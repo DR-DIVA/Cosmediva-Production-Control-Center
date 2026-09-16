@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Code128Barcode } from '@/lib/barcode';
-import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw } from 'lucide-react';
+import { Code128Barcode, QRCodeSvg } from '@/lib/barcode';
+import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode } from 'lucide-react';
 
 export interface QuarantineTagData {
   name: string;
@@ -70,6 +70,25 @@ export function QuarantineTagModal({
     setPrintRotation(val);
     if (typeof window !== 'undefined') {
       localStorage.setItem('quarantine_tag_rotation', val);
+    }
+  };
+
+  const [codeType, setCodeType] = useState<'qrcode' | 'barcode' | 'none'>('qrcode');
+
+  // Load saved code type preference (defaults to qrcode)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedCode = localStorage.getItem('quarantine_tag_code_type');
+      if (savedCode && ['qrcode', 'barcode', 'none'].includes(savedCode)) {
+        setCodeType(savedCode as any);
+      }
+    }
+  }, []);
+
+  const handleCodeTypeChange = (val: 'qrcode' | 'barcode' | 'none') => {
+    setCodeType(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quarantine_tag_code_type', val);
     }
   };
 
@@ -771,6 +790,24 @@ export function QuarantineTagModal({
                     <RotateCw className="w-3.5 h-3.5 text-inherit" />
                     หมุนภาพ ({printRotation === '0' ? '0° แนวนอนปกติ' : `${printRotation}°`})
                   </button>
+
+                  {/* Code Type Switcher Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const nextCode = codeType === 'qrcode' ? 'barcode' : codeType === 'barcode' ? 'none' : 'qrcode';
+                      handleCodeTypeChange(nextCode);
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 border shadow-xs cursor-pointer ${
+                      codeType === 'qrcode'
+                        ? 'bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-300'
+                        : 'bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:text-purple-900'
+                    }`}
+                    title="สลับรูปแบบโค้ด (QR Code -> Barcode -> ซ่อนโค้ด)"
+                  >
+                    <QrCode className="w-3.5 h-3.5 text-inherit" />
+                    {codeType === 'qrcode' ? 'QR Code (แนะนำ)' : codeType === 'barcode' ? 'Barcode' : 'ไม่แสดงโค้ด'}
+                  </button>
                 </div>
 
                 {boxCount > 1 && printAllSequence && (
@@ -902,9 +939,13 @@ export function QuarantineTagModal({
                             {controlNo || '-'}
                           </span>
                         </div>
-                        {controlNo && (
-                          <div className="shrink-0 pl-1">
-                            <Code128Barcode value={controlNo} height={22} width={previewScale === 'actual' ? 115 : 135} />
+                        {controlNo && codeType !== 'none' && (
+                          <div className="shrink-0 pl-1 flex items-center">
+                            {codeType === 'qrcode' ? (
+                              <QRCodeSvg value={controlNo} size={previewScale === 'actual' ? 32 : 36} />
+                            ) : (
+                              <Code128Barcode value={controlNo} height={22} width={previewScale === 'actual' ? 140 : 160} />
+                            )}
                           </div>
                         )}
                       </div>
@@ -1004,6 +1045,24 @@ export function QuarantineTagModal({
               ปิดหน้าต่าง
             </Button>
             <div className="flex flex-wrap items-center gap-2">
+              {/* Code Format Selector (QR Code / Barcode) */}
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+                <QrCode className="w-3.5 h-3.5 text-purple-700 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                  รูปแบบโค้ด:
+                </span>
+                <select
+                  value={codeType}
+                  onChange={(e) => handleCodeTypeChange(e.target.value as any)}
+                  className="text-xs bg-purple-50 font-bold border border-purple-300 rounded px-1.5 py-0.5 text-purple-900 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+                  title="เลือกรูปแบบโค้ดสำหรับสแกน (แนะนำ QR Code สแกนง่าย คมชัด ไม่ทับซ้อน)"
+                >
+                  <option value="qrcode">📱 QR Code (สแกนง่าย คมชัด แนะนำ)</option>
+                  <option value="barcode">|||| Barcode (Code 128)</option>
+                  <option value="none">❌ ไม่แสดงโค้ด</option>
+                </select>
+              </div>
+
               {/* Orientation / Rotation Selector */}
               <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
                 <RotateCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
@@ -1078,9 +1137,13 @@ export function QuarantineTagModal({
                       {controlNo || '-'}
                     </span>
                   </div>
-                  {controlNo && (
-                    <div style={{ flexShrink: 0, paddingLeft: '4px' }}>
-                      <Code128Barcode value={controlNo} height={22} width={120} />
+                  {controlNo && codeType !== 'none' && (
+                    <div style={{ flexShrink: 0, paddingLeft: '4px', display: 'flex', alignItems: 'center' }}>
+                      {codeType === 'qrcode' ? (
+                        <QRCodeSvg value={controlNo} size={30} />
+                      ) : (
+                        <Code128Barcode value={controlNo} height={22} width={140} />
+                      )}
                     </div>
                   )}
                 </div>
