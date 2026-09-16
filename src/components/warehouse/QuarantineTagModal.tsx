@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Code128Barcode } from '@/lib/barcode';
-import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw } from 'lucide-react';
 
 export interface QuarantineTagData {
   name: string;
@@ -54,6 +54,24 @@ export function QuarantineTagModal({
   const [previewIndex, setPreviewIndex] = useState(1);
   const [printPaperMode, setPrintPaperMode] = useState<'sticker' | 'a4'>('sticker');
   const [previewScale, setPreviewScale] = useState<'actual' | 'large'>('actual');
+  const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('0');
+
+  // Load saved printer rotation preference
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedRot = localStorage.getItem('quarantine_tag_rotation');
+      if (savedRot && ['0', '90', '180', '270', 'auto'].includes(savedRot)) {
+        setPrintRotation(savedRot as any);
+      }
+    }
+  }, []);
+
+  const handleRotationChange = (val: '0' | '90' | '180' | '270' | 'auto') => {
+    setPrintRotation(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quarantine_tag_rotation', val);
+    }
+  };
 
   // Sync initialData when modal opens
   useEffect(() => {
@@ -196,6 +214,216 @@ export function QuarantineTagModal({
 
     const contentHtml = container.innerHTML;
 
+    let pageLayoutCss = '';
+    if (printRotation === '90') {
+      pageLayoutCss = `
+        @page {
+          size: 80mm 100mm;
+          margin: 0;
+        }
+        html, body {
+          width: 80mm;
+          height: 100mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: 80mm;
+          height: 100mm;
+          max-width: 80mm;
+          max-height: 100mm;
+          box-sizing: border-box;
+          padding: 0;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: 100mm;
+          height: 80mm;
+          flex-shrink: 0;
+          transform: rotate(90deg);
+          transform-origin: center center;
+          padding: 2.5mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+      `;
+    } else if (printRotation === '270') {
+      pageLayoutCss = `
+        @page {
+          size: 80mm 100mm;
+          margin: 0;
+        }
+        html, body {
+          width: 80mm;
+          height: 100mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: 80mm;
+          height: 100mm;
+          max-width: 80mm;
+          max-height: 100mm;
+          box-sizing: border-box;
+          padding: 0;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: 100mm;
+          height: 80mm;
+          flex-shrink: 0;
+          transform: rotate(270deg);
+          transform-origin: center center;
+          padding: 2.5mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+      `;
+    } else if (printRotation === '180') {
+      pageLayoutCss = `
+        @page {
+          size: 100mm 80mm;
+          margin: 0;
+        }
+        html, body {
+          width: 100mm;
+          height: 80mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: 100mm;
+          height: 80mm;
+          max-width: 100mm;
+          max-height: 80mm;
+          box-sizing: border-box;
+          padding: 0;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: 100mm;
+          height: 80mm;
+          flex-shrink: 0;
+          transform: rotate(180deg);
+          transform-origin: center center;
+          padding: 2.5mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+      `;
+    } else if (printRotation === 'auto') {
+      pageLayoutCss = `
+        @page {
+          margin: 0;
+        }
+        html, body {
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+        }
+        .quarantine-tag-print-page {
+          width: 100mm;
+          height: 80mm;
+          max-width: 100mm;
+          max-height: 80mm;
+          box-sizing: border-box;
+          padding: 2.5mm;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+      `;
+    } else {
+      // printRotation === '0'
+      pageLayoutCss = `
+        @page {
+          size: 100mm 80mm;
+          margin: 0;
+        }
+        html, body {
+          width: 100mm;
+          height: 80mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: 100mm;
+          height: 80mm;
+          max-width: 100mm;
+          max-height: 80mm;
+          box-sizing: border-box;
+          padding: 2.5mm;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+      `;
+    }
+
     doc.open();
     doc.write(`
       <!DOCTYPE html>
@@ -204,10 +432,7 @@ export function QuarantineTagModal({
           <meta charset="utf-8" />
           <title>Quarantine Tag - ${controlNo || 'COSMEDIVA'}</title>
           <style>
-            @page {
-              size: 100mm 80mm;
-              margin: 0;
-            }
+            ${pageLayoutCss}
             * {
               box-sizing: border-box;
               margin: 0;
@@ -216,29 +441,8 @@ export function QuarantineTagModal({
               print-color-adjust: exact !important;
             }
             html, body {
-              width: 100mm;
-              margin: 0;
-              padding: 0;
-              background: #ffffff;
               color: #000000;
               font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            }
-            .quarantine-tag-print-page {
-              width: 100mm;
-              height: 80mm;
-              max-width: 100mm;
-              max-height: 80mm;
-              box-sizing: border-box;
-              padding: 2.5mm;
-              page-break-after: always;
-              break-after: page;
-              page-break-inside: avoid;
-              break-inside: avoid;
-              display: flex;
-              flex-direction: column;
-              justify-content: space-between;
-              background: #ffffff;
-              overflow: hidden;
             }
             .quarantine-tag-print-page:last-child {
               page-break-after: auto;
@@ -725,21 +929,53 @@ export function QuarantineTagModal({
                 </div>
               </div>
 
-              <div className="text-[11px] text-slate-500 text-center flex items-center justify-center gap-2 pt-1">
+              <div className="text-[11px] text-slate-500 text-center flex flex-wrap items-center justify-center gap-2 pt-1">
                 <span>🖨️ รองรับเครื่องพิมพ์สติกเกอร์ความร้อน 100x80 มม.</span>
                 <span>•</span>
                 <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                   ระบบจะพิมพ์สติกเกอร์ทั้งหมด {tagsToPrint.length} ใบ
                 </span>
+                {printRotation !== '0' && (
+                  <>
+                    <span>•</span>
+                    <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1">
+                      <RotateCw className="w-3 h-3 text-amber-600" />
+                      {printRotation === '90' && 'หมุนพิมพ์ 90° (แก้ปัญหาออกแนวตั้ง)'}
+                      {printRotation === '270' && 'หมุนพิมพ์ 270°'}
+                      {printRotation === '180' && 'พิมพ์กลับหัว 180°'}
+                      {printRotation === 'auto' && 'โหมดเลือกการวางแนวใน Chrome'}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          <DialogFooter className="border-t pt-3 flex flex-row items-center justify-between gap-2">
+          <DialogFooter className="border-t pt-3 flex flex-wrap items-center justify-between gap-2">
             <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
               ปิดหน้าต่าง
             </Button>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Orientation / Rotation Selector */}
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+                <RotateCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                  ทิศทางพิมพ์:
+                </span>
+                <select
+                  value={printRotation}
+                  onChange={(e) => handleRotationChange(e.target.value as any)}
+                  className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้าน"
+                >
+                  <option value="0">แนวนอนปกติ (0°)</option>
+                  <option value="90">🔄 หมุน 90° (แก้ปริ้นท์ออกแนวตั้ง)</option>
+                  <option value="270">🔄 หมุน 270° (ทวนเข็ม)</option>
+                  <option value="180">↕️ กลับหัว 180°</option>
+                  <option value="auto">🌐 ให้เลือกใน Chrome (Auto)</option>
+                </select>
+              </div>
+
               <Button
                 onClick={handlePrint}
                 className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md px-5 h-9"
@@ -756,7 +992,8 @@ export function QuarantineTagModal({
       <div ref={printContainerRef} style={{ display: 'none' }}>
         {tagsToPrint.map((tag, idx) => (
           <div key={idx} className="quarantine-tag-print-page">
-            <div className="tag-border">
+            <div className="tag-rotate-wrapper">
+              <div className="tag-border">
               {/* Header */}
               <div className="tag-header">
                 COSMEDIVA
@@ -871,7 +1108,8 @@ export function QuarantineTagModal({
               </div>
             </div>
           </div>
-        ))}
+        </div>
+      ))}
       </div>
     </>
   );
