@@ -274,8 +274,12 @@ export default function RMControlCenterPage() {
     lotProduct: '', 
     warehouse: 'MMPM', 
     controlNo: '',
+    packageType: 'ลัง',
+    customPackageType: '',
     boxCount: '1',
     qtyPerBox: '',
+    oddBoxCount: '0',
+    oddQtyPerBox: '',
     mfgLot: '-'
   });
   const [cmd2SearchQuery, setCmd2SearchQuery] = useState('');
@@ -304,15 +308,51 @@ export default function RMControlCenterPage() {
   const handleCmd2QuantityChange = (qtyStr: string) => {
     const q = parseFloat(qtyStr) || 0;
     const b = parseInt(cmd2Form.boxCount, 10) || 1;
-    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    const oddB = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+    let perBox = cmd2Form.qtyPerBox;
+    if (oddB === 0) {
+      perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    }
     setCmd2Form(prev => ({ ...prev, quantity: qtyStr, qtyPerBox: perBox }));
   };
 
   const handleCmd2BoxCountChange = (boxStr: string) => {
     const b = parseInt(boxStr, 10) || 1;
     const q = parseFloat(cmd2Form.quantity) || 0;
-    const perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    const oddB = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+    let perBox = cmd2Form.qtyPerBox;
+    if (oddB === 0) {
+      perBox = q > 0 && b > 0 ? Math.ceil(q / b).toString() : '';
+    }
     setCmd2Form(prev => ({ ...prev, boxCount: boxStr, qtyPerBox: perBox }));
+  };
+
+  const handleCmd2AutoSplitRemainder = () => {
+    const q = parseFloat(cmd2Form.quantity) || 0;
+    const pBox = parseFloat(cmd2Form.qtyPerBox) || 0;
+    if (q <= 0 || pBox <= 0) {
+      toast.error('กรุณาระบุจำนวนรับเข้าทั้งหมด และยอดต่อภาชนะเต็มก่อน');
+      return;
+    }
+    const full = Math.floor(q / pBox);
+    const rem = q % pBox;
+    if (rem > 0) {
+      setCmd2Form(prev => ({
+        ...prev,
+        boxCount: full > 0 ? full.toString() : '1',
+        oddBoxCount: '1',
+        oddQtyPerBox: rem.toString()
+      }));
+      toast.success(`คำนวณแบ่งเศษสำเร็จ: ${full} เต็ม + 1 เศษ (${rem} ชิ้น)`);
+    } else {
+      setCmd2Form(prev => ({
+        ...prev,
+        boxCount: full.toString(),
+        oddBoxCount: '0',
+        oddQtyPerBox: '0'
+      }));
+      toast.success(`ลงตัวพอดี: ${full} เต็ม (ไม่มีเศษ)`);
+    }
   };
 
   const handleR4QuantityChange = (qtyStr: string) => {
@@ -333,12 +373,25 @@ export default function RMControlCenterPage() {
     let bCount = 1;
     let perBox = item.received_qty != null ? item.received_qty : item.quantity;
     let lot = '-';
+    let pkgType = 'ลัง';
+    let oddBCount = 0;
+    let oddPBox = 0;
 
     const text = `${item.remark || ''} ${item.bottom_remark || ''}`;
-    const boxMatch = text.match(/(\d+)\s*(?:กล่อง|ลัง|pack|box|ถัง|ถุง)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+    
+    // Parse package type and full boxes, e.g. "7 ลัง x 1300" or "8 กล่อง x 1000"
+    const boxMatch = text.match(/(\d+)\s*(ลัง|กล่อง|ถัง|ถุง|หีบ|ห่อ|พาเลท|กระป๋อง|ม้วน|pack|box)\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
     if (boxMatch) {
       bCount = parseInt(boxMatch[1], 10) || 1;
-      perBox = parseFloat(boxMatch[2]) || perBox;
+      pkgType = boxMatch[2];
+      perBox = parseFloat(boxMatch[3]) || perBox;
+    }
+
+    // Parse odd boxes, e.g. "+ 1 ลังเศษ x 1452" or "+ 1 กล่องเศษ x 500"
+    const oddMatch = text.match(/\+\s*(\d+)\s*(?:[^\sxX*]+)?เศษ\s*[xX*]\s*(\d+(?:\.\d+)?)/i);
+    if (oddMatch) {
+      oddBCount = parseInt(oddMatch[1], 10) || 0;
+      oddPBox = parseFloat(oddMatch[2]) || 0;
     }
 
     const lotMatch = text.match(/Lot[:.\s]*([A-Za-z0-9\-_./]+)/i);
@@ -355,6 +408,9 @@ export default function RMControlCenterPage() {
       unit: item.unit || (item.rm_code.startsWith('R4') ? 'KG' : 'ชิ้น'),
       boxCount: bCount,
       qtyPerBox: perBox,
+      packageType: pkgType,
+      oddBoxCount: oddBCount,
+      oddQtyPerBox: oddPBox,
       mfgLot: lot,
       receivedBy: currentUser || 'คลังสินค้า',
       receivedDate: item.receive_date || new Date().toISOString(),
@@ -1190,8 +1246,12 @@ export default function RMControlCenterPage() {
       lotProduct: '', 
       warehouse: 'MMPM', 
       controlNo: '',
+      packageType: 'ลัง',
+      customPackageType: '',
       boxCount: '1',
       qtyPerBox: '',
+      oddBoxCount: '0',
+      oddQtyPerBox: '',
       mfgLot: '-'
     });
     
@@ -1209,27 +1269,38 @@ export default function RMControlCenterPage() {
         .select('control_no')
         .like('control_no', searchPattern);
 
-      let nextNum = 1;
+      let nextIndex = 1;
       if (!error && data && data.length > 0) {
-        const nums = data
-          .map((d: any) => {
-            if (!d.control_no) return 0;
-            const parts = d.control_no.split('-');
-            return parts.length === 2 ? parseInt(parts[1], 10) : 0;
+        const indexes = data
+          .map((item: any) => {
+            if (!item.control_no) return 0;
+            const parts = item.control_no.split('-');
+            if (parts.length >= 2) {
+              const numPart = parseInt(parts[parts.length - 1], 10);
+              return isNaN(numPart) ? 0 : numPart;
+            }
+            return 0;
           })
-          .filter((n: number) => !isNaN(n) && n > 0);
-        if (nums.length > 0) {
-          nextNum = Math.max(...nums) + 1;
+          .filter((n: number) => n > 0);
+
+        if (indexes.length > 0) {
+          nextIndex = Math.max(...indexes) + 1;
         }
       }
-      setCmd2Form(prev => ({ ...prev, controlNo: `${prefix}${dateString}-${String(nextNum).padStart(2, '0')}` }));
-    } catch (error) {
-      console.error("Error generating control no:", error);
+
+      const generatedControlNo = `${prefix}${dateString}-${String(nextIndex).padStart(2, '0')}`;
+      setCmd2Form(prev => ({ ...prev, controlNo: generatedControlNo }));
+    } catch (err) {
+      console.error('Error generating CMD2 control_no:', err);
     }
   };
 
   const handleCmd2Submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!cmd2Form.pmName || !cmd2Form.quantity || !cmd2Form.customerName) {
+      toast.error('กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน');
+      return;
+    }
 
     if (cmd2Form.controlNo.trim()) {
       const { data: duplicateData } = await supabase
@@ -1246,12 +1317,11 @@ export default function RMControlCenterPage() {
 
     setUploading(true);
     
-    // Generate pseudo PO/PR number: PMYYMMAAA
-    // PM คือวัสดุ, YY คือเลขสองหลักสุดท้ายปี ค.ศ. (2026=26), MM คือเลขเดือน (เช่น 09), AAA คือลำดับการคีย์รับเข้าในเดือนนั้น (001 เป็นต้นไป)
+    // Generate pseudo PO/PR number: CMD2-YYMMAAA
     const d = new Date();
     const yy = d.getFullYear().toString().slice(2);
     const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const monthPrefix = `PM${yy}${mm}`;
+    const monthPrefix = `CMD2-${yy}${mm}`;
 
     const { data: poList } = await supabase
       .from('production_lot_rms')
@@ -1279,8 +1349,15 @@ export default function RMControlCenterPage() {
     const qtyVal = parseFloat(cmd2Form.quantity) || 0;
     const bCount = parseInt(cmd2Form.boxCount, 10) || 1;
     const pBox = parseFloat(cmd2Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+    const oddBCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+    const oddPBox = parseFloat(cmd2Form.oddQtyPerBox) || 0;
+    const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
+      ? (cmd2Form.customPackageType.trim() || 'ลัง') 
+      : (cmd2Form.packageType || 'ลัง');
     const mfgLotStr = cmd2Form.mfgLot && cmd2Form.mfgLot.trim() ? cmd2Form.mfgLot.trim() : '-';
-    const pkgStr = `(${bCount}กล่อง x ${pBox}ชิ้น)${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+
+    const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ชิ้น${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ชิ้น` : ''}`;
+    const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
 
     const { error } = await supabase.from('production_lot_rms').insert({
       po_no: fakePo,
@@ -1302,7 +1379,7 @@ export default function RMControlCenterPage() {
     setUploading(false);
 
     if (error) {
-      toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ');
+      toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ: ' + error.message);
     } else {
       toast.success(`รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${fakePo})`);
       setIsCmd2ModalOpen(false);
@@ -1317,6 +1394,9 @@ export default function RMControlCenterPage() {
         unit: 'ชิ้น',
         boxCount: bCount,
         qtyPerBox: pBox,
+        packageType: effectivePkg,
+        oddBoxCount: oddBCount,
+        oddQtyPerBox: oddPBox,
         mfgLot: mfgLotStr,
         receivedBy: currentUser || 'คลังสินค้า',
         receivedDate: new Date().toISOString(),
@@ -1332,8 +1412,12 @@ export default function RMControlCenterPage() {
         lotProduct: '', 
         warehouse: 'MMPM', 
         controlNo: '',
+        packageType: 'ลัง',
+        customPackageType: '',
         boxCount: '1',
         qtyPerBox: '',
+        oddBoxCount: '0',
+        oddQtyPerBox: '',
         mfgLot: '-'
       });
       fetchItems();
@@ -3641,50 +3725,197 @@ export default function RMControlCenterPage() {
             </div>
 
             {/* Packaging Breakdown for Quarantine Tag */}
-            <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-bold text-amber-900 flex items-center gap-1.5">
-                  <Package className="w-3.5 h-3.5 text-amber-600" />
-                  📦 ข้อมูลบรรจุภัณฑ์ & แบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
-                </Label>
-                <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">
-                  {cmd2Form.quantity ? `${Number(cmd2Form.quantity).toLocaleString()} ชิ้น (${cmd2Form.boxCount || 1} กล่อง x ${cmd2Form.qtyPerBox || 0} ชิ้น)` : 'ระบุยอดเพื่อคำนวณอัตโนมัติ'}
-                </span>
-              </div>
-              <div className="grid grid-cols-3 gap-2.5">
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนกล่องทั้งหมด <span className="text-red-500">*</span></Label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    value={cmd2Form.boxCount} 
-                    onChange={e => handleCmd2BoxCountChange(e.target.value)} 
-                    placeholder="เช่น 8"
-                    className="text-xs bg-white font-bold" 
-                  />
+            {(() => {
+              const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
+                ? (cmd2Form.customPackageType.trim() || 'ภาชนะ') 
+                : (cmd2Form.packageType || 'ลัง');
+              const fullCount = parseInt(cmd2Form.boxCount, 10) || 0;
+              const fullQty = parseFloat(cmd2Form.qtyPerBox) || 0;
+              const oddCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+              const oddQty = parseFloat(cmd2Form.oddQtyPerBox) || 0;
+              const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
+              const targetTotal = parseFloat(cmd2Form.quantity) || 0;
+              const isMatch = targetTotal > 0 && calcTotal === targetTotal;
+              const totalUnits = fullCount + oddCount;
+
+              return (
+                <div className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200/90 space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-amber-200/60">
+                    <Label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                      <Package className="w-4 h-4 text-amber-600" />
+                      ข้อมูลภาชนะบรรจุ & ยอดแบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                    </Label>
+                    <div className="flex items-center gap-1.5">
+                      {targetTotal > 0 && fullQty > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleCmd2AutoSplitRemainder}
+                          className="text-[10px] bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                          title="คำนวณจำนวนกล่องเต็มและเศษอัตโนมัติจากยอดรับเข้าและยอดต่อภาชนะเต็ม"
+                        >
+                          ⚡ คำนวณเศษอัตโนมัติ
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Container / Packaging Type Selector */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-amber-950">
+                        ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
+                      </Label>
+                      <select
+                        value={cmd2Form.packageType}
+                        onChange={e => setCmd2Form({ ...cmd2Form, packageType: e.target.value })}
+                        className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-amber-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                      >
+                        <option value="ลัง">ลัง (Box/Carton)</option>
+                        <option value="กล่อง">กล่อง (Box)</option>
+                        <option value="ถัง">ถัง (Drum/Pail)</option>
+                        <option value="ถุง">ถุง (Bag)</option>
+                        <option value="หีบ">หีบ (Chest)</option>
+                        <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                        <option value="พาเลท">พาเลท (Pallet)</option>
+                        <option value="กระป๋อง">กระป๋อง (Can)</option>
+                        <option value="ม้วน">ม้วน (Roll)</option>
+                        <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
+                      </select>
+                    </div>
+
+                    {cmd2Form.packageType === 'อื่นๆ' ? (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-amber-950">
+                          ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
+                        </Label>
+                        <Input
+                          value={cmd2Form.customPackageType}
+                          onChange={e => setCmd2Form({ ...cmd2Form, customPackageType: e.target.value })}
+                          placeholder="เช่น ฟอยล์, ซอง, กระสอบ, แกลลอน"
+                          className="h-8 text-xs font-bold bg-white border-amber-300"
+                        />
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                        <Input 
+                          value={cmd2Form.mfgLot} 
+                          onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
+                          placeholder="เช่น 2609A หรือ -"
+                          className="h-8 text-xs bg-white font-mono" 
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {cmd2Form.packageType === 'อื่นๆ' && (
+                    <div className="space-y-1">
+                      <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                      <Input 
+                        value={cmd2Form.mfgLot} 
+                        onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
+                        placeholder="เช่น 2609A หรือ -"
+                        className="h-8 text-xs bg-white font-mono" 
+                      />
+                    </div>
+                  )}
+
+                  {/* Full & Odd Packaging Breakdown Inputs */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
+                    {/* Full Container Group */}
+                    <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200/80 space-y-2">
+                      <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                        <span>📦 {effectivePkg}เต็ม</span>
+                        <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={cmd2Form.boxCount} 
+                          onChange={e => handleCmd2BoxCountChange(e.target.value)} 
+                          placeholder="เช่น 7"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-slate-600">
+                          จำนวนชิ้น/{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="1" 
+                          value={cmd2Form.qtyPerBox} 
+                          onChange={e => setCmd2Form({ ...cmd2Form, qtyPerBox: e.target.value })} 
+                          placeholder="เช่น 1300"
+                          className="h-8 text-xs bg-white font-bold text-center" 
+                        />
+                      </div>
+                    </div>
+
+                    {/* Odd Container Group */}
+                    <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
+                      <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                        <span>🟠 {effectivePkg}เศษ (Odd)</span>
+                        <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวน{effectivePkg}เศษ
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={cmd2Form.oddBoxCount} 
+                          onChange={e => setCmd2Form({ ...cmd2Form, oddBoxCount: e.target.value })} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-semibold text-amber-900">
+                          จำนวนชิ้น/{effectivePkg}เศษ
+                        </Label>
+                        <Input 
+                          type="number" 
+                          min="0" 
+                          value={cmd2Form.oddQtyPerBox} 
+                          onChange={e => setCmd2Form({ ...cmd2Form, oddQtyPerBox: e.target.value })} 
+                          placeholder="0"
+                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Live Summary and Validation */}
+                  <div className="text-xs pt-1">
+                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
+                      <span className="text-slate-700">
+                        🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
+                      </span>
+                      {targetTotal > 0 && (
+                        isMatch ? (
+                          <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                            ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} ชิ้น ตรงกับยอดรับเข้า
+                          </span>
+                        ) : (
+                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                            ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} ชิ้น (ยอดรับเข้า {targetTotal.toLocaleString()} ชิ้น)
+                          </span>
+                        )
+                      )}
+                    </div>
+                    <div className="text-[11px] text-slate-500 font-mono pt-1">
+                      รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} ชิ้น{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ชิ้น` : ''}){cmd2Form.mfgLot && cmd2Form.mfgLot !== '-' ? ` Lot.${cmd2Form.mfgLot}` : ''}
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนชิ้น/กล่อง <span className="text-red-500">*</span></Label>
-                  <Input 
-                    type="number" 
-                    min="1" 
-                    value={cmd2Form.qtyPerBox} 
-                    onChange={e => setCmd2Form({ ...cmd2Form, qtyPerBox: e.target.value })} 
-                    placeholder="เช่น 1319"
-                    className="text-xs bg-white font-bold" 
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                  <Input 
-                    value={cmd2Form.mfgLot} 
-                    onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
-                    placeholder="เช่น 2609A หรือ -"
-                    className="text-xs bg-white font-mono" 
-                  />
-                </div>
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">

@@ -16,8 +16,11 @@ export interface QuarantineTagData {
   supplier: string;
   totalQty: number | string;
   unit?: string;
+  packageType?: string;
   boxCount?: number | string;
   qtyPerBox?: number | string;
+  oddBoxCount?: number | string;
+  oddQtyPerBox?: number | string;
   mfgLot?: string;
   receivedBy?: string;
   receivedDate?: string;
@@ -28,7 +31,7 @@ interface QuarantineTagModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialData: QuarantineTagData | null;
-  onSavedMetadata?: (data: { boxCount: number; qtyPerBox: number; mfgLot: string }) => void;
+  onSavedMetadata?: (data: { boxCount: number; qtyPerBox: number; mfgLot: string; packageType?: string; oddBoxCount?: number; oddQtyPerBox?: number }) => void;
 }
 
 export function QuarantineTagModal({
@@ -44,8 +47,12 @@ export function QuarantineTagModal({
   const [supplier, setSupplier] = useState('');
   const [totalQty, setTotalQty] = useState<number | string>('');
   const [unit, setUnit] = useState('ชิ้น');
+  const [packageType, setPackageType] = useState('ลัง');
+  const [customPackageType, setCustomPackageType] = useState('');
   const [boxCount, setBoxCount] = useState<number>(1);
   const [qtyPerBox, setQtyPerBox] = useState<number | string>('');
+  const [oddBoxCount, setOddBoxCount] = useState<number>(0);
+  const [oddQtyPerBox, setOddQtyPerBox] = useState<number | string>('');
   const [mfgLot, setMfgLot] = useState('-');
   const [receivedBy, setReceivedBy] = useState('');
   const [receivedDate, setReceivedDate] = useState('');
@@ -103,6 +110,16 @@ export function QuarantineTagModal({
       const tQty = parseFloat(String(initialData.totalQty)) || 0;
       setTotalQty(tQty || initialData.totalQty || '');
       setUnit(initialData.unit || (initialData.code.startsWith('R4') ? 'KG' : 'ชิ้น'));
+
+      const defaultPkg = initialData.packageType || (initialData.code?.startsWith('R4') ? 'ถัง' : 'ลัง');
+      const standardTypes = ['ลัง', 'กล่อง', 'ถัง', 'ถุง', 'หีบ', 'ห่อ', 'พาเลท', 'กระป๋อง', 'ม้วน'];
+      if (standardTypes.includes(defaultPkg)) {
+        setPackageType(defaultPkg);
+        setCustomPackageType('');
+      } else {
+        setPackageType('อื่นๆ');
+        setCustomPackageType(defaultPkg);
+      }
       
       const bCount = Math.max(1, parseInt(String(initialData.boxCount || 1), 10) || 1);
       setBoxCount(bCount);
@@ -114,6 +131,10 @@ export function QuarantineTagModal({
       } else {
         setQtyPerBox('');
       }
+
+      const oddB = Math.max(0, parseInt(String(initialData.oddBoxCount || 0), 10) || 0);
+      setOddBoxCount(oddB);
+      setOddQtyPerBox(initialData.oddQtyPerBox != null ? initialData.oddQtyPerBox : '');
 
       setMfgLot(initialData.mfgLot && initialData.mfgLot.trim() ? initialData.mfgLot.trim() : '-');
       setReceivedBy(initialData.receivedBy || 'คลังสินค้า');
@@ -148,6 +169,9 @@ export function QuarantineTagModal({
     }
   }, [initialData, open]);
 
+  const effectivePackageType = packageType === 'อื่นๆ' ? (customPackageType.trim() || 'ภาชนะ') : packageType;
+  const totalBoxCount = Math.max(1, (boxCount || 0) + (oddBoxCount || 0));
+
   // Handle Box Count changes with auto-calculation of Qty per Box
   const handleBoxCountChange = (val: number) => {
     const safeCount = Math.max(1, val || 1);
@@ -169,29 +193,49 @@ export function QuarantineTagModal({
 
   // Generate sequence of tags
   const tagsToPrint = useMemo(() => {
-    const totalCount = Math.max(1, boxCount || 1);
+    const fullCount = Math.max(0, boxCount || 0);
+    const oddCount = Math.max(0, oddBoxCount || 0);
+    const totalCount = Math.max(1, fullCount + oddCount);
     const list = [];
 
     if (!printAllSequence) {
       // Print single tag (1 of 1 or current previewIndex)
+      const isOdd = previewIndex > fullCount;
       list.push({
         boxIndex: previewIndex,
         totalBoxes: totalCount,
-        boxQty: qtyPerBox || totalQty
+        boxQty: isOdd ? (oddQtyPerBox || totalQty) : (qtyPerBox || totalQty),
+        isOdd
       });
     } else {
-      // Print all sequence 1 of N to N of N
-      for (let i = 1; i <= totalCount; i++) {
-        // Last box may have remainder if uneven
+      // Print all sequence: full boxes followed by odd boxes
+      for (let i = 1; i <= fullCount; i++) {
         list.push({
           boxIndex: i,
           totalBoxes: totalCount,
-          boxQty: qtyPerBox || totalQty
+          boxQty: qtyPerBox || totalQty,
+          isOdd: false
+        });
+      }
+      for (let j = 1; j <= oddCount; j++) {
+        list.push({
+          boxIndex: fullCount + j,
+          totalBoxes: totalCount,
+          boxQty: oddQtyPerBox || 0,
+          isOdd: true
+        });
+      }
+      if (list.length === 0) {
+        list.push({
+          boxIndex: 1,
+          totalBoxes: 1,
+          boxQty: totalQty,
+          isOdd: false
         });
       }
     }
     return list;
-  }, [boxCount, printAllSequence, previewIndex, qtyPerBox, totalQty]);
+  }, [boxCount, oddBoxCount, printAllSequence, previewIndex, qtyPerBox, oddQtyPerBox, totalQty]);
 
   const printContainerRef = useRef<HTMLDivElement>(null);
 
@@ -201,7 +245,10 @@ export function QuarantineTagModal({
       onSavedMetadata({
         boxCount: Number(boxCount) || 1,
         qtyPerBox: Number(qtyPerBox) || Number(totalQty) || 0,
-        mfgLot: mfgLot || '-'
+        mfgLot: mfgLot || '-',
+        packageType: effectivePackageType,
+        oddBoxCount: Number(oddBoxCount) || 0,
+        oddQtyPerBox: Number(oddQtyPerBox) || 0
       });
     }
 
@@ -620,40 +667,113 @@ export function QuarantineTagModal({
                 </div>
               </div>
 
-              {/* Box Count & Qty per Box */}
-              <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 space-y-2">
+              {/* Packaging Breakdown & Remainder */}
+              <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-bold text-amber-950 flex items-center gap-1">
                     <Package className="w-3.5 h-3.5 text-amber-600" />
-                    แบ่งจำนวนกล่อง & ยอดต่อกล่อง
+                    ข้อมูลภาชนะ & แบ่งบรรจุ (ลัง/กล่อง/ถัง)
                   </Label>
                   <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">
                     คำนวณอัตโนมัติ
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-amber-900">จำนวนกล่องทั้งหมด *</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={boxCount}
-                      onChange={e => handleBoxCountChange(parseInt(e.target.value, 10) || 1)}
-                      className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-[11px] font-semibold text-amber-900">จำนวนชิ้น/กล่อง</Label>
-                    <Input
-                      type="number"
-                      value={qtyPerBox}
-                      onChange={e => setQtyPerBox(e.target.value)}
-                      className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
-                    />
+
+                {/* Package Type Selector */}
+                <div className="space-y-1">
+                  <Label className="text-[11px] font-semibold text-amber-900">ประเภทภาชนะบรรจุ</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <select
+                      value={packageType}
+                      onChange={e => setPackageType(e.target.value)}
+                      className="h-8 text-xs font-bold bg-white text-amber-950 border border-amber-300 rounded-lg px-2"
+                    >
+                      <option value="ลัง">ลัง (Box/Carton)</option>
+                      <option value="กล่อง">กล่อง (Box)</option>
+                      <option value="ถัง">ถัง (Drum/Pail)</option>
+                      <option value="ถุง">ถุง (Bag)</option>
+                      <option value="หีบ">หีบ (Chest)</option>
+                      <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                      <option value="พาเลท">พาเลท (Pallet)</option>
+                      <option value="กระป๋อง">กระป๋อง (Can)</option>
+                      <option value="ม้วน">ม้วน (Roll)</option>
+                      <option value="อื่นๆ">อื่นๆ (ระบุเอง)</option>
+                    </select>
+                    {packageType === 'อื่นๆ' ? (
+                      <Input
+                        value={customPackageType}
+                        onChange={e => setCustomPackageType(e.target.value)}
+                        placeholder="พิมพ์ระบุ เช่น กระสอบ"
+                        className="h-8 text-xs font-bold bg-white text-amber-950 border-amber-300"
+                      />
+                    ) : (
+                      <div className="h-8 px-2 flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/50 rounded-lg border border-amber-200">
+                        หน่วยเรียก: {effectivePackageType}
+                      </div>
+                    )}
                   </div>
                 </div>
+
+                {/* Full Packaging */}
+                <div className="pt-1 border-t border-amber-200/60">
+                  <div className="text-[11px] font-bold text-amber-950 mb-1">
+                    🟢 {effectivePackageType}เต็ม (Full)
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-amber-900">จำนวน{effectivePackageType}เต็ม *</Label>
+                      <Input
+                        type="number"
+                        min="1"
+                        value={boxCount}
+                        onChange={e => handleBoxCountChange(parseInt(e.target.value, 10) || 1)}
+                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-amber-900">ยอดต่อ{effectivePackageType}เต็ม</Label>
+                      <Input
+                        type="number"
+                        value={qtyPerBox}
+                        onChange={e => setQtyPerBox(e.target.value)}
+                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Remainder/Odd Packaging */}
+                <div className="pt-1 border-t border-amber-200/60">
+                  <div className="text-[11px] font-bold text-amber-950 mb-1 flex items-center justify-between">
+                    <span>🟠 {effectivePackageType}เศษ (Odd / Remainder)</span>
+                    <span className="text-[10px] font-normal text-amber-700">ใส่ 0 หากไม่มีเศษ</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-amber-900">จำนวน{effectivePackageType}เศษ</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={oddBoxCount}
+                        onChange={e => setOddBoxCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-semibold text-amber-900">ยอดต่อ{effectivePackageType}เศษ</Label>
+                      <Input
+                        type="number"
+                        value={oddQtyPerBox}
+                        onChange={e => setOddQtyPerBox(e.target.value)}
+                        placeholder="0"
+                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="text-[11px] text-amber-900 font-medium pt-1">
-                  📦 สรุป: <strong className="text-slate-900">{totalQty ? Number(totalQty).toLocaleString() : 0} {unit}</strong> ({boxCount} กล่อง x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : 0} {unit})
+                  📦 สรุป: <strong className="text-slate-900">{totalQty ? Number(totalQty).toLocaleString() : 0} {unit}</strong> ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : 0}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}` : ''}) • รวมทั้งสิ้น {totalBoxCount} {effectivePackageType}
                 </div>
               </div>
 
@@ -810,7 +930,7 @@ export function QuarantineTagModal({
                   </button>
                 </div>
 
-                {boxCount > 1 && printAllSequence && (
+                {totalBoxCount > 1 && printAllSequence && (
                   <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-full border border-slate-200 text-xs shadow-xs">
                     <button
                       type="button"
@@ -821,12 +941,12 @@ export function QuarantineTagModal({
                       <ChevronLeft className="w-4 h-4" />
                     </button>
                     <span className="font-mono text-xs font-bold text-purple-900">
-                      กล่องที่ {previewIndex} of {boxCount}
+                      {effectivePackageType}ที่ {previewIndex} of {totalBoxCount} {previewIndex > boxCount ? `[${effectivePackageType}เศษ]` : ''}
                     </span>
                     <button
                       type="button"
-                      disabled={previewIndex >= boxCount}
-                      onClick={() => setPreviewIndex(prev => Math.min(boxCount, prev + 1))}
+                      disabled={previewIndex >= totalBoxCount}
+                      onClick={() => setPreviewIndex(prev => Math.min(totalBoxCount, prev + 1))}
                       className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-30"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -970,26 +1090,41 @@ export function QuarantineTagModal({
                           <span className="font-bold">{totalQty ? Number(totalQty).toLocaleString() : 0}{unit}</span>
                         </div>
                         <span className="font-bold text-slate-900 text-[11px] sm:text-xs shrink-0">
-                          ({boxCount}กล่อง x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit})
+                          ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
                         </span>
                       </div>
 
                       {/* Qty./unit + of N */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center">
-                          <span className="w-24 font-bold shrink-0">Qty./unit</span>
-                          <span className="w-3 text-center shrink-0">:</span>
-                          <span className="font-bold">{qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)} {unit}</span>
-                        </div>
-                        <div className="flex items-center font-bold text-xs sm:text-sm">
-                          <span className="text-slate-600 font-normal mr-2">of</span>
-                          <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono">
-                            {printAllSequence ? previewIndex : 1}
-                          </span>
-                          <span className="mx-1 text-slate-400">/</span>
-                          <span className="font-mono">{boxCount}</span>
-                        </div>
-                      </div>
+                      {(() => {
+                        const isOddPreview = previewIndex > boxCount;
+                        const currentBoxQty = isOddPreview
+                          ? (oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0)
+                          : (qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0));
+                        return (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center">
+                              <span className="w-24 font-bold shrink-0">Qty./unit</span>
+                              <span className="w-3 text-center shrink-0">:</span>
+                              <span className="font-bold">
+                                {currentBoxQty} {unit}
+                                {isOddPreview && (
+                                  <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
+                                    {effectivePackageType}เศษ
+                                  </span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex items-center font-bold text-xs sm:text-sm">
+                              <span className="text-slate-600 font-normal mr-2">of</span>
+                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono">
+                                {printAllSequence ? previewIndex : 1}
+                              </span>
+                              <span className="mx-1 text-slate-400">/</span>
+                              <span className="font-mono">{totalBoxCount}</span>
+                            </div>
+                          </div>
+                        );
+                      })()}
 
                       {/* Received by + Date */}
                       <div className="flex items-center justify-between gap-2 pt-0.5">
@@ -1172,7 +1307,7 @@ export function QuarantineTagModal({
                     </span>
                   </div>
                   <span style={{ fontWeight: 'bold', fontSize: '8.5pt' }}>
-                    ({boxCount}กล่อง x {tag.boxQty ? Number(tag.boxQty).toLocaleString() : 0}{unit})
+                    ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
                   </span>
                 </div>
 
@@ -1183,6 +1318,11 @@ export function QuarantineTagModal({
                     <span className="colon-col">:</span>
                     <span className="val-col val-bold">
                       {tag.boxQty ? Number(tag.boxQty).toLocaleString() : 0} {unit}
+                      {tag.isOdd && (
+                        <span style={{ marginLeft: '4px', fontSize: '7.5pt', fontWeight: 'bold', border: '1px solid #000', padding: '0 2px', borderRadius: '2px' }}>
+                          [{effectivePackageType}เศษ]
+                        </span>
+                      )}
                     </span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '10pt' }}>
