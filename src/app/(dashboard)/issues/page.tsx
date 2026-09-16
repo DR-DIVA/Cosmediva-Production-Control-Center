@@ -19,11 +19,12 @@ import {
   ShieldCheck,
   X,
   Layers,
-  Sparkles
+  Sparkles,
+  RefreshCw
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -61,7 +62,7 @@ export default function IssuesPage() {
   const [currentUserInfo, setCurrentUserInfo] = useState<any>(null)
   const [masterUsers, setMasterUsers] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
-  const [currentUser, setCurrentUser] = useState<string>('System')
+  const [currentUser, setCurrentUser] = useState<string>('')
   const [streamFilter, setStreamFilter] = useState<'ALL' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
 
   // Quality KPI Metrics state
@@ -330,6 +331,77 @@ export default function IssuesPage() {
     toast.success('รีเฟรชข้อมูลคุณภาพล่าสุดแล้ว')
   }
 
+  const [selectedInspector, setSelectedInspector] = useState<string>('')
+
+  const fetchCurrentAuthUser = async (uList: any[] = masterUsers) => {
+    try {
+      // 1. Check session first for speed
+      const { data: { session } } = await supabase.auth.getSession()
+      let authUser: any = session?.user
+
+      // 2. If not found in session, try getUser()
+      if (!authUser) {
+        const { data: { user } } = await supabase.auth.getUser()
+        authUser = user
+      }
+
+      if (authUser) {
+        const email = authUser.email || ''
+        const prefix = email.includes('@') ? email.split('@')[0] : email
+        const metaEmpId = authUser.user_metadata?.employee_id || authUser.user_metadata?.username
+        const metaName = authUser.user_metadata?.full_name || authUser.user_metadata?.name
+
+        // Match with master users list
+        let matched = uList.find(u => 
+          u.id === authUser!.id || 
+          u.employee_id?.toLowerCase() === prefix.toLowerCase() ||
+          u.employee_id?.toLowerCase() === metaEmpId?.toLowerCase()
+        )
+
+        // If not matched in uList yet, fetch from profiles table directly
+        if (!matched) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`id.eq.${authUser.id},employee_id.ilike.${prefix},employee_id.ilike.${metaEmpId || prefix}`)
+            .maybeSingle()
+          if (profile) matched = profile
+        }
+
+        if (matched) {
+          setCurrentUserInfo(matched)
+          const empId = matched.employee_id.toUpperCase()
+          setCurrentUser(empId)
+          if (!selectedInspector) setSelectedInspector(empId)
+          return matched
+        } else {
+          const fallbackUsername = (metaEmpId || (prefix && prefix.toLowerCase() !== 'system' ? prefix : 'QA')).toUpperCase()
+          const info = {
+            employee_id: fallbackUsername,
+            full_name: metaName || fallbackUsername
+          }
+          setCurrentUserInfo(info)
+          setCurrentUser(fallbackUsername)
+          if (!selectedInspector) setSelectedInspector(fallbackUsername)
+          return info
+        }
+      } else {
+        // Fallback: Check if there is a known QA user in uList (e.g. QABUP1677)
+        const qaUser = uList.find(u => u.employee_id?.toUpperCase().startsWith('QA') || u.role?.includes('issues:edit'))
+        if (qaUser) {
+          setCurrentUserInfo(qaUser)
+          const empId = qaUser.employee_id.toUpperCase()
+          setCurrentUser(empId)
+          if (!selectedInspector) setSelectedInspector(empId)
+          return qaUser
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching auth user in issues page:', err)
+    }
+    return null
+  }
+
   useEffect(() => {
     const initData = async () => {
       let uList: any[] = []
@@ -343,27 +415,7 @@ export default function IssuesPage() {
         console.error('Error fetching master users:', err)
       }
 
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const email = user.email || ''
-        const prefix = email.includes('@') ? email.split('@')[0].toLowerCase() : email.toLowerCase()
-        
-        const matched = uList.find(u => 
-          u.id === user.id || 
-          u.employee_id?.toLowerCase() === prefix ||
-          u.employee_id?.toLowerCase() === user.user_metadata?.employee_id?.toLowerCase()
-        )
-
-        if (matched) {
-          setCurrentUserInfo(matched)
-          setCurrentUser(matched.employee_id.toUpperCase())
-        } else {
-          const empId = user.user_metadata?.employee_id 
-            ? user.user_metadata.employee_id.toUpperCase() 
-            : (prefix && prefix !== 'system' ? prefix.toUpperCase() : 'QA')
-          setCurrentUser(empId)
-        }
-      }
+      await fetchCurrentAuthUser(uList)
     }
 
     initData()
@@ -372,9 +424,13 @@ export default function IssuesPage() {
     fetchQualityMetrics()
   }, [])
 
-  const openResolveDialog = (issue: any) => {
+  const openResolveDialog = async (issue: any) => {
     setResolvingIssue(issue)
     setResolveNote('')
+    if (!currentUser || currentUser.toLowerCase() === 'system') {
+      await fetchCurrentAuthUser()
+    }
+    setSelectedInspector(currentUserInfo?.employee_id || currentUser || 'QA')
     setIsResolveOpen(true)
   }
 
@@ -382,7 +438,7 @@ export default function IssuesPage() {
     if (!resolvingIssue) return
     
     const timestamp = new Date().toLocaleString('th-TH')
-    const inspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+    const inspector = (selectedInspector || currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
     const resolutionText = resolveNote.trim() 
       ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${inspector} - ${timestamp})` 
       : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${inspector} - ${timestamp})`
@@ -412,6 +468,37 @@ export default function IssuesPage() {
     fetchIssues()
     fetchActiveTasks()
     fetchQualityMetrics()
+  }
+
+  // Batch sync legacy "SYSTEM" records to the logged-in username
+  const handleSyncLegacySystemRecords = async () => {
+    const targetInspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+    try {
+      const { data: logs, error: fetchErr } = await supabase.from('production_logs')
+        .select('id, note')
+        .or('note.ilike.%(โดย SYSTEM -%,note.ilike.%(โดย System -%')
+
+      if (fetchErr || !logs || logs.length === 0) {
+        toast.info('ไม่พบรายการประวัติที่ใช้ชื่อ SYSTEM')
+        return
+      }
+
+      let updatedCount = 0
+      for (const log of logs) {
+        const updatedNote = log.note.replace(/\(โดย (?:SYSTEM|System) -/g, `(โดย ${targetInspector} -`)
+        const { error: updateErr } = await supabase
+          .from('production_logs')
+          .update({ note: updatedNote })
+          .eq('id', log.id)
+        if (!updateErr) updatedCount++
+      }
+
+      toast.success(`อัปเดตชื่อผู้ตรวจสอบเป็น ${targetInspector} สำเร็จ ${updatedCount} รายการ`)
+      fetchIssues()
+    } catch (err) {
+      console.error('Error syncing legacy system records:', err)
+      toast.error('เกิดข้อผิดพลาดในการอัปเดตข้อมูล')
+    }
   }
 
   const handleReportSubmit = async () => {
@@ -503,6 +590,28 @@ export default function IssuesPage() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 items-end sm:items-center">
+          {/* Active QA Inspector Indicator Badge */}
+          <div className="flex items-center gap-2.5 bg-[#F8F6F0] px-3.5 py-1.5 rounded-xl border border-[#D4AF37]/40 shadow-xs">
+            <div className="w-8 h-8 rounded-lg bg-[#D4AF37]/20 flex items-center justify-center shrink-0">
+              <User className="w-4 h-4 text-[#D4AF37]" />
+            </div>
+            <div className="text-left">
+              <div className="text-[10px] text-[#8B7355] font-bold uppercase tracking-wider">ผู้ตรวจสอบล็อกอิน (QA)</div>
+              <div className="text-xs font-bold text-[#4A4238] flex items-center gap-1">
+                {currentUser ? (
+                  <>
+                    <span className="font-mono bg-white px-1.5 py-0.5 rounded border border-[#D4AF37]/30 text-[#8B7355]">{currentUser}</span>
+                    {currentUserInfo?.full_name && (
+                      <span className="text-slate-600 font-medium ml-1">({currentUserInfo.full_name})</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-slate-400 font-normal">กำลังตรวจสอบสิทธิ์...</span>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div className="w-full sm:w-64">
             <Input 
               placeholder="ค้นหา SKU หรือ LOT..." 
@@ -949,15 +1058,35 @@ export default function IssuesPage() {
         
         <TabsContent value="resolved">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center justify-between">
-                <span>ประวัติปัญหาที่แก้ไขแล้ว (50 รายการล่าสุด)</span>
-                {streamFilter !== 'ALL' && (
-                  <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
-                    Filter: {streamFilter}
-                  </Badge>
-                )}
-              </CardTitle>
+            <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/20 pb-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2 text-[#4A4238]">
+                    <History className="w-5 h-5 text-indigo-600" />
+                    ประวัติปัญหาที่แก้ไขแล้ว (50 รายการล่าสุด)
+                  </CardTitle>
+                  <CardDescription className="text-xs text-[#8B7355] mt-0.5">
+                    บันทึกประวัติการตรวจสอบและรับรองโดยฝ่ายประกันคุณภาพ (Quality Assurance)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  {streamFilter !== 'ALL' && (
+                    <Badge variant="outline" className="text-xs bg-amber-50 text-amber-800 border-amber-300">
+                      Filter: {streamFilter}
+                    </Badge>
+                  )}
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleSyncLegacySystemRecords}
+                    className="text-xs bg-white hover:bg-amber-50 border-[#D4AF37]/40 text-[#8B7355] font-semibold flex items-center gap-1.5 shadow-2xs"
+                    title="อัปเดตบันทึกประวัติย้อนหลังที่เคยเป็น SYSTEM ให้เป็น username ผู้ตรวจสอบปัจจุบัน"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    ซิงค์ชื่อผู้ตรวจสอบ SYSTEM เป็น {currentUser || 'ผู้ตรวจสอบปัจจุบัน'}
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent>
               <Table>
@@ -1007,9 +1136,23 @@ export default function IssuesPage() {
                         <TableCell>
                           <div className={`text-xs p-2 rounded border inline-block bg-[#F8F6F0] text-slate-700 border-slate-200`}>
                             <div className="mb-0.5 whitespace-pre-wrap">
-                              {issue.parsedNote.includes('[') ? 
-                                <span><strong className={issue.parsedNote.includes('Resolved') ? 'text-green-600' : ''}>{issue.parsedNote.split(']')[0] + ']'}</strong> {issue.parsedNote.split(']').slice(1).join(']')}</span> : 
-                                <span>{issue.parsedNote}</span>}
+                              {(() => {
+                                let displayNote = issue.parsedNote || ''
+                                if (displayNote.includes('(โดย SYSTEM -') || displayNote.includes('(โดย System -')) {
+                                  const activeInspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+                                  displayNote = displayNote.replace(/\(โดย (?:SYSTEM|System) -/g, `(โดย ${activeInspector} -`)
+                                }
+                                return displayNote.includes('[') ? (
+                                  <span>
+                                    <strong className={displayNote.includes('Resolved') ? 'text-green-600' : ''}>
+                                      {displayNote.split(']')[0] + ']'}
+                                    </strong>{' '}
+                                    {displayNote.split(']').slice(1).join(']')}
+                                  </span>
+                                ) : (
+                                  <span>{displayNote}</span>
+                                )
+                              })()}
                             </div>
                           </div>
                         </TableCell>
@@ -1018,15 +1161,24 @@ export default function IssuesPage() {
                             <User className="w-3.5 h-3.5 mr-1.5 text-[#D4AF37]" />
                             {(() => {
                               const match = issue.parsedNote.match(/\(โดย (.*?) - /)
-                              const inspectorId = match ? match[1] : '-'
-                              const matchedUser = masterUsers.find(u => u.employee_id?.toLowerCase() === inspectorId.toLowerCase())
+                              let inspectorId = match ? match[1].trim() : ''
+                              const isLegacy = !inspectorId || inspectorId.toUpperCase() === 'SYSTEM'
+                              if (isLegacy) {
+                                inspectorId = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+                              }
+                              const matchedUser = masterUsers.find(u => u.employee_id?.toLowerCase() === inspectorId.toLowerCase()) || 
+                                (currentUserInfo?.employee_id?.toLowerCase() === inspectorId.toLowerCase() ? currentUserInfo : null)
                               return (
                                 <div className="flex items-center gap-1.5">
-                                  <Badge variant="outline" className="bg-amber-50 text-[#8B7355] border-[#D4AF37]/30 font-bold px-2 py-0.5">
+                                  <Badge variant="outline" className={`font-bold px-2 py-0.5 ${
+                                    isLegacy 
+                                      ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                      : 'bg-amber-50 text-[#8B7355] border-[#D4AF37]/30'
+                                  }`}>
                                     {inspectorId}
                                   </Badge>
-                                  {matchedUser && (
-                                    <span className="text-slate-500 font-normal">({matchedUser.full_name})</span>
+                                  {matchedUser?.full_name && (
+                                    <span className="text-slate-600 font-medium">({matchedUser.full_name})</span>
                                   )}
                                 </div>
                               )
@@ -1088,25 +1240,57 @@ export default function IssuesPage() {
 
       {/* Modal: Resolve Issue (QA) */}
       <Dialog open={isResolveOpen} onOpenChange={setIsResolveOpen}>
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle>บันทึกการแก้ไขปัญหา (QA Resolution)</DialogTitle>
+            <DialogTitle className="text-lg flex items-center gap-2 text-[#4A4238]">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              บันทึกการแก้ไขปัญหา (QA Resolution)
+            </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4">
-            <div className="bg-[#F8F6F0] p-3.5 rounded-xl border border-[#D4AF37]/30 flex items-center justify-between">
-              <div>
-                <div className="text-xs text-[#8B7355] font-medium">ผู้ตรวจสอบ (QA) ที่บันทึกรายการ</div>
-                <div className="text-sm font-bold text-[#4A4238] flex items-center gap-2 mt-1">
+            {/* Inspector Selector / Display */}
+            <div className="bg-[#F8F6F0] p-3.5 rounded-xl border border-[#D4AF37]/40 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-[#8B7355] font-bold flex items-center gap-1.5">
                   <User className="w-4 h-4 text-[#D4AF37]" />
-                  <span className="font-mono">{currentUserInfo?.employee_id || currentUser || 'QA'}</span>
-                  {currentUserInfo?.full_name && (
-                    <span className="text-xs font-normal text-slate-600">({currentUserInfo.full_name})</span>
-                  )}
-                </div>
+                  ผู้ตรวจสอบ (QA Inspector) ที่ลงชื่อรับรอง
+                </Label>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                  Logged in: {currentUser || 'QA'}
+                </Badge>
               </div>
-              <Badge variant="outline" className="bg-[#D4AF37]/15 text-[#8B7355] border-[#D4AF37]/40 text-xs">
-                Auto-Stamp
-              </Badge>
+
+              {/* Selector dropdown with master users list */}
+              <div className="pt-0.5">
+                <select
+                  value={selectedInspector}
+                  onChange={(e) => setSelectedInspector(e.target.value)}
+                  className="flex h-10 w-full rounded-lg border border-[#D4AF37]/50 bg-white px-3 py-2 text-sm font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                >
+                  {/* Current logged-in user option */}
+                  {currentUser && (
+                    <option value={currentUser.toUpperCase()}>
+                      {currentUser.toUpperCase()} {currentUserInfo?.full_name ? `(${currentUserInfo.full_name})` : ''} ★ บัญชีที่ล็อกอินอยู่
+                    </option>
+                  )}
+                  {/* Master users list */}
+                  {masterUsers.filter(u => u.employee_id?.toUpperCase() !== currentUser.toUpperCase()).map(u => (
+                    <option key={u.employee_id} value={u.employee_id.toUpperCase()}>
+                      {u.employee_id.toUpperCase()} - {u.full_name} {u.role?.includes('issues') || u.role?.includes('qc') ? '⭐ (QA/QC)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-[11px] text-slate-600 flex items-center justify-between pt-1 border-t border-[#D4AF37]/20">
+                <span>บันทึกประวัติด้วยชื่อผู้ใช้: <strong className="text-[#8B7355] font-bold">{selectedInspector || currentUser || 'QA'}</strong></span>
+                {(() => {
+                  const targetUser = masterUsers.find(u => u.employee_id?.toUpperCase() === (selectedInspector || currentUser).toUpperCase()) || currentUserInfo
+                  return targetUser?.full_name ? (
+                    <span className="font-semibold text-slate-700">({targetUser.full_name})</span>
+                  ) : null
+                })()}
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -1123,7 +1307,7 @@ export default function IssuesPage() {
             <Button variant="outline" onClick={() => setIsResolveOpen(false)}>ยกเลิก</Button>
             <Button 
               onClick={handleResolveConfirm} 
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-green-600 hover:bg-green-700 text-white font-medium"
             >
               <CheckCircle2 className="w-4 h-4 mr-1" />
               บันทึกและปิดปัญหา
