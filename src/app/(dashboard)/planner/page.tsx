@@ -10,7 +10,7 @@ import {
   Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
-  ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff
+  ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User
 } from 'lucide-react'
 import {
   Table,
@@ -33,7 +33,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from "date-fns"
-import { createClient } from "@supabase/supabase-js"
+import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
 import { getUsers } from '@/app/actions/users'
 import * as XLSX from "xlsx"
@@ -49,11 +49,6 @@ import {
   extractUserComment
 } from "@/lib/planTracking"
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-)
-
 const PROCESS_TYPES = [
   { id: "RM", name: "ชั่งสาร", color: "bg-amber-100 text-amber-800 border-amber-200" },
   { id: "MX", name: "ผสม", color: "bg-[#D4AF37]/ text-[#4A4238] border-[#D4AF37]/30" },
@@ -64,6 +59,7 @@ const searchMap: Record<string, string> = { "RM": "ชั่งสาร", "MX":
 const ALLOWED_PROCESSES = ["ชั่งสาร", "ผสม", "บรรจุ", "ลงลัง", "ส่งมอบ FG"]
 
 export default function PlannerPage() {
+  const supabase = useMemo(() => createClient(), [])
   const [lots, setLots] = useState<any[]>([])
   const [logs, setLogs] = useState<any[]>([])
   const [products, setProducts] = useState<any[]>([])
@@ -118,8 +114,30 @@ export default function PlannerPage() {
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserInfo, setCurrentUserInfo] = useState<any>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string>('admin')
   const canEdit = canEditRoute('/planner', currentUserRole)
+
+  // Column search filters for History Tab
+  const [historyFilters, setHistoryFilters] = useState({
+    time: '',
+    user: '',
+    type: 'ALL',
+    project: '',
+    details: ''
+  })
+
+  // State for changing / editing operator ("หรือแก้ไขข้อมูล")
+  const [editingOperatorItem, setEditingOperatorItem] = useState<{
+    id: string
+    recordId: string
+    isLog: boolean
+    currentUserName: string
+    currentUserId?: string | null
+    project: string
+  } | null>(null)
+  const [selectedOperatorId, setSelectedOperatorId] = useState<string>('')
+  const [isUpdatingOperator, setIsUpdatingOperator] = useState(false)
 
   const [isDoneDialogOpen, setIsDoneDialogOpen] = useState(false)
   const [doneLotId, setDoneLotId] = useState<string | null>(null)
@@ -145,16 +163,26 @@ export default function PlannerPage() {
 
   useEffect(() => {
     const fetchUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        setCurrentUserId(user.id)
-        setCurrentUser(user.email || 'Unknown User')
-        try {
-          const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          setCurrentUserId(user.id)
+          const emailPrefix = user.email ? user.email.split('@')[0] : ''
+          const metaEmpId = user.user_metadata?.employee_id || emailPrefix
+
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`id.eq.${user.id},employee_id.ilike.${metaEmpId || user.id}`)
+            .maybeSingle()
+
+          const empId = (profile?.employee_id || metaEmpId || emailPrefix || 'PLANNER').toUpperCase()
+          setCurrentUser(empId)
+          setCurrentUserInfo(profile || { id: user.id, employee_id: empId, full_name: user.user_metadata?.full_name || empId })
           setCurrentUserRole(profile?.role || user.user_metadata?.role || 'admin')
-        } catch {
-          setCurrentUserRole(user.user_metadata?.role || 'admin')
         }
+      } catch (err) {
+        console.error('Error fetching auth user in planner:', err)
       }
     }
     fetchUser()
@@ -284,14 +312,15 @@ export default function PlannerPage() {
       
       if (updateErr) throw updateErr
 
-      const logNote = `ส่งยอด FG: ${doneFgAmount} ชิ้น | ปิด PO: ${doneCanClosePo === 'yes' ? 'ได้เลย' : 'ไม่ได้'}${doneCanClosePo === 'no' ? ` | สาเหตุ: ${doneReason}` : ''}`
+      const userIdentifier = (currentUserInfo?.employee_id || currentUser || 'PLANNER').toUpperCase()
+      const logNote = `ส่งยอด FG: ${doneFgAmount} ชิ้น | ปิด PO: ${doneCanClosePo === 'yes' ? 'ได้เลย' : 'ไม่ได้'}${doneCanClosePo === 'no' ? ` | สาเหตุ: ${doneReason}` : ''} (โดย ${userIdentifier})`
       const newLog = {
         production_lot_id: doneLotId,
         status: "COMPLETED",
         activity_date: format(new Date(), "yyyy-MM-dd"),
         process_id: null,
         note: logNote,
-        ...(currentUserId ? { created_by: currentUserId } : {})
+        ...(currentUserId ? { created_by: currentUserId, updated_by: currentUserId } : {})
       }
 
       const { error: logErr } = await supabase.from("production_logs").insert([newLog])
@@ -335,7 +364,7 @@ export default function PlannerPage() {
         }
       }
 
-      const lotData = {
+      const lotData: any = {
         sku_id: finalProductId,
         lot_no: newLot.lot_number,
         planned_quantity: parseFloat(newLot.target_quantity || "0"),
@@ -351,7 +380,9 @@ export default function PlannerPage() {
           ? `${(newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim()} [1ST_BATCH]`
           : (newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim(),
         fg_due_date: newLot.fg_due_date || null,
-        planned_start_date: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null
+        planned_start_date: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null,
+        updated_at: new Date().toISOString(),
+        ...(currentUserId ? { updated_by: currentUserId } : {})
       }
 
       if (newLot.id) {
@@ -359,6 +390,9 @@ export default function PlannerPage() {
         if (updateErr) throw updateErr
         toast.success("แก้ไขงานเรียบร้อย")
       } else {
+        if (currentUserId) {
+          lotData.created_by = currentUserId
+        }
         const { error: insertErr } = await supabase.from("production_lots").insert([lotData])
         if (insertErr) throw insertErr
         toast.success("เพิ่มงานใหม่เรียบร้อย")
@@ -388,7 +422,7 @@ export default function PlannerPage() {
       status: "PLANNED",
       activity_date: format(new Date(), "yyyy-MM-dd"),
       end_date: format(new Date(), "yyyy-MM-dd"),
-      ...(currentUserId ? { created_by: currentUserId } : {})
+      ...(currentUserId ? { created_by: currentUserId, updated_by: currentUserId } : {})
     }
 
     try {
@@ -414,7 +448,11 @@ export default function PlannerPage() {
   }
 
   const handleUpdateLogDirect = async (logId: string, field: string, value: any) => {
-      let updateData: any = { [field]: value }
+      let updateData: any = { 
+        [field]: value,
+        updated_at: new Date().toISOString(),
+        ...(currentUserId ? { updated_by: currentUserId } : {})
+      }
       const existingLog = logs.find(l => l.id === logId)
       
       if (field === 'activity_date' && value && existingLog) {
@@ -514,19 +552,22 @@ export default function PlannerPage() {
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
     const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+    const userIdentifier = (currentUserInfo?.employee_id || currentUser || 'PLANNER').toUpperCase()
 
     const formattedNote = formatPlanChangeNote(currentNote, {
       originalDate,
       revisedDate: newDate,
       category,
       reason,
-      updatedBy: currentUser !== 'Unknown User' ? currentUser.split('@')[0] : 'Planner',
+      updatedBy: userIdentifier,
       revisionCount
     })
 
     const updateData: any = { 
       [field]: newDate,
-      note: formattedNote
+      note: formattedNote,
+      updated_at: new Date().toISOString(),
+      ...(currentUserId ? { updated_by: currentUserId } : {})
     }
 
     // If updating activity_date and end_date was same as old activity_date, adjust end_date too
@@ -568,11 +609,17 @@ export default function PlannerPage() {
       newNote = currentNote ? `${currentNote}\n[1ST_BATCH: ถัง ${tankNum}]` : `[1ST_BATCH: ถัง ${tankNum}]`
     }
 
+    const updateData: any = { 
+      note: newNote,
+      updated_at: new Date().toISOString(),
+      ...(currentUserId ? { updated_by: currentUserId } : {})
+    }
+
     // Optimistic update
-    setLogs(logs.map(l => l.id === log.id ? { ...l, note: newNote } : l))
+    setLogs(logs.map(l => l.id === log.id ? { ...l, ...updateData } : l))
 
     try {
-      const { error } = await supabase.from('production_logs').update({ note: newNote }).eq('id', log.id)
+      const { error } = await supabase.from('production_logs').update(updateData).eq('id', log.id)
       if (error) throw error
       toast.success(hasTag ? 'ยกเลิกสถานะ 1st Batch เรียบร้อย' : `กำหนดเป็น 1st Batch (ถัง ${log.tank_start || 1}) เรียบร้อย ระบบจะแจ้งเตือน QA และ MX บนเรดาร์ 21 วัน`)
     } catch (err: any) {
@@ -631,57 +678,267 @@ export default function PlannerPage() {
   }
 
   
-  const getHistoryData = () => {
-    const getUserName = (id: string | null) => {
-      if (id) {
-        const u = usersList.find(u => u.id === id);
-        if (u) return u.employee_id ? u.employee_id.toUpperCase() : u.full_name;
-        if (id === currentUserId && currentUser && currentUser !== 'Unknown User') {
-          const empId = currentUser.split('@')[0].toLowerCase();
-          const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
-          return cu?.employee_id ? cu.employee_id.toUpperCase() : currentUser.split('@')[0].toUpperCase();
-        }
-        return 'Planner';
-      } else {
-        if (currentUser && currentUser !== 'Unknown User') {
-          const empId = currentUser.split('@')[0].toLowerCase();
-          const cu = usersList.find(u => u.employee_id?.toLowerCase() === empId);
-          return cu?.employee_id ? cu.employee_id.toUpperCase() : currentUser.split('@')[0].toUpperCase();
-        }
-        return 'Planner';
+  const resolveUserName = (userId: string | null | undefined, fallbackNote?: string | null) => {
+    // 1. If explicit userId provided (uuid)
+    if (userId) {
+      const u = usersList.find(u => u.id === userId);
+      if (u) return (u.employee_id ? u.employee_id.toUpperCase() : u.full_name);
+      if (userId === currentUserId && currentUser && currentUser !== 'Unknown User') {
+        return currentUser.toUpperCase();
       }
-    };
+    }
 
-    const orderHistory = lots.map(lot => ({
-      id: `lot-${lot.id}`,
-      type: 'เพิ่มออเดอร์',
-      project: `${lot.po_no || '-'} / ${lot.products?.sku || 'Unknown SKU'}`,
-      timestamp: lot.created_at,
-      user: getUserName(lot.created_by),
-      details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
-    }));
+    // 2. Check if note has a user tag like (โดย USERNAME) or [PLAN_RESCHEDULE:...updatedBy:"USERNAME"]
+    if (fallbackNote) {
+      const planInfo = parsePlanChangeInfo(fallbackNote);
+      if (planInfo.updatedBy && planInfo.updatedBy.toLowerCase() !== 'planner' && planInfo.updatedBy.toLowerCase() !== 'system') {
+        return planInfo.updatedBy.toUpperCase();
+      }
+      const byMatch = fallbackNote.match(/\(โดย\s+([^-\)]+)/i);
+      if (byMatch && byMatch[1] && byMatch[1].trim().toLowerCase() !== 'system' && byMatch[1].trim().toLowerCase() !== 'planner') {
+        return byMatch[1].trim().toUpperCase();
+      }
+    }
+
+    // 3. If currently logged in user is valid
+    if (currentUser && currentUser !== 'Unknown User' && currentUser.toLowerCase() !== 'planner') {
+      return currentUser.toUpperCase();
+    }
+
+    // 4. Check if there's a known planner in usersList
+    const knownPlanner = usersList.find(u => u.role?.includes('planner:edit') || u.employee_id?.toUpperCase().startsWith('PL'));
+    if (knownPlanner && knownPlanner.employee_id) {
+      return knownPlanner.employee_id.toUpperCase();
+    }
+
+    return 'PLPTB1234';
+  };
+
+  const getHistoryData = () => {
+    const orderHistory = lots.map(lot => {
+      const effectiveUserId = lot.updated_by || lot.created_by;
+      const userName = resolveUserName(effectiveUserId);
+      const userObj = usersList.find(u => u.id === effectiveUserId);
+      return {
+        id: `lot-${lot.id}`,
+        recordId: lot.id,
+        isLog: false,
+        type: 'เพิ่มออเดอร์',
+        project: `${lot.po_no || '-'} / ${lot.products?.sku || 'Unknown SKU'}`,
+        timestamp: lot.created_at,
+        user: userName,
+        userId: effectiveUserId,
+        userFullName: userObj?.full_name || '',
+        details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
+      };
+    });
 
     const taskHistory = logs.map(log => {
       const lot = lots.find(l => l.id === log.production_lot_id);
       const process = processes.find(p => p.id === log.process_id);
       const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at);
       const isRescheduled = planInfo.isRescheduled;
+      const isCompletion = (log.status === 'COMPLETED' || log.status === 'DONE') && (log.note || '').includes('ส่งยอด FG');
+
+      const effectiveUserId = log.updated_by || log.created_by || log.operator_id;
+      const userName = resolveUserName(effectiveUserId, log.note);
+      const userObj = usersList.find(u => u.id === effectiveUserId);
+
+      let actionType = 'ลงคิวงาน';
+      if (isCompletion) actionType = 'ปิดงาน';
+      else if (isRescheduled) actionType = 'ปรับเลื่อนแผน';
+
       return {
         id: `log-${log.id}`,
-        type: isRescheduled ? 'ปรับเลื่อนแผน' : 'ลงคิวงาน',
+        recordId: log.id,
+        isLog: true,
+        type: actionType,
         project: `${lot?.po_no || '-'} / ${lot?.products?.sku || 'Unknown SKU'}`,
         timestamp: log.updated_at || log.created_at,
-        user: getUserName(log.created_by || log.operator_id),
+        user: userName,
+        userId: effectiveUserId,
+        userFullName: userObj?.full_name || '',
         details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}${isRescheduled ? ` [🔄 เลื่อนจาก ${planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yyyy') : '-'}: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}]` : ''}`
-      }
+      };
     });
 
     const combined = [...orderHistory, ...taskHistory].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-    return combined.filter(item => 
-      item.project.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-      item.details.toLowerCase().includes(historySearchQuery.toLowerCase()) ||
-      item.type.toLowerCase().includes(historySearchQuery.toLowerCase())
-    );
+
+    return combined.filter(item => {
+      // General search filter
+      if (historySearchQuery.trim()) {
+        const query = historySearchQuery.toLowerCase().trim();
+        const passGeneral = item.project.toLowerCase().includes(query) ||
+          item.details.toLowerCase().includes(query) ||
+          item.type.toLowerCase().includes(query) ||
+          item.user.toLowerCase().includes(query);
+        if (!passGeneral) return false;
+      }
+
+      // Column filters
+      if (historyFilters.time.trim()) {
+        const query = historyFilters.time.toLowerCase().trim();
+        const formatted = format(new Date(item.timestamp), 'dd MMM yyyy HH:mm:ss').toLowerCase();
+        if (!formatted.includes(query)) return false;
+      }
+
+      if (historyFilters.user.trim()) {
+        const query = historyFilters.user.toLowerCase().trim();
+        const uName = item.user.toLowerCase();
+        const fName = (item.userFullName || '').toLowerCase();
+        if (!uName.includes(query) && !fName.includes(query)) return false;
+      }
+
+      if (historyFilters.type !== 'ALL') {
+        if (item.type !== historyFilters.type) return false;
+      }
+
+      if (historyFilters.project.trim()) {
+        const query = historyFilters.project.toLowerCase().trim();
+        if (!item.project.toLowerCase().includes(query)) return false;
+      }
+
+      if (historyFilters.details.trim()) {
+        const query = historyFilters.details.toLowerCase().trim();
+        if (!item.details.toLowerCase().includes(query)) return false;
+      }
+
+      return true;
+    });
+  };
+
+  const isHistoryFiltered = historySearchQuery.trim() !== '' || 
+    historyFilters.time.trim() !== '' || 
+    historyFilters.user.trim() !== '' || 
+    historyFilters.type !== 'ALL' || 
+    historyFilters.project.trim() !== '' || 
+    historyFilters.details.trim() !== '';
+
+  const clearHistoryFilters = () => {
+    setHistorySearchQuery('');
+    setHistoryFilters({
+      time: '',
+      user: '',
+      type: 'ALL',
+      project: '',
+      details: ''
+    });
+  };
+
+  const handleOpenEditOperator = (item: any) => {
+    setEditingOperatorItem({
+      id: item.id,
+      recordId: item.recordId,
+      isLog: item.isLog,
+      currentUserName: item.user,
+      currentUserId: item.userId,
+      project: item.project
+    });
+    setSelectedOperatorId(item.userId || currentUserId || (usersList[0]?.id || ''));
+  };
+
+  const handleUpdateOperator = async () => {
+    if (!editingOperatorItem || !selectedOperatorId) {
+      toast.error('กรุณาเลือกผู้ดำเนินการ');
+      return;
+    }
+    setIsUpdatingOperator(true);
+    try {
+      const targetUser = usersList.find(u => u.id === selectedOperatorId);
+      const targetUserName = targetUser ? (targetUser.employee_id?.toUpperCase() || targetUser.full_name) : 'PLANNER';
+
+      if (editingOperatorItem.isLog) {
+        const { error } = await supabase
+          .from('production_logs')
+          .update({ 
+            updated_by: selectedOperatorId,
+            created_by: selectedOperatorId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingOperatorItem.recordId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('production_lots')
+          .update({ 
+            updated_by: selectedOperatorId,
+            created_by: selectedOperatorId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', editingOperatorItem.recordId);
+        if (error) throw error;
+      }
+
+      toast.success(`อัปเดตผู้ดำเนินการเป็น ${targetUserName} สำเร็จ`);
+      setEditingOperatorItem(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error updating operator:', err);
+      toast.error('เกิดข้อผิดพลาดในการอัปเดต: ' + err.message);
+    } finally {
+      setIsUpdatingOperator(false);
+    }
+  };
+
+  const handleSyncLegacyRecords = async () => {
+    const targetUserId = currentUserId || usersList.find(u => u.role?.includes('planner:edit'))?.id || usersList[0]?.id;
+    const targetUsername = (currentUserInfo?.employee_id || currentUser || 'PLPTB1234').toUpperCase();
+
+    if (!targetUserId) {
+      toast.error('ไม่พบรหัสผู้ใช้งานสำหรับการซิงค์');
+      return;
+    }
+
+    try {
+      const { data: unsyncedLogs } = await supabase
+        .from('production_logs')
+        .select('id')
+        .is('updated_by', null)
+        .is('created_by', null);
+
+      let updatedLogsCount = 0;
+      if (unsyncedLogs && unsyncedLogs.length > 0) {
+        const logIds = unsyncedLogs.map(l => l.id);
+        for (let i = 0; i < logIds.length; i += 50) {
+          const chunk = logIds.slice(i, i + 50);
+          const { error: logUpdateErr } = await supabase
+            .from('production_logs')
+            .update({ 
+              updated_by: targetUserId,
+              created_by: targetUserId
+            })
+            .in('id', chunk);
+          if (!logUpdateErr) updatedLogsCount += chunk.length;
+        }
+      }
+
+      const { data: unsyncedLots } = await supabase
+        .from('production_lots')
+        .select('id')
+        .is('created_by', null);
+
+      let updatedLotsCount = 0;
+      if (unsyncedLots && unsyncedLots.length > 0) {
+        const lotIds = unsyncedLots.map(l => l.id);
+        for (let i = 0; i < lotIds.length; i += 50) {
+          const chunk = lotIds.slice(i, i + 50);
+          const { error: lotUpdateErr } = await supabase
+            .from('production_lots')
+            .update({ 
+              created_by: targetUserId,
+              updated_by: targetUserId
+            })
+            .in('id', chunk);
+          if (!lotUpdateErr) updatedLotsCount += chunk.length;
+        }
+      }
+
+      toast.success(`ซิงค์ประวัติเดิมเป็น ${targetUsername} สำเร็จ (คิวงาน ${updatedLogsCount} รายการ, ออเดอร์ ${updatedLotsCount} รายการ)`);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error syncing legacy records:', err);
+      toast.error('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message);
+    }
   };
 
   const handleExportHistory = () => {
@@ -691,8 +948,9 @@ export default function PlannerPage() {
       return;
     }
     const exportData = data.map(item => ({
-      'วันเวลา': format(new Date(item.timestamp), 'dd/MM/yyyy HH:mm'),
+      'วันเวลา': format(new Date(item.timestamp), 'dd/MM/yyyy HH:mm:ss'),
       'ผู้ดำเนินการ': item.user,
+      'ชื่อ-นามสกุล': item.userFullName || '-',
       'ประเภท': item.type,
       'Project (PO/SKU)': item.project,
       'รายละเอียด': item.details
@@ -1839,61 +2097,202 @@ export default function PlannerPage() {
 
         {activeTab === "history" && (
           <div className="p-4 bg-white min-h-[500px]">
-            <div className="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
-               <div className="relative">
-                  <Input 
-                    placeholder="ค้นหา Project, ประเภท, รายละเอียด..." 
-                    value={historySearchQuery} 
-                    onChange={e => setHistorySearchQuery(e.target.value)} 
-                    className="w-full md:w-80"
-                  />
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-4 gap-4">
+               <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                  <div className="relative w-full sm:w-72">
+                    <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                    <Input 
+                      placeholder="ค้นหาด่วน ทุกคอลัมน์..." 
+                      value={historySearchQuery} 
+                      onChange={e => setHistorySearchQuery(e.target.value)} 
+                      className="pl-9 pr-8 h-9 text-xs"
+                    />
+                    {historySearchQuery && (
+                      <button onClick={() => setHistorySearchQuery('')} className="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600">
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <Badge variant="outline" className="text-xs font-mono text-slate-600 bg-slate-50 py-1.5 px-2.5">
+                    {isHistoryFiltered ? `พบ ${getHistoryData().length} จาก ${logs.length + lots.length} รายการ` : `ทั้งหมด ${getHistoryData().length} รายการ`}
+                  </Badge>
+                  {isHistoryFiltered && (
+                    <Button 
+                      onClick={clearHistoryFilters} 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-8 text-xs text-sky-700 hover:text-sky-800 hover:bg-sky-50 gap-1 px-2.5"
+                    >
+                      <RotateCcw className="w-3.5 h-3.5" /> ล้างตัวกรอง
+                    </Button>
+                  )}
                </div>
-               <Button variant="outline" onClick={handleExportHistory} className="text-[#0f766e] border-[#0f766e] hover:bg-[#0f766e] hover:text-white">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export Excel (ประวัติ)
-               </Button>
+
+               <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+                  {canEdit && (
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleSyncLegacyRecords} 
+                      className="h-9 text-xs text-blue-700 border-blue-300 hover:bg-blue-50 font-medium"
+                      title="กดเพื่ออัปเดตประวัติการทำงานเดิมที่ยังไม่มีชื่อผู้ทำ ให้เป็น username ของคุณในฐานข้อมูล"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
+                      ซิงค์ประวัติเดิมเป็น {currentUser !== 'Unknown User' ? currentUser : 'ผู้ใช้ปัจจุบัน'}
+                    </Button>
+                  )}
+                  <Button variant="outline" size="sm" onClick={handleExportHistory} className="h-9 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 font-medium">
+                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                    Export Excel (ประวัติ)
+                  </Button>
+               </div>
             </div>
             
-            <div className="rounded-lg border border-slate-200 overflow-hidden">
+            <div className="rounded-xl border border-slate-200 overflow-hidden shadow-xs">
                <Table>
                  <TableHeader className="bg-[#F8F6F0]">
                    <TableRow>
-                     <TableHead className="w-[180px]">วันเวลา</TableHead>
-                     <TableHead className="w-[150px]">ผู้ดำเนินการ</TableHead>
-                     <TableHead className="w-[150px]">ประเภท</TableHead>
-                     <TableHead className="w-[250px]">Project (PO/SKU)</TableHead>
-                     <TableHead>รายละเอียด</TableHead>
+                     <TableHead className="w-[170px] font-bold text-slate-700">วันเวลา</TableHead>
+                     <TableHead className="w-[200px] font-bold text-slate-700">ผู้ดำเนินการ (Username)</TableHead>
+                     <TableHead className="w-[140px] font-bold text-slate-700">ประเภท</TableHead>
+                     <TableHead className="w-[260px] font-bold text-slate-700">Project (PO/SKU)</TableHead>
+                     <TableHead className="font-bold text-slate-700">รายละเอียด</TableHead>
+                   </TableRow>
+                   {/* Column Search Filter Row */}
+                   <TableRow className="bg-slate-50/90 border-t border-b border-slate-200">
+                     <TableHead className="p-1.5">
+                       <div className="relative">
+                         <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                         <Input
+                           value={historyFilters.time}
+                           onChange={e => setHistoryFilters(p => ({ ...p, time: e.target.value }))}
+                           placeholder="ค้นหาวันที่/เวลา..."
+                           className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-blue-400"
+                         />
+                         {historyFilters.time && (
+                           <button onClick={() => setHistoryFilters(p => ({ ...p, time: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                             <X className="w-3 h-3" />
+                           </button>
+                         )}
+                       </div>
+                     </TableHead>
+                     <TableHead className="p-1.5">
+                       <div className="relative">
+                         <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                         <Input
+                           value={historyFilters.user}
+                           onChange={e => setHistoryFilters(p => ({ ...p, user: e.target.value }))}
+                           placeholder="ค้นหา username..."
+                           className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-blue-400"
+                         />
+                         {historyFilters.user && (
+                           <button onClick={() => setHistoryFilters(p => ({ ...p, user: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                             <X className="w-3 h-3" />
+                           </button>
+                         )}
+                       </div>
+                     </TableHead>
+                     <TableHead className="p-1.5">
+                       <Select value={historyFilters.type} onValueChange={val => setHistoryFilters(p => ({ ...p, type: val || 'ALL' }))}>
+                         <SelectTrigger className="h-7 text-xs bg-white border-slate-200 focus:border-blue-400">
+                           <SelectValue placeholder="ทุกประเภท" />
+                         </SelectTrigger>
+                         <SelectContent>
+                           <SelectItem value="ALL" className="text-xs">ทุกประเภท</SelectItem>
+                           <SelectItem value="ลงคิวงาน" className="text-xs">ลงคิวงาน</SelectItem>
+                           <SelectItem value="ปรับเลื่อนแผน" className="text-xs">ปรับเลื่อนแผน</SelectItem>
+                           <SelectItem value="เพิ่มออเดอร์" className="text-xs">เพิ่มออเดอร์</SelectItem>
+                           <SelectItem value="ปิดงาน" className="text-xs">ปิดงาน</SelectItem>
+                         </SelectContent>
+                       </Select>
+                     </TableHead>
+                     <TableHead className="p-1.5">
+                       <div className="relative">
+                         <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                         <Input
+                           value={historyFilters.project}
+                           onChange={e => setHistoryFilters(p => ({ ...p, project: e.target.value }))}
+                           placeholder="ค้นหา PO/SKU..."
+                           className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-blue-400"
+                         />
+                         {historyFilters.project && (
+                           <button onClick={() => setHistoryFilters(p => ({ ...p, project: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                             <X className="w-3 h-3" />
+                           </button>
+                         )}
+                       </div>
+                     </TableHead>
+                     <TableHead className="p-1.5">
+                       <div className="relative">
+                         <Search className="w-3 h-3 absolute left-2 top-2.5 text-slate-400" />
+                         <Input
+                           value={historyFilters.details}
+                           onChange={e => setHistoryFilters(p => ({ ...p, details: e.target.value }))}
+                           placeholder="ค้นหารายละเอียด..."
+                           className="h-7 text-xs pl-6 pr-5 bg-white border-slate-200 focus:border-blue-400"
+                         />
+                         {historyFilters.details && (
+                           <button onClick={() => setHistoryFilters(p => ({ ...p, details: '' }))} className="absolute right-1.5 top-2 text-slate-400 hover:text-slate-600">
+                             <X className="w-3 h-3" />
+                           </button>
+                         )}
+                       </div>
+                     </TableHead>
                    </TableRow>
                  </TableHeader>
                  <TableBody>
                     {getHistoryData().length === 0 ? (
                        <TableRow>
-                          <TableCell colSpan={5} className="text-center py-8 text-slate-500">
-                             ไม่พบประวัติการทำงาน
+                          <TableCell colSpan={5} className="text-center py-10 text-slate-500">
+                             ไม่พบประวัติการทำงานที่ตรงกับเงื่อนไขการค้นหา
                           </TableCell>
                        </TableRow>
                     ) : (
                        getHistoryData().map((item) => (
-                         <TableRow key={item.id} className="hover:bg-slate-50">
-                           <TableCell className="text-slate-600">
-                             {format(new Date(item.timestamp), 'dd MMM yyyy')}
-                             <span className="text-xs text-slate-400 block">{format(new Date(item.timestamp), 'HH:mm:ss')}</span>
+                         <TableRow key={item.id} className="hover:bg-slate-50 transition-colors">
+                           <TableCell className="text-slate-600 font-mono text-xs">
+                             <div className="font-semibold text-slate-700">{format(new Date(item.timestamp), 'dd MMM yyyy')}</div>
+                             <span className="text-[11px] text-slate-400">{format(new Date(item.timestamp), 'HH:mm:ss')}</span>
                            </TableCell>
                            <TableCell>
-                             <div className="flex items-center gap-2">
-                               <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs text-slate-600 font-bold">
-                                 {item.user.charAt(0)}
+                             <div className="flex items-center justify-between group/user max-w-[200px]">
+                               <div className="flex items-center gap-2 overflow-hidden" title={item.userFullName ? `${item.user} (${item.userFullName})` : item.user}>
+                                 <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center justify-center text-xs font-bold shrink-0">
+                                   {item.user.charAt(0)}
+                                 </div>
+                                 <div className="flex flex-col min-w-0">
+                                   <span className="text-xs font-bold text-slate-800 truncate">{item.user}</span>
+                                   {item.userFullName && (
+                                     <span className="text-[10px] text-slate-400 truncate">{item.userFullName}</span>
+                                   )}
+                                 </div>
                                </div>
-                               <span className="text-sm font-medium">{item.user}</span>
+                               {canEdit && (
+                                 <Button
+                                   variant="ghost"
+                                   size="icon"
+                                   className="h-6 w-6 opacity-0 group-hover/user:opacity-100 text-slate-400 hover:text-blue-600 hover:bg-blue-50 transition-opacity ml-1 shrink-0"
+                                   title="คลิกเพื่อแก้ไข/ระบุผู้ดำเนินการ"
+                                   onClick={() => handleOpenEditOperator(item)}
+                                 >
+                                   <Pencil className="w-3 h-3" />
+                                 </Button>
+                               )}
                              </div>
                            </TableCell>
                            <TableCell>
-                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${item.type === 'เพิ่มออเดอร์' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                             <span className={cn(
+                               "px-2.5 py-1 rounded-full text-xs font-medium inline-block",
+                               item.type === 'เพิ่มออเดอร์' && "bg-blue-100 text-blue-800 border border-blue-200",
+                               item.type === 'ลงคิวงาน' && "bg-emerald-100 text-emerald-800 border border-emerald-200",
+                               item.type === 'ปรับเลื่อนแผน' && "bg-amber-100 text-amber-900 border border-amber-300",
+                               item.type === 'ปิดงาน' && "bg-purple-100 text-purple-800 border border-purple-200"
+                             )}>
                                {item.type}
                              </span>
                            </TableCell>
-                           <TableCell className="font-medium text-[#4A4238]">{item.project}</TableCell>
-                           <TableCell className="text-slate-600">{item.details}</TableCell>
+                           <TableCell className="font-semibold text-slate-800 text-xs">{item.project}</TableCell>
+                           <TableCell className="text-slate-600 text-xs leading-relaxed">{item.details}</TableCell>
                          </TableRow>
                        ))
                     )}
@@ -2235,6 +2634,86 @@ export default function PlannerPage() {
                 💾 บันทึกการเลื่อนแผน
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Operator Modal */}
+      <Dialog open={!!editingOperatorItem} onOpenChange={(open) => !open && setEditingOperatorItem(null)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-800 text-base">
+              <span className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 text-base">
+                👤
+              </span>
+              แก้ไขผู้ดำเนินการ (Operator)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              แก้ไขหรือกำหนดผู้ดำเนินการสำหรับรายการประวัตินี้
+            </DialogDescription>
+          </DialogHeader>
+
+          {editingOperatorItem && (
+            <div className="space-y-4 py-3 text-sm">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Project / ออเดอร์:</span>
+                  <span className="font-semibold text-slate-800">{editingOperatorItem.project}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ผู้ดำเนินการปัจจุบัน:</span>
+                  <span className="font-bold text-blue-700">{editingOperatorItem.currentUserName}</span>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  เลือกผู้ดำเนินการใหม่ (Username / พนักงาน) <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={selectedOperatorId}
+                  onValueChange={(val) => setSelectedOperatorId(val || '')}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-white">
+                    <SelectValue placeholder="เลือกผู้ใช้งาน..." />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-[260px]">
+                    {usersList.map((u) => {
+                      const empId = (u.employee_id || u.username || 'USER').toUpperCase();
+                      const name = u.full_name || '';
+                      return (
+                        <SelectItem key={u.id} value={u.id} className="text-xs">
+                          <span className="font-bold text-slate-800">{empId}</span>
+                          {name && <span className="text-slate-500 ml-1.5">({name})</span>}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setEditingOperatorItem(null)}
+              disabled={isUpdatingOperator}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="text-xs bg-blue-600 text-white hover:bg-blue-700"
+              onClick={handleUpdateOperator}
+              disabled={isUpdatingOperator}
+            >
+              {isUpdatingOperator ? "กำลังบันทึก..." : "บันทึกการแก้ไข"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
