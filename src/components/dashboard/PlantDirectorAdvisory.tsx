@@ -83,7 +83,10 @@ export function PlantDirectorAdvisory({
   const [isCopied, setIsCopied] = useState(false)
   const [theme, setTheme] = useState<'night' | 'light'>('night')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
-  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(new Set())
+  // Default to collapsed categories as requested by user to keep view clean and compact
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(
+    () => new Set(['SUPPLY_CHAIN', 'SHOPFLOOR', 'QC_GATE', 'CUSTOMER_OTIF'])
+  )
 
   // Plant Director (PDT) Custom Directives state & sync
   const supabase = useMemo(() => createClient(), [])

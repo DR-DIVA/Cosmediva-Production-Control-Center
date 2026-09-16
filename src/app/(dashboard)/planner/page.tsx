@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import {
   Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
-  ArrowUpDown, ArrowUp, ArrowDown
+  ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff
 } from 'lucide-react'
 import {
   Table,
@@ -81,6 +81,28 @@ export default function PlannerPage() {
   const [historySearchQuery, setHistorySearchQuery] = useState("")
   const [sortColumn, setSortColumn] = useState<string>("lot_no")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
+  
+  // Toggle Switch: Show/Hide Shopfloor Operational Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)
+  const [showShopfloorHandovers, setShowShopfloorHandovers] = useState(false)
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cosmeflow_planner_show_handovers')
+      if (saved !== null) {
+        setShowShopfloorHandovers(saved === 'true')
+      }
+    } catch {}
+  }, [])
+
+  const toggleShowShopfloorHandovers = () => {
+    setShowShopfloorHandovers(prev => {
+      const next = !prev
+      try {
+        localStorage.setItem('cosmeflow_planner_show_handovers', String(next))
+      } catch {}
+      return next
+    })
+  }
   
   const [isDialogOpen, setIsDialogOpen] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
@@ -559,21 +581,53 @@ export default function PlannerPage() {
     }
   }
 
-  const getSortedLotLogs = (lotId: string) => {
-    return logs.filter(l => l.production_lot_id === lotId).sort((a, b) => {
-      const processA = processes.find(p => p.id === a.process_id)?.process_name || "";
-      const processB = processes.find(p => p.id === b.process_id)?.process_name || "";
-      const orderMap: Record<string, number> = { "ชั่งสาร": 1, "ผสม": 2, "บรรจุ": 3 };
-      const weightA = orderMap[processA] || 99;
-      const weightB = orderMap[processB] || 99;
-      if (weightA !== weightB) return weightA - weightB;
-      const tA = a.tank_start === null || a.tank_start === undefined ? 9999 : a.tank_start;
-      const tB = b.tank_start === null || b.tank_start === undefined ? 9999 : b.tank_start;
-      if (tA !== tB) return tA - tB;
-      const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return timeA - timeB;
-    });
+  const isHandoverProcess = (processName?: string) => {
+    if (!processName) return false
+    const p = processName.trim()
+    return (
+      p.startsWith('รอ') ||
+      p.includes('รอ QC') ||
+      p.includes('รอ POF') ||
+      p.includes('รอเข้าคลัง') ||
+      p.includes('รออุโมงค์') ||
+      p.includes('รอบรรจุ') ||
+      p === 'ลงลัง'
+    )
+  }
+
+  const handoverTasksCount = useMemo(() => {
+    return logs.filter(l => {
+      const process = processes.find(p => p.id === l.process_id)
+      const pName = process?.process_name || l.processes?.process_name || ''
+      return isHandoverProcess(pName)
+    }).length
+  }, [logs, processes])
+
+  const getSortedLotLogs = (lotId: string, includeHandovers: boolean = showShopfloorHandovers) => {
+    return logs
+      .filter(l => {
+        if (l.production_lot_id !== lotId) return false
+        if (!includeHandovers) {
+          const process = processes.find(p => p.id === l.process_id)
+          const pName = process?.process_name || l.processes?.process_name || ''
+          if (isHandoverProcess(pName)) return false
+        }
+        return true
+      })
+      .sort((a, b) => {
+        const processA = processes.find(p => p.id === a.process_id)?.process_name || ""
+        const processB = processes.find(p => p.id === b.process_id)?.process_name || ""
+        const orderMap: Record<string, number> = { "ชั่งสาร": 1, "ผสม": 2, "บรรจุ": 3 }
+        const weightA = orderMap[processA] || 99
+        const weightB = orderMap[processB] || 99
+        if (weightA !== weightB) return weightA - weightB
+        const tA = a.tank_start === null || a.tank_start === undefined ? 9999 : a.tank_start
+        const tB = b.tank_start === null || b.tank_start === undefined ? 9999 : b.tank_start
+        if (tA !== tB) return tA - tB
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
+        return timeA - timeB
+      })
   }
 
   
@@ -1190,6 +1244,40 @@ export default function PlannerPage() {
               <Button size="sm" variant={filterDept === "MX" ? "default" : "ghost"} onClick={() => setFilterDept("MX")} className="h-7 text-xs">ผสม (MX)</Button>
               <Button size="sm" variant={filterDept === "PK" ? "default" : "ghost"} onClick={() => setFilterDept("PK")} className="h-7 text-xs">บรรจุ (PK)</Button>
             </div>
+
+            {/* Toggle Switch: Shopfloor Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง) */}
+            <Button
+              size="sm"
+              variant={showShopfloorHandovers ? "default" : "outline"}
+              onClick={toggleShowShopfloorHandovers}
+              className={cn(
+                "h-8 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 rounded-xl",
+                showShopfloorHandovers
+                  ? "bg-purple-700 text-white hover:bg-purple-800 border-purple-800 shadow-sm ring-1 ring-purple-400"
+                  : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:text-purple-900 shadow-xs"
+              )}
+              title="คลิกเพื่อสลับแสดง/ซ่อน ขั้นตอนส่งต่องานหน้างาน (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)"
+            >
+              {showShopfloorHandovers ? (
+                <>
+                  <Eye className="w-3.5 h-3.5 text-purple-200" />
+                  <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): แสดง</span>
+                </>
+              ) : (
+                <>
+                  <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                  <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): ซ่อน</span>
+                </>
+              )}
+              {handoverTasksCount > 0 && (
+                <span className={cn(
+                  "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold",
+                  showShopfloorHandovers ? "bg-purple-900 text-purple-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                )}>
+                  {handoverTasksCount}
+                </span>
+              )}
+            </Button>
           </div>
           <div className="flex items-center gap-2">
             {sortColumn && (
@@ -1611,9 +1699,29 @@ export default function PlannerPage() {
                           <TableRow className="bg-[#F8F6F0]/">
                             <TableCell></TableCell>
                             <TableCell colSpan={7} className="pl-12 py-2">
+                              <div className="flex items-center gap-3 flex-wrap">
                                 <Button variant="ghost" size="sm" className="h-7 text-xs text-[#D4AF37] hover:text-[#D4AF37] hover:bg-[#D4AF37]/" onClick={() => handleAddBlankLog(lot.id)}>
                                     <Plus className="w-3 h-3 mr-1" /> เพิ่มคิวงาน (Add Task)
                                 </Button>
+                                {(() => {
+                                  const hiddenCount = logs.filter(l => l.production_lot_id === lot.id && isHandoverProcess(processes.find(p => p.id === l.process_id)?.process_name || l.processes?.process_name)).length
+                                  if (hiddenCount > 0 && !showShopfloorHandovers) {
+                                    return (
+                                      <span className="text-[11px] text-slate-500 bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 inline-flex items-center gap-1.5 font-medium">
+                                        <span>🛡️ ซ่อนขั้นตอนหน้างาน {hiddenCount} รายการ (รอ QC / รอ POF / รอเข้าคลัง FG / ลงลัง)</span>
+                                        <button 
+                                          type="button" 
+                                          onClick={toggleShowShopfloorHandovers}
+                                          className="text-purple-700 hover:text-purple-900 underline font-bold cursor-pointer"
+                                        >
+                                          คลิกเพื่อเปิดดู
+                                        </button>
+                                      </span>
+                                    )
+                                  }
+                                  return null
+                                })()}
+                              </div>
                             </TableCell>
                             <TableCell colSpan={2}></TableCell>
                           </TableRow>
