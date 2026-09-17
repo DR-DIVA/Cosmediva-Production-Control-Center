@@ -1,6 +1,6 @@
 'use client'
 // Force rebuild
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -12,9 +12,10 @@ import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
-import { differenceInDays, startOfDay } from 'date-fns'
+import { format, differenceInDays, startOfDay } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
 import { cleanDisplayNote } from '@/lib/planTracking'
+import { MasterPlanningTimeline } from '@/components/planner/MasterPlanningTimeline'
 
 const getPackagingIcon = (unit: string, className: string) => {
   switch (unit) {
@@ -39,9 +40,10 @@ export default function PackingTasksPage() {
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('list')
   const [selectedTask, setSelectedTask] = useState<any | null>(null)
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
+  const [userRole, setUserRole] = useState<string | null>(null)
   const [filterDate, setFilterDate] = useState<string>('')
   const [historyList, setHistoryList] = useState<any[]>([])
   const [historyFilters, setHistoryFilters] = useState({
@@ -60,6 +62,37 @@ export default function PackingTasksPage() {
   const [defectNote, setDefectNote] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [qtyDialog, setQtyDialog] = useState<{ open: boolean, taskId: string, tankNum: number, task: any, qty: string, boxLot: string, nextStatus: string }>({ open: false, taskId: '', tankNum: 0, task: null, qty: '', boxLot: '', nextStatus: '' })
+
+  // Column-specific header filters for Queue table
+  const [colFilterSku, setColFilterSku] = useState('')
+  const [colFilterLot, setColFilterLot] = useState('')
+  const [colFilterTank, setColFilterTank] = useState('')
+  const [colFilterTotalTanks, setColFilterTotalTanks] = useState('')
+  const [colFilterBulkSize, setColFilterBulkSize] = useState('')
+  const [colFilterStdYield, setColFilterStdYield] = useState('')
+  const [colFilterActualYield, setColFilterActualYield] = useState('')
+  const [colFilterPieces, setColFilterPieces] = useState('')
+  const [colFilterCartons, setColFilterCartons] = useState('')
+  const [colFilterDate, setColFilterDate] = useState('')
+  const [colFilterStatus, setColFilterStatus] = useState('ALL')
+
+  const hasActiveColFilters = Boolean(
+    colFilterSku || colFilterLot || colFilterTank || colFilterTotalTanks || colFilterBulkSize || colFilterStdYield || colFilterActualYield || colFilterPieces || colFilterCartons || colFilterDate || (colFilterStatus !== 'ALL')
+  )
+
+  const clearAllColFilters = () => {
+    setColFilterSku('')
+    setColFilterLot('')
+    setColFilterTank('')
+    setColFilterTotalTanks('')
+    setColFilterBulkSize('')
+    setColFilterStdYield('')
+    setColFilterActualYield('')
+    setColFilterPieces('')
+    setColFilterCartons('')
+    setColFilterDate('')
+    setColFilterStatus('ALL')
+  }
 
   
   const supabase = createClient()
@@ -745,6 +778,97 @@ export default function PackingTasksPage() {
   const completedTanks = doneTanksCount + sentToPofCount;
   const packingPct = totalTanksCount > 0 ? ((completedTanks / totalTanksCount) * 100).toFixed(1) : '0.0';
 
+  const filteredTasks = useMemo(() => {
+    return tasks.filter(t => {
+      if (filterDate && t.activity_date !== filterDate) return false
+
+      if (searchQuery.trim()) {
+        const term = searchQuery.toLowerCase().trim()
+        const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
+        const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
+        if (!sku.includes(term) && !lotNo.includes(term)) return false
+      }
+
+      if (colFilterSku.trim()) {
+        const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
+        if (!sku.includes(colFilterSku.toLowerCase().trim())) return false
+      }
+
+      if (colFilterLot.trim()) {
+        const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
+        if (!lotNo.includes(colFilterLot.toLowerCase().trim())) return false
+      }
+
+      if (colFilterTank.trim()) {
+        const tankText = `${t.tank_start || 1}-${t.tank_end || 1}`
+        if (!tankText.includes(colFilterTank.trim())) return false
+      }
+
+      if (colFilterTotalTanks.trim()) {
+        const totalTanks = String((t.production_lots as any)?.total_tanks || '')
+        if (!totalTanks.includes(colFilterTotalTanks.trim())) return false
+      }
+
+      if (colFilterBulkSize.trim()) {
+        const bulkSize = String((t.production_lots as any)?.kg_per_tank || '')
+        if (!bulkSize.includes(colFilterBulkSize.trim())) return false
+      }
+
+      if (colFilterStdYield.trim()) {
+        const stdYield = t.production_lots?.kg_per_tank && t.production_lots?.g_per_piece
+          ? String(Math.round((t.production_lots.kg_per_tank * 1000) / t.production_lots.g_per_piece))
+          : ''
+        if (!stdYield.includes(colFilterStdYield.trim())) return false
+      }
+
+      if (colFilterActualYield.trim()) {
+        const details = typeof t.tank_details === 'string' ? JSON.parse(t.tank_details || '{}') : (typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {})
+        let total = 0
+        for (const key in details) {
+          if (key.endsWith('_history')) continue
+          if (details[key]?.pieces) total += Number(details[key].pieces)
+        }
+        if (!String(total).includes(colFilterActualYield.trim())) return false
+      }
+
+      if (colFilterPieces.trim()) {
+        const details = typeof t.tank_details === 'string' ? JSON.parse(t.tank_details || '{}') : (typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {})
+        let total = 0
+        for (const key in details) {
+          if (key.endsWith('_history')) continue
+          if (details[key]?.pieces) total += Number(details[key].pieces)
+        }
+        if (!String(total).includes(colFilterPieces.trim())) return false
+      }
+
+      if (colFilterCartons.trim()) {
+        const details = typeof t.tank_details === 'string' ? JSON.parse(t.tank_details || '{}') : (typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {})
+        let totalCartons = 0
+        for (const key in details) {
+          if (key.endsWith('_history')) continue
+          if (details[key]?.cartons) totalCartons += Number(details[key].cartons)
+        }
+        if (!String(totalCartons).includes(colFilterCartons.trim())) return false
+      }
+
+      if (colFilterDate.trim()) {
+        const dateStr = t.activity_date ? format(new Date(t.activity_date), 'dd/MM/yyyy') : ''
+        const rawDate = t.activity_date || ''
+        const q = colFilterDate.trim()
+        if (!dateStr.includes(q) && !rawDate.includes(q)) return false
+      }
+
+      if (colFilterStatus !== 'ALL') {
+        const s = t.status || 'PLANNED'
+        if (colFilterStatus === 'WAITING' && s !== 'WAITING' && s !== 'PLANNED') return false
+        if (colFilterStatus === 'IN_PROGRESS' && s !== 'IN_PROGRESS') return false
+        if (colFilterStatus === 'DONE' && s !== 'DONE') return false
+      }
+
+      return true
+    })
+  }, [tasks, filterDate, searchQuery, colFilterSku, colFilterLot, colFilterTank, colFilterTotalTanks, colFilterBulkSize, colFilterStdYield, colFilterActualYield, colFilterPieces, colFilterCartons, colFilterDate, colFilterStatus])
+
   return (
     <div className="p-6 max-w-[1400px] mx-auto space-y-6">
       {/* Header Card */}
@@ -790,6 +914,14 @@ export default function PackingTasksPage() {
               className={viewMode === 'calendar' ? 'bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold' : ''}
             >
               <CalendarIcon className="w-4 h-4 mr-1.5" /> ปฏิทิน
+            </Button>
+            <Button
+              variant={viewMode === 'timeline' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setViewMode('timeline')}
+              className={viewMode === 'timeline' ? 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold' : ''}
+            >
+              <Clock className="w-4 h-4 mr-1.5" /> ไทม์ไลน์
             </Button>
           </div>
         </div>
@@ -1077,7 +1209,13 @@ export default function PackingTasksPage() {
         </TabsList>
 
         <TabsContent value="queue">
-      {viewMode === 'calendar' ? (
+      {viewMode === 'timeline' ? (
+        <MasterPlanningTimeline
+          initialDept="PK"
+          currentUser={userRole || 'PK'}
+          onPlanChanged={fetchPackingTasks}
+        />
+      ) : viewMode === 'calendar' ? (
         <TaskCalendar 
           tasks={tasks} 
           onTaskClick={(task) => setSelectedTask(task)} 
@@ -1100,6 +1238,11 @@ export default function PackingTasksPage() {
                 </Button>
               )}
             </div>
+            {hasActiveColFilters && (
+              <Button variant="outline" size="sm" onClick={clearAllColFilters} className="h-8 text-xs text-rose-600 border-rose-200 hover:bg-rose-50 flex items-center gap-1.5">
+                <X className="w-3.5 h-3.5" /> ล้างตัวกรองทุกคอลัมน์
+              </Button>
+            )}
           </div>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -1119,6 +1262,165 @@ export default function PackingTasksPage() {
                     <TableHead>วันที่จัดคิว (แผน)</TableHead>
                     <TableHead>สถานะ</TableHead>
                   </TableRow>
+                  {/* Column-Specific Search Filter Row */}
+                  <TableRow className="bg-slate-50/90 border-t border-b border-slate-200">
+                    <TableHead className="py-1 px-2 text-center">
+                      {hasActiveColFilters ? (
+                        <button
+                          onClick={clearAllColFilters}
+                          title="ล้างตัวกรองทุกคอลัมน์"
+                          className="w-5 h-5 rounded-full bg-rose-100 hover:bg-rose-200 text-rose-600 inline-flex items-center justify-center font-bold text-xs transition-colors cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      ) : (
+                        <span className="text-[10px] text-slate-400 font-normal">กรอง</span>
+                      )}
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[130px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="กรอง SKU..."
+                          value={colFilterSku}
+                          onChange={e => setColFilterSku(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterSku && (
+                          <button onClick={() => setColFilterSku('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[100px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="กรอง LOT..."
+                          value={colFilterLot}
+                          onChange={e => setColFilterLot(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterLot && (
+                          <button onClick={() => setColFilterLot('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[80px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="ถังที่..."
+                          value={colFilterTank}
+                          onChange={e => setColFilterTank(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterTank && (
+                          <button onClick={() => setColFilterTank('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[80px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="จำนวน..."
+                          value={colFilterTotalTanks}
+                          onChange={e => setColFilterTotalTanks(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterTotalTanks && (
+                          <button onClick={() => setColFilterTotalTanks('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[90px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="Bulk kg..."
+                          value={colFilterBulkSize}
+                          onChange={e => setColFilterBulkSize(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterBulkSize && (
+                          <button onClick={() => setColFilterBulkSize('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[90px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="STD..."
+                          value={colFilterStdYield}
+                          onChange={e => setColFilterStdYield(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterStdYield && (
+                          <button onClick={() => setColFilterStdYield('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[90px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="Actual..."
+                          value={colFilterActualYield}
+                          onChange={e => setColFilterActualYield(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterActualYield && (
+                          <button onClick={() => setColFilterActualYield('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[90px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="ชิ้นสะสม..."
+                          value={colFilterPieces}
+                          onChange={e => setColFilterPieces(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterPieces && (
+                          <button onClick={() => setColFilterPieces('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[90px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="ลังสะสม..."
+                          value={colFilterCartons}
+                          onChange={e => setColFilterCartons(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterCartons && (
+                          <button onClick={() => setColFilterCartons('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[110px]">
+                      <div className="relative">
+                        <Input
+                          placeholder="dd/mm/yyyy..."
+                          value={colFilterDate}
+                          onChange={e => setColFilterDate(e.target.value)}
+                          className="h-7 text-xs pr-5 bg-white border-slate-200"
+                        />
+                        {colFilterDate && (
+                          <button onClick={() => setColFilterDate('')} className="absolute right-1.5 top-1.5 text-slate-400 hover:text-slate-600 text-xs">✕</button>
+                        )}
+                      </div>
+                    </TableHead>
+                    <TableHead className="py-1 px-1.5 min-w-[120px]">
+                      <Select value={colFilterStatus} onValueChange={(val) => setColFilterStatus(val || 'ALL')}>
+                        <SelectTrigger className="h-7 text-xs bg-white border-slate-200">
+                          <SelectValue placeholder="ทุกสถานะ" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ALL" className="text-xs">ทุกสถานะ</SelectItem>
+                          <SelectItem value="WAITING" className="text-xs">⏳ รอยิงบรรจุ</SelectItem>
+                          <SelectItem value="IN_PROGRESS" className="text-xs">📦 กำลังบรรจุ</SelectItem>
+                          <SelectItem value="DONE" className="text-xs">✅ บรรจุเสร็จแล้ว</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </TableHead>
+                  </TableRow>
                 </TableHeader>
                 <TableBody>
                   {loading ? (
@@ -1128,28 +1430,21 @@ export default function PackingTasksPage() {
                         กำลังโหลดข้อมูล...
                       </TableCell>
                     </TableRow>
-                  ) : tasks.filter(t => {
-                    const passDate = !filterDate || t.activity_date === filterDate
-                    const term = searchQuery.toLowerCase()
-                    const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
-                    const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
-                    const passSearch = sku.includes(term) || lotNo.includes(term)
-                    return passDate && passSearch
-                  }).length === 0 ? (
+                  ) : filteredTasks.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={12} className="text-center h-32 text-slate-500">
-                        ไม่มีคิวงานบรรจุ{filterDate ? 'ในวันที่เลือก' : ''}
+                        <div>ไม่พบคิวงานบรรจุ{filterDate ? ' ในวันที่เลือก' : ''}{hasActiveColFilters ? ' ตามตัวกรองที่ระบุ' : ''}</div>
+                        {hasActiveColFilters && (
+                          <div className="mt-2">
+                            <Button size="sm" variant="outline" onClick={clearAllColFilters} className="text-xs">
+                              ล้างตัวกรองทั้งหมด
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   ) : (
-                    tasks.filter(t => {
-                      const passDate = !filterDate || t.activity_date === filterDate
-                      const term = searchQuery.toLowerCase()
-                      const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
-                      const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
-                      const passSearch = sku.includes(term) || lotNo.includes(term)
-                      return passDate && passSearch
-                    }).sort((a: any, b: any) => {
+                    filteredTasks.sort((a: any, b: any) => {
                       const lotA = (a.production_lots?.lot_no || '').toString()
                       const lotB = (b.production_lots?.lot_no || '').toString()
                       const lotCompare = lotA.localeCompare(lotB, undefined, { numeric: true })
