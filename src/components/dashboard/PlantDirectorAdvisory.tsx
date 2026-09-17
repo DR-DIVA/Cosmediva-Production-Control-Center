@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover'
 import { 
   Sparkles, 
   Crown, 
@@ -59,6 +60,70 @@ export interface PlantDirectorDirective {
   recommendationDate?: string
 }
 
+export type CopyCategory = 
+  | 'ALL'
+  | 'PILLAR_SUPPLY_CHAIN'
+  | 'PILLAR_SHOPFLOOR'
+  | 'PILLAR_QC_GATE'
+  | 'PILLAR_CUSTOMER_OTIF'
+  | 'DEPT_PURCHASING'
+  | 'DEPT_PLANNING'
+  | 'DEPT_PRODUCTION'
+  | 'DEPT_QC'
+  | 'DEPT_WAREHOUSE'
+
+export function isDeptMatch(directive: PlantDirectorDirective, dept: 'PURCHASING' | 'PLANNING' | 'PRODUCTION' | 'QC' | 'WAREHOUSE'): boolean {
+  const haystack = `${directive.title} ${directive.problemStatement} ${directive.directorDirective} ${directive.actionItems?.map(a => `${a.dept} ${a.action}`).join(' ') || ''}`.toLowerCase()
+
+  switch (dept) {
+    case 'PURCHASING':
+      return directive.pillar === 'SUPPLY_CHAIN' ||
+        haystack.includes('จัดซื้อ') ||
+        haystack.includes('purchasing') ||
+        haystack.includes('supplier') ||
+        haystack.includes('วัตถุดิบ') ||
+        haystack.includes('po ')
+    case 'PLANNING':
+      return haystack.includes('วางแผน') ||
+        haystack.includes('pmc') ||
+        haystack.includes('re-plan') ||
+        haystack.includes('คิวงาน') ||
+        haystack.includes('เลื่อนแผน') ||
+        haystack.includes('ปรับวัน')
+    case 'PRODUCTION':
+      return directive.pillar === 'SHOPFLOOR' ||
+        haystack.includes('ผลิต') ||
+        haystack.includes('ชั่ง') ||
+        haystack.includes('ผสม') ||
+        haystack.includes('บรรจุ') ||
+        haystack.includes('packing') ||
+        haystack.includes('mix') ||
+        haystack.includes('ถัง') ||
+        haystack.includes('ไลน์') ||
+        haystack.includes('ซ่อมบำรุง')
+    case 'QC':
+      return directive.pillar === 'QC_GATE' ||
+        haystack.includes('qc') ||
+        haystack.includes('qa') ||
+        haystack.includes('แล็บ') ||
+        haystack.includes('คุณภาพ') ||
+        haystack.includes('hold') ||
+        haystack.includes('nc')
+    case 'WAREHOUSE':
+      return directive.pillar === 'CUSTOMER_OTIF' ||
+        haystack.includes('คลัง') ||
+        haystack.includes('warehouse') ||
+        haystack.includes('ส่งมอบ') ||
+        haystack.includes('ขนส่ง') ||
+        haystack.includes('โลจิสติกส์') ||
+        haystack.includes('พาเลท') ||
+        haystack.includes('สต็อก') ||
+        haystack.includes('fg')
+    default:
+      return false
+  }
+}
+
 interface PlantDirectorAdvisoryProps {
   etaList: any[]
   logsList: any[]
@@ -81,6 +146,8 @@ export function PlantDirectorAdvisory({
   const [activeFilter, setActiveFilter] = useState<'ALL' | 'SUPPLY_CHAIN' | 'SHOPFLOOR' | 'QC_GATE' | 'CUSTOMER_OTIF'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [isCopied, setIsCopied] = useState(false)
+  const [copiedCategory, setCopiedCategory] = useState<string | null>(null)
+  const [isCopyMenuOpen, setIsCopyMenuOpen] = useState(false)
   const [theme, setTheme] = useState<'night' | 'light'>('night')
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   // Default to collapsed categories as requested by user to keep view clean and compact
@@ -585,29 +652,222 @@ export function PlantDirectorAdvisory({
     }
   }
 
-  // Copy morning briefing to clipboard
-  const handleCopyBriefing = () => {
-    const listToCopy = filteredDirectives.length > 0 ? filteredDirectives : directives
-    const filterNote = searchQuery.trim() 
-      ? ` (ผลการค้นหา: "${searchQuery}")` 
-      : activeFilter !== 'ALL' 
-      ? ` (หมวด: ${activeFilter})` 
-      : ''
-    const header = `👑 [ข้อสั่งการและสรุปประชุมเช้าจาก Plant Director]${filterNote}\n📅 วันที่: ${new Date().toLocaleDateString('th-TH')}\n==============================\n`
-    const body = listToCopy.map((d, idx) => {
-      const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
-      const topicTag = d.topic ? `[${d.topic}] ` : ''
-      const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
-      const customTag = customDirectives[d.id]?.text ? ' (✍️ ผอ. ปรับปรุงข้อสั่งการ)' : ''
-      return `${idx + 1}. ${sevIcon} ${topicTag}${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการจาก ผอ.${customTag}: ${effectiveDirective}\n`
-    }).join('\n')
-    const footer = `\n==============================\n📌 ขอให้ทุกฝ่ายถือปฏิบัติตามข้อสั่งการอย่างเคร่งครัด\nCosmeFlow AI Operations Intelligence`
+  // Memoized category and department counts for copy menu
+  const categoryCounts = useMemo(() => {
+    const supplyChain = directives.filter(d => d.pillar === 'SUPPLY_CHAIN')
+    const shopfloor = directives.filter(d => d.pillar === 'SHOPFLOOR')
+    const qcGate = directives.filter(d => d.pillar === 'QC_GATE')
+    const customerOtif = directives.filter(d => d.pillar === 'CUSTOMER_OTIF')
 
-    navigator.clipboard.writeText(header + body + footer).then(() => {
-      setIsCopied(true)
-      toast.success('คัดลอกข้อสั่งการเข้า Clipboard เรียบร้อยแล้ว พร้อมวางใน LINE ประชุมเช้า')
-      setTimeout(() => setIsCopied(false), 2500)
-    }).catch(() => {
+    const purchasing = directives.filter(d => isDeptMatch(d, 'PURCHASING'))
+    const planning = directives.filter(d => isDeptMatch(d, 'PLANNING'))
+    const production = directives.filter(d => isDeptMatch(d, 'PRODUCTION'))
+    const qc = directives.filter(d => isDeptMatch(d, 'QC'))
+    const warehouse = directives.filter(d => isDeptMatch(d, 'WAREHOUSE'))
+
+    return {
+      supplyChain: supplyChain.length,
+      shopfloor: shopfloor.length,
+      qcGate: qcGate.length,
+      customerOtif: customerOtif.length,
+      purchasing: purchasing.length,
+      planning: planning.length,
+      production: production.length,
+      qc: qc.length,
+      warehouse: warehouse.length
+    }
+  }, [directives])
+
+  // Copy directives to clipboard separated by 4 pillars or 5 operational departments
+  const handleCopyByCategory = (category: CopyCategory) => {
+    let listToCopy: PlantDirectorDirective[] = []
+    let categoryTitle = ''
+    let deptTarget: 'PURCHASING' | 'PLANNING' | 'PRODUCTION' | 'QC' | 'WAREHOUSE' | null = null
+
+    switch (category) {
+      case 'ALL':
+        listToCopy = directives
+        categoryTitle = 'ทุกสายงาน (ภาพรวม)'
+        break
+      case 'PILLAR_SUPPLY_CHAIN':
+        listToCopy = directives.filter(d => d.pillar === 'SUPPLY_CHAIN')
+        categoryTitle = 'จัดซื้อ ➔ ผลิต'
+        break
+      case 'PILLAR_SHOPFLOOR':
+        listToCopy = directives.filter(d => d.pillar === 'SHOPFLOOR')
+        categoryTitle = 'คิวผลิต & หน้างาน'
+        break
+      case 'PILLAR_QC_GATE':
+        listToCopy = directives.filter(d => d.pillar === 'QC_GATE')
+        categoryTitle = 'แล็บ QC ➔ บรรจุ'
+        break
+      case 'PILLAR_CUSTOMER_OTIF':
+        listToCopy = directives.filter(d => d.pillar === 'CUSTOMER_OTIF')
+        categoryTitle = 'ส่งมอบ FG ลูกค้า'
+        break
+      case 'DEPT_PURCHASING':
+        deptTarget = 'PURCHASING'
+        listToCopy = directives.filter(d => isDeptMatch(d, 'PURCHASING'))
+        categoryTitle = 'ฝ่ายจัดซื้อ'
+        break
+      case 'DEPT_PLANNING':
+        deptTarget = 'PLANNING'
+        listToCopy = directives.filter(d => isDeptMatch(d, 'PLANNING'))
+        categoryTitle = 'ฝ่ายวางแผน (PMC)'
+        break
+      case 'DEPT_PRODUCTION':
+        deptTarget = 'PRODUCTION'
+        listToCopy = directives.filter(d => isDeptMatch(d, 'PRODUCTION'))
+        categoryTitle = 'ฝ่ายผลิต (ชั่ง/ผสม/บรรจุ)'
+        break
+      case 'DEPT_QC':
+        deptTarget = 'QC'
+        listToCopy = directives.filter(d => isDeptMatch(d, 'QC'))
+        categoryTitle = 'ฝ่ายประกันคุณภาพ (QC/QA)'
+        break
+      case 'DEPT_WAREHOUSE':
+        deptTarget = 'WAREHOUSE'
+        listToCopy = directives.filter(d => isDeptMatch(d, 'WAREHOUSE'))
+        categoryTitle = 'คลังสินค้า & โลจิสติกส์'
+        break
+    }
+
+    const todayTh = new Date().toLocaleDateString('th-TH', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    })
+
+    let message = ''
+
+    if (category === 'ALL') {
+      // Group by 4 pillars for clean, structured layout in LINE
+      const pillars = [
+        { key: 'SUPPLY_CHAIN', icon: '📦', label: '1. สายงานจัดซื้อ ➔ ผลิต (วัตถุดิบ/ปรับคิวชั่ง)' },
+        { key: 'SHOPFLOOR', icon: '⚖️', label: '2. สายงานคิวผลิต & หน้างาน (คอขวดผสม-บรรจุ)' },
+        { key: 'QC_GATE', icon: '🛡️', label: '3. สายงานแล็บ QC ➔ บรรจุ (ตรวจ Bulk/Hold/ปล่อยผ่าน)' },
+        { key: 'CUSTOMER_OTIF', icon: '🎯', label: '4. สายงานส่งมอบ FG ลูกค้า (กำหนดส่งมอบกระชั้นชิด)' }
+      ]
+
+      const header = `👑 [ข้อสั่งการและสรุปประชุมเช้า Plant Director]\n📅 ประจำวันที่: ${todayTh}\n📊 รวมทั้งสิ้น: ${directives.length} ประเด็น\n==============================\n`
+
+      let body = ''
+      let globalIdx = 1
+
+      pillars.forEach(p => {
+        const pDirectives = directives.filter(d => d.pillar === p.key)
+        if (pDirectives.length > 0) {
+          body += `\n${p.icon} 【${p.label}】 (${pDirectives.length} ประเด็น)\n------------------------------\n`
+          pDirectives.forEach(d => {
+            const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
+            const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
+            const customTag = customDirectives[d.id]?.text ? ' (✍️ ผอ. ปรับปรุง)' : ''
+            body += `${globalIdx}. ${sevIcon} ${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการ ผอ.${customTag}: ${effectiveDirective}\n`
+            if (d.actionItems && d.actionItems.length > 0) {
+              body += `🎯 งานที่ต้องปฏิบัติ:\n`
+              d.actionItems.forEach(a => {
+                body += `   - ${a.dept}: ${a.action}\n`
+              })
+            }
+            body += `\n`
+            globalIdx++
+          })
+        }
+      })
+
+      if (directives.length === 0) {
+        body = `\n✅ สถานะปกติ: สายงานการผลิตทุกแผนกดำเนินงานราบรื่น On Track\n\n`
+      }
+
+      const footer = `==============================\n📌 ขอให้ทุกฝ่ายประสานงานและถือปฏิบัติตามข้อสั่งการอย่างเคร่งครัด\nCosmeFlow AI Strategic Briefing`
+      message = header + body + footer
+
+    } else if (deptTarget) {
+      // Department-focused copy
+      const emojiMap = {
+        PURCHASING: '🛍️',
+        PLANNING: '📋',
+        PRODUCTION: '🏭',
+        QC: '🔬',
+        WAREHOUSE: '🏢'
+      }
+      const icon = emojiMap[deptTarget]
+      const header = `${icon} [ข้อสั่งการประชุมเช้า: ${categoryTitle}]\n📅 ประจำวันที่: ${todayTh}\n📊 จำนวน: ${listToCopy.length} รายการ\n==============================\n`
+
+      let body = ''
+      if (listToCopy.length === 0) {
+        body = `\n✅ สถานะปกติ: ไม่พบประเด็นเร่งด่วนหรือข้อสั่งการตกค้างสำหรับ${categoryTitle}ในวันนี้\n\n`
+      } else {
+        listToCopy.forEach((d, idx) => {
+          const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
+          const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
+          body += `\n${idx + 1}. ${sevIcon} ${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการ ผอ.: ${effectiveDirective}\n`
+
+          // Filter actions specifically relevant to this department
+          const deptActions = d.actionItems.filter(a => {
+            const aText = `${a.dept} ${a.action}`.toLowerCase()
+            if (deptTarget === 'PURCHASING') return aText.includes('จัดซื้อ') || aText.includes('purchasing') || aText.includes('supplier')
+            if (deptTarget === 'PLANNING') return aText.includes('วางแผน') || aText.includes('pmc') || aText.includes('plan')
+            if (deptTarget === 'PRODUCTION') return aText.includes('ผลิต') || aText.includes('ชั่ง') || aText.includes('ผสม') || aText.includes('บรรจุ') || aText.includes('packing') || aText.includes('หัวหน้างาน')
+            if (deptTarget === 'QC') return aText.includes('qc') || aText.includes('qa') || aText.includes('แล็บ') || aText.includes('คุณภาพ')
+            if (deptTarget === 'WAREHOUSE') return aText.includes('คลัง') || aText.includes('warehouse') || aText.includes('ขนส่ง') || aText.includes('โลจิสติกส์') || aText.includes('สต็อก')
+            return false
+          })
+
+          const actionsToShow = deptActions.length > 0 ? deptActions : d.actionItems
+          if (actionsToShow.length > 0) {
+            body += `👉 งานที่${categoryTitle}ต้องปฏิบัติ:\n`
+            actionsToShow.forEach(a => {
+              body += `   - ${a.dept}: ${a.action}\n`
+            })
+          }
+        })
+        body += `\n`
+      }
+
+      const footer = `==============================\n📌 ขอให้ผู้รับผิดชอบดำเนินการและรายงานความคืบหน้า\nCosmeFlow AI Strategic Briefing`
+      message = header + body + footer
+
+    } else {
+      // Pillar-focused copy (4 สายงานหลัก)
+      const pillarIcons: Record<string, string> = {
+        PILLAR_SUPPLY_CHAIN: '📦',
+        PILLAR_SHOPFLOOR: '⚖️',
+        PILLAR_QC_GATE: '🛡️',
+        PILLAR_CUSTOMER_OTIF: '🎯'
+      }
+      const icon = pillarIcons[category] || '👑'
+      const header = `${icon} [ข้อสั่งการสายงาน: ${categoryTitle}]\n📅 ประจำวันที่: ${todayTh}\n📊 จำนวน: ${listToCopy.length} ประเด็น\n==============================\n`
+
+      let body = ''
+      if (listToCopy.length === 0) {
+        body = `\n✅ สถานะปกติ: ไม่พบประเด็นเร่งด่วนหรือข้อสั่งการตกค้างในสายงานนี้\n\n`
+      } else {
+        listToCopy.forEach((d, idx) => {
+          const sevIcon = d.severity === 'CRITICAL' ? '🚨 [ด่วนที่สุด]' : d.severity === 'WARNING' ? '⚠️ [เฝ้าระวัง]' : '✅ [แนวทางปฏิบัติ]'
+          const effectiveDirective = customDirectives[d.id]?.text || d.directorDirective
+          body += `\n${idx + 1}. ${sevIcon} ${d.title}\n• สภาพปัญหา: ${d.problemStatement}\n• ข้อสั่งการ ผอ.: ${effectiveDirective}\n`
+          if (d.actionItems && d.actionItems.length > 0) {
+            body += `🎯 งานที่ต้องปฏิบัติ (Action Items):\n`
+            d.actionItems.forEach(a => {
+              body += `   - ${a.dept}: ${a.action}\n`
+            })
+          }
+        })
+        body += `\n`
+      }
+
+      const footer = `==============================\n📌 ขอให้ผู้เกี่ยวข้องรับทราบและประสานงานทันที\nCosmeFlow AI Strategic Briefing`
+      message = header + body + footer
+    }
+
+    navigator.clipboard.writeText(message).then(() => {
+      setCopiedCategory(categoryTitle)
+      setIsCopyMenuOpen(false)
+      toast.success(`คัดลอกข้อสั่งการ [${categoryTitle}] เรียบร้อยแล้ว พร้อมวางใน LINE`)
+      setTimeout(() => setCopiedCategory(null), 2500)
+    }).catch(err => {
+      console.error('Clipboard error:', err)
       toast.error('ไม่สามารถคัดลอกได้')
     })
   }
@@ -703,15 +963,226 @@ export function PlantDirectorAdvisory({
               )}
             </Button>
 
-            {/* Copy Morning Briefing Button */}
-            <Button
-              type="button"
-              onClick={handleCopyBriefing}
-              className="bg-gradient-to-r from-[#D4AF37] to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-lg border border-amber-300/60 flex items-center gap-1.5 transition active:scale-95"
-            >
-              <Copy className="w-3.5 h-3.5" />
-              <span>{isCopied ? 'คัดลอกแล้ว!' : 'คัดลอกข้อสั่งการเข้า LINE ประชุมเช้า'}</span>
-            </Button>
+            {/* Copy Morning Briefing Dropdown Button */}
+            <Popover open={isCopyMenuOpen} onOpenChange={setIsCopyMenuOpen}>
+              <PopoverTrigger className="bg-gradient-to-r from-[#D4AF37] to-amber-500 hover:from-amber-400 hover:to-amber-600 text-slate-950 font-black text-xs px-4 py-2 rounded-xl shadow-lg border border-amber-300/60 flex items-center gap-1.5 transition active:scale-95 cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-amber-400">
+                <Copy className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">
+                  {copiedCategory ? `คัดลอก (${copiedCategory}) แล้ว!` : 'คัดลอกข้อสั่งการเข้า LINE ประชุมเช้า'}
+                </span>
+                <ChevronDown className={`w-3.5 h-3.5 ml-0.5 shrink-0 transition-transform duration-200 ${isCopyMenuOpen ? 'rotate-180' : ''}`} />
+              </PopoverTrigger>
+
+              <PopoverContent align="end" className={`w-[340px] sm:w-[430px] p-0 border shadow-2xl rounded-2xl overflow-hidden z-50 ${isNight ? 'bg-slate-900 border-[#D4AF37]/50 text-slate-200' : 'bg-white border-amber-300 text-slate-800'}`}>
+                {/* Header */}
+                <div className={`p-3.5 border-b ${isNight ? 'bg-slate-950/80 border-slate-800' : 'bg-amber-50/80 border-amber-200/70'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="w-7 h-7 rounded-xl bg-amber-500/20 text-amber-500 flex items-center justify-center text-sm shadow-inner">
+                        📋
+                      </span>
+                      <div>
+                        <div className={`text-xs font-black ${isNight ? 'text-amber-300' : 'text-amber-950'}`}>
+                          คัดลอกข้อสั่งการเข้า LINE ประชุมเช้า
+                        </div>
+                        <div className={`text-[10px] ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
+                          เลือกคัดลอกแยกตามสายงาน เพื่อความกระชับ อ่านง่ายใน LINE
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsCopyMenuOpen(false)}
+                      className={`p-1 rounded-lg transition ${isNight ? 'hover:bg-slate-800 text-slate-400 hover:text-white' : 'hover:bg-amber-100 text-slate-400 hover:text-slate-700'}`}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="max-h-[70vh] overflow-y-auto p-2.5 space-y-3">
+                  {/* Option 1: Copy All */}
+                  <div>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyByCategory('ALL')}
+                      className={`w-full text-left p-2.5 rounded-xl border flex items-center justify-between transition-all ${
+                        isNight
+                          ? 'bg-amber-500/10 hover:bg-amber-500/20 border-amber-500/40 text-amber-200 shadow-sm'
+                          : 'bg-amber-50 hover:bg-amber-100/90 border-amber-300 text-amber-950 shadow-sm'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="text-xl shrink-0">👑</span>
+                        <div className="min-w-0">
+                          <div className="text-xs font-black flex items-center gap-1.5">
+                            <span>คัดลอกทั้งหมด (จัดหมวดหมู่แยกสายงาน)</span>
+                          </div>
+                          <div className="text-[10px] opacity-80 truncate">
+                            รวมครบทุกประเด็น แบ่งหัวข้อตามสายงานอย่างเป็นระเบียบ
+                          </div>
+                        </div>
+                      </div>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                        isNight ? 'bg-amber-400/20 text-amber-300' : 'bg-amber-200 text-amber-900'
+                      }`}>
+                        {directives.length} ประเด็น
+                      </span>
+                    </button>
+                  </div>
+
+                  {/* Option 2: 4 Strategic Pillars */}
+                  <div>
+                    <div className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+                      isNight ? 'text-amber-400/80' : 'text-amber-900'
+                    }`}>
+                      <span>🏛️ แยกตาม 4 สายงานหลัก (Strategic Pillars)</span>
+                      <span className="text-[9px] font-normal lowercase opacity-70">สั้นกระชับ</span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 mt-1">
+                      {[
+                        {
+                          key: 'PILLAR_SUPPLY_CHAIN' as const,
+                          icon: '📦',
+                          title: '1. จัดซื้อ ➔ ผลิต',
+                          desc: 'วัตถุดิบเลื่อน / ปรับคิวชั่ง',
+                          count: categoryCounts.supplyChain
+                        },
+                        {
+                          key: 'PILLAR_SHOPFLOOR' as const,
+                          icon: '⚖️',
+                          title: '2. คิวผลิต & หน้างาน',
+                          desc: 'ค้างทบทวน / คอขวดผสม-บรรจุ',
+                          count: categoryCounts.shopfloor
+                        },
+                        {
+                          key: 'PILLAR_QC_GATE' as const,
+                          icon: '🛡️',
+                          title: '3. แล็บ QC ➔ บรรจุ',
+                          desc: 'เร่งตรวจ Bulk / NC & Hold',
+                          count: categoryCounts.qcGate
+                        },
+                        {
+                          key: 'PILLAR_CUSTOMER_OTIF' as const,
+                          icon: '🎯',
+                          title: '4. ส่งมอบ FG ลูกค้า',
+                          desc: 'ครบกำหนดส่งกระชั้นชิด',
+                          count: categoryCounts.customerOtif
+                        }
+                      ].map(item => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => handleCopyByCategory(item.key)}
+                          className={`text-left p-2 rounded-xl border flex items-center justify-between transition-all ${
+                            isNight
+                              ? 'bg-slate-800/80 hover:bg-slate-700/80 border-slate-700 text-slate-200'
+                              : 'bg-slate-50 hover:bg-amber-50/70 border-slate-200 hover:border-amber-200 text-slate-700'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-base shrink-0">{item.icon}</span>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold truncate">{item.title}</div>
+                              <div className="text-[9.5px] opacity-70 truncate">{item.desc}</div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ml-1.5 ${
+                            item.count > 0 
+                              ? (isNight ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800')
+                              : (isNight ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500')
+                          }`}>
+                            {item.count}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Option 3: 5 Operational Departments */}
+                  <div>
+                    <div className={`px-2 py-1 text-[10px] font-bold uppercase tracking-wider flex items-center justify-between ${
+                      isNight ? 'text-amber-400/80' : 'text-amber-900'
+                    }`}>
+                      <span>🏢 แยกตามแผนกปฏิบัติการ (Departments)</span>
+                      <span className="text-[9px] font-normal lowercase opacity-70">ส่งตรงกลุ่มไลน์ฝ่าย</span>
+                    </div>
+                    <div className="space-y-1 mt-1">
+                      {[
+                        {
+                          key: 'DEPT_PURCHASING' as const,
+                          icon: '🛍️',
+                          title: 'ฝ่ายจัดซื้อ (Purchasing)',
+                          desc: 'ติดตาม Supplier & วันเข้าวัตถุดิบ/บรรจุภัณฑ์',
+                          count: categoryCounts.purchasing
+                        },
+                        {
+                          key: 'DEPT_PLANNING' as const,
+                          icon: '📋',
+                          title: 'ฝ่ายวางแผน (Planning / PMC)',
+                          desc: 'Re-plan ปรับวันคิวชั่ง ผสม บรรจุ และจัดการคิวค้าง',
+                          count: categoryCounts.planning
+                        },
+                        {
+                          key: 'DEPT_PRODUCTION' as const,
+                          icon: '🏭',
+                          title: 'ฝ่ายผลิต (ชั่งสาร / ผสม / บรรจุ)',
+                          desc: 'บริหารคิวถังผสม จุดคอขวด และความพร้อมหน้างาน',
+                          count: categoryCounts.production
+                        },
+                        {
+                          key: 'DEPT_QC' as const,
+                          icon: '🔬',
+                          title: 'ฝ่ายประกันคุณภาพ (QC / QA)',
+                          desc: 'เร่งรัดผลตรวจแล็บ Bulk, แก้ไข Hold/NC และปล่อยผ่าน',
+                          count: categoryCounts.qc
+                        },
+                        {
+                          key: 'DEPT_WAREHOUSE' as const,
+                          icon: '🏢',
+                          title: 'คลังสินค้า & โลจิสติกส์ (Warehouse)',
+                          desc: 'ตรวจรับของ, เช็คสต็อก และเตรียมพาเลท FG ส่งมอบ',
+                          count: categoryCounts.warehouse
+                        }
+                      ].map(item => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => handleCopyByCategory(item.key)}
+                          className={`w-full text-left px-2.5 py-1.5 rounded-lg border flex items-center justify-between transition-all ${
+                            isNight
+                              ? 'bg-slate-800/60 hover:bg-slate-700/70 border-slate-700/80 text-slate-200'
+                              : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700 shadow-2xs'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-sm shrink-0">{item.icon}</span>
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-bold truncate">{item.title}</div>
+                              <div className="text-[9.5px] opacity-70 truncate">{item.desc}</div>
+                            </div>
+                          </div>
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0 ml-2 ${
+                            item.count > 0 
+                              ? (isNight ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-800')
+                              : (isNight ? 'bg-slate-700 text-slate-400' : 'bg-slate-200 text-slate-500')
+                          }`}>
+                            {item.count} รายการ
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Footer Tip */}
+                <div className={`p-2.5 text-center text-[10px] border-t font-medium ${
+                  isNight ? 'bg-slate-950/60 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                }`}>
+                  💡 ข้อความถูกจัดให้กระชับ พอดีหน้าจอมือถือ พร้อมกด Paste ใน LINE ประชุมเช้าได้ทันที
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
@@ -782,7 +1253,7 @@ export function PlantDirectorAdvisory({
                       : 'bg-white hover:bg-slate-50 border-slate-200 hover:border-slate-300 text-slate-700 shadow-sm'
                 }`}
               >
-                {/* Top: Emoji + Label + Active pill */}
+                {/* Top: Emoji + Label + Active pill + Quick Copy */}
                 <div className="flex items-center justify-between gap-1 w-full">
                   <div className="flex items-center gap-1.5 min-w-0">
                     <span className="text-base md:text-lg shrink-0 leading-none">{card.emoji}</span>
@@ -794,13 +1265,39 @@ export function PlantDirectorAdvisory({
                       {card.label}
                     </span>
                   </div>
-                  {isSelected && (
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
-                      isNight ? 'bg-[#D4AF37] text-slate-950' : 'bg-[#B8860B] text-white'
-                    }`}>
-                      กำลังดู
+                  <div className="flex items-center gap-1 shrink-0">
+                    {isSelected && (
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase shrink-0 ${
+                        isNight ? 'bg-[#D4AF37] text-slate-950' : 'bg-[#B8860B] text-white'
+                      }`}>
+                        กำลังดู
+                      </span>
+                    )}
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const cat = card.key === 'ALL' ? 'ALL' : (`PILLAR_${card.key}` as CopyCategory)
+                        handleCopyByCategory(cat)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.stopPropagation()
+                          const cat = card.key === 'ALL' ? 'ALL' : (`PILLAR_${card.key}` as CopyCategory)
+                          handleCopyByCategory(cat)
+                        }
+                      }}
+                      className={`p-1 rounded-md transition ${
+                        isNight 
+                          ? 'hover:bg-slate-700 text-slate-400 hover:text-amber-300' 
+                          : 'hover:bg-amber-100 text-slate-400 hover:text-amber-800'
+                      }`}
+                      title={`คัดลอกเฉพาะสายงาน "${card.label}" เข้า LINE`}
+                    >
+                      <Copy className="w-3 h-3" />
                     </span>
-                  )}
+                  </div>
                 </div>
 
                 {/* Count and Status breakdown */}
