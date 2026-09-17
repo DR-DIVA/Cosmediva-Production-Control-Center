@@ -682,14 +682,11 @@ export default function PlannerPage() {
   }
 
   
-  const resolveUserName = (userId: string | null | undefined, fallbackNote?: string | null) => {
+  const resolveUserName = (userId: string | null | undefined, fallbackNote?: string | null, isHandoverTask = false) => {
     // 1. If explicit userId provided (uuid)
     if (userId) {
       const u = usersList.find(u => u.id === userId);
       if (u) return (u.employee_id ? u.employee_id.toUpperCase() : u.full_name);
-      if (userId === currentUserId && currentUser && currentUser !== 'Unknown User') {
-        return currentUser.toUpperCase();
-      }
     }
 
     // 2. Check if note has a user tag like (โดย USERNAME) or [PLAN_RESCHEDULE:...updatedBy:"USERNAME"]
@@ -704,12 +701,12 @@ export default function PlannerPage() {
       }
     }
 
-    // 3. If currently logged in user is valid
-    if (currentUser && currentUser !== 'Unknown User' && currentUser.toLowerCase() !== 'planner') {
-      return currentUser.toUpperCase();
+    // 3. If automated shopfloor handover task (รอ QC / รอ POF / รอเข้าคลัง FG / ลงลัง)
+    if (isHandoverTask) {
+      return 'SYSTEM';
     }
 
-    // 4. Check if there's a known planner in usersList
+    // 4. Default for production planning queue: Official Planner Officer (PLPTB1234 คุณพรทิพย์ บูรณ์รัตน์ธรรม)
     const knownPlanner = usersList.find(u => u.role?.includes('planner:edit') || u.employee_id?.toUpperCase().startsWith('PL'));
     if (knownPlanner && knownPlanner.employee_id) {
       return knownPlanner.employee_id.toUpperCase();
@@ -721,8 +718,8 @@ export default function PlannerPage() {
   const getHistoryData = () => {
     const orderHistory = lots.map(lot => {
       const effectiveUserId = lot.updated_by || lot.created_by;
-      const userName = resolveUserName(effectiveUserId);
-      const userObj = usersList.find(u => u.id === effectiveUserId);
+      const userName = resolveUserName(effectiveUserId, null, false);
+      const userObj = usersList.find(u => u.id === effectiveUserId || (u.employee_id && u.employee_id.toUpperCase() === userName.toUpperCase()));
       return {
         id: `lot-${lot.id}`,
         recordId: lot.id,
@@ -732,7 +729,7 @@ export default function PlannerPage() {
         timestamp: lot.created_at,
         user: userName,
         userId: effectiveUserId,
-        userFullName: userObj?.full_name || '',
+        userFullName: userObj?.full_name || (userName === 'PLPTB1234' ? 'คุณพรทิพย์ บูรณ์รัตน์ธรรม' : (userName === 'SYSTEM' ? 'ระบบอัตโนมัติ' : '')),
         details: `เพิ่มออเดอร์ยอด ${(lot.order_quantity || 0).toLocaleString()} pc (${lot.total_tanks || 0} ถัง)`
       };
     });
@@ -744,13 +741,21 @@ export default function PlannerPage() {
       const isRescheduled = planInfo.isRescheduled;
       const isCompletion = (log.status === 'COMPLETED' || log.status === 'DONE') && (log.note || '').includes('ส่งยอด FG');
 
+      const isHandover = process?.process_name ? (
+        process.process_name.includes('รอ QC') ||
+        process.process_name.includes('รอ POF') ||
+        process.process_name.includes('รอเข้าคลัง') ||
+        process.process_name.includes('ลงลัง')
+      ) : false;
+
       const effectiveUserId = log.updated_by || log.created_by || log.operator_id;
-      const userName = resolveUserName(effectiveUserId, log.note);
-      const userObj = usersList.find(u => u.id === effectiveUserId);
+      const userName = resolveUserName(effectiveUserId, log.note, isHandover);
+      const userObj = usersList.find(u => u.id === effectiveUserId || (u.employee_id && u.employee_id.toUpperCase() === userName.toUpperCase()));
 
       let actionType = 'ลงคิวงาน';
       if (isCompletion) actionType = 'ปิดงาน';
       else if (isRescheduled) actionType = 'ปรับเลื่อนแผน';
+      else if (isHandover) actionType = 'ส่งต่องาน (Auto)';
 
       return {
         id: `log-${log.id}`,
@@ -761,7 +766,7 @@ export default function PlannerPage() {
         timestamp: log.updated_at || log.created_at,
         user: userName,
         userId: effectiveUserId,
-        userFullName: userObj?.full_name || '',
+        userFullName: userObj?.full_name || (userName === 'PLPTB1234' ? 'คุณพรทิพย์ บูรณ์รัตน์ธรรม' : (userName === 'SYSTEM' ? 'ระบบส่งต่องานอัตโนมัติ' : '')),
         details: `${process?.process_name || 'งานผลิต'} (${log.tank_start ? `ถัง ${log.tank_start}-${log.tank_end}` : `${log.total_tanks} ถัง`}) - วันที่ ${log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'}${isRescheduled ? ` [🔄 เลื่อนจาก ${planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yyyy') : '-'}: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}]` : ''}`
       };
     });
@@ -881,67 +886,6 @@ export default function PlannerPage() {
       toast.error('เกิดข้อผิดพลาดในการอัปเดต: ' + err.message);
     } finally {
       setIsUpdatingOperator(false);
-    }
-  };
-
-  const handleSyncLegacyRecords = async () => {
-    const targetUserId = currentUserId || usersList.find(u => u.role?.includes('planner:edit'))?.id || usersList[0]?.id;
-    const targetUsername = (currentUserInfo?.employee_id || currentUser || 'PLPTB1234').toUpperCase();
-
-    if (!targetUserId) {
-      toast.error('ไม่พบรหัสผู้ใช้งานสำหรับการซิงค์');
-      return;
-    }
-
-    try {
-      const { data: unsyncedLogs } = await supabase
-        .from('production_logs')
-        .select('id')
-        .is('updated_by', null)
-        .is('created_by', null);
-
-      let updatedLogsCount = 0;
-      if (unsyncedLogs && unsyncedLogs.length > 0) {
-        const logIds = unsyncedLogs.map(l => l.id);
-        for (let i = 0; i < logIds.length; i += 50) {
-          const chunk = logIds.slice(i, i + 50);
-          const { error: logUpdateErr } = await supabase
-            .from('production_logs')
-            .update({ 
-              updated_by: targetUserId,
-              created_by: targetUserId
-            })
-            .in('id', chunk);
-          if (!logUpdateErr) updatedLogsCount += chunk.length;
-        }
-      }
-
-      const { data: unsyncedLots } = await supabase
-        .from('production_lots')
-        .select('id')
-        .is('created_by', null);
-
-      let updatedLotsCount = 0;
-      if (unsyncedLots && unsyncedLots.length > 0) {
-        const lotIds = unsyncedLots.map(l => l.id);
-        for (let i = 0; i < lotIds.length; i += 50) {
-          const chunk = lotIds.slice(i, i + 50);
-          const { error: lotUpdateErr } = await supabase
-            .from('production_lots')
-            .update({ 
-              created_by: targetUserId,
-              updated_by: targetUserId
-            })
-            .in('id', chunk);
-          if (!lotUpdateErr) updatedLotsCount += chunk.length;
-        }
-      }
-
-      toast.success(`ซิงค์ประวัติเดิมเป็น ${targetUsername} สำเร็จ (คิวงาน ${updatedLogsCount} รายการ, ออเดอร์ ${updatedLotsCount} รายการ)`);
-      fetchData();
-    } catch (err: any) {
-      console.error('Error syncing legacy records:', err);
-      toast.error('ซิงค์ข้อมูลไม่สำเร็จ: ' + err.message);
     }
   };
 
@@ -2751,18 +2695,6 @@ export default function PlannerPage() {
                </div>
 
                <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-                  {canEdit && (
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleSyncLegacyRecords} 
-                      className="h-9 text-xs text-blue-700 border-blue-300 hover:bg-blue-50 font-medium"
-                      title="กดเพื่ออัปเดตประวัติการทำงานเดิมที่ยังไม่มีชื่อผู้ทำ ให้เป็น username ของคุณในฐานข้อมูล"
-                    >
-                      <RefreshCw className="w-3.5 h-3.5 mr-1.5" />
-                      ซิงค์ประวัติเดิมเป็น {currentUser !== 'Unknown User' ? currentUser : 'ผู้ใช้ปัจจุบัน'}
-                    </Button>
-                  )}
                   <Button variant="outline" size="sm" onClick={handleExportHistory} className="h-9 text-xs text-emerald-700 border-emerald-300 hover:bg-emerald-50 hover:text-emerald-800 font-medium">
                     <Download className="w-3.5 h-3.5 mr-1.5" />
                     Export Excel (ประวัติ)
@@ -2822,6 +2754,7 @@ export default function PlannerPage() {
                          <SelectContent>
                            <SelectItem value="ALL" className="text-xs">ทุกประเภท</SelectItem>
                            <SelectItem value="ลงคิวงาน" className="text-xs">ลงคิวงาน</SelectItem>
+                           <SelectItem value="ส่งต่องาน (Auto)" className="text-xs">ส่งต่องาน (Auto)</SelectItem>
                            <SelectItem value="ปรับเลื่อนแผน" className="text-xs">ปรับเลื่อนแผน</SelectItem>
                            <SelectItem value="เพิ่มออเดอร์" className="text-xs">เพิ่มออเดอร์</SelectItem>
                            <SelectItem value="ปิดงาน" className="text-xs">ปิดงาน</SelectItem>
@@ -2907,6 +2840,7 @@ export default function PlannerPage() {
                                "px-2.5 py-1 rounded-full text-xs font-medium inline-block",
                                item.type === 'เพิ่มออเดอร์' && "bg-blue-100 text-blue-800 border border-blue-200",
                                item.type === 'ลงคิวงาน' && "bg-emerald-100 text-emerald-800 border border-emerald-200",
+                               item.type === 'ส่งต่องาน (Auto)' && "bg-sky-100 text-sky-800 border border-sky-200",
                                item.type === 'ปรับเลื่อนแผน' && "bg-amber-100 text-amber-900 border border-amber-300",
                                item.type === 'ปิดงาน' && "bg-purple-100 text-purple-800 border border-purple-200"
                              )}>
