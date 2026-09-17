@@ -75,6 +75,7 @@ export function TimelinePrintModal({
   const [showHandovers, setShowHandovers] = useState<boolean>(initialShowHandovers)
   const [includeSignatures, setIncludeSignatures] = useState<boolean>(true)
   const [searchFilter, setSearchFilter] = useState<string>('')
+  const [density, setDensity] = useState<'compact' | 'comfortable'>('compact')
   const [isExportingDirectPdf, setIsExportingDirectPdf] = useState(false)
 
   const printContainerRef = useRef<HTMLDivElement>(null)
@@ -236,7 +237,7 @@ export function TimelinePrintModal({
         <style>
           @page {
             size: A4 landscape;
-            margin: 8mm 8mm 10mm 8mm;
+            margin: 6mm 8mm 8mm 8mm;
           }
           * {
             box-sizing: border-box;
@@ -249,8 +250,8 @@ export function TimelinePrintModal({
             padding: 0;
             background: #ffffff;
             color: #0f172a;
-            font-size: 11px;
-            line-height: 1.3;
+            font-size: 10px;
+            line-height: 1.25;
           }
           table {
             width: 100%;
@@ -263,9 +264,32 @@ export function TimelinePrintModal({
           tbody {
             display: table-row-group;
           }
+          tfoot {
+            display: none !important;
+          }
           tr {
             page-break-inside: avoid;
             break-inside: avoid;
+          }
+          .lot-header-row {
+            page-break-after: avoid !important;
+            break-after: avoid !important;
+          }
+          .signature-section {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            margin-top: 14px;
+          }
+          .signature-grid {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            text-align: center;
+          }
+          .signature-col {
+            flex: 1;
+            border-top: 1px solid #94a3b8;
+            padding-top: 4px;
           }
           .page-break {
             page-break-after: always;
@@ -439,7 +463,7 @@ export function TimelinePrintModal({
           </div>
 
           {/* Interactive Print Options Toolbar */}
-          <div className="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div className="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
             {/* 1. Lookahead Horizon */}
             <div className="space-y-1">
               <Label className="text-[11px] font-bold text-slate-700">ช่วงเวลา (Horizon)</Label>
@@ -497,7 +521,21 @@ export function TimelinePrintModal({
               </Select>
             </div>
 
-            {/* 5. Shopfloor Handover Tasks Toggle */}
+            {/* 5. Density / ความกะทัดรัดของแถว */}
+            <div className="space-y-1">
+              <Label className="text-[11px] font-bold text-slate-700">ความแน่นหน้ากระดาษ</Label>
+              <Select value={density} onValueChange={v => { if (v) setDensity(v as 'compact' | 'comfortable') }}>
+                <SelectTrigger className="h-8 text-xs bg-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="compact">กะทัดรัด (แน่นเต็มหน้า A4)</SelectItem>
+                  <SelectItem value="comfortable">ปกติ (สบายตา)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* 6. Shopfloor Handover Tasks Toggle */}
             <div className="space-y-1">
               <Label className="text-[11px] font-bold text-slate-700">ขั้นตอนหน้างาน</Label>
               <Button
@@ -511,13 +549,13 @@ export function TimelinePrintModal({
                 )}
               >
                 {showHandovers ? <Eye className="w-3.5 h-3.5 mr-1 text-purple-600 shrink-0" /> : <EyeOff className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />}
-                <span className="truncate">{showHandovers ? "แสดงขั้นตอนหน้างาน" : "ซ่อนขั้นตอนหน้างาน"}</span>
+                <span className="truncate">{showHandovers ? "แสดงหน้างาน" : "ซ่อนหน้างาน"}</span>
               </Button>
             </div>
 
-            {/* 6. Quick Search / Filter */}
+            {/* 7. Quick Search / Filter */}
             <div className="space-y-1">
-              <Label className="text-[11px] font-bold text-slate-700">ค้นหาเฉพาะ SKU/LOT</Label>
+              <Label className="text-[11px] font-bold text-slate-700">ค้นหา SKU/LOT</Label>
               <div className="relative">
                 <Input
                   placeholder="เช่น PAMH, 001/26..."
@@ -633,17 +671,26 @@ export function TimelinePrintModal({
                       return (
                         <React.Fragment key={lot.id}>
                           {/* LOT Header Row */}
-                          <tr className="bg-slate-100 font-bold border-t-2 border-slate-300">
-                            <td className="p-1.5 pl-2 border-r border-slate-300 text-left">
+                          <tr className={cn(
+                            "lot-header-row bg-slate-100 font-bold border-t-2 border-slate-300",
+                            density === 'compact' ? "h-6" : "h-7"
+                          )}>
+                            <td className={cn(
+                              "pl-2 border-r border-slate-300 text-left",
+                              density === 'compact' ? "py-0.5 px-1.5" : "p-1.5"
+                            )}>
                               <div className="flex items-center justify-between gap-1">
-                                <span className="text-xs font-black text-slate-900 truncate" title={sku}>
+                                <span className={cn(
+                                  "font-black text-slate-900 truncate",
+                                  density === 'compact' ? "text-[11px]" : "text-xs"
+                                )} title={sku}>
                                   {sku}
                                 </span>
                                 <span className="text-[10px] bg-slate-200 px-1 rounded font-mono font-bold text-slate-700">
                                   {lotNo}
                                 </span>
                               </div>
-                              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-normal mt-0.5">
+                              <div className="flex items-center gap-1.5 text-[9.5px] text-slate-500 font-normal mt-0.5">
                                 <span>PO: {poNo}</span>
                                 <span>•</span>
                                 <span>{orderQty} pc</span>
@@ -704,12 +751,18 @@ export function TimelinePrintModal({
                             const endsAfter = endDiff >= lookaheadDays
 
                             return (
-                              <tr key={log.id} className="hover:bg-slate-50 border-b border-slate-200 text-xs">
+                              <tr key={log.id} className={cn(
+                                "task-row hover:bg-slate-50 border-b border-slate-200 text-xs",
+                                density === 'compact' ? "h-5" : "h-6"
+                              )}>
                                 {/* Task Label Cell */}
-                                <td className="py-1 px-2 border-r border-slate-300 pl-4 bg-white">
+                                <td className={cn(
+                                  "border-r border-slate-300 pl-4 bg-white",
+                                  density === 'compact' ? "py-0.5 px-2 text-[10px]" : "py-1 px-2 text-[11px]"
+                                )}>
                                   <div className="flex items-center gap-1.5">
                                     <span className={cn("w-2 h-2 rounded-full shrink-0", palette.dot)}></span>
-                                    <span className="font-semibold text-slate-800 text-[11px] truncate">
+                                    <span className="font-semibold text-slate-800 truncate">
                                       {pName} (T{log.tank_start || 1}-{log.tank_end || 1})
                                     </span>
                                   </div>
@@ -726,7 +779,11 @@ export function TimelinePrintModal({
                                           <div
                                             key={cIdx}
                                             style={{ width: `${100 / clampedStart}%` }}
-                                            className={cn("h-7 border-r border-slate-100", isWeekend && "bg-slate-100/60")}
+                                            className={cn(
+                                              "border-r border-slate-100",
+                                              density === 'compact' ? "h-5" : "h-6",
+                                              isWeekend && "bg-slate-100/60"
+                                            )}
                                           ></div>
                                         )
                                       })}
@@ -737,13 +794,14 @@ export function TimelinePrintModal({
                                 {/* Spanned Gantt Bar Cell */}
                                 <td colSpan={spannedDays} className="p-0.5 border-r border-slate-200 relative">
                                   <div className={cn(
-                                    "w-full h-6 rounded px-1.5 flex items-center justify-between text-[10px] font-bold border shadow-2xs overflow-hidden",
+                                    "w-full rounded px-1.5 flex items-center justify-between font-bold border shadow-2xs overflow-hidden",
+                                    density === 'compact' ? "h-5 text-[9px]" : "h-6 text-[10px]",
                                     palette.bg,
                                     palette.text,
                                     palette.border
                                   )}>
                                     <div className="flex items-center gap-1 truncate">
-                                      {startsBefore && <span className="text-[9px] opacity-70 shrink-0">◀</span>}
+                                      {startsBefore && <span className="text-[8.5px] opacity-70 shrink-0">◀</span>}
                                       <span className="truncate">
                                         {pName} T{log.tank_start || 1}-{log.tank_end || 1}
                                       </span>
@@ -751,16 +809,16 @@ export function TimelinePrintModal({
 
                                     <div className="flex items-center gap-1 shrink-0 ml-1">
                                       {is1stBatch && (
-                                        <span className="bg-purple-200 text-purple-900 px-1 py-0.2 rounded text-[8.5px] font-black border border-purple-300">
+                                        <span className="bg-purple-200 text-purple-900 px-1 py-0.2 rounded text-[8px] font-black border border-purple-300">
                                           🔬 1st
                                         </span>
                                       )}
                                       {planInfo.isRescheduled && (
-                                        <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded text-[8.5px] font-bold border border-amber-300">
+                                        <span className="bg-amber-200 text-amber-900 px-1 py-0.2 rounded text-[8px] font-bold border border-amber-300">
                                           🔄 เดิม:{planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM') : ''}
                                         </span>
                                       )}
-                                      {endsAfter && <span className="text-[9px] opacity-70 shrink-0">▶</span>}
+                                      {endsAfter && <span className="text-[8.5px] opacity-70 shrink-0">▶</span>}
                                     </div>
                                   </div>
                                 </td>
@@ -777,7 +835,11 @@ export function TimelinePrintModal({
                                           <div
                                             key={cIdx}
                                             style={{ width: `${100 / (lookaheadDays - 1 - clampedEnd)}%` }}
-                                            className={cn("h-7 border-r border-slate-100", isWeekend && "bg-slate-100/60")}
+                                            className={cn(
+                                              "border-r border-slate-100",
+                                              density === 'compact' ? "h-5" : "h-6",
+                                              isWeekend && "bg-slate-100/60"
+                                            )}
                                           ></div>
                                         )
                                       })}
@@ -792,40 +854,36 @@ export function TimelinePrintModal({
                     })
                   )}
                 </tbody>
-
-                {/* Document Sign-off Footer */}
-                {includeSignatures && (
-                  <tfoot>
-                    <tr>
-                      <td colSpan={lookaheadDays + 1} className="pt-6 pb-2 border-t-2 border-slate-300">
-                        <div className="grid grid-cols-3 gap-6 pt-2 text-center text-slate-700">
-                          <div className="border-t border-slate-400 pt-1">
-                            <div className="text-xs font-bold text-slate-900">ผู้จัดทำแผนงาน (Planner)</div>
-                            <div className="text-[10px] text-slate-500 mt-1">({currentUser})</div>
-                            <div className="text-[10px] text-slate-400">วันที่: ..... / ..... / ..........</div>
-                          </div>
-
-                          <div className="border-t border-slate-400 pt-1">
-                            <div className="text-xs font-bold text-slate-900">หัวหน้าฝ่ายผลิต / ผู้รับมอบแผน</div>
-                            <div className="text-[10px] text-slate-500 mt-1">(...................................................)</div>
-                            <div className="text-[10px] text-slate-400">วันที่: ..... / ..... / ..........</div>
-                          </div>
-
-                          <div className="border-t border-slate-400 pt-1">
-                            <div className="text-xs font-bold text-slate-900">ฝ่ายประกันคุณภาพ (QA) / ผู้จัดการโรงงาน</div>
-                            <div className="text-[10px] text-slate-500 mt-1">(...................................................)</div>
-                            <div className="text-[10px] text-slate-400">วันที่: ..... / ..... / ..........</div>
-                          </div>
-                        </div>
-
-                        <div className="text-center text-[10px] text-slate-400 mt-3 italic">
-                          * หมายเหตุ: แผนผังกำหนดการผลิตนี้สร้างจากระบบ CosmeFlow OS อาจมีการปรับเปลี่ยนวันตามผลการตรวจแล็บและสถานการณ์หน้างานจริง *
-                        </div>
-                      </td>
-                    </tr>
-                  </tfoot>
-                )}
               </table>
+
+              {/* Document Sign-off Footer (Appears ONCE at the end of the document on the last page) */}
+              {includeSignatures && (
+                <div className="signature-section mt-4 pt-3 border-t-2 border-slate-300" style={{ pageBreakInside: 'avoid', breakInside: 'avoid' }}>
+                  <div className="signature-grid flex justify-between gap-6 pt-2 text-center text-slate-700">
+                    <div className="signature-col flex-1 border-t border-slate-400 pt-1">
+                      <div className="text-xs font-bold text-slate-900">ผู้จัดทำแผนงาน (Planner)</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">({currentUser})</div>
+                      <div className="text-[9.5px] text-slate-400 mt-1">วันที่: ..... / ..... / ..........</div>
+                    </div>
+
+                    <div className="signature-col flex-1 border-t border-slate-400 pt-1">
+                      <div className="text-xs font-bold text-slate-900">หัวหน้าฝ่ายผลิต / ผู้รับมอบแผน</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">(...................................................)</div>
+                      <div className="text-[9.5px] text-slate-400 mt-1">วันที่: ..... / ..... / ..........</div>
+                    </div>
+
+                    <div className="signature-col flex-1 border-t border-slate-400 pt-1">
+                      <div className="text-xs font-bold text-slate-900">ฝ่ายประกันคุณภาพ (QA) / ผู้จัดการโรงงาน</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">(...................................................)</div>
+                      <div className="text-[9.5px] text-slate-400 mt-1">วันที่: ..... / ..... / ..........</div>
+                    </div>
+                  </div>
+
+                  <div className="text-center text-[10px] text-slate-400 mt-3 italic">
+                    * หมายเหตุ: แผนผังกำหนดการผลิตนี้สร้างจากระบบ CosmeFlow OS อาจมีการปรับเปลี่ยนวันตามผลการตรวจแล็บและสถานการณ์หน้างานจริง *
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
