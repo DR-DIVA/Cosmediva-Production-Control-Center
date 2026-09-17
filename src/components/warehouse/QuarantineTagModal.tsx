@@ -52,15 +52,15 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     width: 100,
     height: 75,
     category: 'popular',
-    paddingMm: 0.5,
-    headerFontSize: '13.5pt',
-    bodyFontSize: '9.2pt',
-    bodyLineHeight: 1.35,
+    paddingMm: 0.8,
+    headerFontSize: '13pt',
+    bodyFontSize: '9pt',
+    bodyLineHeight: 1.3,
     labelColWidth: '68px',
-    bannerFontSize: '11.5pt',
-    revFontSize: '7.5pt',
+    bannerFontSize: '11pt',
+    revFontSize: '7.2pt',
     qrSize: 32,
-    barcodeHeight: 22,
+    barcodeHeight: 20,
     barcodeWidth: 140
   },
   '100x80': {
@@ -252,9 +252,9 @@ export function QuarantineTagModal({
   const [previewIndex, setPreviewIndex] = useState(1);
   const [printPaperMode, setPrintPaperMode] = useState<'sticker' | 'a4'>('sticker');
   const [previewScale, setPreviewScale] = useState<'actual' | 'large'>('actual');
-  const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('270');
+  const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('auto');
   const [labelSize, setLabelSize] = useState<string>('100x75');
-  const [printZoom, setPrintZoom] = useState<string>('102');
+  const [printZoom, setPrintZoom] = useState<string>('100');
   const [marginFit, setMarginFit] = useState<'tight' | 'borderless' | 'standard'>('tight');
 
   // Load saved label size, zoom & margin preferences
@@ -265,10 +265,15 @@ export function QuarantineTagModal({
         setLabelSize(savedSize);
       } else {
         setLabelSize('100x75');
+        if (savedSize === '75x100') {
+          localStorage.setItem('quarantine_tag_label_size', '100x75');
+        }
       }
       const savedZoom = localStorage.getItem('quarantine_tag_print_zoom');
       if (savedZoom && ['98', '100', '102', '104', '106'].includes(savedZoom)) {
         setPrintZoom(savedZoom);
+      } else {
+        setPrintZoom('100');
       }
       const savedMargin = localStorage.getItem('quarantine_tag_margin_fit');
       if (savedMargin && ['tight', 'borderless', 'standard'].includes(savedMargin)) {
@@ -299,18 +304,17 @@ export function QuarantineTagModal({
   };
 
   const activeSize = LABEL_SIZES[labelSize] || LABEL_SIZES['100x75'];
-  const effectivePaddingMm = marginFit === 'borderless' ? 0 : marginFit === 'tight' ? 0.5 : activeSize.paddingMm;
+  const effectivePaddingMm = marginFit === 'borderless' ? 0 : marginFit === 'tight' ? 0.8 : activeSize.paddingMm;
   const zoomFactor = Number(printZoom || 100) / 100;
 
-  // Load saved printer rotation preference (default to '270' to compensate for Gprinter driver 90-degree sideways rotation)
+  // Load saved printer rotation preference (default to 'auto' for Chrome landscape printing on Gprinter GP-1224T)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRot = localStorage.getItem('quarantine_tag_rotation');
-      if (savedRot && ['0', '90', '180', '270'].includes(savedRot)) {
+      if (savedRot && ['0', '90', '180', '270', 'auto'].includes(savedRot)) {
         setPrintRotation(savedRot as any);
       } else {
-        // Default to '270' to fix sideways printing on Gprinter GP-1224T
-        setPrintRotation('270');
+        setPrintRotation('auto');
       }
     }
   }, []);
@@ -576,8 +580,8 @@ export function QuarantineTagModal({
         .tag-rotate-wrapper {
           width: ${wrapperWidth};
           height: ${wrapperHeight};
-          max-width: 100%;
-          max-height: 100%;
+          max-width: calc(100% - 1.6mm);
+          max-height: calc(100% - 1.6mm);
           flex-shrink: 0;
           transform: ${zoomFactor !== 1 ? `scale(${zoomFactor})` : 'none'};
           transform-origin: center center;
@@ -587,6 +591,7 @@ export function QuarantineTagModal({
           flex-direction: column;
           justify-content: space-between;
           overflow: hidden;
+          margin: auto;
         }
       `;
     } else {
@@ -1081,10 +1086,10 @@ export function QuarantineTagModal({
                       value={printZoom}
                       onChange={(e) => handlePrintZoomChange(e.target.value)}
                       className="font-bold text-xs bg-blue-50 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                      title="ปรับสเกลขยายเต็มสติกเกอร์ (102% ชดเชยขอบขาวเครื่องพิมพ์ความร้อนให้ออกมาเต็มดวงพอดี)"
+                      title="ปรับสเกลขยายเต็มสติกเกอร์ (100% พอดีดวง ไม่ตกขอบ)"
                     >
-                      <option value="102">102% (เต็มดวง แนะนำ)</option>
-                      <option value="100">100% (ปกติ)</option>
+                      <option value="100">100% (พอดีดวง ไม่ตกขอบ แนะนำ ⭐)</option>
+                      <option value="102">102% (ขยายเต็มขอบ +2%)</option>
                       <option value="104">104% (เต็มขอบพิเศษ +4%)</option>
                       <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
                       <option value="98">98% (ย่อเล็ก 98%)</option>
@@ -1099,9 +1104,9 @@ export function QuarantineTagModal({
                       value={marginFit}
                       onChange={(e) => handleMarginFitChange(e.target.value as any)}
                       className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:ring-1 focus:ring-slate-500 cursor-pointer"
-                      title="เลือกระยะขอบ (ชิดขอบ 0.5มม. หรือ ไร้ขอบ 0มม.)"
+                      title="เลือกระยะขอบ (ชิดขอบ 0.8มม. หรือ ไร้ขอบ 0มม.)"
                     >
-                      <option value="tight">ชิดขอบ 0.5 มม.</option>
+                      <option value="tight">ชิดขอบ 0.8 มม. (แนะนำ ⭐)</option>
                       <option value="borderless">ไร้ขอบ 0 มม.</option>
                       <option value="standard">ขอบปกติ 1.5 มม.</option>
                     </select>
@@ -1467,11 +1472,26 @@ export function QuarantineTagModal({
               </div>
 
               {/* Orientation Guide / Sideways Fix Alert */}
-              {['270', '90'].includes(printRotation) ? (
+              {printRotation === 'auto' ? (
+                <div className="w-full bg-blue-50 border border-blue-300 text-blue-900 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2.5 shadow-2xs">
+                  <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-blue-950">โหมดแก้ตะแคง (Auto) - ทำงานร่วมกับการตั้งค่าใน Chrome ที่พี่ทำไว้:</strong>
+                    <div className="mt-1 text-[11px] text-blue-800 flex flex-wrap items-center gap-x-4 gap-y-1">
+                      <span>1️⃣ รูปแบบ: <strong>แนวนอน (Landscape)</strong></span>
+                      <span>2️⃣ ขนาดกระดาษ: <strong>100 x 75</strong></span>
+                      <span>3️⃣ ระยะขอบ: <strong>ไม่มี (None)</strong></span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-blue-700">
+                      (เมื่อเลือกขนาดป้าย 100 x 75 มม. สติกเกอร์จะพิมพ์ออกมาเต็มดวงพอดี ไม่เหลือด้านข้าง และไม่ตกขอบล่างค่ะ)
+                    </p>
+                  </div>
+                </div>
+              ) : ['270', '90'].includes(printRotation) ? (
                 <div className="w-full bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-2xs">
                   <Info className="w-4 h-4 text-emerald-600 shrink-0" />
                   <span>
-                    <strong>โหมดแก้พิมพ์ตะแคง (หมุน {printRotation}°):</strong> ระบบทำการหมุนภาพชดเชยการทำงานของเครื่องพิมพ์ความร้อนให้อัตโนมัติแล้วค่ะ เมื่อกดสั่งพิมพ์ สามารถกดปุ่ม <strong>"พิมพ์" (Print)</strong> ในหน้าต่าง Chrome ได้ทันทีเลยค่ะ ไม่ต้องตั้งค่าเพิ่มเติมใน Chrome
+                    <strong>โหมดแก้พิมพ์ตะแคง (หมุน {printRotation}°):</strong> ระบบทำการหมุนภาพชดเชยการทำงานของเครื่องพิมพ์ความร้อนให้อัตโนมัติแล้วค่ะ เมื่อกดสั่งพิมพ์ สามารถกดปุ่ม <strong>"พิมพ์" (Print)</strong> ในหน้าต่าง Chrome ได้ทันทีเลยค่ะ
                   </span>
                 </div>
               ) : (
@@ -1479,16 +1499,16 @@ export function QuarantineTagModal({
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
                     <span>
-                      <strong>หากพิมพ์ออกมาแล้วตะแคง 90°:</strong> แนะนำให้เลือกทิศทางพิมพ์เป็น <strong>"หมุน 270°"</strong> เพื่อให้พิมพ์ออกมาเป็นแนวนอนตรงพอดี
+                      <strong>หากพิมพ์ออกมาแล้วตะแคง:</strong> แนะนำให้เลือกทิศทางพิมพ์เป็น <strong>"แก้ตะแคง (Auto)"</strong> หรือ <strong>"หมุน 270°"</strong>
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleRotationChange('270')}
-                    className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
+                    onClick={() => handleRotationChange('auto')}
+                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
                   >
                     <RotateCw className="w-3.5 h-3.5" />
-                    คลิกเลือกหมุน 270°
+                    คลิกเลือกแก้ตะแคง (Auto)
                   </button>
                 </div>
               )}
@@ -1541,10 +1561,10 @@ export function QuarantineTagModal({
                   value={printZoom}
                   onChange={(e) => handlePrintZoomChange(e.target.value)}
                   className="text-xs bg-blue-50 font-bold border border-blue-300 rounded px-1.5 py-0.5 text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  title="ปรับสเกลขยายเต็มสติกเกอร์ (102% ช่วยแก้ปัญหาขอบขาวเครื่องพิมพ์ความร้อนให้ออกมาเต็มดวงพอดี)"
+                  title="ปรับสเกลขยายเต็มสติกเกอร์ (100% พอดีดวง ไม่ตกขอบ)"
                 >
-                  <option value="102">102% (เต็มดวง แนะนำ)</option>
-                  <option value="100">100% (ปกติ)</option>
+                  <option value="100">100% (พอดีดวง ไม่ตกขอบ แนะนำ ⭐)</option>
+                  <option value="102">102% (ขยายเต็มขอบ +2%)</option>
                   <option value="104">104% (เต็มขอบ +4%)</option>
                   <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
                   <option value="98">98% (ย่อขอบ 98%)</option>
@@ -1561,9 +1581,9 @@ export function QuarantineTagModal({
                   value={marginFit}
                   onChange={(e) => handleMarginFitChange(e.target.value as any)}
                   className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
-                  title="เลือกระยะขอบสติกเกอร์ (ชิดขอบ 0.5มม. หรือ ไร้ขอบ 0มม.)"
+                  title="เลือกระยะขอบสติกเกอร์ (ชิดขอบ 0.8มม. หรือ ไร้ขอบ 0มม.)"
                 >
-                  <option value="tight">ชิดขอบ 0.5 มม.</option>
+                  <option value="tight">ชิดขอบ 0.8 มม. (แนะนำ ⭐)</option>
                   <option value="borderless">ไร้ขอบ 0 มม.</option>
                   <option value="standard">ปกติ 1.5 มม.</option>
                 </select>
@@ -1599,11 +1619,11 @@ export function QuarantineTagModal({
                   className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                   title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้านหรือตะแคง"
                 >
-                  <option value="270">⭐ หมุน 270° (แก้ปัญหาพิมพ์แล้วตะแคง - แนะนำสำหรับ Gprinter)</option>
-                  <option value="90">🔄 หมุน 90° (ตามเข็ม - กรณีเครื่องหมุนอีกด้าน)</option>
+                  <option value="auto">⭐ แก้ตะแคง (Auto - แนะนำสำหรับ Chrome แนวนอน)</option>
+                  <option value="270">หมุน 270° (แก้ปัญหาเครื่องหมุน 90°)</option>
                   <option value="0">แนวนอนปกติ (0°)</option>
+                  <option value="90">🔄 หมุน 90° (ตามเข็ม)</option>
                   <option value="180">↕️ กลับหัว 180°</option>
-                  <option value="auto">🌐 โหมด Auto (สำหรับเครื่องที่เลือกแนวตั้งใน Chrome ได้)</option>
                 </select>
               </div>
 
