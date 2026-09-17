@@ -78,19 +78,20 @@ export function parsePlanChangeInfo(note?: string | null, activityDate?: string 
 }
 
 /**
- * Strips hidden JSON metadata tags ([PLAN_RESCHEDULE:{...}], [DELAY_TRACKING:{...}]) for human-facing UI display.
+ * Strips hidden JSON metadata tags ([PLAN_RESCHEDULE:{...}], [ACTUAL_DELAY:{...}], [DELAY_TRACKING:{...}]) for human-facing UI display.
  */
 export function cleanDisplayNote(note?: string | null): string {
   if (!note) return ''
   return note
     .replace(/\[PLAN_RESCHEDULE:.*?\]/g, '')
+    .replace(/\[ACTUAL_DELAY:.*?\]/g, '')
     .replace(/\[DELAY_TRACKING:.*?\]/g, '')
     .replace(/^\s*[\r\n]/gm, '')
     .trim()
 }
 
 /**
- * Extracts pure user comments from note, stripping both automated reschedule summaries and JSON metadata tags.
+ * Extracts pure user comments from note, stripping automated reschedule summaries, actual delay notes, and JSON metadata tags.
  */
 export function extractUserComment(note?: string | null): string {
   if (!note) return ''
@@ -99,6 +100,8 @@ export function extractUserComment(note?: string | null): string {
     .replace(/\[เลื่อนแผนเป็น .*?\]/g, '')
     .replace(/\*?\s*\(เลื่อนแผนเป็น .*?\)/g, '')
     .replace(/\[เลื่อนเป็น .*?\]/g, '')
+    .replace(/\[เหตุผลล่าช้าหน้างาน:.*?\]/g, '')
+    .replace(/\[เหตุผลทำจริงล่าช้า:.*?\]/g, '')
     .replace(/^\s*[\r\n]/gm, '')
     .trim()
   return cleaned
@@ -153,5 +156,109 @@ export function isTaskStartedByShopfloor(log: any): boolean {
   // Statuses indicating work has begun or finished
   const status = (log.status || '').toUpperCase()
   return status === 'IN_PROGRESS' || status === 'DONE' || status === 'COMPLETED'
+}
+
+/* ==============================================================================
+ * SHOPFLOOR ACTUAL DELAY TRACKING (สำหรับหน้างานบันทึกเหตุผลการทำงานล่าช้ากว่าแผน)
+ * ============================================================================== */
+
+export interface ActualDelayInfo {
+  hasDelayReason: boolean
+  category?: string
+  categoryLabel?: string
+  reason?: string
+  updatedBy?: string
+  updatedAt?: string
+}
+
+export const ACTUAL_DELAY_CATEGORIES = [
+  { id: 'WAIT_RM_PM', label: 'รอวัตถุดิบ / บรรจุภัณฑ์ / สารเคมี (Wait RM/PM)', icon: '📦' },
+  { id: 'FLOOR_DOWNTIME', label: 'เครื่องจักรขัดข้อง / ซ่อมบำรุง / รอช่าง (Machine Downtime)', icon: '⚙️' },
+  { id: 'QC_WAIT', label: 'รอผลตรวจแล็บ QC / รอปล่อยผ่าน (Wait QC Release)', icon: '🔬' },
+  { id: 'CLEANING_CHANGEOVER', label: 'ล้างทำความสะอาดถัง/ไลน์นานกว่าปกติ (Line Clearance/Cleaning)', icon: '🧹' },
+  { id: 'MANPOWER_SHORTAGE', label: 'กำลังคนไม่พอ / ขาดพนักงาน (Manpower Shortage)', icon: '👥' },
+  { id: 'PREVIOUS_TASK_DELAY', label: 'ขั้นตอนก่อนหน้าล่าช้า / ถัง-ไลน์ไม่ว่าง (Previous Process Delay)', icon: '⏳' },
+  { id: 'RUSH_ORDER_INSERT', label: 'แทรกคิวงานด่วนตามคำสั่งผู้บริหาร (Rush Order Priority)', icon: '⚡' },
+  { id: 'REWORK_ADJUST', label: 'แก้งาน / Rework / ปรับเฉดสีสาร (Rework / Recipe Adjustment)', icon: '🔄' },
+  { id: 'OTHER', label: 'อื่นๆ (ระบุในรายละเอียด)', icon: '❓' },
+] as const
+
+export function getActualDelayCategoryLabel(categoryId?: string): string {
+  if (!categoryId) return 'ไม่ระบุหมวดหมู่'
+  const found = ACTUAL_DELAY_CATEGORIES.find(c => c.id === categoryId)
+  return found ? `${found.icon} ${found.label}` : categoryId
+}
+
+/**
+ * Parses actual delay reason metadata entered by shopfloor staff from production_logs.note
+ */
+export function parseActualDelayInfo(note?: string | null): ActualDelayInfo {
+  const result: ActualDelayInfo = {
+    hasDelayReason: false
+  }
+
+  if (!note) return result
+
+  // Look for structured JSON tag: [ACTUAL_DELAY:{...}]
+  const match = note.match(/\[ACTUAL_DELAY:(.*?)\]/)
+  if (match && match[1]) {
+    try {
+      const data = JSON.parse(match[1])
+      result.hasDelayReason = true
+      result.category = data.category || 'OTHER'
+      result.categoryLabel = getActualDelayCategoryLabel(data.category)
+      result.reason = data.reason || ''
+      result.updatedBy = data.updatedBy || ''
+      result.updatedAt = data.updatedAt || ''
+      return result
+    } catch {
+      // ignore json parse error
+    }
+  }
+
+  // Fallback text check
+  const textMatch = note.match(/\[เหตุผลล่าช้าหน้างาน:\s*(.*?)(?:\s*-\s*(.*?))?\]/)
+  if (textMatch) {
+    result.hasDelayReason = true
+    result.category = 'OTHER'
+    result.categoryLabel = textMatch[1] || 'ระบุเหตุผลหน้างาน'
+    result.reason = textMatch[2] || ''
+  }
+
+  return result
+}
+
+/**
+ * Formats shopfloor actual delay metadata into structured string to store in production_logs.note
+ * Preserves any existing [PLAN_RESCHEDULE:{...}] tags and clean notes.
+ */
+export function formatActualDelayNote(
+  existingNote: string | null | undefined,
+  delayData: {
+    category: string
+    reason: string
+    updatedBy?: string
+  }
+): string {
+  const payload = {
+    ...delayData,
+    updatedAt: new Date().toISOString()
+  }
+
+  const tag = `[ACTUAL_DELAY:${JSON.stringify(payload)}]`
+
+  // Clean existing ACTUAL_DELAY tag and previous summaries
+  let cleanNote = (existingNote || '')
+    .replace(/\[ACTUAL_DELAY:.*?\]/g, '')
+    .replace(/\[เหตุผลล่าช้าหน้างาน:.*?\]/g, '')
+    .replace(/\[เหตุผลทำจริงล่าช้า:.*?\]/g, '')
+    .trim()
+
+  const categoryText = getActualDelayCategoryLabel(delayData.category)
+  const humanSummary = `[เหตุผลล่าช้าหน้างาน: ${categoryText}${delayData.reason ? ` - ${delayData.reason}` : ''}]`
+
+  return cleanNote 
+    ? `${humanSummary} ${tag}\n${cleanNote}` 
+    : `${humanSummary} ${tag}`
 }
 

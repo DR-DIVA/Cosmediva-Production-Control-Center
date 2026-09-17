@@ -46,7 +46,11 @@ import {
   formatPlanChangeNote,
   cleanDisplayNote,
   extractUserComment,
-  isTaskStartedByShopfloor
+  isTaskStartedByShopfloor,
+  ACTUAL_DELAY_CATEGORIES,
+  parseActualDelayInfo,
+  formatActualDelayNote,
+  ActualDelayInfo
 } from '@/lib/planTracking'
 
 export type ProductionDept = 'ALL' | 'RM' | 'MX' | 'PK' | 'POF'
@@ -194,6 +198,27 @@ export function MasterPlanningTimeline({
     revisionCount: number
     isSlideDrag?: boolean
     deltaDays?: number
+  } | null>(null)
+
+  // Actual Delay Modal State (สำหรับหน้างานบันทึกเหตุผลการทำงานจริงล่าช้ากว่าแผน - ไม่มีการล็อกแถบ A)
+  const [actualDelayModal, setActualDelayModal] = useState<{
+    isOpen: boolean
+    logId: string
+    lotNo: string
+    sku: string
+    processName: string
+    deptKey: string
+    planDateStr: string
+    actualDateStr: string
+    varianceLabel: string
+    varianceDays: number
+    isDelayed: boolean
+    category: string
+    reason: string
+    actualStartDate: string
+    actualEndDate: string
+    status: string
+    existingDelayInfo?: ActualDelayInfo
   } | null>(null)
 
   // Sliding Drag State for Timeline Bars
@@ -370,10 +395,24 @@ export function MasterPlanningTimeline({
               deptStats[deptKey].delayDays += diff
             }
 
+            const actualDelay = parseActualDelayInfo(log.note)
             const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
             const noteLower = (log.note || '').toLowerCase()
 
-            if (noteLower.includes('qc hold') || noteLower.includes('รอ qc') || noteLower.includes('แล็บ')) {
+            if (actualDelay.hasDelayReason && actualDelay.category) {
+              const cat = actualDelay.category
+              if (bottleneckCounts[cat] !== undefined) {
+                bottleneckCounts[cat]++
+              } else if (cat === 'CLEANING_CHANGEOVER' || cat === 'MANPOWER_SHORTAGE') {
+                bottleneckCounts.FLOOR_DOWNTIME++
+              } else if (cat === 'PREVIOUS_TASK_DELAY') {
+                bottleneckCounts.PLAN_CALIBRATION++
+              } else if (cat === 'REWORK_ADJUST') {
+                bottleneckCounts.QC_WAIT++
+              } else {
+                bottleneckCounts.FLOOR_DOWNTIME++
+              }
+            } else if (noteLower.includes('qc hold') || noteLower.includes('รอ qc') || noteLower.includes('แล็บ')) {
               bottleneckCounts.QC_WAIT++
             } else if (planInfo.category && bottleneckCounts[planInfo.category] !== undefined) {
               bottleneckCounts[planInfo.category]++
@@ -582,7 +621,7 @@ export function MasterPlanningTimeline({
       return
     }
     if (isTaskStartedByShopfloor(log)) {
-      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+      toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวันตามแผน หากต้องการระบุเหตุผลที่เริ่มงานช้ากว่าแผน ให้คลิกที่แถบ A (จริง) ค่ะ`)
       return
     }
     const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
@@ -778,6 +817,107 @@ export function MasterPlanningTimeline({
       const { error } = await supabase.from('production_logs').update(updateData).eq('id', logId)
       if (error) throw error
       toast.success('ปรับวันที่เรียบร้อย')
+      if (onPlanChanged) onPlanChanged()
+      else fetchInternalData()
+    } catch (e: any) {
+      toast.error('อัปเดตไม่สำเร็จ: ' + e.message)
+      if (onPlanChanged) onPlanChanged()
+      else fetchInternalData()
+    }
+  }
+
+  // Open Actual Delay Modal (สำหรับพนักงานหน้างานบันทึกเหตุผลที่ทำงานจริงล่าช้ากว่าแผน - ไม่มีการล็อกแถบ A)
+  const handleOpenActualDelayModal = (log: any, lot: any, process: any, variance?: any) => {
+    const pStart = log.activity_date ? format(new Date(log.activity_date), 'dd/MM/yyyy') : '-'
+    const pEnd = log.end_date ? format(new Date(log.end_date), 'dd/MM/yyyy') : pStart
+    const planDateStr = pEnd !== pStart ? `${pStart} ถึง ${pEnd}` : pStart
+
+    let aStartStr = '-'
+    let actualStartDate = ''
+    if (log.start_time) {
+      actualStartDate = format(new Date(log.start_time), 'yyyy-MM-dd')
+      aStartStr = format(new Date(log.start_time), 'dd/MM/yyyy')
+    } else if (log.activity_date) {
+      actualStartDate = log.activity_date
+      aStartStr = format(new Date(log.activity_date), 'dd/MM/yyyy')
+    }
+
+    let aEndStr = log.status === 'DONE' ? aStartStr : (log.status === 'IN_PROGRESS' ? '(กำลังผลิต)' : '(ยังไม่เริ่ม)')
+    let actualEndDate = ''
+    if (log.end_time) {
+      actualEndDate = format(new Date(log.end_time), 'yyyy-MM-dd')
+      aEndStr = format(new Date(log.end_time), 'dd/MM/yyyy')
+    }
+
+    const actualDateStr = `${aStartStr}${log.end_time ? ` ถึง ${aEndStr}` : ` ${aEndStr}`}`
+    const existingDelay = parseActualDelayInfo(log.note)
+    const deptKey = getProcessDept(process?.process_name || '')
+
+    setActualDelayModal({
+      isOpen: true,
+      logId: log.id,
+      lotNo: lot?.lot_no || '-',
+      sku: lot?.products?.sku || lot?.products?.product_name || '-',
+      processName: process?.process_name || 'งานผลิต',
+      deptKey,
+      planDateStr,
+      actualDateStr,
+      varianceLabel: variance?.label || (log.status === 'DONE' ? 'เสร็จสิ้น' : 'กำลังดำเนินการ'),
+      varianceDays: variance?.diffDays || 0,
+      isDelayed: (variance?.diffDays && variance.diffDays > 0) || existingDelay.hasDelayReason,
+      category: existingDelay.category || 'WAIT_RM_PM',
+      reason: existingDelay.reason || '',
+      actualStartDate,
+      actualEndDate,
+      status: log.status || 'WAITING',
+      existingDelayInfo: existingDelay
+    })
+  }
+
+  // Confirm and Save Actual Delay Reason from Shopfloor
+  const handleConfirmActualDelay = async () => {
+    if (!actualDelayModal) return
+    const { logId, category, reason, actualStartDate, actualEndDate } = actualDelayModal
+
+    if (!reason.trim()) {
+      toast.error('กรุณาระบุรายละเอียดเหตุผลที่ทำงานจริงล่าช้ากว่าแผน')
+      return
+    }
+
+    const existingLog = logs.find(l => l.id === logId)
+    const currentNote = existingLog?.note || ''
+    const userIdentifier = (activeUserIdentifier || currentUser || 'SHOPFLOOR').toUpperCase()
+
+    const formattedNote = formatActualDelayNote(currentNote, {
+      category,
+      reason: reason.trim(),
+      updatedBy: userIdentifier
+    })
+
+    const updateData: any = {
+      note: formattedNote,
+      updated_at: new Date().toISOString(),
+      updated_by: activeUserId || '54168226-988e-4d63-93d2-1a742aafdd84'
+    }
+
+    if (actualStartDate) {
+      const existingTime = existingLog?.start_time ? new Date(existingLog.start_time).toISOString().slice(11) : '08:00:00.000Z'
+      updateData.start_time = `${actualStartDate}T${existingTime}`
+    }
+    if (actualEndDate && existingLog?.status === 'DONE') {
+      const existingTime = existingLog?.end_time ? new Date(existingLog.end_time).toISOString().slice(11) : '17:00:00.000Z'
+      updateData.end_time = `${actualEndDate}T${existingTime}`
+    }
+
+    if (internalLogs.length > 0) {
+      setInternalLogs(prev => prev.map(l => l.id === logId ? { ...l, ...updateData } : l))
+    }
+    setActualDelayModal(null)
+
+    try {
+      const { error } = await supabase.from('production_logs').update(updateData).eq('id', logId)
+      if (error) throw error
+      toast.success('บันทึกเหตุผลการทำงานจริงล่าช้าเรียบร้อย')
       if (onPlanChanged) onPlanChanged()
       else fetchInternalData()
     } catch (e: any) {
@@ -1529,20 +1669,28 @@ export function MasterPlanningTimeline({
 
                       const isCompare = timelineViewMode === 'compare'
                       const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
+                      const actualDelayInfo = parseActualDelayInfo(log.note)
                       const userComment = extractUserComment(log.note)
                       const isStarted = isTaskStartedByShopfloor(log)
 
-                      const tooltipText = [
-                        `📌 SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
+                      const tooltipPlanText = [
+                        `📌 [แผนงาน] SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
+                        `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
+                        planData ? `📅 กำหนดตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}` : '',
+                        planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
+                        isStarted 
+                          ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวันตามแผน (ล็อกแผนเพื่อประเมิน KPI ความแม่นยำ)`
+                          : (canEdit ? `↔️ ลากแถบนี้เพื่อเลื่อนวัน (Slide Bar Period) หรือคลิกเพื่อเปิดหน้าต่างปรับแผน` : '')
+                      ].filter(Boolean).join('\n')
+
+                      const tooltipActualText = [
+                        `📌 [ปฏิบัติงานจริง] SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
                         `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
                         `📊 สถานะ: ${variance.label} [${log.status === 'DONE' ? 'เสร็จสิ้นแล้ว' : log.status === 'IN_PROGRESS' ? 'กำลังดำเนินการ' : 'รอดำเนินการ'}]`,
-                        planData ? `📅 กำหนดตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}` : '',
                         actualData ? `⏱️ ดำเนินการจริง: ${format(actualData.start, 'dd/MM/yyyy')}${log.status === 'DONE' ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ' (ยังไม่เสร็จ)'}` : '',
-                        planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
-                        userComment ? `💬 บันทึก/หมายเหตุหน้างาน: ${userComment}` : '',
-                        isStarted 
-                          ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`
-                          : (canEdit ? `↔️ ลากแถบนี้เพื่อเลื่อนวัน (Slide Bar Period) หรือคลิกเพื่อเปิดหน้าต่างปรับแผน` : '')
+                        actualDelayInfo.hasDelayReason ? `📝 บันทึกเหตุผลล่าช้าหน้างาน: ${actualDelayInfo.categoryLabel}${actualDelayInfo.reason ? ` - ${actualDelayInfo.reason}` : ''}` : '',
+                        userComment ? `💬 หมายเหตุหน้างาน: ${userComment}` : '',
+                        `👉 คลิกแถบ 🅰️ นี้เพื่อบันทึกหรือแก้ไขเหตุผลที่ทำงานจริงล่าช้ากว่าแผน`
                       ].filter(Boolean).join('\n')
 
                       const isDraggingThis = !!(dragState && dragState.logId === log.id)
@@ -1564,27 +1712,48 @@ export function MasterPlanningTimeline({
                               <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                               <span
                                 className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors flex items-center gap-1"
-                                title={tooltipText}
-                                onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                title={isStarted ? tooltipActualText : tooltipPlanText}
+                                onClick={() => {
+                                  if (isStarted || actualDelayInfo.hasDelayReason) {
+                                    handleOpenActualDelayModal(log, lot, process, variance)
+                                  } else {
+                                    handleOpenRescheduleDetail(log, lot, process)
+                                  }
+                                }}
                               >
                                 <span className="truncate">{process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})</span>
-                                {isStarted && <Lock className="w-3 h-3 text-amber-600/80 shrink-0" />}
+                                {isStarted && (
+                                  <span className="text-[9.5px] px-1 py-0 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0 flex items-center gap-0.5" title="ล็อกแถบแผนงาน P เพื่อประเมิน KPI (แต่แถบ A ยังคลิกบันทึกเหตุผลได้ตามปกติ)">
+                                    <Lock className="w-2.5 h-2.5 text-amber-700" />
+                                    <span className="font-normal text-[8.5px]">ล็อกแผน</span>
+                                  </span>
+                                )}
                               </span>
                             </div>
                             {/* Variance Label Badge */}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span
-                                onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                onClick={() => {
+                                  if (isStarted || actualDelayInfo.hasDelayReason) {
+                                    handleOpenActualDelayModal(log, lot, process, variance)
+                                  } else {
+                                    handleOpenRescheduleDetail(log, lot, process)
+                                  }
+                                }}
                                 className={cn(
                                   "text-[9.5px] px-1.5 py-0.2 rounded border font-mono cursor-pointer transition-all flex items-center gap-1",
                                   variance.colorClass,
                                   "hover:ring-1 hover:ring-rose-400 active:scale-95"
                                 )}
-                                title={tooltipText}
+                                title={isStarted ? `คลิกเพื่อบันทึก/ดูเหตุผลที่ทำงานจริงล่าช้ากว่าแผน\n${tooltipActualText}` : tooltipPlanText}
                               >
                                 <span>{variance.label}</span>
-                                {planInfo.isRescheduled && <span title="มีบันทึกการปรับเลื่อนแผน">🔄</span>}
-                                {userComment && <span title={`มีบันทึกหน้างาน: ${userComment}`}>💬</span>}
+                                {planInfo.isRescheduled && <span title={`ปรับแผน: ${planInfo.categoryLabel}`}>🔄</span>}
+                                {actualDelayInfo.hasDelayReason ? (
+                                  <span className="text-[8.5px] bg-rose-50 text-rose-700 px-1 py-0.2 rounded border border-rose-200" title={`เหตุผลล่าช้าหน้างาน: ${actualDelayInfo.categoryLabel}${actualDelayInfo.reason ? ` - ${actualDelayInfo.reason}` : ''}`}>
+                                    📝 {actualDelayInfo.categoryLabel?.split(' ')[0]}
+                                  </span>
+                                ) : (userComment && <span title={`มีบันทึกหน้างาน: ${userComment}`}>💬</span>)}
                               </span>
                             </div>
                           </div>
@@ -1624,11 +1793,15 @@ export function MasterPlanningTimeline({
                                     }
                                   }}
                                   onClick={() => {
-                                    if (!canEdit || isStarted) {
+                                    if (isStarted) {
+                                      toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวัน หากต้องการบันทึกเหตุผลความล่าช้า ให้สลับไปโหมด Compare/Actual เพื่อคลิกแถบ A (จริง) ค่ะ`)
+                                    } else if (canEdit) {
                                       handleOpenRescheduleDetail(log, lot, process)
                                     }
                                   }}
-                                  title={tooltipText}
+                                  title={isStarted 
+                                    ? `🔒 แผนงานถูกล็อกเนื่องจากหน้างานเริ่มงานแล้ว (ล็อกแผนเพื่อประเมิน KPI ความแม่นยำ)\n👉 สลับไปดูแถบ A เพื่อบันทึกเหตุผลที่ทำงานล่าช้ากว่าแผน` 
+                                    : tooltipPlanText}
                                 >
                                   {isStarted ? (
                                     <Lock className="w-3 h-3 text-amber-800/80 mr-1 shrink-0" />
@@ -1655,14 +1828,21 @@ export function MasterPlanningTimeline({
                             {timelineViewMode === 'actual' && actualData?.inView && (
                               <div
                                 className={cn(
-                                  "absolute h-6 rounded-md px-2 flex items-center text-xs font-bold border shadow-xs overflow-hidden z-10 cursor-pointer hover:brightness-95 transition-all text-white",
+                                  "absolute h-6 rounded-md px-2 flex items-center text-xs font-bold border shadow-xs overflow-hidden z-10 cursor-pointer hover:brightness-110 active:scale-[0.99] transition-all text-white",
                                   actualData.status === 'DONE' ? "bg-emerald-600 border-emerald-700" : "bg-blue-600 border-blue-700 animate-pulse"
                                 )}
                                 style={{ left: `calc(${actualData.leftPercent}% + 4px)`, width: `calc(${actualData.widthPercent}% - 8px)` }}
-                                onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                title={tooltipText}
+                                onClick={() => handleOpenActualDelayModal(log, lot, process, variance)}
+                                title={`🅰️ แถบปฏิบัติงานจริง: คลิกเพื่อบันทึก/แก้ไขเหตุผลที่ทำงานจริงล่าช้ากว่าแผน\n${tooltipActualText}`}
                               >
-                                <span className="truncate">{lot.products?.sku} - {process?.process_name} (จริง)</span>
+                                <span className="truncate flex items-center gap-1.5">
+                                  <span>{lot.products?.sku} - {process?.process_name} (จริง)</span>
+                                  {actualDelayInfo.hasDelayReason && (
+                                    <span className="text-[10px] bg-white/20 px-1.5 py-0.2 rounded font-normal shrink-0">
+                                      📝 {actualDelayInfo.categoryLabel?.split(' ')[0]}
+                                    </span>
+                                  )}
+                                </span>
                               </div>
                             )}
 
@@ -1709,11 +1889,15 @@ export function MasterPlanningTimeline({
                                         }
                                       }}
                                       onClick={() => {
-                                        if (!canEdit || isStarted) {
+                                        if (isStarted) {
+                                          toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้แก้ไขวัน หากต้องการระบุเหตุผลความล่าช้า ให้คลิกที่แถบ 🅰️ ด้านล่างค่ะ`)
+                                        } else if (canEdit) {
                                           handleOpenRescheduleDetail(log, lot, process)
                                         }
                                       }}
-                                      title={tooltipText}
+                                      title={isStarted 
+                                        ? `🔒 แถบ P (แผนงาน) ถูกล็อกเนื่องจากหน้างานเริ่มงานแล้ว (เพื่อประเมิน KPI ความแม่นยำ)\n👉 ให้คลิกที่แถบ 🅰️ ด้านล่างเพื่อใส่เหตุผลที่ทำงานล่าช้ากว่าแผน` 
+                                        : `↔️ แถบ P (แผนงาน): ลากแถบเพื่อเลื่อนวัน หรือคลิกเพื่อปรับแผน`}
                                     >
                                       {isStarted ? (
                                         <Lock className="w-2.5 h-2.5 text-amber-700 mr-1 shrink-0" />
@@ -1740,7 +1924,7 @@ export function MasterPlanningTimeline({
                                 {actualData?.inView ? (
                                   <div
                                     className={cn(
-                                      "absolute bottom-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border shadow-2xs overflow-hidden z-10 cursor-pointer hover:brightness-95 transition-all text-white",
+                                      "absolute bottom-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border shadow-2xs overflow-hidden z-10 cursor-pointer hover:brightness-110 active:scale-[0.99] transition-all text-white",
                                       actualData.status === 'DONE'
                                         ? "bg-emerald-600 border-emerald-700"
                                         : "bg-blue-600 border-blue-700 animate-pulse"
@@ -1750,11 +1934,16 @@ export function MasterPlanningTimeline({
                                       width: `calc(${actualData.widthPercent}% - 8px)`,
                                       minWidth: isTimelineExpanded ? '90px' : '54px'
                                     }}
-                                    onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                    title={tooltipText}
+                                    onClick={() => handleOpenActualDelayModal(log, lot, process, variance)}
+                                    title={`🅰️ แถบปฏิบัติงานจริง: คลิกเพื่อบันทึก/แก้ไขเหตุผลที่ทำงานจริงล่าช้ากว่าแผน\n${tooltipActualText}`}
                                   >
-                                    <span className="truncate">
-                                      🅰️ จริง: {format(actualData.start, 'dd/MM')}{actualData.end > actualData.start ? `-${format(actualData.end, 'dd/MM')}` : ''}
+                                    <span className="truncate flex items-center gap-1">
+                                      <span>🅰️ จริง: {format(actualData.start, 'dd/MM')}{actualData.end > actualData.start ? `-${format(actualData.end, 'dd/MM')}` : ''}</span>
+                                      {actualDelayInfo.hasDelayReason && (
+                                        <span className="text-[9px] bg-white/20 px-1 py-0.2 rounded font-normal shrink-0">
+                                          📝 {actualDelayInfo.categoryLabel?.split(' ')[0]}
+                                        </span>
+                                      )}
                                     </span>
                                   </div>
                                 ) : (
@@ -1766,8 +1955,8 @@ export function MasterPlanningTimeline({
                                         width: `calc(${planData.widthPercent}% - 8px)`,
                                         minWidth: isTimelineExpanded ? '90px' : '54px'
                                       }}
-                                      onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                      title={tooltipText}
+                                      onClick={() => handleOpenActualDelayModal(log, lot, process, variance)}
+                                      title={`⏳ ยังไม่เริ่มงานจริง: คลิกเพื่อดูหรือบันทึกหมายเหตุหน้างาน\n${tooltipActualText}`}
                                     >
                                       <span className="truncate">⏳ ยังไม่บันทึกงาน</span>
                                     </div>
@@ -1947,6 +2136,163 @@ export function MasterPlanningTimeline({
                 onClick={handleConfirmReschedule}
               >
                 บันทึกการปรับเลื่อน
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Actual Delay Modal (สำหรับหน้างานบันทึกเหตุผลการทำงานจริงล่าช้ากว่าแผน - แถบ A ไม่มีการล็อก) */}
+      <Dialog open={!!actualDelayModal?.isOpen} onOpenChange={(open) => !open && setActualDelayModal(null)}>
+        <DialogContent className="sm:max-w-[540px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-800 text-base">
+              <span className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-700 text-base">
+                🅰️
+              </span>
+              บันทึกเหตุผลการปฏิบัติงานจริง / ล่าช้ากว่าแผน
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              หน้างานระบุสาเหตุที่การผลิตจริงเริ่มต้นหรือเสร็จสิ้นล่าช้ากว่าแผนที่วางไว้ เพื่อนำไปวิเคราะห์คอขวดและปรับปรุงกระบวนการ
+            </DialogDescription>
+          </DialogHeader>
+
+          {actualDelayModal && (
+            <div className="space-y-4 py-2 text-sm">
+              {/* Context Summary */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Lot No:</span>
+                  <span className="font-semibold text-slate-800">{actualDelayModal.lotNo}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">SKU / สินค้า:</span>
+                  <span className="font-medium text-slate-700">{actualDelayModal.sku}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-slate-500">ขั้นตอนการผลิต:</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-blue-700">{actualDelayModal.processName}</span>
+                    <Badge variant="outline" className="text-[10.5px] px-1.5 py-0 font-bold border-slate-300">
+                      {actualDelayModal.varianceLabel}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              {/* Plan vs Actual Comparison Banner */}
+              <div className="grid grid-cols-2 gap-3 p-3 bg-blue-50/60 rounded-lg border border-blue-200">
+                <div>
+                  <div className="text-[11px] text-indigo-900 font-semibold mb-1 flex items-center gap-1">
+                    <span>🅿️ วันที่กำหนดตามแผน (Plan)</span>
+                  </div>
+                  <div className="text-xs font-bold text-slate-700">
+                    {actualDelayModal.planDateStr}
+                  </div>
+                </div>
+                <div>
+                  <div className="text-[11px] text-blue-900 font-semibold mb-1 flex items-center gap-1">
+                    <span>🅰️ วันที่ดำเนินการจริง (Actual)</span>
+                  </div>
+                  <div className="text-xs font-bold text-blue-900">
+                    {actualDelayModal.actualDateStr}
+                  </div>
+                </div>
+              </div>
+
+              {/* Existing Delay Note if already recorded */}
+              {actualDelayModal.existingDelayInfo?.hasDelayReason && (
+                <div className="p-2.5 bg-amber-50/80 rounded-lg border border-amber-200 text-xs text-amber-900">
+                  <div className="font-bold flex items-center gap-1 text-[11px]">
+                    <span>📝 มีบันทึกเหตุผลล่าช้าก่อนหน้า:</span>
+                    <span className="font-normal text-amber-700">({actualDelayModal.existingDelayInfo.categoryLabel})</span>
+                  </div>
+                  <div className="mt-1 text-[11.5px] text-amber-800">
+                    {actualDelayModal.existingDelayInfo.reason || '-'}
+                  </div>
+                  {actualDelayModal.existingDelayInfo.updatedBy && (
+                    <div className="text-[10px] text-amber-600 mt-1">
+                      บันทึกโดย: {actualDelayModal.existingDelayInfo.updatedBy} {actualDelayModal.existingDelayInfo.updatedAt ? `(${format(new Date(actualDelayModal.existingDelayInfo.updatedAt), 'dd/MM/yyyy HH:mm')})` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Delay Reason Category */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  หมวดหมู่สาเหตุที่ทำจริงล่าช้ากว่าแผน <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={actualDelayModal.category}
+                  onValueChange={(val) => setActualDelayModal({ ...actualDelayModal, category: val || 'WAIT_RM_PM' })}
+                >
+                  <SelectTrigger className="h-9 text-xs bg-white">
+                    <SelectValue placeholder="เลือกหมวดหมู่สาเหตุที่ล่าช้า" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ACTUAL_DELAY_CATEGORIES.map(cat => (
+                      <SelectItem key={cat.id} value={cat.id} className="text-xs">
+                        {cat.icon} {cat.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Detailed Reason Description */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  รายละเอียดเหตุผลจากหน้างาน <span className="text-red-500">* (จำเป็นต้องระบุ)</span>
+                </Label>
+                <Textarea
+                  placeholder="ระบุเหตุผลที่หน้างานล่าช้ากว่าแผน เช่น รอสารเคมีจากคลัง, ช่างกำลังตั้งเครื่องชั่ง, รอผลแล็บ QC ปล่อยผ่าน, ล้างถังนานกว่าปกติ..."
+                  value={actualDelayModal.reason}
+                  onChange={(e) => setActualDelayModal({ ...actualDelayModal, reason: e.target.value })}
+                  className={cn(
+                    "text-xs min-h-[80px] resize-none bg-white",
+                    !actualDelayModal.reason.trim() ? "border-blue-300 focus:border-blue-500" : ""
+                  )}
+                />
+              </div>
+
+              {/* Optional: Adjust Actual Start Date */}
+              <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200">
+                <div className="text-[11px] font-semibold text-slate-700 mb-1.5 flex items-center justify-between">
+                  <span>📅 ปรับแก้วันที่เริ่มปฏิบัติงานจริง (ถ้าจำเป็น)</span>
+                  <span className="text-[10px] text-slate-400 font-normal">มีผลต่อตำแหน่งแถบ 🅰️</span>
+                </div>
+                <Input
+                  type="date"
+                  value={actualDelayModal.actualStartDate || ''}
+                  onChange={(e) => setActualDelayModal({ ...actualDelayModal, actualStartDate: e.target.value })}
+                  className="h-8 text-xs bg-white border-slate-300 font-medium"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
+            <div className="text-[11px] text-slate-500 hidden sm:block">
+              * ข้อมูลจะถูกนำไปวิเคราะห์คอขวดและแสดงผลบนไทม์ไลน์
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="text-xs"
+                onClick={() => setActualDelayModal(null)}
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold"
+                onClick={handleConfirmActualDelay}
+              >
+                บันทึกเหตุผลหน้างาน
               </Button>
             </div>
           </DialogFooter>
