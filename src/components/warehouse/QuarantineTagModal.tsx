@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Code128Barcode, QRCodeSvg } from '@/lib/barcode';
-import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode, Maximize2, Square, AlertTriangle, ArrowLeftRight } from 'lucide-react';
+import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode, Maximize2, Square, AlertTriangle, ArrowLeftRight, Info } from 'lucide-react';
 
 export interface QuarantineTagData {
   name: string;
@@ -252,7 +252,7 @@ export function QuarantineTagModal({
   const [previewIndex, setPreviewIndex] = useState(1);
   const [printPaperMode, setPrintPaperMode] = useState<'sticker' | 'a4'>('sticker');
   const [previewScale, setPreviewScale] = useState<'actual' | 'large'>('actual');
-  const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('0');
+  const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('auto');
   const [labelSize, setLabelSize] = useState<string>('100x75');
   const [printZoom, setPrintZoom] = useState<string>('102');
   const [marginFit, setMarginFit] = useState<'tight' | 'borderless' | 'standard'>('tight');
@@ -302,12 +302,17 @@ export function QuarantineTagModal({
   const effectivePaddingMm = marginFit === 'borderless' ? 0 : marginFit === 'tight' ? 0.5 : activeSize.paddingMm;
   const zoomFactor = Number(printZoom || 100) / 100;
 
-  // Load saved printer rotation preference
+  // Load saved printer rotation preference (default to 'auto' to prevent Chrome Landscape sideways rotation on thermal printers)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedRot = localStorage.getItem('quarantine_tag_rotation');
-      if (savedRot && ['0', '90', '180', '270', 'auto'].includes(savedRot)) {
+      if (savedRot && ['90', '180', '270'].includes(savedRot)) {
         setPrintRotation(savedRot as any);
+      } else if (savedRot === 'auto') {
+        setPrintRotation('auto');
+      } else {
+        // Default to 'auto' (unlocks Chrome Portrait orientation so 100x75 prints straight)
+        setPrintRotation('auto');
       }
     }
   }, []);
@@ -1135,18 +1140,20 @@ export function QuarantineTagModal({
                   <button
                     type="button"
                     onClick={() => {
-                      const nextRot = printRotation === '0' ? '90' : printRotation === '90' ? '180' : printRotation === '180' ? '270' : '0';
+                      const nextRot = printRotation === 'auto' ? '0' : printRotation === '0' ? '90' : printRotation === '90' ? '180' : printRotation === '180' ? '270' : 'auto';
                       handleRotationChange(nextRot);
                     }}
                     className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 border shadow-xs cursor-pointer ${
-                      printRotation !== '0'
+                      printRotation === 'auto'
+                        ? 'bg-blue-600 text-white border-blue-700 shadow-md ring-2 ring-blue-300'
+                        : printRotation !== '0'
                         ? 'bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-300'
                         : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50 hover:text-amber-900'
                     }`}
-                    title="คลิกเพื่อหมุนทิศทางภาพป้าย (0° -> 90° -> 180° -> 270°)"
+                    title="คลิกเพื่อสลับทิศทาง (Auto แก้ตะแคง -> 0° -> 90° -> 180° -> 270°)"
                   >
                     <RotateCw className="w-3.5 h-3.5 text-inherit" />
-                    หมุน ({printRotation === '0' ? '0°' : `${printRotation}°`})
+                    {printRotation === 'auto' ? 'แก้ตะแคง (Auto)' : `หมุน ${printRotation}°`}
                   </button>
 
                   {/* Code Type Switcher Button */}
@@ -1452,14 +1459,41 @@ export function QuarantineTagModal({
                     <span>•</span>
                     <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1">
                       <RotateCw className="w-3 h-3 text-amber-600" />
-                      {printRotation === '90' && 'หมุนพิมพ์ 90° (แก้ปัญหาออกแนวตั้ง)'}
+                      {printRotation === '90' && 'หมุนพิมพ์ 90° (ตามเข็ม)'}
                       {printRotation === '270' && 'หมุนพิมพ์ 270°'}
                       {printRotation === '180' && 'พิมพ์กลับหัว 180°'}
-                      {printRotation === 'auto' && 'โหมดเลือกการวางแนวใน Chrome'}
+                      {printRotation === 'auto' && '⭐ โหมดแก้พิมพ์ตะแคง (Auto - เลือกแนวตั้งใน Chrome)'}
                     </span>
                   </>
                 )}
               </div>
+
+              {/* Orientation Guide / Sideways Fix Alert */}
+              {printRotation === 'auto' ? (
+                <div className="w-full bg-blue-50 border border-blue-200 text-blue-900 text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-2xs">
+                  <Info className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span>
+                    <strong>คำแนะนำแก้พิมพ์ตะแคง:</strong> เมื่อหน้าต่างพิมพ์ Chrome เด้งขึ้นมา ให้ดูหัวข้อ <strong>การวางแนว (Orientation)</strong> แล้วเลือก <strong>"แนวตั้ง" (Portrait)</strong> ป้ายจะพิมพ์ออกเป็นแนวนอนตรง 100% สวยงามพอดีเป๊ะค่ะ (Chrome จะจำไว้ตลอดไป)
+                  </span>
+                </div>
+              ) : (
+                <div className="w-full bg-amber-50 border border-amber-300 text-amber-900 text-xs px-3.5 py-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>หากพิมพ์ออกมาแล้วตะแคง 90°:</strong> แนะนำให้เปิดโหมด <strong>"แก้พิมพ์ตะแคง (Auto)"</strong> แล้วเลือกแนวตั้งใน Chrome
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleRotationChange('auto')}
+                    className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
+                  >
+                    <RotateCw className="w-3.5 h-3.5" />
+                    คลิกเปิดโหมดแก้ตะแคง
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1564,12 +1598,12 @@ export function QuarantineTagModal({
                 <select
                   value={printRotation}
                   onChange={(e) => handleRotationChange(e.target.value as any)}
-                  className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                  title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้าน"
+                  className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้านหรือตะแคง"
                 >
-                  <option value="0">แนวนอนปกติ (0°)</option>
-                  <option value="auto">🌐 ให้เลือกใน Chrome (Auto - แก้พิมพ์ออกแนวตั้ง แนะนำ)</option>
-                  <option value="270">🔄 หมุน 270° (แก้ปัญหาเครื่องพิมพ์ออกแนวตั้ง)</option>
+                  <option value="auto">⭐ แก้พิมพ์ตะแคง / Gprinter (แนะนำ - เลือก 'แนวตั้ง' ใน Chrome)</option>
+                  <option value="0">แนวนอนปกติแบบล็อกขนาด (0° - อาจตะแคงกับบางเครื่องพิมพ์)</option>
+                  <option value="270">🔄 หมุน 270°</option>
                   <option value="90">🔄 หมุน 90° (ตามเข็ม)</option>
                   <option value="180">↕️ กลับหัว 180°</option>
                 </select>
