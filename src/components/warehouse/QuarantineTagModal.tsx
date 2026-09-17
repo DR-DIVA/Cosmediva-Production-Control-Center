@@ -801,835 +801,530 @@ export function QuarantineTagModal({
     <>
       {/* 1. Modal Dialog for screen view */}
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:!max-w-5xl md:!max-w-6xl lg:!max-w-7xl w-[96vw] max-w-[96vw] max-h-[96vh] overflow-y-auto bg-slate-50 p-4 sm:p-6 print:hidden">
-          <DialogHeader className="border-b pb-3">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <DialogTitle className="flex items-center gap-2 text-slate-800 text-lg font-bold">
-                <Package className="w-5 h-5 text-amber-600" />
-                พิมพ์ป้าย Quarantine Tag (กักกัน {activeSize.width} x {activeSize.height} มม.)
+        <DialogContent className="sm:!max-w-5xl md:!max-w-6xl lg:!max-w-7xl w-[98vw] max-w-[98vw] max-h-[96vh] h-auto p-3 sm:p-4 flex flex-col justify-between overflow-hidden bg-slate-50 print:hidden">
+          {/* 1. Header (Compact ~32px) */}
+          <DialogHeader className="border-b pb-2 flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="flex items-center gap-2 text-slate-800 text-base font-bold">
+                <Package className="w-4 h-4 text-amber-600" />
+                พิมพ์ป้าย Quarantine Tag ({activeSize.width} x {activeSize.height} มม.)
               </DialogTitle>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-500 hidden sm:inline">แบบฟอร์ม GMP คอสเมดิวา</span>
-                <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-mono text-xs font-bold">
+                <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-300 font-mono text-[11px] font-bold">
                   {docRev}
                 </Badge>
               </div>
             </div>
-            <p className="text-xs text-slate-500">
-              แบบฟอร์มมาตรฐาน GMP สำหรับติดกล่อง/พาเลทบรรจุภัณฑ์และวัตถุดิบที่รับเข้าคลัง เพื่อรอผลตรวจ QC
-            </p>
           </DialogHeader>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 py-2">
-            {/* Left Col: Configurations (5 cols on large screens) */}
-            <div className="lg:col-span-5 space-y-3.5 bg-white p-4 rounded-xl border border-slate-200 shadow-sm text-xs">
-              <div className="font-bold text-slate-800 flex items-center gap-1.5 pb-2 border-b border-slate-100 text-sm">
-                <Sparkles className="w-4 h-4 text-amber-500" /> ตั้งค่ายอดและการรันป้ายกล่อง
+          {/* 2. Main 2-Column Grid (Fits in ~360px) */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 py-1.5 flex-1 min-h-0 items-stretch">
+            {/* Left Col: Configurations (5 cols) */}
+            <div className="lg:col-span-5 bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between text-xs space-y-2">
+              <div className="font-bold text-slate-800 flex items-center justify-between pb-1 border-b border-slate-100 text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" /> ข้อมูลป้าย & ยอดแบ่งบรรจุ
+                </span>
+                <span className="text-[10px] text-slate-400 font-medium">GMP Form</span>
               </div>
 
               {/* Total Qty & Unit */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">จำนวนรวมทั้งหมด *</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">จำนวนรวมทั้งหมด *</Label>
                   <Input
                     type="number"
                     value={totalQty}
                     onChange={e => handleTotalQtyChange(e.target.value)}
-                    className="h-9 text-xs font-bold bg-slate-50 border-slate-300"
+                    className="h-7 text-xs font-bold bg-slate-50 border-slate-300"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">หน่วยนับ</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">หน่วยนับ</Label>
                   <Input
                     value={unit}
                     onChange={e => setUnit(e.target.value)}
-                    className="h-9 text-xs bg-slate-50 border-slate-300"
+                    className="h-7 text-xs bg-slate-50 border-slate-300"
                   />
                 </div>
               </div>
 
-              {/* Packaging Breakdown & Remainder */}
-              <div className="bg-amber-50/80 p-3 rounded-xl border border-amber-200 space-y-2.5">
+              {/* Packaging Breakdown Card */}
+              <div className="bg-amber-50/70 p-2 rounded-lg border border-amber-200 space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <Label className="text-xs font-bold text-amber-950 flex items-center gap-1">
+                  <Label className="text-[11px] font-bold text-amber-950 flex items-center gap-1">
                     <Package className="w-3.5 h-3.5 text-amber-600" />
-                    ข้อมูลภาชนะ & แบ่งบรรจุ (ลัง/กล่อง/ถัง)
+                    แบ่งบรรจุ ({effectivePackageType})
                   </Label>
-                  <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-bold">
-                    คำนวณอัตโนมัติ
-                  </span>
+                  <select
+                    value={packageType}
+                    onChange={e => setPackageType(e.target.value)}
+                    className="h-6 text-[11px] font-bold bg-white text-amber-950 border border-amber-300 rounded px-1.5 cursor-pointer"
+                  >
+                    <option value="ลัง">ลัง</option>
+                    <option value="กล่อง">กล่อง</option>
+                    <option value="ถัง">ถัง</option>
+                    <option value="ถุง">ถุง</option>
+                    <option value="หีบ">หีบ</option>
+                    <option value="ห่อ">ห่อ</option>
+                    <option value="พาเลท">พาเลท</option>
+                    <option value="กระป๋อง">กระป๋อง</option>
+                    <option value="ม้วน">ม้วน</option>
+                    <option value="อื่นๆ">อื่นๆ</option>
+                  </select>
                 </div>
 
-                {/* Package Type Selector */}
-                <div className="space-y-1">
-                  <Label className="text-[11px] font-semibold text-amber-900">ประเภทภาชนะบรรจุ</Label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <select
-                      value={packageType}
-                      onChange={e => setPackageType(e.target.value)}
-                      className="h-8 text-xs font-bold bg-white text-amber-950 border border-amber-300 rounded-lg px-2"
-                    >
-                      <option value="ลัง">ลัง (Box/Carton)</option>
-                      <option value="กล่อง">กล่อง (Box)</option>
-                      <option value="ถัง">ถัง (Drum/Pail)</option>
-                      <option value="ถุง">ถุง (Bag)</option>
-                      <option value="หีบ">หีบ (Chest)</option>
-                      <option value="ห่อ">ห่อ (Pack/Bundle)</option>
-                      <option value="พาเลท">พาเลท (Pallet)</option>
-                      <option value="กระป๋อง">กระป๋อง (Can)</option>
-                      <option value="ม้วน">ม้วน (Roll)</option>
-                      <option value="อื่นๆ">อื่นๆ (ระบุเอง)</option>
-                    </select>
-                    {packageType === 'อื่นๆ' ? (
-                      <Input
-                        value={customPackageType}
-                        onChange={e => setCustomPackageType(e.target.value)}
-                        placeholder="พิมพ์ระบุ เช่น กระสอบ"
-                        className="h-8 text-xs font-bold bg-white text-amber-950 border-amber-300"
-                      />
-                    ) : (
-                      <div className="h-8 px-2 flex items-center text-[11px] font-bold text-amber-800 bg-amber-100/50 rounded-lg border border-amber-200">
-                        หน่วยเรียก: {effectivePackageType}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                {packageType === 'อื่นๆ' && (
+                  <Input
+                    value={customPackageType}
+                    onChange={e => setCustomPackageType(e.target.value)}
+                    placeholder="ระบุภาชนะ เช่น กระสอบ"
+                    className="h-6 text-xs bg-white text-amber-950 border-amber-300 mb-1"
+                  />
+                )}
 
-                {/* Full Packaging */}
-                <div className="pt-1 border-t border-amber-200/60">
-                  <div className="text-[11px] font-bold text-amber-950 mb-1">
-                    🟢 {effectivePackageType}เต็ม (Full)
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-amber-900">จำนวน{effectivePackageType}เต็ม *</Label>
+                {/* Full & Odd Packaging in 2 compact columns */}
+                <div className="grid grid-cols-2 gap-2 pt-0.5 border-t border-amber-200/60">
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-amber-950">🟢 {effectivePackageType}เต็ม *</span>
+                    <div className="grid grid-cols-2 gap-1">
                       <Input
                         type="number"
                         min="1"
                         value={boxCount}
                         onChange={e => handleBoxCountChange(parseInt(e.target.value, 10) || 1)}
-                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                        placeholder="จน.เต็ม"
+                        className="h-7 text-xs font-bold bg-white text-center text-amber-950 border-amber-300 px-1"
+                        title="จำนวนลังเต็ม"
                       />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-amber-900">ยอดต่อ{effectivePackageType}เต็ม</Label>
                       <Input
                         type="number"
                         value={qtyPerBox}
                         onChange={e => setQtyPerBox(e.target.value)}
-                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                        placeholder="ยอด/ลัง"
+                        className="h-7 text-xs font-bold bg-white text-center text-amber-950 border-amber-300 px-1"
+                        title="ยอดต่อลังเต็ม"
                       />
                     </div>
                   </div>
-                </div>
 
-                {/* Remainder/Odd Packaging */}
-                <div className="pt-1 border-t border-amber-200/60">
-                  <div className="text-[11px] font-bold text-amber-950 mb-1 flex items-center justify-between">
-                    <span>🟠 {effectivePackageType}เศษ (Odd / Remainder)</span>
-                    <span className="text-[10px] font-normal text-amber-700">ใส่ 0 หากไม่มีเศษ</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-amber-900">จำนวน{effectivePackageType}เศษ</Label>
+                  <div className="space-y-0.5">
+                    <span className="text-[10px] font-bold text-amber-950">🟠 {effectivePackageType}เศษ</span>
+                    <div className="grid grid-cols-2 gap-1">
                       <Input
                         type="number"
                         min="0"
                         value={oddBoxCount}
                         onChange={e => setOddBoxCount(Math.max(0, parseInt(e.target.value, 10) || 0))}
-                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                        placeholder="จน.เศษ"
+                        className="h-7 text-xs font-bold bg-white text-center text-amber-950 border-amber-300 px-1"
+                        title="จำนวนลังเศษ (ใส่ 0 หากไม่มีเศษ)"
                       />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-semibold text-amber-900">ยอดต่อ{effectivePackageType}เศษ</Label>
                       <Input
                         type="number"
                         value={oddQtyPerBox}
                         onChange={e => setOddQtyPerBox(e.target.value)}
-                        placeholder="0"
-                        className="h-8 text-xs font-bold bg-white text-center text-amber-950 border-amber-300"
+                        placeholder="ยอดเศษ"
+                        className="h-7 text-xs font-bold bg-white text-center text-amber-950 border-amber-300 px-1"
+                        title="ยอดต่อลังเศษ"
                       />
                     </div>
                   </div>
                 </div>
 
-                <div className="text-[11px] text-amber-900 font-medium pt-1">
-                  📦 สรุป: <strong className="text-slate-900">{totalQty ? Number(totalQty).toLocaleString() : 0} {unit}</strong> ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : 0}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}` : ''}) • รวมทั้งสิ้น {totalBoxCount} {effectivePackageType}
+                <div className="text-[10px] text-amber-900 font-medium truncate pt-0.5">
+                  📦 สรุป: <strong className="text-slate-900">{totalQty ? Number(totalQty).toLocaleString() : 0} {unit}</strong> ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : 0}{oddBoxCount > 0 ? ` + ${oddBoxCount} เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}` : ''}) • รวม {totalBoxCount} {effectivePackageType}
                 </div>
               </div>
 
-              {/* Supplier & Supplier Lot */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">ผู้ส่งมอบ / ลูกค้า</Label>
+              {/* Supplier & Lot */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">ผู้ส่งมอบ / ลูกค้า</Label>
                   <Input
                     value={supplier}
                     onChange={e => setSupplier(e.target.value)}
-                    className="h-8 text-xs bg-slate-50"
+                    className="h-7 text-xs bg-slate-50"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">Lot ผู้ผลิต (ถ้ามี)</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">Lot ผู้ผลิต</Label>
                   <Input
                     value={mfgLot}
                     onChange={e => setMfgLot(e.target.value)}
                     placeholder="Lot.-"
-                    className="h-8 text-xs bg-slate-50 font-mono"
+                    className="h-7 text-xs bg-slate-50 font-mono"
                   />
                 </div>
               </div>
 
               {/* Receiver & Date */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">ผู้รับเข้า (Received by)</Label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">ผู้รับเข้า</Label>
                   <Input
                     value={receivedBy}
                     onChange={e => setReceivedBy(e.target.value)}
-                    className="h-8 text-xs bg-slate-50"
+                    className="h-7 text-xs bg-slate-50"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-slate-700">วันที่รับเข้า</Label>
+                <div className="space-y-0.5">
+                  <Label className="text-[11px] font-semibold text-slate-700">วันที่รับเข้า</Label>
                   <Input
                     value={receivedDate}
                     onChange={e => setReceivedDate(e.target.value)}
-                    className="h-8 text-xs font-mono bg-slate-50"
+                    className="h-7 text-xs font-mono bg-slate-50"
                   />
                 </div>
               </div>
 
               {/* Print Mode Selector */}
-              <div className="pt-3 border-t border-slate-100 space-y-2">
-                <Label className="text-xs font-bold text-slate-800 block">ตัวเลือกการสั่งพิมพ์</Label>
-                <div className="flex flex-col gap-2">
-                  <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-slate-200 has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50/60 transition-colors">
+              <div className="pt-1 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-700 text-[11px]">พิมพ์:</span>
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
                       name="printMode"
                       checked={printAllSequence}
                       onChange={() => setPrintAllSequence(true)}
-                      className="accent-amber-600 mt-0.5"
+                      className="accent-amber-600 w-3.5 h-3.5"
                     />
-                    <div className="text-xs">
-                      <span className="font-bold text-slate-800">พิมพ์รันเลขครบทุก{effectivePackageType} ({totalBoxCount} ใบ)</span>
-                      <p className="text-[11px] text-slate-500">รันพิมพ์ 1 of {totalBoxCount}, 2 of {totalBoxCount} ... จนครบ {totalBoxCount} {effectivePackageType}</p>
-                    </div>
+                    <span className="font-bold text-slate-800 text-[11px]">รันครบทุก{effectivePackageType} ({totalBoxCount} ใบ)</span>
                   </label>
-
-                  <label className="flex items-start gap-2.5 p-2 rounded-lg hover:bg-slate-50 cursor-pointer border border-slate-200 has-[:checked]:border-amber-400 has-[:checked]:bg-amber-50/60 transition-colors">
+                  <label className="flex items-center gap-1.5 cursor-pointer">
                     <input
                       type="radio"
                       name="printMode"
                       checked={!printAllSequence}
                       onChange={() => setPrintAllSequence(false)}
-                      className="accent-amber-600 mt-0.5"
+                      className="accent-amber-600 w-3.5 h-3.5"
                     />
-                    <div className="text-xs">
-                      <span className="font-bold text-slate-800">พิมพ์เฉพาะใบเดียว (1 ใบ)</span>
-                      <p className="text-[11px] text-slate-500">สำหรับติดพาเลท หรือพิมพ์ทดแทนเฉพาะกล่องที่ชำรุด</p>
-                    </div>
+                    <span className="text-slate-600 text-[11px]">เฉพาะ 1 ใบ</span>
                   </label>
                 </div>
               </div>
             </div>
 
-            {/* Right Col: Live Tag Preview (7 cols on large screens) */}
-            <div className="lg:col-span-7 flex flex-col items-center justify-start space-y-3.5 bg-slate-100/70 p-4 sm:p-6 rounded-2xl border border-slate-200">
-              {/* Preview Control Toolbar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 w-full pb-2 border-b border-slate-200">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
-                    <Sparkles className="w-4 h-4 text-amber-600" />
-                    ตัวอย่างป้าย ({activeSize.width} x {activeSize.height} มม.)
-                  </span>
+            {/* Right Col: Live Tag Preview (7 cols) */}
+            <div className="lg:col-span-7 bg-slate-100/70 p-2.5 sm:p-3 rounded-xl border border-slate-200 shadow-xs flex flex-col justify-between items-center">
+              {/* Preview Header Toolbar */}
+              <div className="flex items-center justify-between w-full pb-1 border-b border-slate-200 text-xs">
+                <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                  <span>ตัวอย่างป้าย ({activeSize.width} x {activeSize.height} มม.)</span>
                 </div>
 
-                {/* Size, Scale Switcher, Rotation & Code Type */}
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/* Label Size Dropdown */}
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
-                    <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ขนาดป้าย:</span>
-                    <select
-                      value={labelSize}
-                      onChange={(e) => handleLabelSizeChange(e.target.value)}
-                      className="font-bold text-xs bg-amber-50 text-amber-900 border border-amber-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                      title="เลือกขนาดสติกเกอร์ที่ต้องการพิมพ์"
-                    >
-                      {renderLabelSizeOptions()}
-                    </select>
-                  </div>
+                <div className="flex items-center gap-1.5">
+                  {totalBoxCount > 1 && printAllSequence && (
+                    <div className="flex items-center gap-1 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs text-[11px]">
+                      <button
+                        type="button"
+                        disabled={previewIndex <= 1}
+                        onClick={() => setPreviewIndex(prev => Math.max(1, prev - 1))}
+                        className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                      <span className="font-mono font-bold text-purple-900 text-[10px]">
+                        {previewIndex} / {totalBoxCount}
+                      </span>
+                      <button
+                        type="button"
+                        disabled={previewIndex >= totalBoxCount}
+                        onClick={() => setPreviewIndex(prev => Math.min(totalBoxCount, prev + 1))}
+                        className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-30 cursor-pointer"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    </div>
+                  )}
 
-                  {/* Quick Aspect Ratio Swap Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (labelSize === '100x75') handleLabelSizeChange('75x100');
-                      else if (labelSize === '75x100') handleLabelSizeChange('100x75');
-                      else if (labelSize === '100x80') handleLabelSizeChange('80x100');
-                      else if (labelSize === '80x100') handleLabelSizeChange('100x80');
-                      else handleLabelSizeChange('100x75');
-                    }}
-                    className="px-2 py-1.5 bg-white hover:bg-amber-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 flex items-center gap-1 shadow-2xs cursor-pointer"
-                    title="สลับสัดส่วนป้ายระหว่าง แนวนอน (100x75) กับ แนวตั้ง (75x100)"
-                  >
-                    <ArrowLeftRight className="w-3.5 h-3.5 text-amber-600" />
-                    <span className="hidden sm:inline">{activeSize.width > activeSize.height ? 'สลับเป็นแนวตั้ง' : 'สลับเป็นแนวนอน'}</span>
-                  </button>
-
-                  {/* Print Scale / Zoom Selector */}
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
-                    <Maximize2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ความเต็มป้าย:</span>
-                    <select
-                      value={printZoom}
-                      onChange={(e) => handlePrintZoomChange(e.target.value)}
-                      className="font-bold text-xs bg-blue-50 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                      title="ปรับสเกลขยายเต็มสติกเกอร์ (100% พอดีดวง ไม่ตกขอบ)"
-                    >
-                      <option value="100">100% (พอดีดวง ไม่ตกขอบ แนะนำ ⭐)</option>
-                      <option value="102">102% (ขยายเต็มขอบ +2%)</option>
-                      <option value="104">104% (เต็มขอบพิเศษ +4%)</option>
-                      <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
-                      <option value="98">98% (ย่อเล็ก 98%)</option>
-                    </select>
-                  </div>
-
-                  {/* Margin Fit Selector */}
-                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
-                    <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ระยะขอบ:</span>
-                    <select
-                      value={marginFit}
-                      onChange={(e) => handleMarginFitChange(e.target.value as any)}
-                      className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:ring-1 focus:ring-slate-500 cursor-pointer"
-                      title="เลือกระยะขอบ (ชิดขอบ 0.8มม. หรือ ไร้ขอบ 0มม.)"
-                    >
-                      <option value="tight">ชิดขอบ 0.8 มม. (แนะนำ ⭐)</option>
-                      <option value="borderless">ไร้ขอบ 0 มม.</option>
-                      <option value="standard">ขอบปกติ 1.5 มม.</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs shadow-xs">
-                    <button
-                      type="button"
-                      onClick={() => setPreviewScale('actual')}
-                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
-                        previewScale === 'actual'
-                          ? 'bg-amber-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                      title={`แสดงขนาดตามสัดส่วนจริง ${activeSize.width} x ${activeSize.height} มม.`}
-                    >
-                      📏 {activeSize.width}x{activeSize.height} มม.
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPreviewScale('large')}
-                      className={`px-2.5 py-1 rounded-md font-bold text-xs transition-colors flex items-center gap-1 ${
-                        previewScale === 'large'
-                          ? 'bg-amber-600 text-white shadow-xs'
-                          : 'text-slate-600 hover:bg-slate-100'
-                      }`}
-                      title="ขยายขนาดใหญ่เพื่ออ่านชัดเจนเต็มหน้าต่าง"
-                    >
-                      🔍 ขยายใหญ่
-                    </button>
-                  </div>
-
-                  {/* Quick Rotate Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const nextRot = printRotation === 'auto' ? '0' : printRotation === '0' ? '90' : printRotation === '90' ? '180' : printRotation === '180' ? '270' : 'auto';
-                      handleRotationChange(nextRot);
-                    }}
-                    className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 border shadow-xs cursor-pointer ${
-                      printRotation === 'auto'
-                        ? 'bg-blue-600 text-white border-blue-700 shadow-md ring-2 ring-blue-300'
-                        : printRotation !== '0'
-                        ? 'bg-amber-600 text-white border-amber-700 shadow-md ring-2 ring-amber-300'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-amber-50 hover:text-amber-900'
-                    }`}
-                    title="คลิกเพื่อสลับทิศทาง (Auto แก้ตะแคง -> 0° -> 90° -> 180° -> 270°)"
-                  >
-                    <RotateCw className="w-3.5 h-3.5 text-inherit" />
-                    {printRotation === 'auto' ? 'แก้ตะแคง (Auto)' : `หมุน ${printRotation}°`}
-                  </button>
-
-                  {/* Code Type Switcher Button */}
+                  {/* Code Format Button */}
                   <button
                     type="button"
                     onClick={() => {
                       const nextCode = codeType === 'qrcode' ? 'barcode' : codeType === 'barcode' ? 'none' : 'qrcode';
                       handleCodeTypeChange(nextCode);
                     }}
-                    className={`px-2.5 py-1.5 rounded-lg font-bold text-xs transition-all flex items-center gap-1.5 border shadow-xs cursor-pointer ${
-                      codeType === 'qrcode'
-                        ? 'bg-purple-700 text-white border-purple-800 shadow-md ring-2 ring-purple-300'
-                        : 'bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:text-purple-900'
-                    }`}
-                    title="สลับรูปแบบโค้ด (QR Code -> Barcode -> ซ่อนโค้ด)"
+                    className="px-2 py-0.5 bg-white hover:bg-purple-50 border border-slate-300 rounded text-[10.5px] font-bold text-purple-800 flex items-center gap-1 shadow-2xs cursor-pointer"
+                    title="สลับรูปแบบโค้ด"
                   >
-                    <QrCode className="w-3.5 h-3.5 text-inherit" />
-                    {codeType === 'qrcode' ? 'QR Code' : codeType === 'barcode' ? 'Barcode' : 'ไม่แสดงโค้ด'}
+                    <QrCode className="w-3 h-3" />
+                    {codeType === 'qrcode' ? 'QR Code' : codeType === 'barcode' ? 'Barcode' : 'ไม่แสดง'}
+                  </button>
+
+                  {/* Scale Switcher Button */}
+                  <button
+                    type="button"
+                    onClick={() => setPreviewScale(prev => prev === 'actual' ? 'large' : 'actual')}
+                    className="px-2 py-0.5 bg-white hover:bg-slate-50 border border-slate-300 rounded text-[10.5px] font-bold text-slate-700 flex items-center gap-1 shadow-2xs cursor-pointer"
+                    title="สลับขนาดพรีวิว"
+                  >
+                    {previewScale === 'actual' ? '🔍 ขยาย' : '📏 ปกติ'}
                   </button>
                 </div>
-
-                {totalBoxCount > 1 && printAllSequence && (
-                  <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-full border border-slate-200 text-xs shadow-xs">
-                    <button
-                      type="button"
-                      disabled={previewIndex <= 1}
-                      onClick={() => setPreviewIndex(prev => Math.max(1, prev - 1))}
-                      className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-30"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="font-mono text-xs font-bold text-purple-900">
-                      {effectivePackageType}ที่ {previewIndex} of {totalBoxCount} {previewIndex > boxCount ? `[${effectivePackageType}เศษ]` : ''}
-                    </span>
-                    <button
-                      type="button"
-                      disabled={previewIndex >= totalBoxCount}
-                      onClick={() => setPreviewIndex(prev => Math.min(totalBoxCount, prev + 1))}
-                      className="p-0.5 hover:bg-slate-100 rounded disabled:opacity-30"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
               </div>
 
               {/* Orientation Alert for Vertical Size */}
               {activeSize.height > activeSize.width && (
-                <div className="w-full bg-amber-50 border-2 border-amber-400 text-amber-900 text-xs px-3.5 py-2.5 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>
-                      <strong>ระวัง:</strong> กำลังเลือกขนาด <strong>แนวตั้ง ({activeSize.width} x {activeSize.height} มม.)</strong> ซึ่งจะพิมพ์ออกมาเป็นทรงสูง หากม้วนสติกเกอร์ที่เครื่องพิมพ์ของคุณเป็น <strong>แนวนอน (100 x 75 มม.)</strong> ให้กดสลับเป็นแนวนอน
-                    </span>
-                  </div>
+                <div className="w-full bg-amber-50 border border-amber-300 text-amber-900 text-[10.5px] px-2.5 py-1 rounded-lg flex items-center justify-between my-0.5">
+                  <span className="truncate">⚠️ เลือกแนวตั้ง ({activeSize.width}x{activeSize.height} มม.) ม้วนแนวนอนให้กดสลับ</span>
                   <button
                     type="button"
                     onClick={() => handleLabelSizeChange('100x75')}
-                    className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1 rounded-lg shadow-xs cursor-pointer flex items-center gap-1"
+                    className="shrink-0 ml-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[10px] px-2 py-0.5 rounded cursor-pointer"
                   >
-                    <ArrowLeftRight className="w-3.5 h-3.5" />
-                    เปลี่ยนเป็น 100x75 แนวนอน
+                    สลับเป็น 100x75
                   </button>
                 </div>
               )}
 
-              {/* Physical Tag Preview Card with Ruler Dimension Guides */}
-              <div className="flex flex-col items-center justify-center w-full py-2 min-h-[380px]">
-                {/* Width Guide Ruler */}
-                <div className="text-[10px] text-slate-500 font-mono mb-1.5 flex items-center gap-1">
-                  <span>◄</span>
-                  <span className="border-b border-dashed border-slate-400 px-6 font-bold text-slate-700">
-                    {['90', '270'].includes(printRotation)
-                      ? `ความกว้างป้ายหลังหมุน: ${activeSize.height} มม.`
-                      : `ความกว้างสติกเกอร์: ${activeSize.width} มม.`}
-                  </span>
-                  <span>►</span>
-                </div>
+              {/* Center Tag Preview Box */}
+              <div className="flex-1 flex items-center justify-center w-full py-1">
+                {(() => {
+                  const isRot = ['90', '270'].includes(printRotation);
+                  const baseW = previewScale === 'large' ? 360 : 315;
+                  const baseH = Math.round((baseW * activeSize.height) / activeSize.width);
+                  const dispW = isRot ? baseH : baseW;
+                  const dispH = isRot ? baseW : baseH;
 
-                <div className="flex items-center gap-2">
-                  {/* Height Guide Ruler */}
-                  <div className="text-[10px] text-slate-500 font-mono [writing-mode:vertical-rl] rotate-180 flex items-center justify-center gap-1 h-full py-4">
-                    <span>◄</span>
-                    <span className="border-l border-dashed border-slate-400 py-6 font-bold text-slate-700">
-                      {['90', '270'].includes(printRotation)
-                        ? `ความสูงหลังหมุน: ${activeSize.width} มม.`
-                        : `ความสูงสติกเกอร์: ${activeSize.height} มม.`}
-                    </span>
-                    <span>►</span>
-                  </div>
-
-                  {/* Outer Frame that adjusts bounding box when rotated */}
-                  {(() => {
-                    const isRot = ['90', '270'].includes(printRotation);
-                    const dispW = isRot ? activeSize.height : activeSize.width;
-                    const dispH = isRot ? activeSize.width : activeSize.height;
-                    const largeBaseW = 460;
-                    const largeBaseH = Math.round((largeBaseW * activeSize.height) / activeSize.width);
-                    const largeDispW = isRot ? largeBaseH : largeBaseW;
-                    const largeDispH = isRot ? largeBaseW : largeBaseH;
-
-                    return (
+                  return (
+                    <div 
+                      className="flex items-center justify-center transition-all duration-200"
+                      style={{ width: `${dispW}px`, height: `${dispH}px` }}
+                    >
                       <div 
-                        className="flex items-center justify-center transition-all duration-300"
-                        style={
-                          previewScale === 'actual'
-                            ? { width: `${dispW}mm`, height: `${dispH}mm` }
-                            : { width: `${largeDispW}px`, height: `${largeDispH}px` }
-                        }
+                        className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-md transition-transform duration-200 origin-center"
+                        style={{
+                          width: `${baseW}px`,
+                          height: `${baseH}px`,
+                          boxSizing: 'border-box',
+                          transform:
+                            printRotation === '90'
+                              ? `rotate(90deg)`
+                              : printRotation === '270'
+                              ? `rotate(270deg)`
+                              : printRotation === '180'
+                              ? `rotate(180deg)`
+                              : 'none'
+                        }}
                       >
-                        {/* Physical Tag Preview */}
-                        <div 
-                          className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-2xl transition-transform duration-300 origin-center"
-                          style={{
-                            ...(previewScale === 'actual' ? {
-                              width: `${activeSize.width}mm`,
-                              height: `${activeSize.height}mm`,
-                              minWidth: `${activeSize.width}mm`,
-                              minHeight: `${activeSize.height}mm`,
-                              maxWidth: `${activeSize.width}mm`,
-                              maxHeight: `${activeSize.height}mm`,
-                              boxSizing: 'border-box',
-                              fontSize: activeSize.bodyFontSize,
-                              lineHeight: activeSize.bodyLineHeight
-                            } : {
-                              width: `${largeBaseW}px`,
-                              height: `${largeBaseH}px`,
-                              maxWidth: '100%',
-                              boxSizing: 'border-box',
-                              fontSize: '12px',
-                              lineHeight: 1.35
-                            }),
-                            transform:
-                              printRotation === '90'
-                                ? `rotate(90deg) scale(${zoomFactor})`
-                                : printRotation === '270'
-                                ? `rotate(270deg) scale(${zoomFactor})`
-                                : printRotation === '180'
-                                ? `rotate(180deg) scale(${zoomFactor})`
-                                : zoomFactor !== 1
-                                ? `scale(${zoomFactor})`
-                                : 'none'
-                          }}
-                        >
-                          {/* Tag Header */}
-                          <div 
-                            className="border-b-2 border-black text-center font-bold tracking-wider py-1 uppercase bg-white"
-                            style={{ fontSize: previewScale === 'actual' ? activeSize.headerFontSize : '14px' }}
-                          >
-                            COSMEDIVA
+                        {/* Tag Header */}
+                        <div className="border-b-2 border-black text-center font-bold tracking-wider py-0.5 uppercase bg-white text-[11.5px]">
+                          COSMEDIVA
+                        </div>
+
+                        {/* Tag Body */}
+                        <div className="flex-1 px-2 py-1 flex flex-col justify-between font-medium space-y-0.5 text-[10px] leading-tight">
+                          {/* Name */}
+                          <div className="flex items-start">
+                            <span className="w-16 font-bold shrink-0">Name</span>
+                            <span className="w-2 text-center shrink-0">:</span>
+                            <span className="flex-1 font-bold line-clamp-2 leading-tight">
+                              {name || '-'}
+                            </span>
                           </div>
 
-                          {/* Tag Body */}
-                          <div 
-                            className="flex-1 p-2 sm:p-2.5 flex flex-col justify-between font-medium space-y-0.5"
-                            style={{ 
-                              fontSize: previewScale === 'actual' ? activeSize.bodyFontSize : '12px',
-                              lineHeight: previewScale === 'actual' ? activeSize.bodyLineHeight : 1.3 
-                            }}
-                          >
-                            {/* Name */}
-                            <div className="flex items-start">
-                              <span className="w-20 font-bold shrink-0">Name</span>
-                              <span className="w-2.5 text-center shrink-0">:</span>
-                              <span className="flex-1 font-bold line-clamp-2 leading-tight">
-                                {name || '-'}
+                          {/* Code */}
+                          <div className="flex items-center">
+                            <span className="w-16 font-bold shrink-0">Code</span>
+                            <span className="w-2 text-center shrink-0">:</span>
+                            <span className="flex-1 font-mono font-bold tracking-tight">
+                              {code || '-'}
+                            </span>
+                          </div>
+
+                          {/* Control No. + Barcode */}
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center flex-1 min-w-0">
+                              <span className="w-16 font-bold shrink-0">Control No.</span>
+                              <span className="w-2 text-center shrink-0">:</span>
+                              <span className="font-mono font-bold text-[10.5px] tracking-tight text-purple-950 truncate">
+                                {controlNo || '-'}
                               </span>
                             </div>
+                            {controlNo && codeType !== 'none' && (
+                              <div className="shrink-0 pl-1 flex items-center">
+                                {codeType === 'qrcode' ? (
+                                  <QRCodeSvg value={controlNo} size={24} />
+                                ) : (
+                                  <Code128Barcode value={controlNo} height={15} width={90} />
+                                )}
+                              </div>
+                            )}
+                          </div>
 
-                            {/* Code */}
+                          {/* Supplier + Lot */}
+                          <div className="flex items-center justify-between gap-1">
+                            <div className="flex items-center flex-1 min-w-0">
+                              <span className="w-16 font-bold shrink-0">Supplier</span>
+                              <span className="w-2 text-center shrink-0">:</span>
+                              <span className="font-medium truncate">{supplier || '-'}</span>
+                            </div>
+                            <span className="font-medium shrink-0 text-slate-700 pl-1 text-[9px]">
+                              Lot.{mfgLot || '-'}
+                            </span>
+                          </div>
+
+                          {/* Total Qty + Package Breakdown */}
+                          <div className="flex items-center justify-between gap-1">
                             <div className="flex items-center">
-                              <span className="w-20 font-bold shrink-0">Code</span>
-                              <span className="w-2.5 text-center shrink-0">:</span>
-                              <span className="flex-1 font-mono font-bold tracking-tight">
-                                {code || '-'}
-                              </span>
+                              <span className="w-16 font-bold shrink-0">Total Qty.</span>
+                              <span className="w-2 text-center shrink-0">:</span>
+                              <span className="font-bold">{totalQty ? Number(totalQty).toLocaleString() : 0}{unit}</span>
                             </div>
-
-                            {/* Control No. + Barcode */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <div className="flex items-center flex-1 min-w-0">
-                                <span className="w-20 font-bold shrink-0">Control No.</span>
-                                <span className="w-2.5 text-center shrink-0">:</span>
-                                <span className="font-mono font-bold text-xs sm:text-sm tracking-tight text-purple-950 truncate">
-                                  {controlNo || '-'}
-                                </span>
-                              </div>
-                              {controlNo && codeType !== 'none' && (
-                                <div className="shrink-0 pl-1 flex items-center">
-                                  {codeType === 'qrcode' ? (
-                                    <QRCodeSvg value={controlNo} size={previewScale === 'actual' ? activeSize.qrSize : Math.round(activeSize.qrSize * 1.3)} />
-                                  ) : (
-                                    <Code128Barcode value={controlNo} height={previewScale === 'actual' ? activeSize.barcodeHeight : Math.round(activeSize.barcodeHeight * 1.2)} width={previewScale === 'actual' ? activeSize.barcodeWidth : Math.round(activeSize.barcodeWidth * 1.2)} />
-                                  )}
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Supplier + Lot */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <div className="flex items-center flex-1 min-w-0">
-                                <span className="w-20 font-bold shrink-0">Supplier</span>
-                                <span className="w-2.5 text-center shrink-0">:</span>
-                                <span className="font-medium truncate">{supplier || '-'}</span>
-                              </div>
-                              <span className="font-medium shrink-0 text-slate-700 pl-1 text-[10px] sm:text-xs">
-                                Lot.{mfgLot || '-'}
-                              </span>
-                            </div>
-
-                            {/* Total Qty + Package Breakdown */}
-                            <div className="flex items-center justify-between gap-1.5">
-                              <div className="flex items-center">
-                                <span className="w-20 font-bold shrink-0">Total Qty.</span>
-                                <span className="w-2.5 text-center shrink-0">:</span>
-                                <span className="font-bold">{totalQty ? Number(totalQty).toLocaleString() : 0}{unit}</span>
-                              </div>
-                              <span className="font-bold text-slate-900 text-[10px] sm:text-xs shrink-0">
-                                ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
-                              </span>
-                            </div>
-
-                            {/* Qty./unit + of N */}
-                            {(() => {
-                              const isOddPreview = previewIndex > boxCount;
-                              const currentBoxQty = isOddPreview
-                                ? (oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0)
-                                : (qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0));
-                              return (
-                                <div className="flex items-center justify-between gap-1.5">
-                                  <div className="flex items-center">
-                                    <span className="w-20 font-bold shrink-0">Qty./unit</span>
-                                    <span className="w-2.5 text-center shrink-0">:</span>
-                                    <span className="font-bold">
-                                      {currentBoxQty} {unit}
-                                      {isOddPreview && (
-                                        <span className="ml-1 text-[9px] bg-amber-100 text-amber-900 px-1 py-0.5 rounded border border-amber-300">
-                                          {effectivePackageType}เศษ
-                                        </span>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center font-bold text-xs sm:text-sm">
-                                    <span className="text-slate-600 font-normal mr-1.5">of</span>
-                                    <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono">
-                                      {printAllSequence ? previewIndex : 1}
-                                    </span>
-                                    <span className="mx-1 text-slate-400">/</span>
-                                    <span className="font-mono">{totalBoxCount}</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-
-                            {/* Received by + Date */}
-                            <div className="flex items-center justify-between gap-1.5 pt-0.5">
-                              <div className="flex items-center flex-1 min-w-0">
-                                <span className="w-20 font-bold shrink-0">Received by</span>
-                                <span className="w-2.5 text-center shrink-0">:</span>
-                                <span className="font-medium truncate">{receivedBy || '-'}</span>
-                              </div>
-                              <span className="font-medium shrink-0 text-[10px] sm:text-[11px] text-slate-700 pl-1">
-                                รับเข้า {receivedDate || '-'}
-                              </span>
-                            </div>
+                            <span className="font-bold text-slate-900 text-[9px] shrink-0">
+                              ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
+                            </span>
                           </div>
 
-                          {/* Tag Footer Banner */}
-                          <div 
-                            className="border-t-2 border-black text-center font-bold tracking-wide py-0.5 bg-amber-50"
-                            style={{ fontSize: previewScale === 'actual' ? activeSize.bannerFontSize : '12px' }}
-                          >
-                            Quarantine : กักกัน
-                          </div>
+                          {/* Qty./unit + of N */}
+                          {(() => {
+                            const isOddPreview = previewIndex > boxCount;
+                            const currentBoxQty = isOddPreview
+                              ? (oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0)
+                              : (qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0));
+                            return (
+                              <div className="flex items-center justify-between gap-1">
+                                <div className="flex items-center">
+                                  <span className="w-16 font-bold shrink-0">Qty./unit</span>
+                                  <span className="w-2 text-center shrink-0">:</span>
+                                  <span className="font-bold">
+                                    {currentBoxQty} {unit}
+                                    {isOddPreview && (
+                                      <span className="ml-1 text-[8px] bg-amber-100 text-amber-900 px-1 rounded border border-amber-300">
+                                        เศษ
+                                      </span>
+                                    )}
+                                  </span>
+                                </div>
+                                <div className="flex items-center font-bold text-[10.5px]">
+                                  <span className="text-slate-600 font-normal mr-1 text-[9.5px]">of</span>
+                                  <span className="px-1 py-0.2 bg-slate-100 border border-slate-300 rounded font-mono">
+                                    {printAllSequence ? previewIndex : 1}
+                                  </span>
+                                  <span className="mx-0.5 text-slate-400">/</span>
+                                  <span className="font-mono">{totalBoxCount}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
 
-                          {/* Doc Rev Bottom line */}
-                          <div 
-                            className="border-t border-black text-center text-slate-700 py-0.5 bg-white font-mono"
-                            style={{ fontSize: previewScale === 'actual' ? activeSize.revFontSize : '10px' }}
-                          >
-                            {docRev}
+                          {/* Received by + Date */}
+                          <div className="flex items-center justify-between gap-1 pt-0.5">
+                            <div className="flex items-center flex-1 min-w-0">
+                              <span className="w-16 font-bold shrink-0">Received by</span>
+                              <span className="w-2 text-center shrink-0">:</span>
+                              <span className="font-medium truncate">{receivedBy || '-'}</span>
+                            </div>
+                            <span className="font-medium shrink-0 text-[9px] text-slate-700 pl-1">
+                              รับเข้า {receivedDate || '-'}
+                            </span>
                           </div>
                         </div>
+
+                        {/* Tag Footer Banner */}
+                        <div className="border-t-2 border-black text-center font-bold tracking-wide py-0.5 bg-amber-50 text-[10px]">
+                          Quarantine : กักกัน
+                        </div>
+
+                        {/* Doc Rev Bottom line */}
+                        <div className="border-t border-black text-center text-slate-700 py-0.5 bg-white font-mono text-[8px]">
+                          {docRev}
+                        </div>
                       </div>
-                    );
-                  })()}
-                </div>
-              </div>
-
-              <div className="text-[11px] text-slate-500 text-center flex flex-wrap items-center justify-center gap-2 pt-1">
-                <span>🖨️ เครื่องพิมพ์สติกเกอร์ความร้อน: <strong>{activeSize.width}x{activeSize.height} มม.</strong></span>
-                <span>•</span>
-                <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1">
-                  <Maximize2 className="w-3 h-3 text-blue-600" />
-                  สเกลขยายเต็มป้าย: {printZoom}% ({marginFit === 'borderless' ? 'ไร้ขอบ 0 มม.' : marginFit === 'tight' ? 'ชิดขอบ 0.5 มม.' : 'ขอบปกติ 1.5 มม.'})
-                </span>
-                <span>•</span>
-                <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                  ระบบจะพิมพ์สติกเกอร์ทั้งหมด {tagsToPrint.length} ใบ
-                </span>
-                {printRotation !== '0' && (
-                  <>
-                    <span>•</span>
-                    <span className="font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-300 flex items-center gap-1">
-                      <RotateCw className="w-3 h-3 text-amber-600" />
-                      {printRotation === '270' && '⭐ หมุนชดเชย 270° (แก้ตะแคง)'}
-                      {printRotation === '90' && 'หมุนพิมพ์ 90°'}
-                      {printRotation === '180' && 'พิมพ์กลับหัว 180°'}
-                      {printRotation === 'auto' && 'โหมด Auto'}
-                    </span>
-                  </>
-                )}
-              </div>
-
-              {/* Orientation Guide / Sideways Fix Alert */}
-              {printRotation === 'auto' ? (
-                <div className="w-full bg-blue-50 border border-blue-300 text-blue-900 text-xs px-3.5 py-2.5 rounded-xl flex items-start gap-2.5 shadow-2xs">
-                  <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-                  <div>
-                    <strong className="text-blue-950">โหมดแก้ตะแคง (Auto) - ทำงานร่วมกับการตั้งค่าใน Chrome ที่พี่ทำไว้:</strong>
-                    <div className="mt-1 text-[11px] text-blue-800 flex flex-wrap items-center gap-x-4 gap-y-1">
-                      <span>1️⃣ รูปแบบ: <strong>แนวนอน (Landscape)</strong></span>
-                      <span>2️⃣ ขนาดกระดาษ: <strong>100 x 75</strong></span>
-                      <span>3️⃣ ระยะขอบ: <strong>ไม่มี (None)</strong></span>
                     </div>
-                    <p className="mt-1 text-[11px] text-blue-700">
-                      (เมื่อเลือกขนาดป้าย 100 x 75 มม. สติกเกอร์จะพิมพ์ออกมาเต็มดวงพอดี ไม่เหลือด้านข้าง และไม่ตกขอบล่างค่ะ)
-                    </p>
-                  </div>
-                </div>
-              ) : ['270', '90'].includes(printRotation) ? (
-                <div className="w-full bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-2xs">
-                  <Info className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span>
-                    <strong>โหมดแก้พิมพ์ตะแคง (หมุน {printRotation}°):</strong> ระบบทำการหมุนภาพชดเชยการทำงานของเครื่องพิมพ์ความร้อนให้อัตโนมัติแล้วค่ะ เมื่อกดสั่งพิมพ์ สามารถกดปุ่ม <strong>"พิมพ์" (Print)</strong> ในหน้าต่าง Chrome ได้ทันทีเลยค่ะ
+                  );
+                })()}
+              </div>
+
+              {/* Bottom Helper Guide (Single sleek line) */}
+              <div className="w-full bg-blue-50/90 border border-blue-200 text-blue-950 text-[11px] px-3 py-1 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-1.5 truncate">
+                  <Info className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="truncate">
+                    ตั้งค่าใน Chrome: <strong>แนวนอน</strong> • กระดาษ <strong>100 x 75</strong> • ระยะขอบ <strong>ไม่มี</strong>
                   </span>
                 </div>
-              ) : (
-                <div className="w-full bg-amber-50 border border-amber-300 text-amber-900 text-xs px-3.5 py-2 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
-                  <div className="flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                    <span>
-                      <strong>หากพิมพ์ออกมาแล้วตะแคง:</strong> แนะนำให้เลือกทิศทางพิมพ์เป็น <strong>"แก้ตะแคง (Auto)"</strong> หรือ <strong>"หมุน 270°"</strong>
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleRotationChange('auto')}
-                    className="shrink-0 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-2.5 py-1 rounded-lg shadow-2xs cursor-pointer flex items-center gap-1"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    คลิกเลือกแก้ตะแคง (Auto)
-                  </button>
-                </div>
-              )}
+                <span className="font-bold text-blue-700 shrink-0 pl-2">
+                  พิมพ์เต็มดวง ไม่ตกขอบ ⭐
+                </span>
+              </div>
             </div>
           </div>
 
-          <DialogFooter className="border-t pt-3 flex flex-wrap items-center justify-between gap-2">
-            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+          {/* 3. Footer: Unified Single Control Bar (~44px) */}
+          <DialogFooter className="border-t pt-2 mt-0.5 flex flex-wrap items-center justify-between gap-2 flex-shrink-0">
+            <Button variant="outline" size="sm" onClick={() => onOpenChange(false)} className="h-8 text-xs">
               ปิดหน้าต่าง
             </Button>
+
             <div className="flex flex-wrap items-center gap-2">
-              {/* Label Size Selector */}
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+              {/* ขนาดป้าย */}
+              <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-300 text-xs shadow-2xs">
                 <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                  ขนาดป้าย:
-                </span>
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">ขนาด:</span>
                 <select
                   value={labelSize}
                   onChange={(e) => handleLabelSizeChange(e.target.value)}
                   className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                  title="เลือกขนาดสติกเกอร์ตามม้วนกระดาษที่ใส่ในเครื่องพิมพ์"
                 >
                   {renderLabelSizeOptions()}
                 </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (labelSize === '100x75') handleLabelSizeChange('75x100');
-                    else if (labelSize === '75x100') handleLabelSizeChange('100x75');
-                    else if (labelSize === '100x80') handleLabelSizeChange('80x100');
-                    else if (labelSize === '80x100') handleLabelSizeChange('100x80');
-                    else handleLabelSizeChange('100x75');
-                  }}
-                  className="px-1.5 py-0.5 hover:bg-amber-100 rounded text-[10px] font-bold text-amber-800 border border-amber-200 cursor-pointer flex items-center gap-1"
-                  title="สลับสัดส่วนป้ายระหว่าง แนวนอน (100x75) กับ แนวตั้ง (75x100)"
-                >
-                  <ArrowLeftRight className="w-3 h-3" />
-                  {activeSize.width > activeSize.height ? 'สลับแนวตั้ง' : 'สลับแนวนอน'}
-                </button>
               </div>
 
-              {/* Print Zoom / Fullness Selector */}
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+              {/* ทิศทางพิมพ์ */}
+              <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-300 text-xs shadow-2xs">
+                <RotateCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">ทิศทาง:</span>
+                <select
+                  value={printRotation}
+                  onChange={(e) => handleRotationChange(e.target.value as any)}
+                  className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                >
+                  <option value="auto">⭐ แก้ตะแคง (Auto)</option>
+                  <option value="270">หมุน 270°</option>
+                  <option value="0">แนวนอนปกติ (0°)</option>
+                  <option value="90">🔄 หมุน 90°</option>
+                  <option value="180">↕️ กลับหัว 180°</option>
+                </select>
+              </div>
+
+              {/* ความเต็มป้าย */}
+              <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-300 text-xs shadow-2xs">
                 <Maximize2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                  ความเต็มป้าย:
-                </span>
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">เต็มป้าย:</span>
                 <select
                   value={printZoom}
                   onChange={(e) => handlePrintZoomChange(e.target.value)}
                   className="text-xs bg-blue-50 font-bold border border-blue-300 rounded px-1.5 py-0.5 text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
-                  title="ปรับสเกลขยายเต็มสติกเกอร์ (100% พอดีดวง ไม่ตกขอบ)"
                 >
-                  <option value="100">100% (พอดีดวง ไม่ตกขอบ แนะนำ ⭐)</option>
-                  <option value="102">102% (ขยายเต็มขอบ +2%)</option>
-                  <option value="104">104% (เต็มขอบ +4%)</option>
-                  <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
-                  <option value="98">98% (ย่อขอบ 98%)</option>
+                  <option value="100">100% (พอดีดวง ⭐)</option>
+                  <option value="102">102% (+2%)</option>
+                  <option value="104">104% (+4%)</option>
+                  <option value="98">98%</option>
                 </select>
               </div>
 
-              {/* Margin Fit Selector */}
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+              {/* ระยะขอบ */}
+              <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-300 text-xs shadow-2xs">
                 <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                  ระยะขอบ:
-                </span>
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">ขอบ:</span>
                 <select
                   value={marginFit}
                   onChange={(e) => handleMarginFitChange(e.target.value as any)}
                   className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
-                  title="เลือกระยะขอบสติกเกอร์ (ชิดขอบ 0.8มม. หรือ ไร้ขอบ 0มม.)"
                 >
-                  <option value="tight">ชิดขอบ 0.8 มม. (แนะนำ ⭐)</option>
+                  <option value="tight">ชิดขอบ 0.8 มม. ⭐</option>
                   <option value="borderless">ไร้ขอบ 0 มม.</option>
                   <option value="standard">ปกติ 1.5 มม.</option>
                 </select>
               </div>
 
-              {/* Code Format Selector (QR Code / Barcode) */}
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
-                <QrCode className="w-3.5 h-3.5 text-purple-700 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                  รูปแบบโค้ด:
-                </span>
-                <select
-                  value={codeType}
-                  onChange={(e) => handleCodeTypeChange(e.target.value as any)}
-                  className="text-xs bg-purple-50 font-bold border border-purple-300 rounded px-1.5 py-0.5 text-purple-900 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
-                  title="เลือกรูปแบบโค้ดสำหรับสแกน (แนะนำ QR Code สแกนง่าย คมชัด ไม่ทับซ้อน)"
-                >
-                  <option value="qrcode">📱 QR Code (สแกนง่าย คมชัด แนะนำ)</option>
-                  <option value="barcode">|||| Barcode (Code 128)</option>
-                  <option value="none">❌ ไม่แสดงโค้ด</option>
-                </select>
-              </div>
-
-              {/* Orientation / Rotation Selector */}
-              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
-                <RotateCw className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
-                  ทิศทางพิมพ์:
-                </span>
-                <select
-                  value={printRotation}
-                  onChange={(e) => handleRotationChange(e.target.value as any)}
-                  className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
-                  title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้านหรือตะแคง"
-                >
-                  <option value="auto">⭐ แก้ตะแคง (Auto - แนะนำสำหรับ Chrome แนวนอน)</option>
-                  <option value="270">หมุน 270° (แก้ปัญหาเครื่องหมุน 90°)</option>
-                  <option value="0">แนวนอนปกติ (0°)</option>
-                  <option value="90">🔄 หมุน 90° (ตามเข็ม)</option>
-                  <option value="180">↕️ กลับหัว 180°</option>
-                </select>
-              </div>
-
               <Button
                 onClick={handlePrint}
-                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md px-5 h-9"
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md px-4 h-8 cursor-pointer"
               >
                 <Printer className="w-4 h-4" />
                 สั่งพิมพ์สติกเกอร์ {tagsToPrint.length} ใบ ({activeSize.width}x{activeSize.height} มม.)
