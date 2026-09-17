@@ -2743,57 +2743,63 @@ export default function RMControlCenterPage() {
       </div>
 
         <Tabs value={activeViewTab} onValueChange={setActiveViewTab} className="w-full">
-        <TabsList className="bg-gradient-to-r from-amber-600 via-[#C59B27] to-amber-600 p-2 sm:p-2.5 rounded-2xl border border-amber-400/50 shadow-lg w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 h-auto">
+        {/* Soft, Modern Segmented Control Bar */}
+        <TabsList className="bg-[#F8F6F0] p-1.5 sm:p-2 rounded-2xl border border-[#E7DFD5] shadow-xs w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 h-auto">
+          {/* 1. Overview Dashboard */}
           <TabsTrigger 
             value="dashboard" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
           >
-            <LayoutDashboard className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-100 transition-colors"/> 
+            <LayoutDashboard className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
             <span className="truncate">Overview Dashboard</span>
           </TabsTrigger>
 
+          {/* 2. Purchasing View */}
           <TabsTrigger 
             value="purchasing" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
           >
-            <ShoppingCart className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-100 transition-colors"/> 
+            <ShoppingCart className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
             <span className="truncate">Purchasing View</span>
           </TabsTrigger>
 
+          {/* 3. Warehouse View */}
           <TabsTrigger 
             value="warehouse" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
           >
-            <Box className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-blue-600 text-blue-100 transition-colors"/> 
+            <Box className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-blue-600 text-blue-500/70 transition-colors"/> 
             <span className="truncate">Warehouse View</span>
           </TabsTrigger>
 
+          {/* 4. QC View */}
           <TabsTrigger 
             value="qc" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
           >
-            <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-emerald-600 text-emerald-100 transition-colors"/> 
+            <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-emerald-600 text-emerald-500/70 transition-colors"/> 
             <span className="truncate">QC View</span>
           </TabsTrigger>
 
+          {/* 5. Planning View */}
           <TabsTrigger 
             value="planning" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
           >
-            <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-indigo-600 text-indigo-100 transition-colors"/> 
+            <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-indigo-600 text-indigo-500/70 transition-colors"/> 
             <span className="truncate">Planning View</span>
           </TabsTrigger>
         </TabsList>
 
-        {/* Continuous Work History & Report Action Bar (Both History & Export Excel for All 5 Menus) */}
-        <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-3.5 mb-2">
+        {/* Continuous Work History & Report Action Bar (Soft, Clean, Unified Tone) */}
+        <div className="bg-[#FAF9F6] p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-3 mb-2">
           {/* Left: Current View & Continuous Status Information */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
-              <History className="w-4 h-4 text-amber-700 animate-pulse shrink-0" />
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center gap-2 bg-white border border-slate-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
+              <History className="w-4 h-4 text-[#D4AF37] animate-pulse shrink-0" />
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-amber-950">ประวัติการทำงานแบบต่อเนื่อง:</span>
-                <Badge className="bg-amber-600 text-white font-mono text-[11px] px-2 py-0.2 font-bold">
+                <span className="text-xs font-semibold text-slate-700">ประวัติการทำงานแบบต่อเนื่อง:</span>
+                <Badge className="bg-[#D4AF37]/15 text-[#6D5A1A] border border-[#D4AF37]/30 font-semibold text-[11px] px-2.5 py-0.5 rounded-lg">
                   {viewNameMap[activeViewTab] || activeViewTab}
                 </Badge>
               </div>
@@ -2801,11 +2807,11 @@ export default function RMControlCenterPage() {
 
             {/* Quick stats pills */}
             <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
-              <span className="bg-slate-100 px-2.5 py-1 rounded-lg font-medium border border-slate-200 flex items-center gap-1">
-                📦 <strong className="text-slate-900">{currentViewItemsCount}</strong> รายการในหน้านี้
+              <span className="bg-white px-2.5 py-1 rounded-lg font-medium border border-slate-200/80 shadow-2xs flex items-center gap-1">
+                📦 <strong className="text-slate-800">{currentViewItemsCount}</strong> รายการในหน้านี้
               </span>
-              <span className="inline-flex bg-purple-50 text-purple-900 px-2.5 py-1 rounded-lg font-medium border border-purple-200 items-center gap-1">
-                ⚡ บันทึกประวัติสะสม <strong className="text-purple-800">{continuousHistory.length}</strong> ไทม์ไลน์
+              <span className="inline-flex bg-white px-2.5 py-1 rounded-lg font-medium border border-slate-200/80 shadow-2xs text-slate-600 items-center gap-1">
+                ⚡ บันทึกประวัติสะสม <strong className="text-purple-700">{continuousHistory.length}</strong> ไทม์ไลน์
               </span>
             </div>
           </div>
@@ -2817,7 +2823,7 @@ export default function RMControlCenterPage() {
               variant="outline"
               size="sm"
               onClick={() => setIsHistoryModalOpen(true)}
-              className="h-9 text-xs font-bold text-amber-900 border-amber-300 hover:bg-amber-50 hover:text-amber-950 shadow-2xs cursor-pointer flex items-center gap-1.5"
+              className="h-8.5 text-xs font-semibold bg-white text-slate-700 border border-slate-300 hover:bg-slate-50 hover:text-slate-900 rounded-xl shadow-2xs cursor-pointer flex items-center gap-1.5"
             >
               <History className="w-4 h-4 text-amber-600" />
               ดูประวัติแบบต่อเนื่อง ({continuousHistory.length})
@@ -2827,9 +2833,9 @@ export default function RMControlCenterPage() {
             <Button
               size="sm"
               onClick={handleExportCurrentView}
-              className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer flex items-center gap-1.5"
+              className="h-8.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs cursor-pointer flex items-center gap-1.5"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+              <FileSpreadsheet className="w-4 h-4 text-white" />
               Export Excel ({viewShortNameMap[activeViewTab] || 'Report'})
             </Button>
           </div>
