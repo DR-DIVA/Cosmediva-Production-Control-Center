@@ -2743,50 +2743,60 @@ export default function RMControlCenterPage() {
       </div>
 
         <Tabs value={activeViewTab} onValueChange={setActiveViewTab} className="w-full">
-        {/* Soft, Modern Segmented Control Bar - Auto Height & Multi-row Resilient */}
-        <TabsList className="bg-[#F8F6F0] p-1.5 sm:p-2 rounded-2xl border border-[#E7DFD5] shadow-xs w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 !h-auto group-data-horizontal/tabs:!h-auto min-h-fit">
+        {/* Modern Two-Tone Segmented Control Bar */}
+        <TabsList className="bg-[#F2ECE1] p-1.5 sm:p-2 rounded-2xl border border-[#DFD5C4] shadow-inner w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 !h-auto group-data-horizontal/tabs:!h-auto min-h-fit">
           {/* 1. Overview Dashboard */}
           <TabsTrigger 
             value="dashboard" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
+            className="group bg-white hover:bg-amber-50/70 text-slate-700 hover:text-amber-950 border border-slate-200/90 hover:border-amber-300 shadow-2xs hover:shadow-xs data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-[#D4AF37] data-[state=active]:!via-amber-500 data-[state=active]:!to-[#B8962A] data-[state=active]:!text-white data-[state=active]:!border-amber-400 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-amber-400/25 py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs sm:text-sm font-bold transition-all duration-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer !h-auto min-h-[44px]"
           >
-            <LayoutDashboard className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
+            <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <LayoutDashboard className="w-4 h-4"/> 
+            </span>
             <span className="truncate">Overview Dashboard</span>
           </TabsTrigger>
 
           {/* 2. Purchasing View */}
           <TabsTrigger 
             value="purchasing" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
+            className="group bg-white hover:bg-amber-50/70 text-slate-700 hover:text-amber-950 border border-slate-200/90 hover:border-amber-300 shadow-2xs hover:shadow-xs data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-amber-500 data-[state=active]:!via-orange-500 data-[state=active]:!to-amber-600 data-[state=active]:!text-white data-[state=active]:!border-amber-400 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-amber-400/25 py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs sm:text-sm font-bold transition-all duration-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer !h-auto min-h-[44px]"
           >
-            <ShoppingCart className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
+            <span className="w-7 h-7 rounded-lg bg-amber-100 text-amber-700 flex items-center justify-center shrink-0 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <ShoppingCart className="w-4 h-4"/> 
+            </span>
             <span className="truncate">Purchasing View</span>
           </TabsTrigger>
 
           {/* 3. Warehouse View */}
           <TabsTrigger 
             value="warehouse" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
+            className="group bg-white hover:bg-blue-50/70 text-slate-700 hover:text-blue-950 border border-slate-200/90 hover:border-blue-300 shadow-2xs hover:shadow-xs data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-blue-600 data-[state=active]:!via-indigo-600 data-[state=active]:!to-blue-700 data-[state=active]:!text-white data-[state=active]:!border-blue-400 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-blue-400/25 py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs sm:text-sm font-bold transition-all duration-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer !h-auto min-h-[44px]"
           >
-            <Box className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-blue-600 text-blue-500/70 transition-colors"/> 
+            <span className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Box className="w-4 h-4"/> 
+            </span>
             <span className="truncate">Warehouse View</span>
           </TabsTrigger>
 
           {/* 4. QC View */}
           <TabsTrigger 
             value="qc" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
+            className="group bg-white hover:bg-emerald-50/70 text-slate-700 hover:text-emerald-950 border border-slate-200/90 hover:border-emerald-300 shadow-2xs hover:shadow-xs data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-emerald-600 data-[state=active]:!via-teal-600 data-[state=active]:!to-emerald-700 data-[state=active]:!text-white data-[state=active]:!border-emerald-400 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-emerald-400/25 py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs sm:text-sm font-bold transition-all duration-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer !h-auto min-h-[44px]"
           >
-            <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-emerald-600 text-emerald-500/70 transition-colors"/> 
+            <span className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Activity className="w-4 h-4"/> 
+            </span>
             <span className="truncate">QC View</span>
           </TabsTrigger>
 
           {/* 5. Planning View */}
           <TabsTrigger 
             value="planning" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px] col-span-2 sm:col-span-1"
+            className="group bg-white hover:bg-indigo-50/70 text-slate-700 hover:text-indigo-950 border border-slate-200/90 hover:border-indigo-300 shadow-2xs hover:shadow-xs data-[state=active]:!bg-gradient-to-r data-[state=active]:!from-indigo-600 data-[state=active]:!via-violet-600 data-[state=active]:!to-indigo-700 data-[state=active]:!text-white data-[state=active]:!border-indigo-400 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-indigo-400/25 py-2 sm:py-2.5 px-2.5 sm:px-3 text-xs sm:text-sm font-bold transition-all duration-200 rounded-xl flex items-center justify-center gap-2 cursor-pointer !h-auto min-h-[44px] col-span-2 sm:col-span-1"
           >
-            <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-indigo-600 text-indigo-500/70 transition-colors"/> 
+            <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 group-data-[state=active]:bg-white/20 group-data-[state=active]:text-white transition-colors">
+              <Calendar className="w-4 h-4"/> 
+            </span>
             <span className="truncate">Planning View</span>
           </TabsTrigger>
         </TabsList>
