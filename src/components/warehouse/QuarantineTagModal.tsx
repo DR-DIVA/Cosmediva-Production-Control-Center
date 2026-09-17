@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Code128Barcode, QRCodeSvg } from '@/lib/barcode';
-import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode, Maximize2, Square } from 'lucide-react';
+import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode, Maximize2, Square, AlertTriangle, ArrowLeftRight } from 'lucide-react';
 
 export interface QuarantineTagData {
   name: string;
@@ -261,8 +261,10 @@ export function QuarantineTagModal({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedSize = localStorage.getItem('quarantine_tag_label_size');
-      if (savedSize && LABEL_SIZES[savedSize]) {
+      if (savedSize && savedSize !== '75x100' && LABEL_SIZES[savedSize]) {
         setLabelSize(savedSize);
+      } else {
+        setLabelSize('100x75');
       }
       const savedZoom = localStorage.getItem('quarantine_tag_print_zoom');
       if (savedZoom && ['98', '100', '102', '104', '106'].includes(savedZoom)) {
@@ -497,6 +499,7 @@ export function QuarantineTagModal({
 
     const isRotated = ['90', '270'].includes(printRotation);
     const is180 = printRotation === '180';
+    const isAuto = printRotation === 'auto';
     const physW = isRotated ? activeSize.height : activeSize.width;
     const physH = isRotated ? activeSize.width : activeSize.height;
 
@@ -509,8 +512,8 @@ export function QuarantineTagModal({
     iframe.style.position = 'fixed';
     iframe.style.top = '-9999px';
     iframe.style.left = '-9999px';
-    iframe.style.width = `${physW}mm`;
-    iframe.style.height = `${physH}mm`;
+    iframe.style.width = isAuto ? `${activeSize.width}mm` : `${physW}mm`;
+    iframe.style.height = isAuto ? `${activeSize.height}mm` : `${physH}mm`;
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
@@ -537,53 +540,101 @@ export function QuarantineTagModal({
     const wrapperWidth = `${activeSize.width}mm`;
     const wrapperHeight = `${activeSize.height}mm`;
 
-    let pageLayoutCss = `
-      @page {
-        size: ${physW}mm ${physH}mm;
-        margin: 0;
-      }
-      html, body {
-        width: ${physW}mm;
-        height: ${physH}mm;
-        margin: 0;
-        padding: 0;
-        background: #ffffff;
-        overflow: hidden;
-      }
-      .quarantine-tag-print-page {
-        width: ${physW}mm;
-        height: ${physH}mm;
-        max-width: ${physW}mm;
-        max-height: ${physH}mm;
-        box-sizing: border-box;
-        padding: 0;
-        margin: 0;
-        page-break-after: always;
-        break-after: page;
-        page-break-inside: avoid;
-        break-inside: avoid;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: #ffffff;
-        overflow: hidden;
-      }
-      .tag-rotate-wrapper {
-        width: ${wrapperWidth};
-        height: ${wrapperHeight};
-        max-width: ${wrapperWidth};
-        max-height: ${wrapperHeight};
-        flex-shrink: 0;
-        transform: ${transformCss};
-        transform-origin: center center;
-        padding: ${effectivePaddingMm}mm;
-        box-sizing: border-box;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        overflow: hidden;
-      }
-    `;
+    let pageLayoutCss = '';
+    if (isAuto) {
+      pageLayoutCss = `
+        @page {
+          margin: 0;
+        }
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: 100%;
+          height: 100%;
+          box-sizing: border-box;
+          padding: 0;
+          margin: 0;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: ${wrapperWidth};
+          height: ${wrapperHeight};
+          max-width: 100%;
+          max-height: 100%;
+          flex-shrink: 0;
+          transform: ${zoomFactor !== 1 ? `scale(${zoomFactor})` : 'none'};
+          transform-origin: center center;
+          padding: ${effectivePaddingMm}mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          overflow: hidden;
+        }
+      `;
+    } else {
+      pageLayoutCss = `
+        @page {
+          size: ${physW}mm ${physH}mm;
+          margin: 0;
+        }
+        html, body {
+          width: ${physW}mm;
+          height: ${physH}mm;
+          margin: 0;
+          padding: 0;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .quarantine-tag-print-page {
+          width: ${physW}mm;
+          height: ${physH}mm;
+          max-width: ${physW}mm;
+          max-height: ${physH}mm;
+          box-sizing: border-box;
+          padding: 0;
+          margin: 0;
+          page-break-after: always;
+          break-after: page;
+          page-break-inside: avoid;
+          break-inside: avoid;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          background: #ffffff;
+          overflow: hidden;
+        }
+        .tag-rotate-wrapper {
+          width: ${wrapperWidth};
+          height: ${wrapperHeight};
+          max-width: ${wrapperWidth};
+          max-height: ${wrapperHeight};
+          flex-shrink: 0;
+          transform: ${transformCss};
+          transform-origin: center center;
+          padding: ${effectivePaddingMm}mm;
+          box-sizing: border-box;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+          overflow: hidden;
+        }
+      `;
+    }
 
     doc.open();
     doc.write(`
@@ -717,18 +768,18 @@ export function QuarantineTagModal({
 
   const renderLabelSizeOptions = () => (
     <>
-      <optgroup label="⭐ ยอดนิยม / แนะนำ">
-        <option value="100x75">100 x 75 มม. (แนวนอน - ใช้งานปัจจุบัน ⭐)</option>
-        <option value="100x80">100 x 80 มม. (แนวนอน - มาตรฐานเดิม)</option>
-        <option value="80x100">80 x 100 มม. (แนวตั้ง)</option>
-        <option value="75x100">75 x 100 มม. (แนวตั้ง)</option>
+      <optgroup label="⭐ แนะนำสำหรับม้วนสติกเกอร์แนวนอน (ใช้งานปัจจุบัน)">
+        <option value="100x75">100 x 75 มม. (แนวนอน - แนะนำสำหรับม้วน 100x75 ⭐)</option>
+        <option value="100x80">100 x 80 มม. (แนวนอน - ม้วนมาตรฐานเดิม)</option>
       </optgroup>
-      <optgroup label="📏 แนวนอนขนาดกลาง">
+      <optgroup label="⚠️ ม้วนสติกเกอร์ทรงสูง (แนวตั้ง - โปรดตรวจสอบก่อนเลือก)">
+        <option value="75x100">75 x 100 มม. (แนวตั้ง - กว้าง 75 x สูง 100 มม.)</option>
+        <option value="80x100">80 x 100 มม. (แนวตั้ง - กว้าง 80 x สูง 100 มม.)</option>
+      </optgroup>
+      <optgroup label="📏 สติกเกอร์แนวนอนขนาดอื่นๆ">
         <option value="80x50">80 x 50 มม. (แนวนอน)</option>
         <option value="75x50">75 x 50 มม. (แนวนอน)</option>
         <option value="70x50">70 x 50 มม. (แนวนอนกะทัดรัด)</option>
-      </optgroup>
-      <optgroup label="🏷️ ขนาดเล็ก / ขนาดใหญ่">
         <option value="50x30">50 x 30 มม. (ดวงเล็กพิเศษ)</option>
         <option value="100x100">100 x 100 มม. (สี่เหลี่ยมจัตุรัส)</option>
         <option value="100x150">100 x 150 มม. (ขนาดใหญ่ / ติดพาเลท)</option>
@@ -1002,6 +1053,23 @@ export function QuarantineTagModal({
                     </select>
                   </div>
 
+                  {/* Quick Aspect Ratio Swap Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (labelSize === '100x75') handleLabelSizeChange('75x100');
+                      else if (labelSize === '75x100') handleLabelSizeChange('100x75');
+                      else if (labelSize === '100x80') handleLabelSizeChange('80x100');
+                      else if (labelSize === '80x100') handleLabelSizeChange('100x80');
+                      else handleLabelSizeChange('100x75');
+                    }}
+                    className="px-2 py-1.5 bg-white hover:bg-amber-50 border border-slate-300 rounded-lg text-xs font-bold text-slate-700 flex items-center gap-1 shadow-2xs cursor-pointer"
+                    title="สลับสัดส่วนป้ายระหว่าง แนวนอน (100x75) กับ แนวตั้ง (75x100)"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5 text-amber-600" />
+                    <span className="hidden sm:inline">{activeSize.width > activeSize.height ? 'สลับเป็นแนวตั้ง' : 'สลับเป็นแนวนอน'}</span>
+                  </button>
+
                   {/* Print Scale / Zoom Selector */}
                   <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
                     <Maximize2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
@@ -1124,6 +1192,26 @@ export function QuarantineTagModal({
                   </div>
                 )}
               </div>
+
+              {/* Orientation Alert for Vertical Size */}
+              {activeSize.height > activeSize.width && (
+                <div className="w-full bg-amber-50 border-2 border-amber-400 text-amber-900 text-xs px-3.5 py-2.5 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-xs">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>
+                      <strong>ระวัง:</strong> กำลังเลือกขนาด <strong>แนวตั้ง ({activeSize.width} x {activeSize.height} มม.)</strong> ซึ่งจะพิมพ์ออกมาเป็นทรงสูง หากม้วนสติกเกอร์ที่เครื่องพิมพ์ของคุณเป็น <strong>แนวนอน (100 x 75 มม.)</strong> ให้กดสลับเป็นแนวนอน
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleLabelSizeChange('100x75')}
+                    className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1 rounded-lg shadow-xs cursor-pointer flex items-center gap-1"
+                  >
+                    <ArrowLeftRight className="w-3.5 h-3.5" />
+                    เปลี่ยนเป็น 100x75 แนวนอน
+                  </button>
+                </div>
+              )}
 
               {/* Physical Tag Preview Card with Ruler Dimension Guides */}
               <div className="flex flex-col items-center justify-center w-full py-2 min-h-[380px]">
@@ -1394,6 +1482,21 @@ export function QuarantineTagModal({
                 >
                   {renderLabelSizeOptions()}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (labelSize === '100x75') handleLabelSizeChange('75x100');
+                    else if (labelSize === '75x100') handleLabelSizeChange('100x75');
+                    else if (labelSize === '100x80') handleLabelSizeChange('80x100');
+                    else if (labelSize === '80x100') handleLabelSizeChange('100x80');
+                    else handleLabelSizeChange('100x75');
+                  }}
+                  className="px-1.5 py-0.5 hover:bg-amber-100 rounded text-[10px] font-bold text-amber-800 border border-amber-200 cursor-pointer flex items-center gap-1"
+                  title="สลับสัดส่วนป้ายระหว่าง แนวนอน (100x75) กับ แนวตั้ง (75x100)"
+                >
+                  <ArrowLeftRight className="w-3 h-3" />
+                  {activeSize.width > activeSize.height ? 'สลับแนวตั้ง' : 'สลับแนวนอน'}
+                </button>
               </div>
 
               {/* Print Zoom / Fullness Selector */}
@@ -1465,10 +1568,10 @@ export function QuarantineTagModal({
                   title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้าน"
                 >
                   <option value="0">แนวนอนปกติ (0°)</option>
-                  <option value="270">🔄 หมุน 270° (ทวนเข็ม - ป้ายตั้งทางซ้าย)</option>
-                  <option value="90">🔄 หมุน 90° (ตามเข็ม - ป้ายตั้งทางขวา)</option>
+                  <option value="auto">🌐 ให้เลือกใน Chrome (Auto - แก้พิมพ์ออกแนวตั้ง แนะนำ)</option>
+                  <option value="270">🔄 หมุน 270° (แก้ปัญหาเครื่องพิมพ์ออกแนวตั้ง)</option>
+                  <option value="90">🔄 หมุน 90° (ตามเข็ม)</option>
                   <option value="180">↕️ กลับหัว 180°</option>
-                  <option value="auto">🌐 ให้เลือกใน Chrome (Auto)</option>
                 </select>
               </div>
 
