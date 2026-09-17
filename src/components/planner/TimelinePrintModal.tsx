@@ -463,7 +463,7 @@ export function TimelinePrintModal({
           </div>
 
           {/* Interactive Print Options Toolbar */}
-          <div className="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          <div className="mt-4 pt-3 border-t border-slate-200 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
             {/* 1. Lookahead Horizon */}
             <div className="space-y-1">
               <Label className="text-[11px] font-bold text-slate-700">ช่วงเวลา (Horizon)</Label>
@@ -486,7 +486,7 @@ export function TimelinePrintModal({
                 type="date"
                 value={startDateStr}
                 onChange={e => setStartDateStr(e.target.value)}
-                className="h-8 text-xs bg-white"
+                className="h-8 text-xs bg-white px-2"
               />
             </div>
 
@@ -553,7 +553,26 @@ export function TimelinePrintModal({
               </Button>
             </div>
 
-            {/* 7. Quick Search / Filter */}
+            {/* 7. Document Sign-off Box Toggle */}
+            <div className="space-y-1">
+              <Label className="text-[11px] font-bold text-slate-700">ช่องลงนามอนุมัติ</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIncludeSignatures(!includeSignatures)}
+                className={cn(
+                  "w-full h-8 text-xs font-semibold justify-start px-2 bg-white",
+                  includeSignatures ? "border-emerald-300 text-emerald-800 bg-emerald-50" : "text-slate-600"
+                )}
+                title="ผู้จัดทำแผนงาน (Planner) / หัวหน้าฝ่ายผลิต / ฝ่ายประกันคุณภาพ (QA) และ ผู้อำนวยการโรงงาน"
+              >
+                {includeSignatures ? <CheckCircle2 className="w-3.5 h-3.5 mr-1 text-emerald-600 shrink-0" /> : <EyeOff className="w-3.5 h-3.5 mr-1 text-slate-400 shrink-0" />}
+                <span className="truncate">{includeSignatures ? "เปิดช่องลงชื่อ" : "ปิดช่องลงชื่อ"}</span>
+              </Button>
+            </div>
+
+            {/* 8. Quick Search / Filter */}
             <div className="space-y-1">
               <Label className="text-[11px] font-bold text-slate-700">ค้นหา SKU/LOT</Label>
               <div className="relative">
@@ -873,7 +892,7 @@ export function TimelinePrintModal({
                     </div>
 
                     <div className="signature-col flex-1 border-t border-slate-400 pt-1">
-                      <div className="text-xs font-bold text-slate-900">ฝ่ายประกันคุณภาพ (QA) / ผู้จัดการโรงงาน</div>
+                      <div className="text-xs font-bold text-slate-900">ฝ่ายประกันคุณภาพ (QA) / ผู้อำนวยการโรงงาน</div>
                       <div className="text-[10px] text-slate-500 mt-0.5">(...................................................)</div>
                       <div className="text-[9.5px] text-slate-400 mt-1">วันที่: ..... / ..... / ..........</div>
                     </div>
