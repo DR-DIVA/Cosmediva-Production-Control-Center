@@ -27,6 +27,197 @@ export interface QuarantineTagData {
   docRev?: string;
 }
 
+export interface LabelSizeConfig {
+  id: string;
+  name: string;
+  width: number; // mm
+  height: number; // mm
+  category: 'popular' | 'standard' | 'small' | 'large';
+  paddingMm: number;
+  headerFontSize: string;
+  bodyFontSize: string;
+  bodyLineHeight: number;
+  labelColWidth: string;
+  bannerFontSize: string;
+  revFontSize: string;
+  qrSize: number;
+  barcodeHeight: number;
+  barcodeWidth: number;
+}
+
+export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
+  '100x75': {
+    id: '100x75',
+    name: '100 x 75 มม. (แนวนอน - ใช้งานปัจจุบัน ⭐)',
+    width: 100,
+    height: 75,
+    category: 'popular',
+    paddingMm: 1.5,
+    headerFontSize: '11.5pt',
+    bodyFontSize: '8pt',
+    bodyLineHeight: 1.25,
+    labelColWidth: '65px',
+    bannerFontSize: '10pt',
+    revFontSize: '6.5pt',
+    qrSize: 26,
+    barcodeHeight: 20,
+    barcodeWidth: 130
+  },
+  '100x80': {
+    id: '100x80',
+    name: '100 x 80 มม. (แนวนอน - มาตรฐานเดิม)',
+    width: 100,
+    height: 80,
+    category: 'popular',
+    paddingMm: 2.5,
+    headerFontSize: '13pt',
+    bodyFontSize: '9pt',
+    bodyLineHeight: 1.35,
+    labelColWidth: '72px',
+    bannerFontSize: '11pt',
+    revFontSize: '7.5pt',
+    qrSize: 30,
+    barcodeHeight: 22,
+    barcodeWidth: 140
+  },
+  '80x100': {
+    id: '80x100',
+    name: '80 x 100 มม. (แนวตั้ง)',
+    width: 80,
+    height: 100,
+    category: 'popular',
+    paddingMm: 2,
+    headerFontSize: '12pt',
+    bodyFontSize: '8.5pt',
+    bodyLineHeight: 1.3,
+    labelColWidth: '60px',
+    bannerFontSize: '10.5pt',
+    revFontSize: '7pt',
+    qrSize: 28,
+    barcodeHeight: 20,
+    barcodeWidth: 120
+  },
+  '75x100': {
+    id: '75x100',
+    name: '75 x 100 มม. (แนวตั้ง)',
+    width: 75,
+    height: 100,
+    category: 'popular',
+    paddingMm: 1.8,
+    headerFontSize: '11.5pt',
+    bodyFontSize: '8pt',
+    bodyLineHeight: 1.25,
+    labelColWidth: '58px',
+    bannerFontSize: '10pt',
+    revFontSize: '6.5pt',
+    qrSize: 26,
+    barcodeHeight: 18,
+    barcodeWidth: 110
+  },
+  '80x50': {
+    id: '80x50',
+    name: '80 x 50 มม. (แนวนอน)',
+    width: 80,
+    height: 50,
+    category: 'standard',
+    paddingMm: 1.2,
+    headerFontSize: '10pt',
+    bodyFontSize: '7pt',
+    bodyLineHeight: 1.18,
+    labelColWidth: '50px',
+    bannerFontSize: '8.5pt',
+    revFontSize: '5.5pt',
+    qrSize: 22,
+    barcodeHeight: 15,
+    barcodeWidth: 100
+  },
+  '75x50': {
+    id: '75x50',
+    name: '75 x 50 มม. (แนวนอน)',
+    width: 75,
+    height: 50,
+    category: 'standard',
+    paddingMm: 1.2,
+    headerFontSize: '9.5pt',
+    bodyFontSize: '6.8pt',
+    bodyLineHeight: 1.15,
+    labelColWidth: '48px',
+    bannerFontSize: '8.5pt',
+    revFontSize: '5.5pt',
+    qrSize: 21,
+    barcodeHeight: 15,
+    barcodeWidth: 95
+  },
+  '70x50': {
+    id: '70x50',
+    name: '70 x 50 มม. (แนวนอนกะทัดรัด)',
+    width: 70,
+    height: 50,
+    category: 'standard',
+    paddingMm: 1.2,
+    headerFontSize: '9pt',
+    bodyFontSize: '6.5pt',
+    bodyLineHeight: 1.15,
+    labelColWidth: '46px',
+    bannerFontSize: '8pt',
+    revFontSize: '5.5pt',
+    qrSize: 20,
+    barcodeHeight: 14,
+    barcodeWidth: 90
+  },
+  '50x30': {
+    id: '50x30',
+    name: '50 x 30 มม. (ดวงเล็กพิเศษ)',
+    width: 50,
+    height: 30,
+    category: 'small',
+    paddingMm: 0.8,
+    headerFontSize: '7pt',
+    bodyFontSize: '4.8pt',
+    bodyLineHeight: 1.1,
+    labelColWidth: '32px',
+    bannerFontSize: '6pt',
+    revFontSize: '4.2pt',
+    qrSize: 15,
+    barcodeHeight: 10,
+    barcodeWidth: 65
+  },
+  '100x100': {
+    id: '100x100',
+    name: '100 x 100 มม. (สี่เหลี่ยมจัตุรัส)',
+    width: 100,
+    height: 100,
+    category: 'large',
+    paddingMm: 2.5,
+    headerFontSize: '14pt',
+    bodyFontSize: '9.5pt',
+    bodyLineHeight: 1.4,
+    labelColWidth: '75px',
+    bannerFontSize: '12pt',
+    revFontSize: '8pt',
+    qrSize: 34,
+    barcodeHeight: 24,
+    barcodeWidth: 150
+  },
+  '100x150': {
+    id: '100x150',
+    name: '100 x 150 มม. (ขนาดใหญ่ / ติดพาเลท)',
+    width: 100,
+    height: 150,
+    category: 'large',
+    paddingMm: 3,
+    headerFontSize: '16pt',
+    bodyFontSize: '11pt',
+    bodyLineHeight: 1.5,
+    labelColWidth: '85px',
+    bannerFontSize: '14pt',
+    revFontSize: '9pt',
+    qrSize: 45,
+    barcodeHeight: 30,
+    barcodeWidth: 170
+  }
+};
+
 interface QuarantineTagModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -62,6 +253,26 @@ export function QuarantineTagModal({
   const [printPaperMode, setPrintPaperMode] = useState<'sticker' | 'a4'>('sticker');
   const [previewScale, setPreviewScale] = useState<'actual' | 'large'>('actual');
   const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('0');
+  const [labelSize, setLabelSize] = useState<string>('100x75');
+
+  // Load saved label size preference (defaults to 100x75)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedSize = localStorage.getItem('quarantine_tag_label_size');
+      if (savedSize && LABEL_SIZES[savedSize]) {
+        setLabelSize(savedSize);
+      }
+    }
+  }, []);
+
+  const handleLabelSizeChange = (val: string) => {
+    setLabelSize(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quarantine_tag_label_size', val);
+    }
+  };
+
+  const activeSize = LABEL_SIZES[labelSize] || LABEL_SIZES['100x75'];
 
   // Load saved printer rotation preference
   useEffect(() => {
@@ -239,7 +450,7 @@ export function QuarantineTagModal({
 
   const printContainerRef = useRef<HTMLDivElement>(null);
 
-  // Print handler via isolated iframe to ensure ONLY the 100x80mm tags print without background website
+  // Print handler via isolated iframe to ensure ONLY the tag prints without background website
   const handlePrint = () => {
     if (onSavedMetadata) {
       onSavedMetadata({
@@ -258,6 +469,11 @@ export function QuarantineTagModal({
       return;
     }
 
+    const isRotated = ['90', '270'].includes(printRotation);
+    const is180 = printRotation === '180';
+    const physW = isRotated ? activeSize.height : activeSize.width;
+    const physH = isRotated ? activeSize.width : activeSize.height;
+
     // Clean up any existing iframe
     const existingFrame = document.getElementById('quarantine-print-iframe');
     if (existingFrame) existingFrame.remove();
@@ -267,8 +483,8 @@ export function QuarantineTagModal({
     iframe.style.position = 'fixed';
     iframe.style.top = '-9999px';
     iframe.style.left = '-9999px';
-    iframe.style.width = '100mm';
-    iframe.style.height = '80mm';
+    iframe.style.width = `${physW}mm`;
+    iframe.style.height = `${physH}mm`;
     iframe.style.border = 'none';
     document.body.appendChild(iframe);
 
@@ -281,25 +497,26 @@ export function QuarantineTagModal({
     const contentHtml = container.innerHTML;
 
     let pageLayoutCss = '';
-    if (printRotation === '90') {
+    if (isRotated) {
+      const angle = printRotation === '90' ? '90deg' : '270deg';
       pageLayoutCss = `
         @page {
-          size: 80mm 100mm;
+          size: ${physW}mm ${physH}mm;
           margin: 0;
         }
         html, body {
-          width: 80mm;
-          height: 100mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
           margin: 0;
           padding: 0;
           background: #ffffff;
           overflow: hidden;
         }
         .quarantine-tag-print-page {
-          width: 80mm;
-          height: 100mm;
-          max-width: 80mm;
-          max-height: 100mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
+          max-width: ${physW}mm;
+          max-height: ${physH}mm;
           box-sizing: border-box;
           padding: 0;
           page-break-after: always;
@@ -313,37 +530,38 @@ export function QuarantineTagModal({
           overflow: hidden;
         }
         .tag-rotate-wrapper {
-          width: 100mm;
-          height: 80mm;
+          width: ${activeSize.width}mm;
+          height: ${activeSize.height}mm;
           flex-shrink: 0;
-          transform: rotate(90deg);
+          transform: rotate(${angle});
           transform-origin: center center;
-          padding: 2.5mm;
+          padding: ${activeSize.paddingMm}mm;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          overflow: hidden;
         }
       `;
-    } else if (printRotation === '270') {
+    } else if (is180) {
       pageLayoutCss = `
         @page {
-          size: 80mm 100mm;
+          size: ${physW}mm ${physH}mm;
           margin: 0;
         }
         html, body {
-          width: 80mm;
-          height: 100mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
           margin: 0;
           padding: 0;
           background: #ffffff;
           overflow: hidden;
         }
         .quarantine-tag-print-page {
-          width: 80mm;
-          height: 100mm;
-          max-width: 80mm;
-          max-height: 100mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
+          max-width: ${physW}mm;
+          max-height: ${physH}mm;
           box-sizing: border-box;
           padding: 0;
           page-break-after: always;
@@ -357,60 +575,17 @@ export function QuarantineTagModal({
           overflow: hidden;
         }
         .tag-rotate-wrapper {
-          width: 100mm;
-          height: 80mm;
-          flex-shrink: 0;
-          transform: rotate(270deg);
-          transform-origin: center center;
-          padding: 2.5mm;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-      `;
-    } else if (printRotation === '180') {
-      pageLayoutCss = `
-        @page {
-          size: 100mm 80mm;
-          margin: 0;
-        }
-        html, body {
-          width: 100mm;
-          height: 80mm;
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .quarantine-tag-print-page {
-          width: 100mm;
-          height: 80mm;
-          max-width: 100mm;
-          max-height: 80mm;
-          box-sizing: border-box;
-          padding: 0;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .tag-rotate-wrapper {
-          width: 100mm;
-          height: 80mm;
+          width: ${activeSize.width}mm;
+          height: ${activeSize.height}mm;
           flex-shrink: 0;
           transform: rotate(180deg);
           transform-origin: center center;
-          padding: 2.5mm;
+          padding: ${activeSize.paddingMm}mm;
           box-sizing: border-box;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          overflow: hidden;
         }
       `;
     } else if (printRotation === 'auto') {
@@ -422,14 +597,15 @@ export function QuarantineTagModal({
           margin: 0;
           padding: 0;
           background: #ffffff;
+          overflow: hidden;
         }
         .quarantine-tag-print-page {
-          width: 100mm;
-          height: 80mm;
-          max-width: 100mm;
-          max-height: 80mm;
+          width: ${activeSize.width}mm;
+          height: ${activeSize.height}mm;
+          max-width: ${activeSize.width}mm;
+          max-height: ${activeSize.height}mm;
           box-sizing: border-box;
-          padding: 2.5mm;
+          padding: ${activeSize.paddingMm}mm;
           page-break-after: always;
           break-after: page;
           page-break-inside: avoid;
@@ -446,30 +622,31 @@ export function QuarantineTagModal({
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          overflow: hidden;
         }
       `;
     } else {
       // printRotation === '0'
       pageLayoutCss = `
         @page {
-          size: 100mm 80mm;
+          size: ${physW}mm ${physH}mm;
           margin: 0;
         }
         html, body {
-          width: 100mm;
-          height: 80mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
           margin: 0;
           padding: 0;
           background: #ffffff;
           overflow: hidden;
         }
         .quarantine-tag-print-page {
-          width: 100mm;
-          height: 80mm;
-          max-width: 100mm;
-          max-height: 80mm;
+          width: ${physW}mm;
+          height: ${physH}mm;
+          max-width: ${physW}mm;
+          max-height: ${physH}mm;
           box-sizing: border-box;
-          padding: 2.5mm;
+          padding: ${activeSize.paddingMm}mm;
           page-break-after: always;
           break-after: page;
           page-break-inside: avoid;
@@ -486,6 +663,7 @@ export function QuarantineTagModal({
           display: flex;
           flex-direction: column;
           justify-content: space-between;
+          overflow: hidden;
         }
       `;
     }
@@ -517,29 +695,32 @@ export function QuarantineTagModal({
             .tag-border {
               width: 100%;
               height: 100%;
-              border: 2px solid #000000;
+              border: 1.5px solid #000000;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
               box-sizing: border-box;
+              overflow: hidden;
             }
             .tag-header {
-              border-bottom: 2px solid #000000;
+              border-bottom: 1.5px solid #000000;
               text-align: center;
               font-weight: bold;
               letter-spacing: 1px;
-              padding: 3px 0;
-              font-size: 13pt;
+              padding: 2px 0;
+              font-size: ${activeSize.headerFontSize};
               text-transform: uppercase;
+              flex-shrink: 0;
             }
             .tag-body {
               flex: 1;
-              padding: 6px 10px;
+              padding: 3px 6px;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
-              font-size: 9pt;
-              line-height: 1.35;
+              font-size: ${activeSize.bodyFontSize};
+              line-height: ${activeSize.bodyLineHeight};
+              overflow: hidden;
             }
             .tag-row {
               display: flex;
@@ -551,19 +732,20 @@ export function QuarantineTagModal({
               align-items: flex-start;
             }
             .label-col {
-              width: 72px;
+              width: ${activeSize.labelColWidth};
               font-weight: bold;
               flex-shrink: 0;
-              font-size: 9.5pt;
+              font-size: ${activeSize.bodyFontSize};
             }
             .colon-col {
-              width: 10px;
+              width: 8px;
               text-align: center;
               flex-shrink: 0;
             }
             .val-col {
               flex: 1;
-              font-size: 9pt;
+              font-size: ${activeSize.bodyFontSize};
+              min-width: 0;
             }
             .val-bold {
               font-weight: bold;
@@ -573,20 +755,22 @@ export function QuarantineTagModal({
               font-weight: bold;
             }
             .tag-banner {
-              border-top: 2px solid #000000;
+              border-top: 1.5px solid #000000;
               text-align: center;
               font-weight: bold;
               letter-spacing: 0.5px;
-              padding: 3px 0;
-              font-size: 11pt;
+              padding: 2px 0;
+              font-size: ${activeSize.bannerFontSize};
+              flex-shrink: 0;
             }
             .tag-rev {
               border-top: 1px solid #000000;
               text-align: center;
-              font-size: 7.5pt;
+              font-size: ${activeSize.revFontSize};
               font-family: monospace;
-              padding: 2px 0;
+              padding: 1.5px 0;
               color: #000000;
+              flex-shrink: 0;
             }
           </style>
         </head>
@@ -614,6 +798,27 @@ export function QuarantineTagModal({
     }, 400);
   };
 
+  const renderLabelSizeOptions = () => (
+    <>
+      <optgroup label="⭐ ยอดนิยม / แนะนำ">
+        <option value="100x75">100 x 75 มม. (แนวนอน - ใช้งานปัจจุบัน ⭐)</option>
+        <option value="100x80">100 x 80 มม. (แนวนอน - มาตรฐานเดิม)</option>
+        <option value="80x100">80 x 100 มม. (แนวตั้ง)</option>
+        <option value="75x100">75 x 100 มม. (แนวตั้ง)</option>
+      </optgroup>
+      <optgroup label="📏 แนวนอนขนาดกลาง">
+        <option value="80x50">80 x 50 มม. (แนวนอน)</option>
+        <option value="75x50">75 x 50 มม. (แนวนอน)</option>
+        <option value="70x50">70 x 50 มม. (แนวนอนกะทัดรัด)</option>
+      </optgroup>
+      <optgroup label="🏷️ ขนาดเล็ก / ขนาดใหญ่">
+        <option value="50x30">50 x 30 มม. (ดวงเล็กพิเศษ)</option>
+        <option value="100x100">100 x 100 มม. (สี่เหลี่ยมจัตุรัส)</option>
+        <option value="100x150">100 x 150 มม. (ขนาดใหญ่ / ติดพาเลท)</option>
+      </optgroup>
+    </>
+  );
+
   if (!open) return null;
 
   return (
@@ -625,7 +830,7 @@ export function QuarantineTagModal({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <DialogTitle className="flex items-center gap-2 text-slate-800 text-lg font-bold">
                 <Package className="w-5 h-5 text-amber-600" />
-                พิมพ์ป้าย Quarantine Tag (กักกัน 100 x 80 มม.)
+                พิมพ์ป้าย Quarantine Tag (กักกัน {activeSize.width} x {activeSize.height} มม.)
               </DialogTitle>
               <div className="flex items-center gap-2">
                 <span className="text-xs text-slate-500 hidden sm:inline">แบบฟอร์ม GMP คอสเมดิวา</span>
@@ -860,12 +1065,26 @@ export function QuarantineTagModal({
                 <div className="flex items-center gap-1.5">
                   <span className="text-xs font-bold text-slate-800 flex items-center gap-1">
                     <Sparkles className="w-4 h-4 text-amber-600" />
-                    ตัวอย่างป้ายสติกเกอร์ (100 x 80 มม.)
+                    ตัวอย่างป้าย ({activeSize.width} x {activeSize.height} มม.)
                   </span>
                 </div>
 
-                {/* Scale Switcher & Rotation Button */}
+                {/* Size, Scale Switcher, Rotation & Code Type */}
                 <div className="flex flex-wrap items-center gap-1.5">
+                  {/* Label Size Dropdown */}
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
+                    <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ขนาดป้าย:</span>
+                    <select
+                      value={labelSize}
+                      onChange={(e) => handleLabelSizeChange(e.target.value)}
+                      className="font-bold text-xs bg-amber-50 text-amber-900 border border-amber-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                      title="เลือกขนาดสติกเกอร์ที่ต้องการพิมพ์"
+                    >
+                      {renderLabelSizeOptions()}
+                    </select>
+                  </div>
+
                   <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs shadow-xs">
                     <button
                       type="button"
@@ -875,9 +1094,9 @@ export function QuarantineTagModal({
                           ? 'bg-amber-600 text-white shadow-xs'
                           : 'text-slate-600 hover:bg-slate-100'
                       }`}
-                      title="แสดงขนาดตามสัดส่วนจริง 100 x 80 มม."
+                      title={`แสดงขนาดตามสัดส่วนจริง ${activeSize.width} x ${activeSize.height} มม.`}
                     >
-                      📏 ขนาดจริง 100x80 มม.
+                      📏 {activeSize.width}x{activeSize.height} มม.
                     </button>
                     <button
                       type="button"
@@ -889,7 +1108,7 @@ export function QuarantineTagModal({
                       }`}
                       title="ขยายขนาดใหญ่เพื่ออ่านชัดเจนเต็มหน้าต่าง"
                     >
-                      🔍 ขยายใหญ่เต็มตา
+                      🔍 ขยายใหญ่
                     </button>
                   </div>
 
@@ -908,7 +1127,7 @@ export function QuarantineTagModal({
                     title="คลิกเพื่อหมุนทิศทางภาพป้าย (0° -> 90° -> 180° -> 270°)"
                   >
                     <RotateCw className="w-3.5 h-3.5 text-inherit" />
-                    หมุนภาพ ({printRotation === '0' ? '0° แนวนอนปกติ' : `${printRotation}°`})
+                    หมุน ({printRotation === '0' ? '0°' : `${printRotation}°`})
                   </button>
 
                   {/* Code Type Switcher Button */}
@@ -926,7 +1145,7 @@ export function QuarantineTagModal({
                     title="สลับรูปแบบโค้ด (QR Code -> Barcode -> ซ่อนโค้ด)"
                   >
                     <QrCode className="w-3.5 h-3.5 text-inherit" />
-                    {codeType === 'qrcode' ? 'QR Code (แนะนำ)' : codeType === 'barcode' ? 'Barcode' : 'ไม่แสดงโค้ด'}
+                    {codeType === 'qrcode' ? 'QR Code' : codeType === 'barcode' ? 'Barcode' : 'ไม่แสดงโค้ด'}
                   </button>
                 </div>
 
@@ -962,8 +1181,8 @@ export function QuarantineTagModal({
                   <span>◄</span>
                   <span className="border-b border-dashed border-slate-400 px-6 font-bold text-slate-700">
                     {['90', '270'].includes(printRotation)
-                      ? 'ความกว้างป้ายหลังหมุน: 80 มม. (8 ซม.)'
-                      : 'ความกว้างสติ๊กเกอร์: 100 มม. (10 ซม.)'}
+                      ? `ความกว้างป้ายหลังหมุน: ${activeSize.height} มม.`
+                      : `ความกว้างสติกเกอร์: ${activeSize.width} มม.`}
                   </span>
                   <span>►</span>
                 </div>
@@ -974,187 +1193,210 @@ export function QuarantineTagModal({
                     <span>◄</span>
                     <span className="border-l border-dashed border-slate-400 py-6 font-bold text-slate-700">
                       {['90', '270'].includes(printRotation)
-                        ? 'ความสูงหลังหมุน: 100 มม. (10 ซม.)'
-                        : 'ความสูงสติ๊กเกอร์: 80 มม. (8 ซม.)'}
+                        ? `ความสูงหลังหมุน: ${activeSize.width} มม.`
+                        : `ความสูงสติกเกอร์: ${activeSize.height} มม.`}
                     </span>
                     <span>►</span>
                   </div>
 
                   {/* Outer Frame that adjusts bounding box when rotated */}
-                  <div 
-                    className="flex items-center justify-center transition-all duration-300"
-                    style={
-                      ['90', '270'].includes(printRotation)
-                        ? previewScale === 'actual'
-                          ? { width: '80mm', height: '100mm' }
-                          : { width: '416px', height: '520px' }
-                        : previewScale === 'actual'
-                          ? { width: '100mm', height: '80mm' }
-                          : { width: '520px', height: '416px' }
-                    }
-                  >
-                    {/* Physical Tag Preview */}
-                    <div 
-                      className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-2xl transition-transform duration-300 origin-center"
-                      style={{
-                        ...(previewScale === 'actual' ? {
-                          width: '100mm',
-                          height: '80mm',
-                          minWidth: '100mm',
-                          minHeight: '80mm',
-                          maxWidth: '100mm',
-                          maxHeight: '80mm',
-                          boxSizing: 'border-box',
-                          fontSize: '9.5pt',
-                          lineHeight: 1.3
-                        } : {
-                          width: '520px',
-                          height: '416px',
-                          maxWidth: '100%',
-                          boxSizing: 'border-box',
-                          fontSize: '13px',
-                          lineHeight: 1.35
-                        }),
-                        transform:
-                          printRotation === '90'
-                            ? 'rotate(90deg)'
-                            : printRotation === '270'
-                            ? 'rotate(270deg)'
-                            : printRotation === '180'
-                            ? 'rotate(180deg)'
-                            : 'none'
-                      }}
-                    >
-                    {/* Tag Header */}
-                    <div className="border-b-2 border-black text-center font-bold tracking-wider py-1 text-sm sm:text-base uppercase bg-white">
-                      COSMEDIVA
-                    </div>
+                  {(() => {
+                    const isRot = ['90', '270'].includes(printRotation);
+                    const dispW = isRot ? activeSize.height : activeSize.width;
+                    const dispH = isRot ? activeSize.width : activeSize.height;
+                    const largeBaseW = 460;
+                    const largeBaseH = Math.round((largeBaseW * activeSize.height) / activeSize.width);
+                    const largeDispW = isRot ? largeBaseH : largeBaseW;
+                    const largeDispH = isRot ? largeBaseW : largeBaseH;
 
-                    {/* Tag Body */}
-                    <div className="flex-1 p-2 sm:p-2.5 flex flex-col justify-between font-medium space-y-1">
-                      {/* Name */}
-                      <div className="flex items-start">
-                        <span className="w-24 font-bold shrink-0">Name</span>
-                        <span className="w-3 text-center shrink-0">:</span>
-                        <span className="flex-1 font-bold line-clamp-2 leading-tight">
-                          {name || '-'}
-                        </span>
-                      </div>
-
-                      {/* Code */}
-                      <div className="flex items-center">
-                        <span className="w-24 font-bold shrink-0">Code</span>
-                        <span className="w-3 text-center shrink-0">:</span>
-                        <span className="flex-1 font-mono font-bold tracking-tight">
-                          {code || '-'}
-                        </span>
-                      </div>
-
-                      {/* Control No. + Barcode */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center flex-1 min-w-0">
-                          <span className="w-24 font-bold shrink-0">Control No.</span>
-                          <span className="w-3 text-center shrink-0">:</span>
-                          <span className="font-mono font-bold text-xs sm:text-sm tracking-tight text-purple-950 truncate">
-                            {controlNo || '-'}
-                          </span>
-                        </div>
-                        {controlNo && codeType !== 'none' && (
-                          <div className="shrink-0 pl-1 flex items-center">
-                            {codeType === 'qrcode' ? (
-                              <QRCodeSvg value={controlNo} size={previewScale === 'actual' ? 32 : 36} />
-                            ) : (
-                              <Code128Barcode value={controlNo} height={22} width={previewScale === 'actual' ? 140 : 160} />
-                            )}
+                    return (
+                      <div 
+                        className="flex items-center justify-center transition-all duration-300"
+                        style={
+                          previewScale === 'actual'
+                            ? { width: `${dispW}mm`, height: `${dispH}mm` }
+                            : { width: `${largeDispW}px`, height: `${largeDispH}px` }
+                        }
+                      >
+                        {/* Physical Tag Preview */}
+                        <div 
+                          className="bg-white text-black font-sans border-2 border-black flex flex-col justify-between select-none shadow-2xl transition-transform duration-300 origin-center"
+                          style={{
+                            ...(previewScale === 'actual' ? {
+                              width: `${activeSize.width}mm`,
+                              height: `${activeSize.height}mm`,
+                              minWidth: `${activeSize.width}mm`,
+                              minHeight: `${activeSize.height}mm`,
+                              maxWidth: `${activeSize.width}mm`,
+                              maxHeight: `${activeSize.height}mm`,
+                              boxSizing: 'border-box',
+                              fontSize: activeSize.bodyFontSize,
+                              lineHeight: activeSize.bodyLineHeight
+                            } : {
+                              width: `${largeBaseW}px`,
+                              height: `${largeBaseH}px`,
+                              maxWidth: '100%',
+                              boxSizing: 'border-box',
+                              fontSize: '12px',
+                              lineHeight: 1.35
+                            }),
+                            transform:
+                              printRotation === '90'
+                                ? 'rotate(90deg)'
+                                : printRotation === '270'
+                                ? 'rotate(270deg)'
+                                : printRotation === '180'
+                                ? 'rotate(180deg)'
+                                : 'none'
+                          }}
+                        >
+                          {/* Tag Header */}
+                          <div 
+                            className="border-b-2 border-black text-center font-bold tracking-wider py-1 uppercase bg-white"
+                            style={{ fontSize: previewScale === 'actual' ? activeSize.headerFontSize : '14px' }}
+                          >
+                            COSMEDIVA
                           </div>
-                        )}
-                      </div>
 
-                      {/* Supplier + Lot */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center flex-1 min-w-0">
-                          <span className="w-24 font-bold shrink-0">Supplier</span>
-                          <span className="w-3 text-center shrink-0">:</span>
-                          <span className="font-medium truncate">{supplier || '-'}</span>
-                        </div>
-                        <span className="font-medium shrink-0 text-slate-700 pl-2">
-                          Lot.{mfgLot || '-'}
-                        </span>
-                      </div>
+                          {/* Tag Body */}
+                          <div 
+                            className="flex-1 p-2 sm:p-2.5 flex flex-col justify-between font-medium space-y-0.5"
+                            style={{ 
+                              fontSize: previewScale === 'actual' ? activeSize.bodyFontSize : '12px',
+                              lineHeight: previewScale === 'actual' ? activeSize.bodyLineHeight : 1.3 
+                            }}
+                          >
+                            {/* Name */}
+                            <div className="flex items-start">
+                              <span className="w-20 font-bold shrink-0">Name</span>
+                              <span className="w-2.5 text-center shrink-0">:</span>
+                              <span className="flex-1 font-bold line-clamp-2 leading-tight">
+                                {name || '-'}
+                              </span>
+                            </div>
 
-                      {/* Total Qty + Package Breakdown */}
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center">
-                          <span className="w-24 font-bold shrink-0">Total Qty.</span>
-                          <span className="w-3 text-center shrink-0">:</span>
-                          <span className="font-bold">{totalQty ? Number(totalQty).toLocaleString() : 0}{unit}</span>
-                        </div>
-                        <span className="font-bold text-slate-900 text-[11px] sm:text-xs shrink-0">
-                          ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
-                        </span>
-                      </div>
-
-                      {/* Qty./unit + of N */}
-                      {(() => {
-                        const isOddPreview = previewIndex > boxCount;
-                        const currentBoxQty = isOddPreview
-                          ? (oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0)
-                          : (qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0));
-                        return (
-                          <div className="flex items-center justify-between gap-2">
+                            {/* Code */}
                             <div className="flex items-center">
-                              <span className="w-24 font-bold shrink-0">Qty./unit</span>
-                              <span className="w-3 text-center shrink-0">:</span>
-                              <span className="font-bold">
-                                {currentBoxQty} {unit}
-                                {isOddPreview && (
-                                  <span className="ml-1.5 text-[10px] bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">
-                                    {effectivePackageType}เศษ
-                                  </span>
-                                )}
+                              <span className="w-20 font-bold shrink-0">Code</span>
+                              <span className="w-2.5 text-center shrink-0">:</span>
+                              <span className="flex-1 font-mono font-bold tracking-tight">
+                                {code || '-'}
                               </span>
                             </div>
-                            <div className="flex items-center font-bold text-xs sm:text-sm">
-                              <span className="text-slate-600 font-normal mr-2">of</span>
-                              <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono">
-                                {printAllSequence ? previewIndex : 1}
+
+                            {/* Control No. + Barcode */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center flex-1 min-w-0">
+                                <span className="w-20 font-bold shrink-0">Control No.</span>
+                                <span className="w-2.5 text-center shrink-0">:</span>
+                                <span className="font-mono font-bold text-xs sm:text-sm tracking-tight text-purple-950 truncate">
+                                  {controlNo || '-'}
+                                </span>
+                              </div>
+                              {controlNo && codeType !== 'none' && (
+                                <div className="shrink-0 pl-1 flex items-center">
+                                  {codeType === 'qrcode' ? (
+                                    <QRCodeSvg value={controlNo} size={previewScale === 'actual' ? activeSize.qrSize : Math.round(activeSize.qrSize * 1.3)} />
+                                  ) : (
+                                    <Code128Barcode value={controlNo} height={previewScale === 'actual' ? activeSize.barcodeHeight : Math.round(activeSize.barcodeHeight * 1.2)} width={previewScale === 'actual' ? activeSize.barcodeWidth : Math.round(activeSize.barcodeWidth * 1.2)} />
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Supplier + Lot */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center flex-1 min-w-0">
+                                <span className="w-20 font-bold shrink-0">Supplier</span>
+                                <span className="w-2.5 text-center shrink-0">:</span>
+                                <span className="font-medium truncate">{supplier || '-'}</span>
+                              </div>
+                              <span className="font-medium shrink-0 text-slate-700 pl-1 text-[10px] sm:text-xs">
+                                Lot.{mfgLot || '-'}
                               </span>
-                              <span className="mx-1 text-slate-400">/</span>
-                              <span className="font-mono">{totalBoxCount}</span>
+                            </div>
+
+                            {/* Total Qty + Package Breakdown */}
+                            <div className="flex items-center justify-between gap-1.5">
+                              <div className="flex items-center">
+                                <span className="w-20 font-bold shrink-0">Total Qty.</span>
+                                <span className="w-2.5 text-center shrink-0">:</span>
+                                <span className="font-bold">{totalQty ? Number(totalQty).toLocaleString() : 0}{unit}</span>
+                              </div>
+                              <span className="font-bold text-slate-900 text-[10px] sm:text-xs shrink-0">
+                                ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
+                              </span>
+                            </div>
+
+                            {/* Qty./unit + of N */}
+                            {(() => {
+                              const isOddPreview = previewIndex > boxCount;
+                              const currentBoxQty = isOddPreview
+                                ? (oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0)
+                                : (qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0));
+                              return (
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <div className="flex items-center">
+                                    <span className="w-20 font-bold shrink-0">Qty./unit</span>
+                                    <span className="w-2.5 text-center shrink-0">:</span>
+                                    <span className="font-bold">
+                                      {currentBoxQty} {unit}
+                                      {isOddPreview && (
+                                        <span className="ml-1 text-[9px] bg-amber-100 text-amber-900 px-1 py-0.5 rounded border border-amber-300">
+                                          {effectivePackageType}เศษ
+                                        </span>
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center font-bold text-xs sm:text-sm">
+                                    <span className="text-slate-600 font-normal mr-1.5">of</span>
+                                    <span className="px-1.5 py-0.5 bg-slate-100 border border-slate-300 rounded font-mono">
+                                      {printAllSequence ? previewIndex : 1}
+                                    </span>
+                                    <span className="mx-1 text-slate-400">/</span>
+                                    <span className="font-mono">{totalBoxCount}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+
+                            {/* Received by + Date */}
+                            <div className="flex items-center justify-between gap-1.5 pt-0.5">
+                              <div className="flex items-center flex-1 min-w-0">
+                                <span className="w-20 font-bold shrink-0">Received by</span>
+                                <span className="w-2.5 text-center shrink-0">:</span>
+                                <span className="font-medium truncate">{receivedBy || '-'}</span>
+                              </div>
+                              <span className="font-medium shrink-0 text-[10px] sm:text-[11px] text-slate-700 pl-1">
+                                รับเข้า {receivedDate || '-'}
+                              </span>
                             </div>
                           </div>
-                        );
-                      })()}
 
-                      {/* Received by + Date */}
-                      <div className="flex items-center justify-between gap-2 pt-0.5">
-                        <div className="flex items-center flex-1 min-w-0">
-                          <span className="w-24 font-bold shrink-0">Received by</span>
-                          <span className="w-3 text-center shrink-0">:</span>
-                          <span className="font-medium truncate">{receivedBy || '-'}</span>
+                          {/* Tag Footer Banner */}
+                          <div 
+                            className="border-t-2 border-black text-center font-bold tracking-wide py-0.5 bg-amber-50"
+                            style={{ fontSize: previewScale === 'actual' ? activeSize.bannerFontSize : '12px' }}
+                          >
+                            Quarantine : กักกัน
+                          </div>
+
+                          {/* Doc Rev Bottom line */}
+                          <div 
+                            className="border-t border-black text-center text-slate-700 py-0.5 bg-white font-mono"
+                            style={{ fontSize: previewScale === 'actual' ? activeSize.revFontSize : '10px' }}
+                          >
+                            {docRev}
+                          </div>
                         </div>
-                        <span className="font-medium shrink-0 text-[10px] sm:text-[11px] text-slate-700 pl-2">
-                          รับเข้า {receivedDate || '-'}
-                        </span>
                       </div>
-                    </div>
-
-                    {/* Tag Footer Banner */}
-                    <div className="border-t-2 border-black text-center font-bold tracking-wide py-1 text-xs sm:text-sm bg-amber-50">
-                      Quarantine : กักกัน
-                    </div>
-
-                    {/* Doc Rev Bottom line */}
-                    <div className="border-t border-black text-center text-[9px] sm:text-[10px] text-slate-700 py-0.5 bg-white font-mono">
-                      {docRev}
-                    </div>
-                  </div>
+                    );
+                  })()}
                 </div>
               </div>
-            </div>
 
               <div className="text-[11px] text-slate-500 text-center flex flex-wrap items-center justify-center gap-2 pt-1">
-                <span>🖨️ รองรับเครื่องพิมพ์สติกเกอร์ความร้อน 100x80 มม.</span>
+                <span>🖨️ เครื่องพิมพ์สติกเกอร์ความร้อน: <strong>{activeSize.width}x{activeSize.height} มม.</strong></span>
                 <span>•</span>
                 <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                   ระบบจะพิมพ์สติกเกอร์ทั้งหมด {tagsToPrint.length} ใบ
@@ -1180,6 +1422,22 @@ export function QuarantineTagModal({
               ปิดหน้าต่าง
             </Button>
             <div className="flex flex-wrap items-center gap-2">
+              {/* Label Size Selector */}
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+                <Layers className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                  ขนาดป้าย:
+                </span>
+                <select
+                  value={labelSize}
+                  onChange={(e) => handleLabelSizeChange(e.target.value)}
+                  className="text-xs bg-amber-50 font-bold border border-amber-300 rounded px-1.5 py-0.5 text-amber-900 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
+                  title="เลือกขนาดสติกเกอร์ตามม้วนกระดาษที่ใส่ในเครื่องพิมพ์"
+                >
+                  {renderLabelSizeOptions()}
+                </select>
+              </div>
+
               {/* Code Format Selector (QR Code / Barcode) */}
               <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
                 <QrCode className="w-3.5 h-3.5 text-purple-700 shrink-0" />
@@ -1210,7 +1468,7 @@ export function QuarantineTagModal({
                   className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-amber-500 cursor-pointer"
                   title="ปรับทิศทางการพิมพ์สำหรับเครื่องพิมพ์สติกเกอร์ที่พิมพ์ออกมากลับด้าน"
                 >
-                  <option value="0">แนวนอนปกติ (0° - แนะนำสำหรับสติกเกอร์ 100x80)</option>
+                  <option value="0">แนวนอนปกติ (0°)</option>
                   <option value="270">🔄 หมุน 270° (ทวนเข็ม - ป้ายตั้งทางซ้าย)</option>
                   <option value="90">🔄 หมุน 90° (ตามเข็ม - ป้ายตั้งทางขวา)</option>
                   <option value="180">↕️ กลับหัว 180°</option>
@@ -1223,7 +1481,7 @@ export function QuarantineTagModal({
                 className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-md px-5 h-9"
               >
                 <Printer className="w-4 h-4" />
-                สั่งพิมพ์สติกเกอร์ {tagsToPrint.length} ใบ (100x80 มม.)
+                สั่งพิมพ์สติกเกอร์ {tagsToPrint.length} ใบ ({activeSize.width}x{activeSize.height} มม.)
               </Button>
             </div>
           </DialogFooter>
@@ -1254,10 +1512,10 @@ export function QuarantineTagModal({
 
                 {/* Code */}
                 <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                     <span className="label-col">Code</span>
                     <span className="colon-col">:</span>
-                    <span className="val-col val-mono" style={{ fontSize: '9.5pt' }}>
+                    <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize }}>
                       {code || '-'}
                     </span>
                   </div>
@@ -1265,19 +1523,19 @@ export function QuarantineTagModal({
 
                 {/* Control No. + Barcode */}
                 <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
                     <span className="label-col">Control No.</span>
                     <span className="colon-col">:</span>
-                    <span className="val-col val-mono" style={{ fontSize: '10.5pt' }}>
+                    <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize }}>
                       {controlNo || '-'}
                     </span>
                   </div>
                   {controlNo && codeType !== 'none' && (
                     <div style={{ flexShrink: 0, paddingLeft: '4px', display: 'flex', alignItems: 'center' }}>
                       {codeType === 'qrcode' ? (
-                        <QRCodeSvg value={controlNo} size={30} />
+                        <QRCodeSvg value={controlNo} size={activeSize.qrSize} />
                       ) : (
-                        <Code128Barcode value={controlNo} height={22} width={140} />
+                        <Code128Barcode value={controlNo} height={activeSize.barcodeHeight} width={activeSize.barcodeWidth} />
                       )}
                     </div>
                   )}
@@ -1285,64 +1543,64 @@ export function QuarantineTagModal({
 
                 {/* Supplier + Lot */}
                 <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <span className="label-col">Supplier</span>
                     <span className="colon-col">:</span>
                     <span className="val-col" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {supplier || '-'}
                     </span>
                   </div>
-                  <span style={{ flexShrink: 0, paddingLeft: '8px', fontSize: '8.5pt' }}>
+                  <span style={{ flexShrink: 0, paddingLeft: '6px', fontSize: activeSize.revFontSize, fontWeight: 500 }}>
                     Lot.{mfgLot || '-'}
                   </span>
                 </div>
 
                 {/* Total Qty + Breakdown */}
                 <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                     <span className="label-col">Total Qty.</span>
                     <span className="colon-col">:</span>
                     <span className="val-col val-bold">
                       {totalQty ? Number(totalQty).toLocaleString() : 0}{unit}
                     </span>
                   </div>
-                  <span style={{ fontWeight: 'bold', fontSize: '8.5pt' }}>
+                  <span style={{ fontWeight: 'bold', fontSize: `calc(${activeSize.bodyFontSize} * 0.9)`, whiteSpace: 'nowrap' }}>
                     ({boxCount} {effectivePackageType} x {qtyPerBox ? Number(qtyPerBox).toLocaleString() : (totalQty ? Number(totalQty).toLocaleString() : 0)}{unit}{oddBoxCount > 0 ? ` + ${oddBoxCount} ${effectivePackageType}เศษ x ${oddQtyPerBox ? Number(oddQtyPerBox).toLocaleString() : 0}${unit}` : ''})
                   </span>
                 </div>
 
                 {/* Qty./unit + of N */}
                 <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', minWidth: 0 }}>
                     <span className="label-col">Qty./unit</span>
                     <span className="colon-col">:</span>
                     <span className="val-col val-bold">
                       {tag.boxQty ? Number(tag.boxQty).toLocaleString() : 0} {unit}
                       {tag.isOdd && (
-                        <span style={{ marginLeft: '4px', fontSize: '7.5pt', fontWeight: 'bold', border: '1px solid #000', padding: '0 2px', borderRadius: '2px' }}>
+                        <span style={{ marginLeft: '4px', fontSize: `calc(${activeSize.bodyFontSize} * 0.8)`, fontWeight: 'bold', border: '1px solid #000', padding: '0 2px', borderRadius: '2px' }}>
                           [{effectivePackageType}เศษ]
                         </span>
                       )}
                     </span>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: '10pt' }}>
-                    <span style={{ fontWeight: 'normal', fontSize: '8.5pt', marginRight: '8px' }}>of</span>
+                  <div style={{ display: 'flex', alignItems: 'center', fontWeight: 'bold', fontSize: activeSize.bodyFontSize, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontWeight: 'normal', fontSize: `calc(${activeSize.bodyFontSize} * 0.9)`, marginRight: '6px' }}>of</span>
                     <span>{tag.boxIndex}</span>
-                    <span style={{ margin: '0 4px', fontWeight: 'normal', color: '#666' }}>/</span>
+                    <span style={{ margin: '0 3px', fontWeight: 'normal', color: '#666' }}>/</span>
                     <span>{tag.totalBoxes}</span>
                   </div>
                 </div>
 
                 {/* Received by + Date */}
-                <div className="tag-row" style={{ paddingTop: '2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, overflow: 'hidden' }}>
+                <div className="tag-row" style={{ paddingTop: '1px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0, overflow: 'hidden' }}>
                     <span className="label-col">Received by</span>
                     <span className="colon-col">:</span>
-                    <span className="val-col" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '8.5pt' }}>
+                    <span className="val-col" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: `calc(${activeSize.bodyFontSize} * 0.95)` }}>
                       {receivedBy || '-'}
                     </span>
                   </div>
-                  <span style={{ flexShrink: 0, paddingLeft: '8px', fontSize: '8.5pt' }}>
+                  <span style={{ flexShrink: 0, paddingLeft: '6px', fontSize: `calc(${activeSize.bodyFontSize} * 0.9)` }}>
                     รับเข้า {receivedDate || '-'}
                   </span>
                 </div>
