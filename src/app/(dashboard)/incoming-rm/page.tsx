@@ -2743,12 +2743,12 @@ export default function RMControlCenterPage() {
       </div>
 
         <Tabs value={activeViewTab} onValueChange={setActiveViewTab} className="w-full">
-        {/* Soft, Modern Segmented Control Bar */}
-        <TabsList className="bg-[#F8F6F0] p-1.5 sm:p-2 rounded-2xl border border-[#E7DFD5] shadow-xs w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 h-auto">
+        {/* Soft, Modern Segmented Control Bar - Auto Height & Multi-row Resilient */}
+        <TabsList className="bg-[#F8F6F0] p-1.5 sm:p-2 rounded-2xl border border-[#E7DFD5] shadow-xs w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-1.5 sm:gap-2 !h-auto group-data-horizontal/tabs:!h-auto min-h-fit">
           {/* 1. Overview Dashboard */}
           <TabsTrigger 
             value="dashboard" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
           >
             <LayoutDashboard className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
             <span className="truncate">Overview Dashboard</span>
@@ -2757,7 +2757,7 @@ export default function RMControlCenterPage() {
           {/* 2. Purchasing View */}
           <TabsTrigger 
             value="purchasing" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
           >
             <ShoppingCart className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-500/70 transition-colors"/> 
             <span className="truncate">Purchasing View</span>
@@ -2766,7 +2766,7 @@ export default function RMControlCenterPage() {
           {/* 3. Warehouse View */}
           <TabsTrigger 
             value="warehouse" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
           >
             <Box className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-blue-600 text-blue-500/70 transition-colors"/> 
             <span className="truncate">Warehouse View</span>
@@ -2775,7 +2775,7 @@ export default function RMControlCenterPage() {
           {/* 4. QC View */}
           <TabsTrigger 
             value="qc" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px]"
           >
             <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-emerald-600 text-emerald-500/70 transition-colors"/> 
             <span className="truncate">QC View</span>
@@ -2784,7 +2784,7 @@ export default function RMControlCenterPage() {
           {/* 5. Planning View */}
           <TabsTrigger 
             value="planning" 
-            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer"
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm data-[state=active]:border-slate-200/90 data-[state=active]:ring-1 data-[state=active]:ring-slate-900/5 py-2.5 sm:py-3 px-3 sm:px-4 text-slate-600 hover:text-slate-900 hover:bg-white/60 font-semibold text-xs sm:text-sm md:text-[14px] transition-all duration-200 rounded-xl flex items-center justify-center gap-2 border border-transparent cursor-pointer !h-auto min-h-[42px] col-span-2 sm:col-span-1"
           >
             <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-indigo-600 text-indigo-500/70 transition-colors"/> 
             <span className="truncate">Planning View</span>
@@ -2792,7 +2792,7 @@ export default function RMControlCenterPage() {
         </TabsList>
 
         {/* Continuous Work History & Report Action Bar (Soft, Clean, Unified Tone) */}
-        <div className="bg-[#FAF9F6] p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-3 mb-2">
+        <div className="bg-[#FAF9F6] p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-4 mb-2 clear-both">
           {/* Left: Current View & Continuous Status Information */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
             <div className="flex items-center gap-2 bg-white border border-slate-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
