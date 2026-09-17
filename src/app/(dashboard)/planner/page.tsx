@@ -980,6 +980,9 @@ export default function PlannerPage() {
     }
   }
 
+  const completedLotsCount = useMemo(() => lots.filter(lot => lot.current_status === "DONE").length, [lots]);
+  const activeLotsCount = useMemo(() => lots.filter(lot => lot.current_status !== "DONE").length, [lots]);
+
   const filteredLots = lots.filter(lot => {
     if (activeTab === "completed" && lot.current_status !== "DONE") return false;
     if (activeTab !== "completed" && lot.current_status === "DONE") return false;
@@ -1660,16 +1663,75 @@ export default function PlannerPage() {
         <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div className="flex flex-wrap gap-4 items-center">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList className="bg-slate-100/80 p-1 rounded-xl">
-                <TabsTrigger value="table" className="rounded-lg data-active:bg-slate-800 data-[active]:bg-slate-800 data-[active]:text-white data-active:text-white transition-all">Main Table</TabsTrigger>
-                <TabsTrigger value="timeline" className="rounded-lg data-active:bg-indigo-600 data-[active]:bg-indigo-600 data-[active]:text-white data-active:text-white transition-all">Timeline</TabsTrigger>
-                <TabsTrigger value="history" className="flex items-center gap-2 rounded-lg data-active:bg-blue-600 data-[active]:bg-blue-600 data-[active]:text-white data-active:text-white transition-all">
-                  <History className="w-4 h-4" />
-                  ประวัติการทำงานแบบต่อเนื่อง
+              <TabsList className="!h-auto p-1.5 bg-slate-100/90 border border-slate-200/90 rounded-2xl shadow-inner flex flex-wrap items-center gap-1.5">
+                {/* Tab 1: Main Table */}
+                <TabsTrigger
+                  value="table"
+                  className={cn(
+                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
+                    activeTab === "table"
+                      ? "!bg-slate-900 !text-white !border-slate-900 shadow-md ring-2 ring-slate-900/25"
+                      : "!bg-white !text-slate-700 hover:!bg-slate-100 hover:!text-slate-950 border-slate-300"
+                  )}
+                >
+                  <Layers className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "table" ? "text-amber-400" : "text-slate-500")} />
+                  <span>Main Table</span>
+                  <span className={cn(
+                    "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors",
+                    activeTab === "table" ? "bg-slate-800 text-amber-300 border border-slate-700" : "bg-slate-100 text-slate-600 border border-slate-200"
+                  )}>
+                    {activeLotsCount}
+                  </span>
                 </TabsTrigger>
-                <TabsTrigger value="completed" className="flex items-center gap-2 rounded-lg text-emerald-600 data-active:bg-emerald-500 data-[active]:bg-emerald-500 data-[active]:text-white data-active:text-white transition-all">
-                  <CheckCircle2 className="w-4 h-4" />
-                  งานที่เสร็จสิ้น (Completed)
+
+                {/* Tab 2: Timeline */}
+                <TabsTrigger
+                  value="timeline"
+                  className={cn(
+                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
+                    activeTab === "timeline"
+                      ? "!bg-indigo-600 !text-white !border-indigo-600 shadow-md ring-2 ring-indigo-600/30"
+                      : "!bg-indigo-50/80 !text-indigo-700 hover:!bg-indigo-100 hover:!text-indigo-950 border-indigo-200/90"
+                  )}
+                >
+                  <CalendarIcon className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "timeline" ? "text-indigo-200" : "text-indigo-600")} />
+                  <span>Timeline</span>
+                </TabsTrigger>
+
+                {/* Tab 3: ประวัติการทำงานแบบต่อเนื่อง */}
+                <TabsTrigger
+                  value="history"
+                  className={cn(
+                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
+                    activeTab === "history"
+                      ? "!bg-blue-600 !text-white !border-blue-600 shadow-md ring-2 ring-blue-600/30"
+                      : "!bg-blue-50/80 !text-blue-700 hover:!bg-blue-100 hover:!text-blue-950 border-blue-200/90"
+                  )}
+                >
+                  <History className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "history" ? "text-blue-200 animate-pulse" : "text-blue-600")} />
+                  <span>ประวัติการทำงานแบบต่อเนื่อง</span>
+                </TabsTrigger>
+
+                {/* Tab 4: งานที่เสร็จสิ้น (Completed) */}
+                <TabsTrigger
+                  value="completed"
+                  className={cn(
+                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
+                    activeTab === "completed"
+                      ? "!bg-emerald-600 !text-white !border-emerald-600 shadow-md ring-2 ring-emerald-600/30"
+                      : "!bg-emerald-50/80 !text-emerald-700 hover:!bg-emerald-100 hover:!text-emerald-950 border-emerald-200/80"
+                  )}
+                >
+                  <CheckCircle2 className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "completed" ? "text-emerald-200" : "text-emerald-600")} />
+                  <span>งานที่เสร็จสิ้น (Completed)</span>
+                  {completedLotsCount > 0 && (
+                    <span className={cn(
+                      "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors",
+                      activeTab === "completed" ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                    )}>
+                      {completedLotsCount}
+                    </span>
+                  )}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
