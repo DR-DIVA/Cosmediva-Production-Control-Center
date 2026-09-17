@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Code128Barcode, QRCodeSvg } from '@/lib/barcode';
-import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode } from 'lucide-react';
+import { Printer, Package, Sparkles, Layers, CheckCircle2, ChevronLeft, ChevronRight, X, RotateCw, QrCode, Maximize2, Square } from 'lucide-react';
 
 export interface QuarantineTagData {
   name: string;
@@ -52,16 +52,16 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     width: 100,
     height: 75,
     category: 'popular',
-    paddingMm: 1.5,
-    headerFontSize: '11.5pt',
-    bodyFontSize: '8pt',
-    bodyLineHeight: 1.25,
-    labelColWidth: '65px',
-    bannerFontSize: '10pt',
-    revFontSize: '6.5pt',
-    qrSize: 26,
-    barcodeHeight: 20,
-    barcodeWidth: 130
+    paddingMm: 0.5,
+    headerFontSize: '13.5pt',
+    bodyFontSize: '9.2pt',
+    bodyLineHeight: 1.35,
+    labelColWidth: '68px',
+    bannerFontSize: '11.5pt',
+    revFontSize: '7.5pt',
+    qrSize: 32,
+    barcodeHeight: 22,
+    barcodeWidth: 140
   },
   '100x80': {
     id: '100x80',
@@ -69,14 +69,14 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     width: 100,
     height: 80,
     category: 'popular',
-    paddingMm: 2.5,
-    headerFontSize: '13pt',
-    bodyFontSize: '9pt',
+    paddingMm: 2.0,
+    headerFontSize: '13.5pt',
+    bodyFontSize: '9.2pt',
     bodyLineHeight: 1.35,
     labelColWidth: '72px',
-    bannerFontSize: '11pt',
+    bannerFontSize: '11.5pt',
     revFontSize: '7.5pt',
-    qrSize: 30,
+    qrSize: 32,
     barcodeHeight: 22,
     barcodeWidth: 140
   },
@@ -86,14 +86,14 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     width: 80,
     height: 100,
     category: 'popular',
-    paddingMm: 2,
-    headerFontSize: '12pt',
-    bodyFontSize: '8.5pt',
+    paddingMm: 1.0,
+    headerFontSize: '12.5pt',
+    bodyFontSize: '8.8pt',
     bodyLineHeight: 1.3,
     labelColWidth: '60px',
-    bannerFontSize: '10.5pt',
+    bannerFontSize: '11pt',
     revFontSize: '7pt',
-    qrSize: 28,
+    qrSize: 30,
     barcodeHeight: 20,
     barcodeWidth: 120
   },
@@ -103,16 +103,16 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     width: 75,
     height: 100,
     category: 'popular',
-    paddingMm: 1.8,
-    headerFontSize: '11.5pt',
-    bodyFontSize: '8pt',
-    bodyLineHeight: 1.25,
+    paddingMm: 0.8,
+    headerFontSize: '12pt',
+    bodyFontSize: '8.5pt',
+    bodyLineHeight: 1.3,
     labelColWidth: '58px',
-    bannerFontSize: '10pt',
-    revFontSize: '6.5pt',
-    qrSize: 26,
-    barcodeHeight: 18,
-    barcodeWidth: 110
+    bannerFontSize: '10.5pt',
+    revFontSize: '7pt',
+    qrSize: 28,
+    barcodeHeight: 20,
+    barcodeWidth: 115
   },
   '80x50': {
     id: '80x50',
@@ -254,13 +254,23 @@ export function QuarantineTagModal({
   const [previewScale, setPreviewScale] = useState<'actual' | 'large'>('actual');
   const [printRotation, setPrintRotation] = useState<'0' | '90' | '180' | '270' | 'auto'>('0');
   const [labelSize, setLabelSize] = useState<string>('100x75');
+  const [printZoom, setPrintZoom] = useState<string>('102');
+  const [marginFit, setMarginFit] = useState<'tight' | 'borderless' | 'standard'>('tight');
 
-  // Load saved label size preference (defaults to 100x75)
+  // Load saved label size, zoom & margin preferences
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const savedSize = localStorage.getItem('quarantine_tag_label_size');
       if (savedSize && LABEL_SIZES[savedSize]) {
         setLabelSize(savedSize);
+      }
+      const savedZoom = localStorage.getItem('quarantine_tag_print_zoom');
+      if (savedZoom && ['98', '100', '102', '104', '106'].includes(savedZoom)) {
+        setPrintZoom(savedZoom);
+      }
+      const savedMargin = localStorage.getItem('quarantine_tag_margin_fit');
+      if (savedMargin && ['tight', 'borderless', 'standard'].includes(savedMargin)) {
+        setMarginFit(savedMargin as any);
       }
     }
   }, []);
@@ -272,7 +282,23 @@ export function QuarantineTagModal({
     }
   };
 
+  const handlePrintZoomChange = (val: string) => {
+    setPrintZoom(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quarantine_tag_print_zoom', val);
+    }
+  };
+
+  const handleMarginFitChange = (val: 'tight' | 'borderless' | 'standard') => {
+    setMarginFit(val);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('quarantine_tag_margin_fit', val);
+    }
+  };
+
   const activeSize = LABEL_SIZES[labelSize] || LABEL_SIZES['100x75'];
+  const effectivePaddingMm = marginFit === 'borderless' ? 0 : marginFit === 'tight' ? 0.5 : activeSize.paddingMm;
+  const zoomFactor = Number(printZoom || 100) / 100;
 
   // Load saved printer rotation preference
   useEffect(() => {
@@ -496,177 +522,68 @@ export function QuarantineTagModal({
 
     const contentHtml = container.innerHTML;
 
-    let pageLayoutCss = '';
+    let transformCss = '';
     if (isRotated) {
       const angle = printRotation === '90' ? '90deg' : '270deg';
-      pageLayoutCss = `
-        @page {
-          size: ${physW}mm ${physH}mm;
-          margin: 0;
-        }
-        html, body {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .quarantine-tag-print-page {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          max-width: ${physW}mm;
-          max-height: ${physH}mm;
-          box-sizing: border-box;
-          padding: 0;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .tag-rotate-wrapper {
-          width: ${activeSize.width}mm;
-          height: ${activeSize.height}mm;
-          flex-shrink: 0;
-          transform: rotate(${angle});
-          transform-origin: center center;
-          padding: ${activeSize.paddingMm}mm;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          overflow: hidden;
-        }
-      `;
+      transformCss = zoomFactor !== 1 ? `rotate(${angle}) scale(${zoomFactor})` : `rotate(${angle})`;
     } else if (is180) {
-      pageLayoutCss = `
-        @page {
-          size: ${physW}mm ${physH}mm;
-          margin: 0;
-        }
-        html, body {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .quarantine-tag-print-page {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          max-width: ${physW}mm;
-          max-height: ${physH}mm;
-          box-sizing: border-box;
-          padding: 0;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .tag-rotate-wrapper {
-          width: ${activeSize.width}mm;
-          height: ${activeSize.height}mm;
-          flex-shrink: 0;
-          transform: rotate(180deg);
-          transform-origin: center center;
-          padding: ${activeSize.paddingMm}mm;
-          box-sizing: border-box;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          overflow: hidden;
-        }
-      `;
-    } else if (printRotation === 'auto') {
-      pageLayoutCss = `
-        @page {
-          margin: 0;
-        }
-        html, body {
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .quarantine-tag-print-page {
-          width: ${activeSize.width}mm;
-          height: ${activeSize.height}mm;
-          max-width: ${activeSize.width}mm;
-          max-height: ${activeSize.height}mm;
-          box-sizing: border-box;
-          padding: ${activeSize.paddingMm}mm;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .tag-rotate-wrapper {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          overflow: hidden;
-        }
-      `;
+      transformCss = zoomFactor !== 1 ? `rotate(180deg) scale(${zoomFactor})` : `rotate(180deg)`;
+    } else if (zoomFactor !== 1) {
+      transformCss = `scale(${zoomFactor})`;
     } else {
-      // printRotation === '0'
-      pageLayoutCss = `
-        @page {
-          size: ${physW}mm ${physH}mm;
-          margin: 0;
-        }
-        html, body {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          margin: 0;
-          padding: 0;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .quarantine-tag-print-page {
-          width: ${physW}mm;
-          height: ${physH}mm;
-          max-width: ${physW}mm;
-          max-height: ${physH}mm;
-          box-sizing: border-box;
-          padding: ${activeSize.paddingMm}mm;
-          page-break-after: always;
-          break-after: page;
-          page-break-inside: avoid;
-          break-inside: avoid;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          background: #ffffff;
-          overflow: hidden;
-        }
-        .tag-rotate-wrapper {
-          width: 100%;
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-          overflow: hidden;
-        }
-      `;
+      transformCss = 'none';
     }
+
+    const wrapperWidth = `${activeSize.width}mm`;
+    const wrapperHeight = `${activeSize.height}mm`;
+
+    let pageLayoutCss = `
+      @page {
+        size: ${physW}mm ${physH}mm;
+        margin: 0;
+      }
+      html, body {
+        width: ${physW}mm;
+        height: ${physH}mm;
+        margin: 0;
+        padding: 0;
+        background: #ffffff;
+        overflow: hidden;
+      }
+      .quarantine-tag-print-page {
+        width: ${physW}mm;
+        height: ${physH}mm;
+        max-width: ${physW}mm;
+        max-height: ${physH}mm;
+        box-sizing: border-box;
+        padding: 0;
+        margin: 0;
+        page-break-after: always;
+        break-after: page;
+        page-break-inside: avoid;
+        break-inside: avoid;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #ffffff;
+        overflow: hidden;
+      }
+      .tag-rotate-wrapper {
+        width: ${wrapperWidth};
+        height: ${wrapperHeight};
+        max-width: ${wrapperWidth};
+        max-height: ${wrapperHeight};
+        flex-shrink: 0;
+        transform: ${transformCss};
+        transform-origin: center center;
+        padding: ${effectivePaddingMm}mm;
+        box-sizing: border-box;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        overflow: hidden;
+      }
+    `;
 
     doc.open();
     doc.write(`
@@ -695,7 +612,7 @@ export function QuarantineTagModal({
             .tag-border {
               width: 100%;
               height: 100%;
-              border: 1.5px solid #000000;
+              border: 2px solid #000000;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -703,18 +620,18 @@ export function QuarantineTagModal({
               overflow: hidden;
             }
             .tag-header {
-              border-bottom: 1.5px solid #000000;
+              border-bottom: 2px solid #000000;
               text-align: center;
               font-weight: bold;
-              letter-spacing: 1px;
-              padding: 2px 0;
+              letter-spacing: 1.5px;
+              padding: 2.5px 0;
               font-size: ${activeSize.headerFontSize};
               text-transform: uppercase;
               flex-shrink: 0;
             }
             .tag-body {
               flex: 1;
-              padding: 3px 6px;
+              padding: 3.5px 8px;
               display: flex;
               flex-direction: column;
               justify-content: space-between;
@@ -1085,6 +1002,40 @@ export function QuarantineTagModal({
                     </select>
                   </div>
 
+                  {/* Print Scale / Zoom Selector */}
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
+                    <Maximize2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ความเต็มป้าย:</span>
+                    <select
+                      value={printZoom}
+                      onChange={(e) => handlePrintZoomChange(e.target.value)}
+                      className="font-bold text-xs bg-blue-50 text-blue-900 border border-blue-300 rounded px-1.5 py-0.5 focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                      title="ปรับสเกลขยายเต็มสติกเกอร์ (102% ชดเชยขอบขาวเครื่องพิมพ์ความร้อนให้ออกมาเต็มดวงพอดี)"
+                    >
+                      <option value="102">102% (เต็มดวง แนะนำ)</option>
+                      <option value="100">100% (ปกติ)</option>
+                      <option value="104">104% (เต็มขอบพิเศษ +4%)</option>
+                      <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
+                      <option value="98">98% (ย่อเล็ก 98%)</option>
+                    </select>
+                  </div>
+
+                  {/* Margin Fit Selector */}
+                  <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-slate-200 text-xs shadow-xs">
+                    <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                    <span className="font-bold text-slate-700 whitespace-nowrap hidden sm:inline">ระยะขอบ:</span>
+                    <select
+                      value={marginFit}
+                      onChange={(e) => handleMarginFitChange(e.target.value as any)}
+                      className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:ring-1 focus:ring-slate-500 cursor-pointer"
+                      title="เลือกระยะขอบ (ชิดขอบ 0.5มม. หรือ ไร้ขอบ 0มม.)"
+                    >
+                      <option value="tight">ชิดขอบ 0.5 มม.</option>
+                      <option value="borderless">ไร้ขอบ 0 มม.</option>
+                      <option value="standard">ขอบปกติ 1.5 มม.</option>
+                    </select>
+                  </div>
+
                   <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-slate-200 text-xs shadow-xs">
                     <button
                       type="button"
@@ -1242,11 +1193,13 @@ export function QuarantineTagModal({
                             }),
                             transform:
                               printRotation === '90'
-                                ? 'rotate(90deg)'
+                                ? `rotate(90deg) scale(${zoomFactor})`
                                 : printRotation === '270'
-                                ? 'rotate(270deg)'
+                                ? `rotate(270deg) scale(${zoomFactor})`
                                 : printRotation === '180'
-                                ? 'rotate(180deg)'
+                                ? `rotate(180deg) scale(${zoomFactor})`
+                                : zoomFactor !== 1
+                                ? `scale(${zoomFactor})`
                                 : 'none'
                           }}
                         >
@@ -1398,6 +1351,11 @@ export function QuarantineTagModal({
               <div className="text-[11px] text-slate-500 text-center flex flex-wrap items-center justify-center gap-2 pt-1">
                 <span>🖨️ เครื่องพิมพ์สติกเกอร์ความร้อน: <strong>{activeSize.width}x{activeSize.height} มม.</strong></span>
                 <span>•</span>
+                <span className="font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 flex items-center gap-1">
+                  <Maximize2 className="w-3 h-3 text-blue-600" />
+                  สเกลขยายเต็มป้าย: {printZoom}% ({marginFit === 'borderless' ? 'ไร้ขอบ 0 มม.' : marginFit === 'tight' ? 'ชิดขอบ 0.5 มม.' : 'ขอบปกติ 1.5 มม.'})
+                </span>
+                <span>•</span>
                 <span className="font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
                   ระบบจะพิมพ์สติกเกอร์ทั้งหมด {tagsToPrint.length} ใบ
                 </span>
@@ -1435,6 +1393,44 @@ export function QuarantineTagModal({
                   title="เลือกขนาดสติกเกอร์ตามม้วนกระดาษที่ใส่ในเครื่องพิมพ์"
                 >
                   {renderLabelSizeOptions()}
+                </select>
+              </div>
+
+              {/* Print Zoom / Fullness Selector */}
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+                <Maximize2 className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                  ความเต็มป้าย:
+                </span>
+                <select
+                  value={printZoom}
+                  onChange={(e) => handlePrintZoomChange(e.target.value)}
+                  className="text-xs bg-blue-50 font-bold border border-blue-300 rounded px-1.5 py-0.5 text-blue-900 focus:outline-none focus:ring-1 focus:ring-blue-500 cursor-pointer"
+                  title="ปรับสเกลขยายเต็มสติกเกอร์ (102% ช่วยแก้ปัญหาขอบขาวเครื่องพิมพ์ความร้อนให้ออกมาเต็มดวงพอดี)"
+                >
+                  <option value="102">102% (เต็มดวง แนะนำ)</option>
+                  <option value="100">100% (ปกติ)</option>
+                  <option value="104">104% (เต็มขอบ +4%)</option>
+                  <option value="106">106% (เต็มขอบสูงสุด +6%)</option>
+                  <option value="98">98% (ย่อขอบ 98%)</option>
+                </select>
+              </div>
+
+              {/* Margin Fit Selector */}
+              <div className="flex items-center gap-1.5 bg-white px-2.5 py-1 rounded-lg border border-slate-300 shadow-2xs">
+                <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                <span className="text-[11px] font-bold text-slate-700 whitespace-nowrap">
+                  ระยะขอบ:
+                </span>
+                <select
+                  value={marginFit}
+                  onChange={(e) => handleMarginFitChange(e.target.value as any)}
+                  className="text-xs bg-slate-50 font-medium border border-slate-200 rounded px-1.5 py-0.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-slate-500 cursor-pointer"
+                  title="เลือกระยะขอบสติกเกอร์ (ชิดขอบ 0.5มม. หรือ ไร้ขอบ 0มม.)"
+                >
+                  <option value="tight">ชิดขอบ 0.5 มม.</option>
+                  <option value="borderless">ไร้ขอบ 0 มม.</option>
+                  <option value="standard">ปกติ 1.5 มม.</option>
                 </select>
               </div>
 
