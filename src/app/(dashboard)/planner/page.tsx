@@ -1642,154 +1642,260 @@ export default function PlannerPage() {
         </div>
 
       <Card className="border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-white flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-          <div className="flex flex-wrap gap-4 items-center">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-auto">
-              <TabsList className="!h-auto p-1.5 bg-slate-100/90 border border-slate-200/90 rounded-2xl shadow-inner flex flex-wrap items-center gap-1.5">
+        {/* Sub-menu Navigation & Filter Toolbar */}
+        <div className="bg-white border-b border-slate-200">
+          {/* Tier 1: Primary Navigation Bar (4 Main Sub-tabs + Global Action) */}
+          <div className="px-4 sm:px-5 py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+            <div className="w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+              <div className="inline-flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/90 shadow-2xs shrink-0">
                 {/* Tab 1: Main Table */}
-                <TabsTrigger
-                  value="table"
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('table')}
                   className={cn(
-                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
-                    activeTab === "table"
-                      ? "!bg-slate-900 !text-white !border-slate-900 shadow-md ring-2 ring-slate-900/25"
-                      : "!bg-white !text-slate-700 hover:!bg-slate-100 hover:!text-slate-950 border-slate-300"
+                    "h-9 px-3.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                    activeTab === 'table'
+                      ? "bg-[#0B192C] text-white shadow-sm ring-1 ring-slate-800"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                   )}
                 >
-                  <Layers className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "table" ? "text-amber-400" : "text-slate-500")} />
+                  <Layers className={cn("w-4 h-4 shrink-0", activeTab === 'table' ? "text-amber-400" : "text-slate-400")} />
                   <span>Main Table</span>
                   <span className={cn(
                     "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors",
-                    activeTab === "table" ? "bg-slate-800 text-amber-300 border border-slate-700" : "bg-slate-100 text-slate-600 border border-slate-200"
+                    activeTab === 'table' ? "bg-slate-800 text-amber-300 border border-slate-700" : "bg-white text-slate-600 border border-slate-200"
                   )}>
                     {activeLotsCount}
                   </span>
-                </TabsTrigger>
+                </button>
 
                 {/* Tab 2: Timeline */}
-                <TabsTrigger
-                  value="timeline"
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('timeline')}
                   className={cn(
-                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
-                    activeTab === "timeline"
-                      ? "!bg-indigo-600 !text-white !border-indigo-600 shadow-md ring-2 ring-indigo-600/30"
-                      : "!bg-indigo-50/80 !text-indigo-700 hover:!bg-indigo-100 hover:!text-indigo-950 border-indigo-200/90"
+                    "h-9 px-3.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                    activeTab === 'timeline'
+                      ? "bg-[#0B192C] text-white shadow-sm ring-1 ring-slate-800"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                   )}
                 >
-                  <CalendarIcon className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "timeline" ? "text-indigo-200" : "text-indigo-600")} />
+                  <CalendarIcon className={cn("w-4 h-4 shrink-0", activeTab === 'timeline' ? "text-indigo-400" : "text-slate-400")} />
                   <span>Timeline</span>
-                </TabsTrigger>
+                </button>
 
                 {/* Tab 3: ประวัติการทำงานแบบต่อเนื่อง */}
-                <TabsTrigger
-                  value="history"
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('history')}
                   className={cn(
-                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
-                    activeTab === "history"
-                      ? "!bg-blue-600 !text-white !border-blue-600 shadow-md ring-2 ring-blue-600/30"
-                      : "!bg-blue-50/80 !text-blue-700 hover:!bg-blue-100 hover:!text-blue-950 border-blue-200/90"
+                    "h-9 px-3.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                    activeTab === 'history'
+                      ? "bg-[#0B192C] text-white shadow-sm ring-1 ring-slate-800"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                   )}
                 >
-                  <History className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "history" ? "text-blue-200 animate-pulse" : "text-blue-600")} />
+                  <History className={cn("w-4 h-4 shrink-0", activeTab === 'history' ? "text-blue-400 animate-pulse" : "text-slate-400")} />
                   <span>ประวัติการทำงานแบบต่อเนื่อง</span>
-                </TabsTrigger>
+                </button>
 
                 {/* Tab 4: งานที่เสร็จสิ้น (Completed) */}
-                <TabsTrigger
-                  value="completed"
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('completed')}
                   className={cn(
-                    "h-9 px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-bold transition-all duration-150 cursor-pointer flex items-center gap-2 border shadow-xs",
-                    activeTab === "completed"
-                      ? "!bg-emerald-600 !text-white !border-emerald-600 shadow-md ring-2 ring-emerald-600/30"
-                      : "!bg-emerald-50/80 !text-emerald-700 hover:!bg-emerald-100 hover:!text-emerald-950 border-emerald-200/80"
+                    "h-9 px-3.5 sm:px-4 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0",
+                    activeTab === 'completed'
+                      ? "bg-[#0B192C] text-white shadow-sm ring-1 ring-slate-800"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-white/80"
                   )}
                 >
-                  <CheckCircle2 className={cn("w-4 h-4 shrink-0 transition-colors", activeTab === "completed" ? "text-emerald-200" : "text-emerald-600")} />
+                  <CheckCircle2 className={cn("w-4 h-4 shrink-0", activeTab === 'completed' ? "text-emerald-400" : "text-slate-400")} />
                   <span>งานที่เสร็จสิ้น (Completed)</span>
                   {completedLotsCount > 0 && (
                     <span className={cn(
                       "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors",
-                      activeTab === "completed" ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                      activeTab === 'completed' ? "bg-emerald-800 text-white" : "bg-white text-emerald-700 border border-emerald-200"
                     )}>
                       {completedLotsCount}
                     </span>
                   )}
-                </TabsTrigger>
-              </TabsList>
-            </Tabs>
-            <div className="hidden md:block h-6 w-px bg-slate-200 mx-2"></div>
-            <div className="flex bg-slate-100 p-1 rounded-md">
-              <Button size="sm" variant={filterDept === "ALL" ? "default" : "ghost"} onClick={() => setFilterDept("ALL")} className="h-7 text-xs">All</Button>
-              <Button size="sm" variant={filterDept === "RM" ? "default" : "ghost"} onClick={() => setFilterDept("RM")} className="h-7 text-xs">ชั่งสาร (RM)</Button>
-              <Button size="sm" variant={filterDept === "MX" ? "default" : "ghost"} onClick={() => setFilterDept("MX")} className="h-7 text-xs">ผสม (MX)</Button>
-              <Button size="sm" variant={filterDept === "PK" ? "default" : "ghost"} onClick={() => setFilterDept("PK")} className="h-7 text-xs">บรรจุ (PK)</Button>
+                </button>
+              </div>
             </div>
 
-            {/* Toggle Switch: Shopfloor Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง) */}
-            <Button
-              size="sm"
-              variant={showShopfloorHandovers ? "default" : "outline"}
-              onClick={toggleShowShopfloorHandovers}
-              className={cn(
-                "h-8 text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 rounded-xl",
-                showShopfloorHandovers
-                  ? "bg-purple-700 text-white hover:bg-purple-800 border-purple-800 shadow-sm ring-1 ring-purple-400"
-                  : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:text-purple-900 shadow-xs"
+            {/* Right Action: Print / Export PDF (when on Timeline) */}
+            <div className="flex items-center gap-2 shrink-0">
+              {activeTab === "timeline" && (
+                <Button 
+                  size="sm" 
+                  onClick={() => setIsTimelinePrintOpen(true)} 
+                  className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 shrink-0 rounded-lg cursor-pointer"
+                  title="พิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
+                </Button>
               )}
-              title="คลิกเพื่อสลับแสดง/ซ่อน ขั้นตอนส่งต่องานหน้างาน (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)"
-            >
-              {showShopfloorHandovers ? (
-                <>
-                  <Eye className="w-3.5 h-3.5 text-purple-200" />
-                  <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): แสดง</span>
-                </>
-              ) : (
-                <>
-                  <EyeOff className="w-3.5 h-3.5 text-slate-400" />
-                  <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): ซ่อน</span>
-                </>
-              )}
-              {handoverTasksCount > 0 && (
-                <span className={cn(
-                  "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold",
-                  showShopfloorHandovers ? "bg-purple-900 text-purple-200" : "bg-slate-100 text-slate-600 border border-slate-200"
-                )}>
-                  {handoverTasksCount}
-                </span>
-              )}
-            </Button>
-          </div>
-          <div className="flex items-center gap-2">
-            {sortColumn && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => setSortColumn("")} 
-                className="h-8 text-xs bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100 flex items-center gap-1"
-                title="คลิกเพื่อรีเซ็ตการเรียงลำดับ"
-              >
-                <span>เรียงตาม: {sortColumn} ({sortDirection.toUpperCase()})</span>
-                <X className="w-3 h-3 ml-1" />
-              </Button>
-            )}
-            <div className="hidden md:flex bg-slate-100 p-1 rounded-md mr-2">
-              <Button size="sm" variant={filterOrderType === "ALL" ? "default" : "ghost"} onClick={() => setFilterOrderType("ALL")} className="h-7 text-xs">ทั้งหมด</Button>
-              <Button size="sm" variant={filterOrderType === "MTS" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTS")} className="h-7 text-xs">MTS</Button>
-              <Button size="sm" variant={filterOrderType === "MTO" ? "default" : "ghost"} onClick={() => setFilterOrderType("MTO")} className="h-7 text-xs">MTO</Button>
             </div>
-            <Input placeholder="ค้นหา PO หรือ SKU..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-64 h-9" />
-            {activeTab === "timeline" && (
-              <Button 
-                size="sm" 
-                onClick={() => setIsTimelinePrintOpen(true)} 
-                className="h-9 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 shrink-0 rounded-lg"
-                title="พิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
-              >
-                <Printer className="w-3.5 h-3.5" />
-                <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
-              </Button>
-            )}
           </div>
+
+          {/* Tier 2: Contextual Toolbar & Filters (for table, timeline, completed) */}
+          {activeTab !== "history" && (
+            <div className="px-4 sm:px-5 py-2.5 bg-[#FAF9F6] border-t border-slate-150 flex flex-wrap items-center justify-between gap-3">
+              {/* Left Filters */}
+              <div className="flex flex-wrap items-center gap-2.5">
+                {/* Department Filter (All, RM, MX, PK) */}
+                <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
+                    <Filter className="w-3 h-3 text-slate-400" /> แผนก:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("ALL")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "ALL" ? "bg-[#0B192C] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("RM")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "RM" ? "bg-amber-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    ชั่งสาร (RM)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("MX")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "MX" ? "bg-[#B8962A] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    ผสม (MX)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("PK")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "PK" ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    บรรจุ (PK)
+                  </button>
+                </div>
+
+                {/* Order Type Filter (All, MTS, MTO) */}
+                <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                  <span className="text-[11px] font-semibold text-slate-400 px-2">ประเภท:</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilterOrderType("ALL")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterOrderType === "ALL" ? "bg-[#0B192C] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    ทั้งหมด
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterOrderType("MTS")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterOrderType === "MTS" ? "bg-blue-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    MTS
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterOrderType("MTO")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterOrderType === "MTO" ? "bg-purple-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    MTO
+                  </button>
+                </div>
+
+                {/* Handover Tasks Toggle (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง) */}
+                <button
+                  type="button"
+                  onClick={toggleShowShopfloorHandovers}
+                  className={cn(
+                    "h-8 px-3 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 shrink-0 border cursor-pointer",
+                    showShopfloorHandovers
+                      ? "bg-purple-700 text-white hover:bg-purple-800 border-purple-800 shadow-sm"
+                      : "bg-white text-slate-700 border-slate-200 hover:bg-purple-50 hover:text-purple-900 shadow-2xs"
+                  )}
+                  title="คลิกเพื่อสลับแสดง/ซ่อน ขั้นตอนส่งต่องานหน้างาน (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)"
+                >
+                  {showShopfloorHandovers ? (
+                    <>
+                      <Eye className="w-3.5 h-3.5 text-purple-200" />
+                      <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): แสดง</span>
+                    </>
+                  ) : (
+                    <>
+                      <EyeOff className="w-3.5 h-3.5 text-slate-400" />
+                      <span>ขั้นตอนหน้างาน (รอ QC/POF/FG): ซ่อน</span>
+                    </>
+                  )}
+                  {handoverTasksCount > 0 && (
+                    <span className={cn(
+                      "ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold",
+                      showShopfloorHandovers ? "bg-purple-900 text-purple-200" : "bg-slate-100 text-slate-600 border border-slate-200"
+                    )}>
+                      {handoverTasksCount}
+                    </span>
+                  )}
+                </button>
+              </div>
+
+              {/* Right Side: Search & Sort Reset */}
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                {sortColumn && (
+                  <button 
+                    type="button"
+                    onClick={() => setSortColumn("")} 
+                    className="h-8 px-2.5 rounded-lg text-xs bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 flex items-center gap-1 font-medium cursor-pointer shadow-2xs shrink-0"
+                    title="คลิกเพื่อรีเซ็ตการเรียงลำดับ"
+                  >
+                    <span>เรียงตาม: {sortColumn} ({sortDirection.toUpperCase()})</span>
+                    <X className="w-3.5 h-3.5 ml-0.5 text-blue-500" />
+                  </button>
+                )}
+
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-3.5 h-3.5 absolute left-3 top-2.5 text-slate-400" />
+                  <Input 
+                    placeholder="ค้นหา PO หรือ SKU..." 
+                    value={searchQuery} 
+                    onChange={(e) => setSearchQuery(e.target.value)} 
+                    className="w-full h-8 pl-8 pr-8 text-xs bg-white border-slate-200 focus:border-[#D4AF37] rounded-lg shadow-2xs" 
+                  />
+                  {searchQuery && (
+                    <button 
+                      type="button" 
+                      onClick={() => setSearchQuery("")} 
+                      className="absolute right-2 top-2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {(activeTab === "table" || activeTab === "completed") && (
