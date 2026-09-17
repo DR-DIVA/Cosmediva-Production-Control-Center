@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { 
-  Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronRight, ChevronLeft,
+  Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft,
   Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
@@ -1077,6 +1077,7 @@ export default function PlannerPage() {
   const [kpiCustomStart, setKpiCustomStart] = useState<string>(defaultCustomStart)
   const [kpiCustomEnd, setKpiCustomEnd] = useState<string>(defaultCustomEnd)
   const [syncTableWithPeriod, setSyncTableWithPeriod] = useState<boolean>(false)
+  const [isKpiPeriodOpen, setIsKpiPeriodOpen] = useState<boolean>(false)
 
   const kpiDateRange = useMemo(() => {
     if (kpiPeriodMode === 'all') {
@@ -1597,225 +1598,294 @@ export default function PlannerPage() {
         </div>
       </div>
 
-      {/* 0. KPI Reporting Period & Horizon Control Toolbar */}
-      <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#D4AF37]/35 space-y-3">
-        {/* Row 1: Header + Active Period Badge + Quick Action Presets */}
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-            <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-2xs shrink-0">
-              <CalendarDays className="w-5 h-5 text-[#D4AF37]" />
+      {/* 0. KPI Reporting Period & Horizon Control Toolbar (Collapsible) */}
+      {!isKpiPeriodOpen ? (
+        <div className="bg-white/95 backdrop-blur-sm rounded-xl px-4 py-2 shadow-2xs border border-[#D4AF37]/35 flex flex-wrap items-center justify-between gap-2.5 transition-all">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="w-7 h-7 rounded-lg bg-[#D4AF37]/15 text-[#8B7355] flex items-center justify-center shrink-0">
+              <CalendarDays className="w-4 h-4 text-[#D4AF37]" />
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-sm font-black text-[#4A4238] tracking-tight">
-                  ช่วงเวลาสรุปผลรายงาน KPI (Reporting Period)
-                </span>
-                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs flex items-center gap-1.5">
-                  <Clock className="w-3 h-3 text-[#D4AF37]" />
-                  <span>{kpiDateRange.label}</span>
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                <span>คำนวณและสรุปผลตัวเลข KPI 4 ด้านตามช่วงเวลา</span>
-                {kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear && (
-                  <span className="text-emerald-700 font-bold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> ค่าเริ่มต้น: เดือนปัจจุบัน
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5 self-start lg:self-center">
-            {/* Current Month Shortcut */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setKpiPeriodMode('month')
-                setKpiYear(currentYear)
-                setKpiMonth(currentMonthIdx)
-              }}
-              className={cn(
-                "h-8 px-2.5 text-xs font-bold transition-all rounded-xl",
-                kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear
-                  ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
-                  : "bg-amber-50/80 text-amber-900 border-amber-200 hover:bg-amber-100"
-              )}
-            >
-              📍 เดือนปัจจุบัน ({THAI_MONTHS_SHORT[currentMonthIdx]})
-            </Button>
-
-            {/* Previous Month Shortcut */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setKpiPeriodMode('month')
-                const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
-                setKpiYear(prevMonthDate.getFullYear())
-                setKpiMonth(prevMonthDate.getMonth())
-              }}
-              className={cn(
-                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
-                kpiPeriodMode === 'month' && (kpiMonth === (currentMonthIdx === 0 ? 11 : currentMonthIdx - 1)) && (kpiYear === (currentMonthIdx === 0 ? currentYear - 1 : currentYear))
-                  ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-              )}
-            >
-              เดือนที่แล้ว
-            </Button>
-
-            {/* Custom Range */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setKpiPeriodMode(kpiPeriodMode === 'custom' ? 'month' : 'custom')}
-              className={cn(
-                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
-                kpiPeriodMode === 'custom'
-                  ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-              )}
-            >
-              📆 กำหนดช่วงวันเอง
-            </Button>
-
-            {/* All Time */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setKpiPeriodMode('all')}
-              className={cn(
-                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
-                kpiPeriodMode === 'all'
-                  ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
-                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-              )}
-            >
-              🌐 ทั้งหมด (All Time)
-            </Button>
-          </div>
-        </div>
-
-        {/* Row 2: 12-Month Selector Bar & Year Selector */}
-        {kpiPeriodMode === 'month' && (
-          <div className="pt-2.5 border-t border-slate-150 flex flex-col md:flex-row md:items-center justify-between gap-3">
-            {/* Year Selector */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-xs font-bold text-slate-500">ปี:</span>
-              <div className="inline-flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
-                {[currentYear - 1, currentYear, currentYear + 1].map(y => (
-                  <button
-                    key={y}
-                    type="button"
-                    onClick={() => setKpiYear(y)}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
-                      kpiYear === y
-                        ? "bg-[#2D2721] text-amber-300 shadow-2xs"
-                        : "text-slate-600 hover:text-slate-900"
-                    )}
-                  >
-                    {y}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 12 Months Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-thin w-full md:w-auto">
-              {THAI_MONTHS_SHORT.map((mName, idx) => {
-                const isSelected = kpiPeriodMode === 'month' && kpiMonth === idx
-                const isCurrent = idx === currentMonthIdx && kpiYear === currentYear
-                return (
-                  <button
-                    key={mName}
-                    type="button"
-                    onClick={() => {
-                      setKpiPeriodMode('month')
-                      setKpiMonth(idx)
-                    }}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1",
-                      isSelected
-                        ? "bg-[#D4AF37] text-slate-950 font-black shadow-xs ring-1 ring-[#B8962A]"
-                        : isCurrent
-                        ? "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
-                    )}
-                    title={`ดูรายงานประจำเดือน ${THAI_MONTHS_FULL[idx]} ${kpiYear}`}
-                  >
-                    <span>{mName}</span>
-                    {isCurrent && !isSelected && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Row 2 (Alternative): Custom Date Inputs */}
-        {kpiPeriodMode === 'custom' && (
-          <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-slate-600">จากวันที่:</span>
-              <input
-                type="date"
-                value={kpiCustomStart}
-                onChange={e => setKpiCustomStart(e.target.value)}
-                className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-              />
-            </div>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-bold text-slate-600">ถึงวันที่:</span>
-              <input
-                type="date"
-                value={kpiCustomEnd}
-                onChange={e => setKpiCustomEnd(e.target.value)}
-                className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
-              />
-            </div>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                setKpiCustomStart(defaultCustomStart)
-                setKpiCustomEnd(defaultCustomEnd)
-              }}
-              className="h-7 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
-            >
-              รีเซ็ตเป็นเดือนนี้
-            </Button>
-          </div>
-        )}
-
-        {/* Row 3: Table Sync Toggle (Optional) */}
-        <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input
-              type="checkbox"
-              checked={syncTableWithPeriod}
-              onChange={e => setSyncTableWithPeriod(e.target.checked)}
-              className="rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]"
-            />
-            <span className="font-medium text-[#4A4238]">
-              ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Table with Selected Period)
+            <span className="text-xs font-bold text-[#4A4238]">ช่วงเวลารายงาน KPI:</span>
+            <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs flex items-center gap-1.5">
+              <Clock className="w-3 h-3 text-[#D4AF37]" />
+              <span>{kpiDateRange.label}</span>
             </span>
-          </label>
-          <div className="text-[11px] font-medium text-slate-400">
-            พบ {totalLotsCount} ล็อตการผลิต • {totalTasksCount} คิวงาน ในช่วงเวลานี้
+            <span className="text-[11px] text-slate-400 font-medium hidden sm:inline">
+              ({totalLotsCount} ล็อต • {totalTasksCount} คิวงาน)
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {(kpiPeriodMode !== 'month' || kpiMonth !== currentMonthIdx || kpiYear !== currentYear) && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setKpiPeriodMode('month')
+                  setKpiYear(currentYear)
+                  setKpiMonth(currentMonthIdx)
+                }}
+                className="h-7 px-2 text-[11px] font-bold text-amber-700 hover:bg-amber-100 rounded-lg cursor-pointer"
+                title="คลิกเพื่อรีเซ็ตกลับเป็นเดือนปัจจุบัน"
+              >
+                📍 กลับเดือนปัจจุบัน
+              </Button>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsKpiPeriodOpen(true)}
+              className="h-7 px-2.5 text-xs font-bold text-[#4A4238] bg-[#FAF8F5] hover:bg-[#F0ECE1] border-[#D4AF37]/50 rounded-lg shadow-2xs flex items-center gap-1.5 cursor-pointer transition-all hover:border-[#D4AF37]"
+            >
+              <Filter className="w-3.5 h-3.5 text-[#D4AF37]" />
+              <span>เลือกเดือน / กางออก</span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-600" />
+            </Button>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#D4AF37]/40 space-y-3 transition-all animate-in fade-in-50 duration-200">
+          {/* Row 1: Header + Active Period Badge + Quick Action Presets + Close Button */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+              <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-2xs shrink-0">
+                <CalendarDays className="w-5 h-5 text-[#D4AF37]" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-sm font-black text-[#4A4238] tracking-tight">
+                    ช่วงเวลาสรุปผลรายงาน KPI (Reporting Period)
+                  </span>
+                  <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs flex items-center gap-1.5">
+                    <Clock className="w-3 h-3 text-[#D4AF37]" />
+                    <span>{kpiDateRange.label}</span>
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                  <span>คำนวณและสรุปผลตัวเลข KPI 4 ด้านตามช่วงเวลา</span>
+                  {kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear && (
+                    <span className="text-emerald-700 font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" /> ค่าเริ่มต้น: เดือนปัจจุบัน
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Presets and Close/Collapse Button */}
+            <div className="flex flex-wrap items-center gap-1.5 self-start lg:self-center">
+              {/* Current Month Shortcut */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setKpiPeriodMode('month')
+                  setKpiYear(currentYear)
+                  setKpiMonth(currentMonthIdx)
+                }}
+                className={cn(
+                  "h-8 px-2.5 text-xs font-bold transition-all rounded-xl cursor-pointer",
+                  kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear
+                    ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
+                    : "bg-amber-50/80 text-amber-900 border-amber-200 hover:bg-amber-100"
+                )}
+              >
+                📍 เดือนปัจจุบัน ({THAI_MONTHS_SHORT[currentMonthIdx]})
+              </Button>
+
+              {/* Previous Month Shortcut */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setKpiPeriodMode('month')
+                  const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+                  setKpiYear(prevMonthDate.getFullYear())
+                  setKpiMonth(prevMonthDate.getMonth())
+                }}
+                className={cn(
+                  "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl cursor-pointer",
+                  kpiPeriodMode === 'month' && (kpiMonth === (currentMonthIdx === 0 ? 11 : currentMonthIdx - 1)) && (kpiYear === (currentMonthIdx === 0 ? currentYear - 1 : currentYear))
+                    ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                )}
+              >
+                เดือนที่แล้ว
+              </Button>
+
+              {/* Custom Range */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setKpiPeriodMode(kpiPeriodMode === 'custom' ? 'month' : 'custom')}
+                className={cn(
+                  "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl cursor-pointer",
+                  kpiPeriodMode === 'custom'
+                    ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                )}
+              >
+                📆 กำหนดช่วงวันเอง
+              </Button>
+
+              {/* All Time */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setKpiPeriodMode('all')}
+                className={cn(
+                  "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl cursor-pointer",
+                  kpiPeriodMode === 'all'
+                    ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
+                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                )}
+              >
+                🌐 ทั้งหมด (All Time)
+              </Button>
+
+              {/* Close / Collapse Button */}
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsKpiPeriodOpen(false)}
+                className="h-8 px-2 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl cursor-pointer ml-1 flex items-center gap-1 border border-slate-200"
+                title="ซ่อนกรอบตัวเลือก"
+              >
+                <ChevronUp className="w-4 h-4 text-slate-500" />
+                <span>ซ่อนกรอบ</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Row 2: 12-Month Selector Bar & Year Selector */}
+          {kpiPeriodMode === 'month' && (
+            <div className="pt-2.5 border-t border-slate-150 flex flex-col md:flex-row md:items-center justify-between gap-3">
+              {/* Year Selector */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-xs font-bold text-slate-500">ปี:</span>
+                <div className="inline-flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+                  {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+                    <button
+                      key={y}
+                      type="button"
+                      onClick={() => setKpiYear(y)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                        kpiYear === y
+                          ? "bg-[#2D2721] text-amber-300 shadow-2xs"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      {y}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 12 Months Pills */}
+              <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-thin w-full md:w-auto">
+                {THAI_MONTHS_SHORT.map((mName, idx) => {
+                  const isSelected = kpiPeriodMode === 'month' && kpiMonth === idx
+                  const isCurrent = idx === currentMonthIdx && kpiYear === currentYear
+                  return (
+                    <button
+                      key={mName}
+                      type="button"
+                      onClick={() => {
+                        setKpiPeriodMode('month')
+                        setKpiMonth(idx)
+                      }}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1",
+                        isSelected
+                          ? "bg-[#D4AF37] text-slate-950 font-black shadow-xs ring-1 ring-[#B8962A]"
+                          : isCurrent
+                          ? "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
+                      )}
+                      title={`ดูรายงานประจำเดือน ${THAI_MONTHS_FULL[idx]} ${kpiYear}`}
+                    >
+                      <span>{mName}</span>
+                      {isCurrent && !isSelected && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Row 2 (Alternative): Custom Date Inputs */}
+          {kpiPeriodMode === 'custom' && (
+            <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-slate-600">จากวันที่:</span>
+                <input
+                  type="date"
+                  value={kpiCustomStart}
+                  onChange={e => setKpiCustomStart(e.target.value)}
+                  className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="font-bold text-slate-600">ถึงวันที่:</span>
+                <input
+                  type="date"
+                  value={kpiCustomEnd}
+                  onChange={e => setKpiCustomEnd(e.target.value)}
+                  className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+                />
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setKpiCustomStart(defaultCustomStart)
+                  setKpiCustomEnd(defaultCustomEnd)
+                }}
+                className="h-7 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+              >
+                รีเซ็ตเป็นเดือนนี้
+              </Button>
+            </div>
+          )}
+
+          {/* Row 3: Table Sync Toggle (Optional) */}
+          <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={syncTableWithPeriod}
+                onChange={e => setSyncTableWithPeriod(e.target.checked)}
+                className="rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]"
+              />
+              <span className="font-medium text-[#4A4238]">
+                ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Table with Selected Period)
+              </span>
+            </label>
+            <div className="flex items-center gap-3 text-[11px] font-medium text-slate-400">
+              <span>พบ {totalLotsCount} ล็อตการผลิต • {totalTasksCount} คิวงาน ในช่วงเวลานี้</span>
+              <button
+                type="button"
+                onClick={() => setIsKpiPeriodOpen(false)}
+                className="text-[#8B7355] font-bold hover:underline cursor-pointer flex items-center gap-0.5"
+              >
+                <span>ย่อเก็บ</span>
+                <ChevronUp className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 1. Executive Master Planning KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
