@@ -15,7 +15,8 @@ import {
   Search,
   X,
   Loader2,
-  Lock
+  Lock,
+  GripVertical
 } from 'lucide-react'
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
@@ -25,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   Dialog,
@@ -103,7 +105,7 @@ export function MasterPlanningTimeline({
   const [timelineOffsetDays, setTimelineOffsetDays] = useState<number>(0)
   const [isTimelineExpanded, setIsTimelineExpanded] = useState<boolean>(false)
 
-  // Modals
+  // Modals & Sliding Reschedule
   const [isTimelinePrintOpen, setIsTimelinePrintOpen] = useState(false)
   const [rescheduleModal, setRescheduleModal] = useState<{
     isOpen: boolean
@@ -113,11 +115,25 @@ export function MasterPlanningTimeline({
     processName: string
     originalDate: string
     newDate: string
+    newEndDate?: string
     field: string
     category: string
     reason: string
     currentNote: string
     revisionCount: number
+    isSlideDrag?: boolean
+    deltaDays?: number
+  } | null>(null)
+
+  // Sliding Drag State for Timeline Bars
+  const [dragState, setDragState] = useState<{
+    logId: string
+    startX: number
+    pStart: Date
+    pEnd: Date
+    durationDays: number
+    deltaDays: number
+    containerWidth: number
   } | null>(null)
 
   // Detect user if not passed
@@ -455,10 +471,103 @@ export function MasterPlanningTimeline({
     })
   }
 
+  // Sliding Bar Period Pointer Down Handler
+  const handleBarPointerDown = (
+    e: React.PointerEvent<HTMLDivElement>,
+    log: any,
+    lot: any,
+    process: any,
+    planData: { start: Date; end: Date; leftPercent: number; widthPercent: number }
+  ) => {
+    if (!canEdit) return
+    if (isTaskStartedByShopfloor(log)) {
+      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+      return
+    }
+
+    // Only respond to primary mouse button (0) or touch/pen
+    if (e.button !== 0) return
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    const startX = e.clientX
+    const containerEl = e.currentTarget.parentElement
+    const containerWidth = containerEl?.getBoundingClientRect().width || 1
+    const totalDays = totalTimelineDays || 14
+    const dayWidth = containerWidth / totalDays
+
+    const pStart = planData.start
+    const pEnd = planData.end
+    const durationDays = differenceInDays(pEnd, pStart)
+
+    let currentDeltaDays = 0
+
+    setDragState({
+      logId: log.id,
+      startX,
+      pStart,
+      pEnd,
+      durationDays,
+      deltaDays: 0,
+      containerWidth
+    })
+
+    const handlePointerMove = (moveEv: PointerEvent) => {
+      const deltaX = moveEv.clientX - startX
+      const snappedDelta = Math.round(deltaX / dayWidth)
+      currentDeltaDays = snappedDelta
+      setDragState(prev => prev ? { ...prev, deltaDays: snappedDelta } : null)
+    }
+
+    const handlePointerUp = () => {
+      window.removeEventListener('pointermove', handlePointerMove)
+      window.removeEventListener('pointerup', handlePointerUp)
+      setDragState(null)
+
+      if (currentDeltaDays === 0) {
+        // Simple click without sliding: open standard reschedule modal
+        handleOpenRescheduleDetail(log, lot, process)
+      } else {
+        // Dragged/Slid by delta days: open reschedule modal with slide prefill and required reason
+        const newStartDate = addDays(pStart, currentDeltaDays)
+        const newEndDate = addDays(pEnd, currentDeltaDays)
+        const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
+
+        setRescheduleModal({
+          isOpen: true,
+          logId: log.id,
+          lotNo: lot?.lot_no || '-',
+          sku: lot?.products?.sku || lot?.products?.product_name || '-',
+          processName: process?.process_name || 'งานผลิต',
+          originalDate: planInfo.originalDate || log.activity_date || '',
+          newDate: format(newStartDate, 'yyyy-MM-dd'),
+          newEndDate: format(newEndDate, 'yyyy-MM-dd'),
+          field: 'activity_date',
+          category: planInfo.category || 'WAIT_RM_PM',
+          reason: '',
+          currentNote: extractUserComment(log.note),
+          revisionCount: (planInfo.revisionCount || 0) + 1,
+          isSlideDrag: true,
+          deltaDays: currentDeltaDays
+        })
+      }
+    }
+
+    window.addEventListener('pointermove', handlePointerMove)
+    window.addEventListener('pointerup', handlePointerUp)
+  }
+
   // Save Reschedule Confirmation
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
-    const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+    const { logId, field, newDate, newEndDate, originalDate, category, reason, currentNote, revisionCount, isSlideDrag } = rescheduleModal
+
+    if (isSlideDrag && !reason.trim()) {
+      toast.error('กรุณาระบุรายละเอียดเหตุผลในการเลื่อนแผนงาน')
+      return
+    }
+
     const existingLog = logs.find(l => l.id === logId)
     if (existingLog && isTaskStartedByShopfloor(existingLog)) {
       toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)')
@@ -484,7 +593,9 @@ export function MasterPlanningTimeline({
       updated_by: activeUserId || '54168226-988e-4d63-93d2-1a742aafdd84'
     }
 
-    if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
+    if (newEndDate) {
+      updateData.end_date = newEndDate
+    } else if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
       updateData.end_date = newDate
     }
 
@@ -1223,8 +1334,13 @@ export function MasterPlanningTimeline({
                         userComment ? `💬 บันทึก/หมายเหตุหน้างาน: ${userComment}` : '',
                         isStarted 
                           ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`
-                          : (canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : '')
+                          : (canEdit ? `↔️ ลากแถบนี้เพื่อเลื่อนวัน (Slide Bar Period) หรือคลิกเพื่อเปิดหน้าต่างปรับแผน` : '')
                       ].filter(Boolean).join('\n')
+
+                      const isDraggingThis = !!(dragState && dragState.logId === log.id)
+                      const currentDelta = isDraggingThis ? dragState.deltaDays : 0
+                      const shiftPercent = (currentDelta / totalTimelineDays) * 100
+                      const effectiveLeftPercent = planData ? planData.leftPercent + shiftPercent : 0
 
                       return (
                         <div
@@ -1269,17 +1385,62 @@ export function MasterPlanningTimeline({
                           <div className="flex flex-1 relative h-full items-center">
                             {/* Mode 1: Plan Only */}
                             {timelineViewMode === 'plan' && planData?.inView && (
-                              <div
-                                className={cn(
-                                  "absolute h-6 rounded-md px-2 flex items-center text-xs font-medium border shadow-xs overflow-hidden z-10 cursor-pointer hover:brightness-95 transition-all",
-                                  pt.color
+                              <>
+                                {/* Ghost Placeholder Bar at original position during drag */}
+                                {isDraggingThis && (
+                                  <div
+                                    className="absolute h-6 rounded-md px-2 flex items-center text-xs font-medium border border-dashed border-slate-300 bg-slate-100/60 opacity-60 pointer-events-none z-5"
+                                    style={{ left: `calc(${planData.leftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
+                                  >
+                                    <span className="truncate opacity-50">{lot.products?.sku} - แผนเดิม</span>
+                                  </div>
                                 )}
-                                style={{ left: `calc(${planData.leftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
-                                onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                title={tooltipText}
-                              >
-                                <span className="truncate">{lot.products?.sku} - {process?.process_name}</span>
-                              </div>
+
+                                <div
+                                  className={cn(
+                                    "absolute h-6 rounded-md px-2 flex items-center text-xs font-medium border shadow-xs overflow-hidden select-none transition-all",
+                                    pt.color,
+                                    isStarted
+                                      ? "cursor-not-allowed opacity-90"
+                                      : canEdit
+                                        ? "cursor-grab active:cursor-grabbing hover:brightness-95 hover:shadow-md touch-none"
+                                        : "cursor-pointer hover:brightness-95",
+                                    isDraggingThis
+                                      ? "z-30 ring-2 ring-indigo-600 shadow-xl scale-[1.02] cursor-grabbing opacity-95 transition-none"
+                                      : "z-10"
+                                  )}
+                                  style={{ left: `calc(${effectiveLeftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
+                                  onPointerDown={(e) => {
+                                    if (canEdit && !isStarted) {
+                                      handleBarPointerDown(e, log, lot, process, planData)
+                                    }
+                                  }}
+                                  onClick={() => {
+                                    if (!canEdit || isStarted) {
+                                      handleOpenRescheduleDetail(log, lot, process)
+                                    }
+                                  }}
+                                  title={tooltipText}
+                                >
+                                  {isStarted ? (
+                                    <Lock className="w-3 h-3 text-amber-800/80 mr-1 shrink-0" />
+                                  ) : canEdit ? (
+                                    <GripVertical className="w-3 h-3 text-slate-500/70 mr-0.5 shrink-0 hover:text-slate-900" />
+                                  ) : null}
+
+                                  <span className="truncate">{lot.products?.sku} - {process?.process_name}</span>
+
+                                  {/* Floating Delta Badge when dragging */}
+                                  {isDraggingThis && (
+                                    <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-slate-900 text-white text-[10.5px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-40 flex items-center gap-1">
+                                      <span>↔️ {format(addDays(planData.start, currentDelta), 'dd/MM/yyyy')}</span>
+                                      <span className={currentDelta > 0 ? "text-emerald-300" : currentDelta < 0 ? "text-amber-300" : "text-slate-300"}>
+                                        ({currentDelta > 0 ? `+${currentDelta}` : currentDelta === 0 ? 'เดิม' : `${currentDelta}`} วัน)
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
                             )}
 
                             {/* Mode 2: Actual Only */}
@@ -1302,18 +1463,69 @@ export function MasterPlanningTimeline({
                               <>
                                 {/* Top Track: 🅿️ Plan Bar */}
                                 {planData?.inView && (
-                                  <div
-                                    className="absolute top-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden z-10 cursor-pointer hover:bg-indigo-100 transition-colors"
-                                    style={{
-                                      left: `calc(${planData.leftPercent}% + 4px)`,
-                                      width: `calc(${planData.widthPercent}% - 8px)`,
-                                      minWidth: isTimelineExpanded ? '90px' : '54px'
-                                    }}
-                                    onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                    title={tooltipText}
-                                  >
-                                    <span className="truncate">🅿️ แผน: {format(planData.start, 'dd/MM')}{planData.end > planData.start ? `-${format(planData.end, 'dd/MM')}` : ''}</span>
-                                  </div>
+                                  <>
+                                    {/* Ghost placeholder when dragging */}
+                                    {isDraggingThis && (
+                                      <div
+                                        className="absolute top-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border border-dashed border-slate-300 bg-slate-100/60 opacity-60 pointer-events-none z-5"
+                                        style={{
+                                          left: `calc(${planData.leftPercent}% + 4px)`,
+                                          width: `calc(${planData.widthPercent}% - 8px)`,
+                                          minWidth: isTimelineExpanded ? '90px' : '54px'
+                                        }}
+                                      >
+                                        <span className="truncate opacity-50">🅿️ แผนเดิม</span>
+                                      </div>
+                                    )}
+
+                                    <div
+                                      className={cn(
+                                        "absolute top-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden select-none transition-all",
+                                        isStarted
+                                          ? "cursor-not-allowed opacity-90"
+                                          : canEdit
+                                            ? "cursor-grab active:cursor-grabbing hover:bg-indigo-100 touch-none"
+                                            : "cursor-pointer hover:bg-indigo-100",
+                                        isDraggingThis
+                                          ? "z-30 ring-2 ring-indigo-600 shadow-xl bg-indigo-100 scale-[1.02] cursor-grabbing transition-none"
+                                          : "z-10"
+                                      )}
+                                      style={{
+                                        left: `calc(${effectiveLeftPercent}% + 4px)`,
+                                        width: `calc(${planData.widthPercent}% - 8px)`,
+                                        minWidth: isTimelineExpanded ? '90px' : '54px'
+                                      }}
+                                      onPointerDown={(e) => {
+                                        if (canEdit && !isStarted) {
+                                          handleBarPointerDown(e, log, lot, process, planData)
+                                        }
+                                      }}
+                                      onClick={() => {
+                                        if (!canEdit || isStarted) {
+                                          handleOpenRescheduleDetail(log, lot, process)
+                                        }
+                                      }}
+                                      title={tooltipText}
+                                    >
+                                      {isStarted ? (
+                                        <Lock className="w-2.5 h-2.5 text-amber-700 mr-1 shrink-0" />
+                                      ) : canEdit ? (
+                                        <GripVertical className="w-2.5 h-2.5 text-indigo-400 mr-0.5 shrink-0" />
+                                      ) : null}
+
+                                      <span className="truncate">🅿️ แผน: {format(addDays(planData.start, currentDelta), 'dd/MM')}{planData.end > planData.start ? `-${format(addDays(planData.end, currentDelta), 'dd/MM')}` : ''}</span>
+
+                                      {/* Floating Delta Badge when dragging in Compare mode */}
+                                      {isDraggingThis && (
+                                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-indigo-950 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-lg whitespace-nowrap pointer-events-none z-40 flex items-center gap-1">
+                                          <span>↔️ {format(addDays(planData.start, currentDelta), 'dd/MM/yyyy')}</span>
+                                          <span className={currentDelta > 0 ? "text-emerald-300" : currentDelta < 0 ? "text-amber-300" : "text-slate-300"}>
+                                            ({currentDelta > 0 ? `+${currentDelta}` : currentDelta === 0 ? 'เดิม' : `${currentDelta}`} วัน)
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </>
                                 )}
 
                                 {/* Bottom Track: 🅰️ Actual Bar */}
@@ -1384,6 +1596,26 @@ export function MasterPlanningTimeline({
 
           {rescheduleModal && (
             <div className="space-y-4 py-2 text-sm">
+              {/* Slide Drag Info Banner */}
+              {rescheduleModal.isSlideDrag && (
+                <div className="p-3 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 rounded-lg flex items-start gap-2.5 text-indigo-950 shadow-2xs">
+                  <div className="p-1.5 bg-indigo-600 text-white rounded-md mt-0.5 shrink-0">
+                    <CalendarDays className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold flex items-center gap-2">
+                      <span>เลื่อนแถบเวลาแผนงานผลิต (Slide Bar Period)</span>
+                      <Badge variant="secondary" className="bg-indigo-200/80 text-indigo-900 border-indigo-300 text-[10px] font-bold">
+                        {rescheduleModal.deltaDays && rescheduleModal.deltaDays > 0 ? `+${rescheduleModal.deltaDays}` : rescheduleModal.deltaDays} วัน
+                      </Badge>
+                    </div>
+                    <p className="text-[11.5px] text-indigo-700/90 mt-0.5 leading-relaxed">
+                      ระบบคำนวณและปรับเลื่อนช่วงวันที่ตามแถบที่ลากแล้ว <strong className="text-indigo-950 font-bold">กรุณาระบุเหตุผลในการเลื่อนแผน</strong> เพื่อบันทึกประวัติการปรับเปลี่ยน
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Context Summary */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between">
@@ -1411,7 +1643,11 @@ export function MasterPlanningTimeline({
                 <div>
                   <div className="text-[11px] text-emerald-800 font-medium mb-1 flex items-center justify-between">
                     <span>🎯 กำหนดวันใหม่ (Revised)</span>
-                    <span className="text-[10px] text-emerald-600 font-normal">คลิกเลือกวันใหม่</span>
+                    {rescheduleModal.isSlideDrag ? (
+                      <span className="text-[10px] text-indigo-600 font-semibold">ปรับจากการเลื่อนแถบ</span>
+                    ) : (
+                      <span className="text-[10px] text-emerald-600 font-normal">คลิกเลือกวันใหม่</span>
+                    )}
                   </div>
                   <Input
                     type="date"
@@ -1419,6 +1655,11 @@ export function MasterPlanningTimeline({
                     onChange={(e) => setRescheduleModal({ ...rescheduleModal, newDate: e.target.value })}
                     className="h-8 text-xs bg-white border-emerald-400 font-bold text-emerald-800 focus:ring-emerald-500"
                   />
+                  {rescheduleModal.newEndDate && rescheduleModal.newEndDate !== rescheduleModal.newDate && (
+                    <div className="text-[10px] text-slate-500 mt-1">
+                      ถึง: {format(new Date(rescheduleModal.newEndDate), 'dd/MM/yyyy')}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1447,28 +1688,40 @@ export function MasterPlanningTimeline({
               {/* Additional Note */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  รายละเอียดเพิ่มเติม / หมายเหตุของฝ่ายวางแผน
+                  รายละเอียดเหตุผลการเลื่อนแผน {rescheduleModal.isSlideDrag ? <span className="text-red-500">* (จำเป็นต้องระบุ)</span> : null}
                 </Label>
                 <Textarea
-                  placeholder="เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"
+                  placeholder={rescheduleModal.isSlideDrag ? "ระบุเหตุผลการเลื่อนแผน (จำเป็น) เช่น ลูกค้าขอเลื่อนวันส่ง, วัตถุดิบเข้าช้า, ซ่อมบำรุงเครื่องจักร..." : "เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"}
                   value={rescheduleModal.reason}
                   onChange={(e) => setRescheduleModal({ ...rescheduleModal, reason: e.target.value })}
-                  className="text-xs min-h-[70px] resize-none bg-white"
+                  className={cn(
+                    "text-xs min-h-[75px] resize-none bg-white",
+                    rescheduleModal.isSlideDrag && !rescheduleModal.reason.trim() ? "border-amber-400 focus:border-indigo-500" : ""
+                  )}
                 />
+                {rescheduleModal.isSlideDrag && !rescheduleModal.reason.trim() && (
+                  <p className="text-[11px] text-amber-700 font-medium">⚠️ กรุณากรอกเหตุผลเพื่อยืนยันการเลื่อนแผนงาน</p>
+                )}
               </div>
             </div>
           )}
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="text-xs text-slate-500 hover:text-slate-700 w-full sm:w-auto"
-              onClick={handleQuickRescheduleWithoutReason}
-            >
-              ปรับวันโดยไม่บันทึกสาเหตุ
-            </Button>
+            {!rescheduleModal?.isSlideDrag ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-xs text-slate-500 hover:text-slate-700 w-full sm:w-auto"
+                onClick={handleQuickRescheduleWithoutReason}
+              >
+                ปรับวันโดยไม่บันทึกสาเหตุ
+              </Button>
+            ) : (
+              <div className="text-[11px] text-slate-500 hidden sm:block">
+                * ต้องระบุเหตุผลเมื่อปรับเลื่อนจาก Timeline
+              </div>
+            )}
             <div className="flex gap-2 w-full sm:w-auto justify-end">
               <Button
                 type="button"
