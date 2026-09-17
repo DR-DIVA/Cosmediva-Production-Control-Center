@@ -1199,7 +1199,7 @@ export function RollingMasterRadar({
   }
 
   const [viewMode, setViewMode] = useState<'timeline' | 'daily' | 'logistics'>('timeline')
-  const [streamFilter, setStreamFilter] = useState<'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE'>('ALL')
+  const [selectedStreams, setSelectedStreams] = useState<('ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE')[]>([])
   const [loading, setLoading] = useState(true)
   const [radarData, setRadarData] = useState<{
     etaList: any[]
@@ -2151,9 +2151,32 @@ export function RollingMasterRadar({
     }
   ]
 
-  const activeStreams = streamFilter === 'ALL' 
+  const isAllStreams = selectedStreams.length === 0 || selectedStreams.length === streamsConfig.length
+
+  const activeStreams = isAllStreams 
     ? streamsConfig 
-    : streamsConfig.filter(s => s.key === streamFilter)
+    : streamsConfig.filter(s => selectedStreams.includes(s.key))
+
+  const handleToggleStream = (key: 'ALL' | 'ETA' | 'WEIGHING' | 'MIXING' | 'QC' | 'QA' | 'BULK_STOCK' | 'PACKING' | 'POF' | 'FG_DUE') => {
+    if (key === 'ALL') {
+      setSelectedStreams([])
+      return
+    }
+    // If currently showing ALL streams, clicking a stream isolates/focuses on this single stream
+    if (isAllStreams) {
+      setSelectedStreams([key])
+      return
+    }
+    // If already selected, unselect it
+    if (selectedStreams.includes(key)) {
+      const next = selectedStreams.filter(k => k !== key)
+      setSelectedStreams(next.length === 0 ? [] : next)
+    } else {
+      // Add to current selection (multi-select)
+      const next = [...selectedStreams, key]
+      setSelectedStreams(next.length === streamsConfig.length ? [] : next)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -2270,25 +2293,71 @@ export function RollingMasterRadar({
             </button>
           </div>
 
-          {/* Stream Filter Pills */}
-          <div className={`flex flex-wrap items-center gap-1 p-1 rounded-xl border text-xs ${
+          {/* Stream Filter Pills (Multi-Select Support) */}
+          <div className={`flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl border text-xs ${
             isNight ? 'bg-slate-900 border-slate-700' : 'bg-white border-slate-200'
           }`}>
-            <span className={`text-[11px] font-bold px-2 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>สายงาน:</span>
-            {(['ALL', 'ETA', 'WEIGHING', 'MIXING', 'QC', 'QA', 'BULK_STOCK', 'PACKING', 'POF', 'FG_DUE'] as const).map(f => (
+            <span className={`text-[11px] font-bold px-1.5 flex items-center gap-1.5 ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
+              <span>สายงาน:</span>
+              {!isAllStreams && (
+                <span className="text-[10px] font-black px-1.5 py-0.2 rounded-full bg-[#D4AF37] text-slate-950 shadow-2xs">
+                  {selectedStreams.length}
+                </span>
+              )}
+            </span>
+            <button
+              type="button"
+              onClick={() => handleToggleStream('ALL')}
+              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer ${
+                isAllStreams
+                  ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs'
+                  : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
+              }`}
+              title="แสดงทุกสายงาน"
+            >
+              ทั้งหมด
+            </button>
+            {(
+              [
+                { key: 'ETA' as const, label: 'คลัง RM/PM' },
+                { key: 'WEIGHING' as const, label: 'ชั่ง' },
+                { key: 'MIXING' as const, label: 'ผสม' },
+                { key: 'QC' as const, label: 'ตรวจ QC' },
+                { key: 'QA' as const, label: 'ประกัน QA' },
+                { key: 'BULK_STOCK' as const, label: 'คลัง Bulk' },
+                { key: 'PACKING' as const, label: 'บรรจุ' },
+                { key: 'POF' as const, label: 'ลงลัง/POF' },
+                { key: 'FG_DUE' as const, label: 'คลัง FG' },
+              ]
+            ).map(({ key, label }) => {
+              const isSelected = !isAllStreams && selectedStreams.includes(key)
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => handleToggleStream(key)}
+                  className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition cursor-pointer flex items-center gap-1 ${
+                    isSelected
+                      ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs ring-1 ring-[#B89628]'
+                      : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
+                  }`}
+                  title={isSelected ? `คลิกเพื่อยกเลิกการเลือก ${label}` : `คลิกเพื่อเพิ่ม/เลือก ${label}`}
+                >
+                  {isSelected && <span className="font-black text-[10px]">✓</span>}
+                  <span>{label}</span>
+                </button>
+              )
+            })}
+            {!isAllStreams && (
               <button
-                key={f}
                 type="button"
-                onClick={() => setStreamFilter(f)}
-                className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition ${
-                  streamFilter === f
-                    ? 'bg-[#D4AF37] text-slate-950 font-bold shadow-xs'
-                    : (isNight ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
-                }`}
+                onClick={() => handleToggleStream('ALL')}
+                className="ml-1 px-2 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 hover:bg-amber-500/10 rounded transition cursor-pointer"
+                title="ล้างตัวเลือกทั้งหมดกลับเป็นแสดงทุกสายงาน"
               >
-                {f === 'ALL' ? 'ทั้งหมด' : f === 'ETA' ? 'คลัง RM/PM' : f === 'WEIGHING' ? 'ชั่ง' : f === 'MIXING' ? 'ผสม' : f === 'QC' ? 'ตรวจ QC' : f === 'QA' ? 'ประกัน QA' : f === 'BULK_STOCK' ? 'คลัง Bulk' : f === 'PACKING' ? 'บรรจุ' : f === 'POF' ? 'ลงลัง/POF' : 'คลัง FG'}
+                ✕ ล้างตัวเลือก
               </button>
-            ))}
+            )}
           </div>
         </div>
 
@@ -2956,15 +3025,15 @@ export function RollingMasterRadar({
               <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {horizonDates.map((d) => {
-                    const dayEta = dateStreamMap[d.dateStr]?.ETA || []
-                    const dayWeighing = dateStreamMap[d.dateStr]?.WEIGHING || []
-                    const dayMixing = dateStreamMap[d.dateStr]?.MIXING || []
-                    const dayQc = dateStreamMap[d.dateStr]?.QC || []
-                    const dayQa = dateStreamMap[d.dateStr]?.QA || []
-                    const dayBulkStock = dateStreamMap[d.dateStr]?.BULK_STOCK || []
-                    const dayPacking = dateStreamMap[d.dateStr]?.PACKING || []
-                    const dayPof = dateStreamMap[d.dateStr]?.POF || []
-                    const dayFgDue = dateStreamMap[d.dateStr]?.FG_DUE || []
+                    const dayEta = (!isAllStreams && !selectedStreams.includes('ETA')) ? [] : (dateStreamMap[d.dateStr]?.ETA || [])
+                    const dayWeighing = (!isAllStreams && !selectedStreams.includes('WEIGHING')) ? [] : (dateStreamMap[d.dateStr]?.WEIGHING || [])
+                    const dayMixing = (!isAllStreams && !selectedStreams.includes('MIXING')) ? [] : (dateStreamMap[d.dateStr]?.MIXING || [])
+                    const dayQc = (!isAllStreams && !selectedStreams.includes('QC')) ? [] : (dateStreamMap[d.dateStr]?.QC || [])
+                    const dayQa = (!isAllStreams && !selectedStreams.includes('QA')) ? [] : (dateStreamMap[d.dateStr]?.QA || [])
+                    const dayBulkStock = (!isAllStreams && !selectedStreams.includes('BULK_STOCK')) ? [] : (dateStreamMap[d.dateStr]?.BULK_STOCK || [])
+                    const dayPacking = (!isAllStreams && !selectedStreams.includes('PACKING')) ? [] : (dateStreamMap[d.dateStr]?.PACKING || [])
+                    const dayPof = (!isAllStreams && !selectedStreams.includes('POF')) ? [] : (dateStreamMap[d.dateStr]?.POF || [])
+                    const dayFgDue = (!isAllStreams && !selectedStreams.includes('FG_DUE')) ? [] : (dateStreamMap[d.dateStr]?.FG_DUE || [])
 
                     const totalDayTasks = dayEta.length + dayWeighing.length + dayMixing.length + dayQc.length + dayQa.length + dayBulkStock.length + dayPacking.length + dayPof.length + dayFgDue.length
 
