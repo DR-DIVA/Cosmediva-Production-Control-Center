@@ -1401,6 +1401,7 @@ export default function PofTasksPage() {
           initialDept="PK"
           currentUser={currentUser || 'POF'}
           onPlanChanged={fetchPofTasks}
+          hideHeaderKpi={true}
         />
       ) : viewMode === 'calendar' ? (
         <TaskCalendar 

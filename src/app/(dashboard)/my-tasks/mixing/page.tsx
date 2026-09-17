@@ -1146,6 +1146,7 @@ export default function MixingTasksPage() {
           initialDept="MX"
           currentUser={userRole || 'MX'}
           onPlanChanged={fetchMixingTasks}
+          hideHeaderKpi={true}
         />
       ) : viewMode === 'calendar' ? (
         <TaskCalendar 

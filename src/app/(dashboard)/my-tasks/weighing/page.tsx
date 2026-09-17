@@ -1020,6 +1020,7 @@ export default function WeighingTasksPage() {
           initialDept="RM"
           currentUser={userRole || 'RM'}
           onPlanChanged={fetchWeighingTasks}
+          hideHeaderKpi={true}
         />
       ) : viewMode === 'calendar' ? (
         <TaskCalendar 

@@ -1214,6 +1214,7 @@ export default function PackingTasksPage() {
           initialDept="PK"
           currentUser={userRole || 'PK'}
           onPlanChanged={fetchPackingTasks}
+          hideHeaderKpi={true}
         />
       ) : viewMode === 'calendar' ? (
         <TaskCalendar 
