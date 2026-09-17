@@ -83,6 +83,7 @@ export default function PlannerPage() {
   // Toggle Switch: Show/Hide Shopfloor Operational Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)
   const [showShopfloorHandovers, setShowShopfloorHandovers] = useState(false)
   const [isTimelinePrintOpen, setIsTimelinePrintOpen] = useState(false)
+  const [timelineViewMode, setTimelineViewMode] = useState<'plan' | 'actual' | 'compare'>('plan')
 
   useEffect(() => {
     try {
@@ -1115,6 +1116,180 @@ export default function PlannerPage() {
   })
   const pkDone = pkTasks.filter(l => l.status === 'DONE').length
 
+  // -------------------------------------------------------------
+  // Plan vs Actual KPI Metrics (Schedule Adherence & Bottlenecks)
+  // -------------------------------------------------------------
+  const scheduleAdherenceStats = useMemo(() => {
+    let totalPlanned = 0
+    let totalCompleted = 0
+    let totalOnTime = 0
+    let totalDelayed = 0
+    let totalEarly = 0
+    let totalDelayDays = 0
+
+    const deptStats = {
+      RM: { total: 0, completed: 0, onTime: 0, delayed: 0, delayDays: 0 },
+      MX: { total: 0, completed: 0, onTime: 0, delayed: 0, delayDays: 0 },
+      PK: { total: 0, completed: 0, onTime: 0, delayed: 0, delayDays: 0 }
+    }
+
+    const bottleneckCounts: Record<string, number> = {
+      FLOOR_DOWNTIME: 0,
+      WAIT_RM_PM: 0,
+      QC_WAIT: 0,
+      RUSH_ORDER_INSERT: 0,
+      PLAN_CALIBRATION: 0,
+      CUSTOMER_RESCHEDULE: 0,
+      OTHER: 0
+    }
+
+    const todayStart = startOfDay(new Date())
+
+    logs.forEach(log => {
+      const process = processes.find(p => p.id === log.process_id)
+      const pName = (process?.process_name || log.processes?.process_name || '').toLowerCase()
+
+      let deptKey: 'RM' | 'MX' | 'PK' | null = null
+      if (pName.includes('ชั่ง')) deptKey = 'RM'
+      else if (pName.includes('ผสม')) deptKey = 'MX'
+      else if (pName.includes('บรรจุ') || pName.includes('ลงลัง')) deptKey = 'PK'
+
+      if (log.activity_date) {
+        totalPlanned++
+        if (deptKey) deptStats[deptKey].total++
+
+        const planStart = startOfDay(new Date(log.activity_date))
+        const planEnd = log.end_date ? startOfDay(new Date(log.end_date)) : planStart
+
+        if (log.status === 'DONE') {
+          totalCompleted++
+          if (deptKey) deptStats[deptKey].completed++
+
+          const actualEnd = log.end_time
+            ? startOfDay(new Date(log.end_time))
+            : (log.updated_at ? startOfDay(new Date(log.updated_at)) : planStart)
+
+          const diff = differenceInDays(actualEnd, planEnd)
+
+          if (diff <= 0) {
+            totalOnTime++
+            if (deptKey) deptStats[deptKey].onTime++
+            if (diff < 0) totalEarly++
+          } else {
+            totalDelayed++
+            totalDelayDays += diff
+            if (deptKey) {
+              deptStats[deptKey].delayed++
+              deptStats[deptKey].delayDays += diff
+            }
+
+            const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
+            const noteLower = (log.note || '').toLowerCase()
+
+            if (noteLower.includes('qc hold') || noteLower.includes('รอ qc') || noteLower.includes('แล็บ')) {
+              bottleneckCounts.QC_WAIT++
+            } else if (planInfo.category && bottleneckCounts[planInfo.category] !== undefined) {
+              bottleneckCounts[planInfo.category]++
+            } else if (noteLower.includes('เครื่อง') || noteLower.includes('เสีย') || noteLower.includes('ซ่อม')) {
+              bottleneckCounts.FLOOR_DOWNTIME++
+            } else if (noteLower.includes('วัตถุดิบ') || noteLower.includes('สาร') || noteLower.includes('บรรจุภัณฑ์')) {
+              bottleneckCounts.WAIT_RM_PM++
+            } else {
+              bottleneckCounts.FLOOR_DOWNTIME++
+            }
+          }
+        } else if (log.status === 'IN_PROGRESS') {
+          if (differenceInDays(todayStart, planEnd) > 0) {
+            const overdue = differenceInDays(todayStart, planEnd)
+            totalDelayed++
+            totalDelayDays += overdue
+            if (deptKey) {
+              deptStats[deptKey].delayed++
+              deptStats[deptKey].delayDays += overdue
+            }
+          }
+        } else if (log.status === 'WAITING') {
+          if (differenceInDays(todayStart, planStart) > 0) {
+            const overdue = differenceInDays(todayStart, planStart)
+            totalDelayed++
+            totalDelayDays += overdue
+            if (deptKey) {
+              deptStats[deptKey].delayed++
+              deptStats[deptKey].delayDays += overdue
+            }
+          }
+        }
+      }
+    })
+
+    const overallAccuracy = (totalOnTime + totalDelayed) > 0
+      ? ((totalOnTime / (totalOnTime + totalDelayed)) * 100).toFixed(1)
+      : '100.0'
+
+    const rmAccuracy = (deptStats.RM.onTime + deptStats.RM.delayed) > 0
+      ? ((deptStats.RM.onTime / (deptStats.RM.onTime + deptStats.RM.delayed)) * 100).toFixed(1)
+      : '100.0'
+
+    const mxAccuracy = (deptStats.MX.onTime + deptStats.MX.delayed) > 0
+      ? ((deptStats.MX.onTime / (deptStats.MX.onTime + deptStats.MX.delayed)) * 100).toFixed(1)
+      : '100.0'
+
+    const pkAccuracy = (deptStats.PK.onTime + deptStats.PK.delayed) > 0
+      ? ((deptStats.PK.onTime / (deptStats.PK.onTime + deptStats.PK.delayed)) * 100).toFixed(1)
+      : '100.0'
+
+    const avgDelay = totalDelayed > 0
+      ? (totalDelayDays / totalDelayed).toFixed(1)
+      : '0.0'
+
+    // Determine top bottleneck
+    const bottleneckLabels: Record<string, string> = {
+      FLOOR_DOWNTIME: '⚙️ หน้างานขัดข้อง / ชะลอผลิต',
+      WAIT_RM_PM: '📦 รอวัตถุดิบ / บรรจุภัณฑ์',
+      QC_WAIT: '🔬 รอผลตรวจแล็บ QC ปล่อยผ่าน',
+      RUSH_ORDER_INSERT: '⚡ แทรกงานด่วนลูกค้า',
+      PLAN_CALIBRATION: '📋 การปรับแผนงานปกติ',
+      CUSTOMER_RESCHEDULE: '👤 ลูกค้าขอเลื่อนวัน',
+      OTHER: '❓ อื่นๆ'
+    }
+
+    const sortedBottlenecks = Object.entries(bottleneckCounts)
+      .filter(([_, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+
+    const totalBottleneckIncidents = sortedBottlenecks.reduce((acc, [_, c]) => acc + c, 0)
+    const topBottleneck = sortedBottlenecks[0]
+    const topBottleneckText = topBottleneck 
+      ? `${bottleneckLabels[topBottleneck[0]] || topBottleneck[0]} (${topBottleneck[1]} งาน)`
+      : 'ยังไม่พบคอขวดสะสม'
+
+    const bottleneckSummaryText = sortedBottlenecks.length > 0
+      ? sortedBottlenecks.slice(0, 3).map(([k, count]) => {
+          const pct = totalBottleneckIncidents > 0 ? Math.round((count / totalBottleneckIncidents) * 100) : 0
+          return `${bottleneckLabels[k]?.split(' ')[1] || k} ${pct}%`
+        }).join(' • ')
+      : 'ทุกสายงานดำเนินงานตามแผน'
+
+    return {
+      overallAccuracy,
+      totalPlanned,
+      totalCompleted,
+      totalOnTime,
+      totalDelayed,
+      totalEarly,
+      avgDelay,
+      deptStats: {
+        RM: { ...deptStats.RM, accuracy: rmAccuracy },
+        MX: { ...deptStats.MX, accuracy: mxAccuracy },
+        PK: { ...deptStats.PK, accuracy: pkAccuracy }
+      },
+      topBottleneckText,
+      bottleneckSummaryText,
+      sortedBottlenecks,
+      totalBottleneckIncidents
+    }
+  }, [logs, processes])
+
   const handleRefreshData = () => {
     fetchData()
     toast.success('รีเฟรชข้อมูลแผนการผลิตล่าสุดเรียบร้อยแล้ว')
@@ -2008,136 +2183,474 @@ export default function PlannerPage() {
 
         {activeTab === "timeline" && (
           <>
-            <div className="p-3 bg-gradient-to-r from-indigo-50/70 via-slate-50 to-white border-b border-slate-200 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-indigo-100 border border-indigo-200 flex items-center justify-center text-indigo-700 font-bold shrink-0">
-                  <CalendarDays className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
-                    <span>แผนผังกำหนดการผลิต (Timeline Lookahead 14 วัน)</span>
-                    <span className="text-[10.5px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-mono font-semibold">
-                      {format(timelineDates[0], 'dd MMM yyyy')} - {format(timelineDates[13], 'dd MMM yyyy')}
-                    </span>
+            {/* Plan vs Actual KPI Summary Header */}
+            <div className="p-3 sm:p-4 bg-white border-b border-slate-200">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-3">
+                {/* 1. Overall Plan Accuracy */}
+                <div className="bg-gradient-to-br from-indigo-50/80 to-white p-2.5 rounded-xl border border-indigo-200 shadow-xs">
+                  <div className="text-[10.5px] font-bold text-indigo-700 flex items-center justify-between">
+                    <span>ความแม่นยำรวม (Accuracy)</span>
+                    <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
                   </div>
-                  <div className="text-[11px] text-slate-500 mt-0.5">
-                    แสดงคิวงานชั่งสาร ผสม บรรจุ พร้อมสถานะ 🔬 1st Batch และการปรับเลื่อนวัน 🔄
+                  <div className="text-xl font-black text-indigo-950 mt-1">
+                    {scheduleAdherenceStats.overallAccuracy}%
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    ตรงแผน <strong className="text-emerald-700 font-bold">{scheduleAdherenceStats.totalOnTime}</strong> • ล่าช้า <strong className="text-rose-700 font-bold">{scheduleAdherenceStats.totalDelayed}</strong>
+                  </div>
+                </div>
+
+                {/* 2. RM Weighing */}
+                <div className="bg-gradient-to-br from-amber-50/80 to-white p-2.5 rounded-xl border border-amber-200 shadow-xs">
+                  <div className="text-[10.5px] font-bold text-amber-800 flex items-center justify-between">
+                    <span>🟡 ฝ่ายชั่งสาร (RM)</span>
+                    <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.RM.accuracy}%</span>
+                  </div>
+                  <div className="text-xl font-black text-amber-950 mt-1">
+                    {scheduleAdherenceStats.deptStats.RM.accuracy}%
+                  </div>
+                  <div className="w-full bg-amber-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                    <div className="bg-amber-500 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.RM.accuracy}%` }} />
+                  </div>
+                </div>
+
+                {/* 3. MX Mixing */}
+                <div className="bg-gradient-to-br from-blue-50/80 to-white p-2.5 rounded-xl border border-blue-200 shadow-xs">
+                  <div className="text-[10.5px] font-bold text-blue-800 flex items-center justify-between">
+                    <span>🔵 ฝ่ายผสม (MX)</span>
+                    <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.MX.accuracy}%</span>
+                  </div>
+                  <div className="text-xl font-black text-blue-950 mt-1">
+                    {scheduleAdherenceStats.deptStats.MX.accuracy}%
+                  </div>
+                  <div className="w-full bg-blue-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                    <div className="bg-blue-600 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.MX.accuracy}%` }} />
+                  </div>
+                </div>
+
+                {/* 4. PK Packing (Highlights if bottleneck) */}
+                <div className={cn(
+                  "p-2.5 rounded-xl border shadow-xs transition-all",
+                  Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90
+                    ? "bg-gradient-to-br from-rose-50/90 to-white border-rose-300 ring-1 ring-rose-200"
+                    : "bg-gradient-to-br from-emerald-50/80 to-white border-emerald-200"
+                )}>
+                  <div className={cn(
+                    "text-[10.5px] font-bold flex items-center justify-between",
+                    Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-800" : "text-emerald-800"
+                  )}>
+                    <span>🟢 ฝ่ายบรรจุ (PK)</span>
+                    <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.PK.accuracy}%</span>
+                  </div>
+                  <div className={cn(
+                    "text-xl font-black mt-1",
+                    Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-950" : "text-emerald-950"
+                  )}>
+                    {scheduleAdherenceStats.deptStats.PK.accuracy}%
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                    <div
+                      className={cn("h-full rounded-full", Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "bg-rose-500" : "bg-emerald-500")}
+                      style={{ width: `${scheduleAdherenceStats.deptStats.PK.accuracy}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* 5. Average Delay */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>ความล่าช้าเฉลี่ย</span>
+                    <Clock className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <div className="text-xl font-black text-slate-900 mt-1">
+                    +{scheduleAdherenceStats.avgDelay} <span className="text-xs font-normal text-slate-500">วัน</span>
+                  </div>
+                  <div className="text-[10px] text-slate-500 mt-0.5">
+                    เร็วกว่าแผน: <strong className="text-blue-600 font-bold">{scheduleAdherenceStats.totalEarly}</strong> งาน
+                  </div>
+                </div>
+
+                {/* 6. Bottleneck Insights */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
+                    <span>วิเคราะห์คอขวดสะสม</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                  </div>
+                  <div className="text-[10.5px] font-bold text-slate-900 mt-1 truncate" title={scheduleAdherenceStats.topBottleneckText}>
+                    {scheduleAdherenceStats.topBottleneckText}
+                  </div>
+                  <div className="text-[9.5px] text-slate-500 mt-0.5 truncate" title={scheduleAdherenceStats.bottleneckSummaryText}>
+                    {scheduleAdherenceStats.bottleneckSummaryText}
                   </div>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <Button
-                  size="sm"
-                  onClick={() => setIsTimelinePrintOpen(true)}
-                  className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 rounded-lg"
-                  title="คลิกเพื่อเปิดหน้าต่างพิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
-                </Button>
+              {/* View Mode Switcher Toolbar & Print Trigger */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-slate-100">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs font-bold text-slate-700 shrink-0">โหมดมุมมอง Timeline:</span>
+                  <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-2xs">
+                    <button
+                      type="button"
+                      onClick={() => setTimelineViewMode('plan')}
+                      className={cn(
+                        "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                        timelineViewMode === 'plan'
+                          ? "bg-white text-indigo-900 shadow-sm font-black ring-1 ring-slate-200"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      <span>🅿️ แผนงาน (Plan)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimelineViewMode('actual')}
+                      className={cn(
+                        "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                        timelineViewMode === 'actual'
+                          ? "bg-white text-emerald-900 shadow-sm font-black ring-1 ring-slate-200"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      <span>🅰️ ทำจริง (Actual)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTimelineViewMode('compare')}
+                      className={cn(
+                        "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
+                        timelineViewMode === 'compare'
+                          ? "bg-indigo-600 text-white shadow-sm font-black"
+                          : "text-slate-600 hover:text-slate-900"
+                      )}
+                    >
+                      <span>⚖️ เปรียบเทียบ (Compare P vs A)</span>
+                      <span className="bg-amber-400 text-amber-950 text-[8.5px] px-1 py-0 rounded font-black">PRO</span>
+                    </button>
+                  </div>
+
+                  {/* Visual Legend */}
+                  <div className="hidden lg:flex items-center gap-2 text-[10.5px] text-slate-600 ml-2">
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>ตรงแผน</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0"></span>ล่าช้า</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>เร็วกว่าแผน</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-indigo-50 border border-dashed border-indigo-400 shrink-0"></span>🅿️ แผน</span>
+                    <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-emerald-600 shrink-0"></span>🅰️ ทำจริง</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] font-mono text-slate-500 hidden sm:inline">
+                    {format(timelineDates[0], 'dd MMM yyyy')} - {format(timelineDates[13], 'dd MMM yyyy')}
+                  </span>
+                  <Button
+                    size="sm"
+                    onClick={() => setIsTimelinePrintOpen(true)}
+                    className="h-8 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white shadow-xs flex items-center gap-1.5 rounded-lg"
+                    title="คลิกเพื่อเปิดหน้าต่างพิมพ์หรือบันทึกแผนงาน Timeline เป็นเอกสาร PDF (A4 แนวนอน)"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>พิมพ์ / Export PDF (A4 แนวนอน)</span>
+                  </Button>
+                </div>
               </div>
             </div>
 
+            {/* Interactive Timeline Lookahead Table */}
             <div className="overflow-x-auto min-h-[500px]">
-            <div className="min-w-[1200px] border-t border-slate-200 relative">
-              <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
-                <div className="w-[250px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0]">Project / Task</div>
-                <div className="flex flex-1">
-                  {timelineDates.map((date, i) => (
-                    <div key={i} className="flex-1 min-w-[60px] p-2 text-center border-r border-slate-200 text-xs">
-                      <div className={cn("font-medium", date.getDay() === 0 || date.getDay() === 6 ? "text-red-500" : "text-slate-700")}>{format(date, "EEE")}</div>
-                      <div className="text-slate-500">{format(date, "dd MMM")}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="divide-y divide-slate-100 relative">
-                <div className="absolute inset-0 left-[250px] flex pointer-events-none">
-                    {timelineDates.map((_, i) => (
-                        <div key={i} className="flex-1 min-w-[60px] border-r border-slate-200 border-dashed"></div>
+              <div className="min-w-[1200px] border-t border-slate-200 relative">
+                {/* Timeline Date Headers */}
+                <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
+                  <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0]">
+                    Project / Task {timelineViewMode === 'compare' ? '(P vs A)' : ''}
+                  </div>
+                  <div className="flex flex-1">
+                    {timelineDates.map((date, i) => (
+                      <div key={i} className="flex-1 min-w-[60px] p-2 text-center border-r border-slate-200 text-xs">
+                        <div className={cn("font-medium", date.getDay() === 0 || date.getDay() === 6 ? "text-red-500 font-bold" : "text-slate-700")}>{format(date, "EEE")}</div>
+                        <div className="text-slate-500">{format(date, "dd MMM")}</div>
+                      </div>
                     ))}
+                  </div>
                 </div>
 
-                {filteredLots.map(lot => {
-                  const lotLogs = getSortedLotLogs(lot.id)
-                  const showLot = lotLogs.some(log => {
+                <div className="divide-y divide-slate-100 relative">
+                  <div className="absolute inset-0 left-[260px] flex pointer-events-none">
+                    {timelineDates.map((_, i) => (
+                      <div key={i} className="flex-1 min-w-[60px] border-r border-slate-200 border-dashed"></div>
+                    ))}
+                  </div>
+
+                  {filteredLots.map(lot => {
+                    const lotLogs = getSortedLotLogs(lot.id)
+                    const showLot = lotLogs.some(log => {
                       const process = processes.find(p => p.id === log.process_id)
                       let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
-                      if (!pt) return filterDept === "ALL" && log.activity_date
-                      return (filterDept === "ALL" || filterDept === pt.id) && log.activity_date
-                  });
+                      const matchesDept = filterDept === "ALL" || filterDept === pt?.id
+                      if (timelineViewMode === 'actual') {
+                        return matchesDept && (log.start_time || log.status === 'DONE')
+                      }
+                      return matchesDept && (log.activity_date || log.start_time)
+                    })
 
-                  if (filterDept !== "ALL" && !showLot) return null
+                    if (filterDept !== "ALL" && !showLot) return null
 
-                  return (
-                    <div key={lot.id} className="group relative z-10">
-                      <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
-                        <div className="w-[250px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
-                          <div className="font-medium text-sm line-clamp-2 break-words text-wrap">{lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span></div>
-                        </div>
-                        <div className="flex flex-1"></div>
-                      </div>
-
-                      {lotLogs.map(log => {
-                        const process = processes.find(p => p.id === log.process_id)
-                        let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
-                        if (!pt) pt = { id: "OTHER", name: process?.process_name || "Unknown", color: "bg-slate-100 text-slate-800 border-slate-200" }
-                        
-                        if (filterDept !== "ALL" && filterDept !== pt.id) return null
-
-                        let leftPercent = 0
-                        let widthPercent = 0
-                        let hasDates = false
-
-                        if (log.activity_date) {
-                          const startDate = startOfDay(new Date(log.activity_date))
-                          const endDate = log.end_date ? startOfDay(new Date(log.end_date)) : startDate
-                          const timelineStart = startOfDay(timelineDates[0])
-                          
-                          const startDiff = differenceInDays(startDate, timelineStart)
-                          const duration = differenceInDays(endDate, startDate) + 1
-
-                          const endDiff = startDiff + duration - 1
-                          if (endDiff >= 0 && startDiff < 14) {
-                            hasDates = true
-                            const actualStartDiff = Math.max(0, startDiff)
-                            const actualEndDiff = Math.min(13, endDiff)
-                            const actualDuration = actualEndDiff - actualStartDiff + 1
-                            
-                            leftPercent = (actualStartDiff / 14) * 100
-                            widthPercent = (actualDuration / 14) * 100
-                          }
-                        }
-
-                        if (!hasDates && filterDept !== "ALL") return null;
-
-                        return (
-                          <div key={log.id} className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
-                            <div className="w-[250px] shrink-0 py-2 px-3 pl-6 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0] flex items-center gap-2">
-                              <div className={cn("w-1.5 h-1.5 rounded-full", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
-                              <span className="text-xs font-medium text-slate-600 border-l-2 border-slate-200 pl-2">{process?.process_name || "Unknown"} (T{log.tank_start}-{log.tank_end})</span>
-                            </div>
-                            <div className="flex flex-1 relative h-full items-center">
-                              {hasDates && (
-                                <div 
-                                  className={cn("absolute rounded-full flex items-center px-3 py-1 text-xs font-medium overflow-hidden shadow-sm transition-all hover:brightness-95 cursor-pointer", pt.color, "z-30")}
-                                  style={{ left: `calc(${leftPercent}% + 4px)`, width: `calc(${widthPercent}% - 8px)` }}
-                                  title={`รหัสงาน/SKU: ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nLOT: ${lot.lot_no || '-'}\nถังที่: ${log.tank_start}-${log.tank_end}\nวันที่: ${log.activity_date ? format(new Date(log.activity_date), 'dd MMM yyyy') : '-'}${log.end_date && log.end_date !== log.activity_date ? ` ถึง ${format(new Date(log.end_date), 'dd MMM yyyy')}` : ''}`}
-                                >
-                                  <span className="line-clamp-2 break-words text-wrap">{lot.products?.sku} - {process?.process_name}</span>
-                                </div>
-                              )}
+                    return (
+                      <div key={lot.id} className="group relative z-10">
+                        {/* LOT Header Row */}
+                        <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
+                          <div className="w-[260px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
+                            <div className="font-medium text-sm line-clamp-2 break-words text-wrap">
+                              {lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span>
                             </div>
                           </div>
-                        )
-                      })}
-                    </div>
-                  )
-                })}
+                          <div className="flex flex-1"></div>
+                        </div>
+
+                        {/* Individual Task Rows */}
+                        {lotLogs.map(log => {
+                          const process = processes.find(p => p.id === log.process_id)
+                          let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
+                          if (!pt) pt = { id: "OTHER", name: process?.process_name || "Unknown", color: "bg-slate-100 text-slate-800 border-slate-200" }
+
+                          if (filterDept !== "ALL" && filterDept !== pt.id) return null
+
+                          const timelineStart = startOfDay(timelineDates[0])
+                          const todayStart = startOfDay(new Date())
+
+                          // 1. Calculate Plan Period
+                          let planData: any = null
+                          if (log.activity_date) {
+                            const pStart = startOfDay(new Date(log.activity_date))
+                            const pEnd = log.end_date ? startOfDay(new Date(log.end_date)) : pStart
+                            const startDiff = differenceInDays(pStart, timelineStart)
+                            const duration = differenceInDays(pEnd, pStart) + 1
+                            const endDiff = startDiff + duration - 1
+
+                            if (endDiff >= 0 && startDiff < 14) {
+                              const actualStartDiff = Math.max(0, startDiff)
+                              const actualEndDiff = Math.min(13, endDiff)
+                              const actualDuration = actualEndDiff - actualStartDiff + 1
+                              planData = {
+                                start: pStart,
+                                end: pEnd,
+                                inView: true,
+                                leftPercent: (actualStartDiff / 14) * 100,
+                                widthPercent: (actualDuration / 14) * 100,
+                                startsBefore: startDiff < 0,
+                                endsAfter: endDiff >= 14
+                              }
+                            }
+                          }
+
+                          // 2. Calculate Actual Period
+                          let actualData: any = null
+                          const actualStartRaw = log.start_time || (log.status === 'DONE' ? (log.activity_date || log.end_time || log.updated_at) : null)
+                          if (actualStartRaw) {
+                            const aStart = startOfDay(new Date(actualStartRaw))
+                            let aEnd = aStart
+                            if (log.status === 'DONE') {
+                              const actualEndRaw = log.end_time || log.updated_at || actualStartRaw
+                              aEnd = startOfDay(new Date(actualEndRaw))
+                              if (aEnd < aStart) aEnd = aStart
+                            } else if (log.status === 'IN_PROGRESS') {
+                              aEnd = todayStart > aStart ? todayStart : aStart
+                            }
+
+                            const startDiff = differenceInDays(aStart, timelineStart)
+                            const duration = differenceInDays(aEnd, aStart) + 1
+                            const endDiff = startDiff + duration - 1
+
+                            if (endDiff >= 0 && startDiff < 14) {
+                              const actualStartDiff = Math.max(0, startDiff)
+                              const actualEndDiff = Math.min(13, endDiff)
+                              const actualDuration = actualEndDiff - actualStartDiff + 1
+                              actualData = {
+                                start: aStart,
+                                end: aEnd,
+                                inView: true,
+                                leftPercent: (actualStartDiff / 14) * 100,
+                                widthPercent: (actualDuration / 14) * 100,
+                                startsBefore: startDiff < 0,
+                                endsAfter: endDiff >= 14,
+                                status: log.status
+                              }
+                            }
+                          }
+
+                          // 3. Calculate Variance
+                          let variance = {
+                            type: 'WAITING',
+                            diffDays: 0,
+                            label: 'รอเริ่มตามแผน',
+                            colorClass: 'bg-slate-100 text-slate-600 border-slate-200'
+                          }
+
+                          if (log.activity_date) {
+                            const pEnd = log.end_date ? startOfDay(new Date(log.end_date)) : startOfDay(new Date(log.activity_date))
+                            const pStart = startOfDay(new Date(log.activity_date))
+
+                            if (log.status === 'DONE') {
+                              const aEnd = log.end_time
+                                ? startOfDay(new Date(log.end_time))
+                                : (log.updated_at ? startOfDay(new Date(log.updated_at)) : pEnd)
+                              const diff = differenceInDays(aEnd, pEnd)
+
+                              if (diff === 0) {
+                                variance = { type: 'ON_TIME', diffDays: 0, label: '✅ ตรงแผน', colorClass: 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold' }
+                              } else if (diff < 0) {
+                                variance = { type: 'EARLY', diffDays: diff, label: `⚡ เร็วกว่าแผน ${Math.abs(diff)}d`, colorClass: 'bg-blue-100 text-blue-800 border-blue-300 font-bold' }
+                              } else {
+                                variance = { type: 'DELAYED', diffDays: diff, label: `⚠️ ล่าช้า +${diff}d`, colorClass: 'bg-rose-100 text-rose-800 border-rose-300 font-bold' }
+                              }
+                            } else if (log.status === 'IN_PROGRESS') {
+                              const overdue = differenceInDays(todayStart, pEnd)
+                              if (overdue > 0) {
+                                variance = { type: 'OVERDUE_IN_PROGRESS', diffDays: overdue, label: `🚨 เกินกำหนด +${overdue}d`, colorClass: 'bg-rose-100 text-rose-900 border-rose-400 font-bold' }
+                              } else {
+                                variance = { type: 'IN_PROGRESS', diffDays: 0, label: '⏳ กำลังผลิตตามแผน', colorClass: 'bg-amber-100 text-amber-800 border-amber-300 font-medium' }
+                              }
+                            } else {
+                              const overdue = differenceInDays(todayStart, pStart)
+                              if (overdue > 0) {
+                                variance = { type: 'OVERDUE_START', diffDays: overdue, label: `⏳ เลยวันเริ่ม +${overdue}d`, colorClass: 'bg-amber-100 text-amber-900 border-amber-400 font-bold' }
+                              }
+                            }
+                          }
+
+                          // Filter condition based on viewMode
+                          if (timelineViewMode === 'plan' && !planData?.inView) return null
+                          if (timelineViewMode === 'actual' && !actualData?.inView) return null
+                          if (timelineViewMode === 'compare' && !planData?.inView && !actualData?.inView) return null
+
+                          const isCompare = timelineViewMode === 'compare'
+
+                          return (
+                            <div
+                              key={log.id}
+                              className={cn(
+                                "flex bg-white hover:bg-[#F8F6F0] transition-colors items-center border-b border-slate-100",
+                                isCompare ? "h-[58px]" : "h-[42px]"
+                              )}
+                            >
+                              {/* Left Task Label Cell */}
+                              <div className="w-[260px] shrink-0 py-1 px-3 pl-6 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0] flex flex-col justify-center">
+                                <div className="flex items-center gap-1.5">
+                                  <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
+                                  <span className="text-xs font-semibold text-slate-800 truncate" title={`${process?.process_name || 'งานผลิต'} (T${log.tank_start || 1}-${log.tank_end || 1})`}>
+                                    {process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})
+                                  </span>
+                                </div>
+
+                                {isCompare && (
+                                  <div className="flex items-center gap-1 mt-1 pl-3.5">
+                                    <span className={cn("text-[9px] px-1.5 py-0.2 rounded border font-bold shadow-2xs", variance.colorClass)}>
+                                      {variance.label}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Right Gantt Chart Area */}
+                              <div className="flex flex-1 relative h-full items-center">
+                                {/* Mode 1: Plan Only */}
+                                {timelineViewMode === 'plan' && planData?.inView && (
+                                  <div
+                                    className={cn(
+                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-medium overflow-hidden shadow-sm transition-all hover:brightness-95 cursor-pointer z-30",
+                                      pt.color
+                                    )}
+                                    style={{ left: `calc(${planData.leftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
+                                    title={`[🅿️ แผนงาน] ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nช่วงวันตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}`}
+                                  >
+                                    <span className="truncate">{lot.products?.sku} - {process?.process_name}</span>
+                                  </div>
+                                )}
+
+                                {/* Mode 2: Actual Only */}
+                                {timelineViewMode === 'actual' && actualData?.inView && (
+                                  <div
+                                    className={cn(
+                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-bold text-white overflow-hidden shadow-sm transition-all hover:brightness-95 cursor-pointer z-30",
+                                      log.status === 'DONE' ? "bg-emerald-600" : "bg-amber-600"
+                                    )}
+                                    style={{ left: `calc(${actualData.leftPercent}% + 4px)`, width: `calc(${actualData.widthPercent}% - 8px)` }}
+                                    title={`[🅰️ ทำจริง] ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nช่วงวันทำจริง: ${format(actualData.start, 'dd/MM/yyyy')}${actualData.end > actualData.start ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ''}\nสถานะ: ${log.status === 'DONE' ? 'เสร็จสิ้นแล้ว' : 'กำลังดำเนินการ'}`}
+                                  >
+                                    <span className="truncate">{lot.products?.sku} - {process?.process_name} (จริง)</span>
+                                  </div>
+                                )}
+
+                                {/* Mode 3: Compare P vs A (Dual-Track Gantt Bars) */}
+                                {timelineViewMode === 'compare' && (
+                                  <>
+                                    {/* Top Track: 🅿️ Plan Bar */}
+                                    {planData?.inView && (
+                                      <div
+                                        className="absolute rounded px-2 flex items-center font-bold text-[9.5px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden z-20"
+                                        style={{
+                                          top: '5px',
+                                          height: '22px',
+                                          left: `calc(${planData.leftPercent}% + 4px)`,
+                                          width: `calc(${planData.widthPercent}% - 8px)`
+                                        }}
+                                        title={`[🅿️ แผนงาน (Plan)]\nขั้นตอน: ${process?.process_name || '-'}\nช่วงตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}`}
+                                      >
+                                        <span className="truncate">🅿️ แผน: {format(planData.start, 'dd/MM')}{planData.end > planData.start ? `-${format(planData.end, 'dd/MM')}` : ''}</span>
+                                      </div>
+                                    )}
+
+                                    {/* Bottom Track: 🅰️ Actual Bar */}
+                                    {actualData?.inView ? (
+                                      <div
+                                        className={cn(
+                                          "absolute rounded px-2 flex items-center font-bold text-[9.5px] text-white shadow-xs overflow-hidden z-30",
+                                          variance.type === 'ON_TIME' && "bg-emerald-600 border border-emerald-700",
+                                          variance.type === 'DELAYED' && "bg-rose-600 border border-rose-700",
+                                          variance.type === 'EARLY' && "bg-blue-600 border border-blue-700",
+                                          variance.type === 'OVERDUE_IN_PROGRESS' && "bg-rose-700 border border-rose-800 animate-pulse",
+                                          variance.type === 'IN_PROGRESS' && "bg-amber-600 border border-amber-700",
+                                          variance.type === 'OVERDUE_START' && "bg-amber-500 border border-amber-600",
+                                          variance.type === 'WAITING' && "bg-slate-400 border border-slate-500"
+                                        )}
+                                        style={{
+                                          top: '30px',
+                                          height: '22px',
+                                          left: `calc(${actualData.leftPercent}% + 4px)`,
+                                          width: `calc(${actualData.widthPercent}% - 8px)`
+                                        }}
+                                        title={`[🅰️ ทำจริง (Actual)]\nขั้นตอน: ${process?.process_name || '-'}\nช่วงทำจริง: ${format(actualData.start, 'dd/MM/yyyy')}${actualData.end > actualData.start ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ''}\nสถานะ: ${variance.label}`}
+                                      >
+                                        <span className="truncate">
+                                          🅰️ จริง: {format(actualData.start, 'dd/MM')}{actualData.end > actualData.start ? `-${format(actualData.end, 'dd/MM')}` : ''}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      planData?.inView && (
+                                        <div
+                                          className="absolute rounded px-2 flex items-center font-medium text-[9px] border border-dashed border-slate-300 bg-slate-50 text-slate-400 overflow-hidden z-10"
+                                          style={{
+                                            top: '30px',
+                                            height: '22px',
+                                            left: `calc(${planData.leftPercent}% + 4px)`,
+                                            width: `calc(${planData.widthPercent}% - 8px)`
+                                          }}
+                                        >
+                                          <span className="truncate">⏳ ยังไม่บันทึกเริ่มงาน</span>
+                                        </div>
+                                      )
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
-            </div>
             </div>
           </>
         )}
@@ -2776,6 +3289,7 @@ export default function PlannerPage() {
         initialDept={filterDept}
         initialOrderType={filterOrderType}
         initialShowHandovers={showShopfloorHandovers}
+        initialViewMode={timelineViewMode}
       />
     </div>
   )
