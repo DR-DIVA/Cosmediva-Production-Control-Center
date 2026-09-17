@@ -9,16 +9,17 @@ import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import * as XLSX from 'xlsx';
 import { 
   Upload, FileText, CheckCircle2, Loader2, Search, Download, Paperclip, 
   LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, 
   Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, 
   Scissors, Plus, X, TrendingUp, Layers, RefreshCw, ShieldCheck, CheckSquare, 
-  Sparkles, Clock, ArrowUpRight, Printer
+  Sparkles, Clock, ArrowUpRight, Printer, FileSpreadsheet, History
 } from 'lucide-react';
 import { QuarantineTagModal, QuarantineTagData } from "@/components/warehouse/QuarantineTagModal";
 import { 
@@ -52,6 +53,7 @@ type RMItem = {
   received_qty?: number | null;
   released_date?: string | null;
   updated_at?: string | null;
+  created_at?: string | null;
   production_lots?: { lot_no: string; sku_id: string; products?: { sku: string }; production_logs?: { activity_date: string; processes?: { process_name: string } }[] };
 };
 
@@ -258,6 +260,11 @@ export default function RMControlCenterPage() {
   // Quarantine Tag State (100x80mm)
   const [isQuarantineTagOpen, setIsQuarantineTagOpen] = useState(false);
   const [quarantineTagData, setQuarantineTagData] = useState<QuarantineTagData | null>(null);
+
+  // Continuous History & Report States
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+  const [historyStageFilter, setHistoryStageFilter] = useState<'ALL' | 'PURCHASING' | 'WAREHOUSE' | 'QC' | 'PLANNING'>('ALL');
+  const [historySearchQuery, setHistorySearchQuery] = useState('');
 
   // Receive Modal Additional Packaging Fields
   const [receivePackageType, setReceivePackageType] = useState('ลัง');
@@ -2018,6 +2025,364 @@ export default function RMControlCenterPage() {
   const uniqueSuppliers = new Set(typeFilteredItems.map(i => i.supplier).filter(Boolean)).size;
   const unitLabel = mainTab === 'rm' ? 'KG' : 'PCS';
 
+  // ----------------------------------------------------
+  // Continuous Work History & Excel Export Engine (5 Views)
+  // ----------------------------------------------------
+  const viewNameMap: Record<string, string> = {
+    dashboard: 'Overview Dashboard (ภาพรวมทั้งหมด)',
+    purchasing: 'Purchasing View (แผนกจัดซื้อ)',
+    warehouse: 'Warehouse View (แผนกคลังสินค้า)',
+    qc: 'QC View (แผนกตรวจรับรองคุณภาพ)',
+    planning: 'Planning View (แผนกวางแผนการผลิต)'
+  };
+
+  const viewShortNameMap: Record<string, string> = {
+    dashboard: 'Overview',
+    purchasing: 'Purchasing',
+    warehouse: 'Warehouse',
+    qc: 'QC',
+    planning: 'Planning'
+  };
+
+  const currentViewItemsCount = useMemo(() => {
+    if (activeViewTab === 'dashboard') return typeFilteredItems.length;
+    if (activeViewTab === 'purchasing') return purchasingItems.length;
+    if (activeViewTab === 'warehouse') return warehouseItems.length;
+    if (activeViewTab === 'qc') return qcItems.length;
+    if (activeViewTab === 'planning') return planningItems.length;
+    return filteredItems.length;
+  }, [activeViewTab, typeFilteredItems.length, purchasingItems.length, warehouseItems.length, qcItems.length, planningItems.length, filteredItems.length]);
+
+  // Generate Chronological Continuous Work History Events
+  const continuousHistory = useMemo(() => {
+    const events: {
+      id: string;
+      timestamp: string;
+      dateObj: Date;
+      stage: 'PURCHASING' | 'WAREHOUSE' | 'QC' | 'PLANNING';
+      stageLabel: string;
+      stageBadgeClass: string;
+      itemCode: string;
+      itemName: string;
+      poNo: string;
+      controlNo: string;
+      supplier: string;
+      qty: string;
+      unit: string;
+      details: string;
+      status: string;
+      user: string;
+    }[] = [];
+
+    typeFilteredItems.forEach((item) => {
+      // 1. Purchasing Event
+      if (item.po_no || item.created_at) {
+        events.push({
+          id: `pu-${item.id}`,
+          timestamp: item.po_date || item.created_at || '',
+          dateObj: new Date(item.po_date || item.created_at || 0),
+          stage: 'PURCHASING',
+          stageLabel: 'สั่งซื้อ (PO)',
+          stageBadgeClass: 'bg-amber-100 text-amber-900 border-amber-300',
+          itemCode: item.rm_code || '-',
+          itemName: item.rm_name || '-',
+          poNo: item.po_no || '-',
+          controlNo: item.control_no || '-',
+          supplier: item.supplier || '-',
+          qty: item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+          unit: item.unit || '-',
+          details: `สั่งซื้อ ${item.quantity || '-'} ${item.unit || ''} (ETA: ${item.eta_date || '-'})`,
+          status: item.status || 'ORDERED',
+          user: 'ฝ่ายจัดซื้อ'
+        });
+      }
+
+      // 2. Warehouse Receiving Event
+      if (item.receive_date || item.control_no || item.received_qty != null) {
+        events.push({
+          id: `wh-${item.id}`,
+          timestamp: item.receive_date || item.updated_at || item.created_at || '',
+          dateObj: new Date(item.receive_date || item.updated_at || item.created_at || 0),
+          stage: 'WAREHOUSE',
+          stageLabel: 'รับเข้าคลัง (WH)',
+          stageBadgeClass: 'bg-blue-100 text-blue-900 border-blue-300',
+          itemCode: item.rm_code || '-',
+          itemName: item.rm_name || '-',
+          poNo: item.po_no || '-',
+          controlNo: item.control_no || '-',
+          supplier: item.supplier || '-',
+          qty: item.received_qty != null ? Number(item.received_qty).toLocaleString() : (item.quantity != null ? Number(item.quantity).toLocaleString() : '-'),
+          unit: item.unit || '-',
+          details: `รับเข้าคลัง ${item.warehouse || 'MMPM'} ยอดรับ ${item.received_qty || item.quantity} ${item.unit || ''} (Control No: ${item.control_no || '-'}) ${item.remark ? `[${item.remark}]` : ''}`,
+          status: 'RECEIVED',
+          user: 'คลังสินค้า'
+        });
+      }
+
+      // 3. QC Event
+      if (item.qc_status && item.qc_status !== 'WAITING_QC' && item.qc_status !== 'QUARANTINED') {
+        events.push({
+          id: `qc-${item.id}`,
+          timestamp: item.released_date || item.updated_at || item.receive_date || '',
+          dateObj: new Date(item.released_date || item.updated_at || item.receive_date || 0),
+          stage: 'QC',
+          stageLabel: 'ตรวจรับรอง (QC)',
+          stageBadgeClass: item.qc_status === 'PASSED' || item.qc_status === 'READY' ? 'bg-emerald-100 text-emerald-900 border-emerald-300' : 'bg-rose-100 text-rose-900 border-rose-300',
+          itemCode: item.rm_code || '-',
+          itemName: item.rm_name || '-',
+          poNo: item.po_no || '-',
+          controlNo: item.control_no || '-',
+          supplier: item.supplier || '-',
+          qty: item.received_qty != null ? Number(item.received_qty).toLocaleString() : (item.quantity != null ? Number(item.quantity).toLocaleString() : '-'),
+          unit: item.unit || '-',
+          details: `ผลตรวจ QC: ${item.qc_status === 'PASSED' || item.qc_status === 'READY' ? '✅ ผ่านการตรวจรับรอง (Released พร้อมใช้)' : item.qc_status} ${item.released_date ? `เมื่อ ${item.released_date}` : ''}`,
+          status: item.qc_status,
+          user: 'ฝ่าย QC'
+        });
+      }
+
+      // 4. Planning Sync Event
+      if (item.production_lots) {
+        events.push({
+          id: `plan-${item.id}`,
+          timestamp: item.production_lots.production_logs?.[0]?.activity_date || item.created_at || '',
+          dateObj: new Date(item.production_lots.production_logs?.[0]?.activity_date || item.created_at || 0),
+          stage: 'PLANNING',
+          stageLabel: 'แผนผลิต (Plan)',
+          stageBadgeClass: 'bg-indigo-100 text-indigo-900 border-indigo-300',
+          itemCode: item.rm_code || '-',
+          itemName: item.rm_name || '-',
+          poNo: item.po_no || '-',
+          controlNo: item.control_no || '-',
+          supplier: item.supplier || '-',
+          qty: item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+          unit: item.unit || '-',
+          details: `เชื่อมโยงล็อตผลิต ${item.production_lots.lot_no || '-'} (SKU: ${item.production_lots.products?.sku || '-'})`,
+          status: 'PLANNING_SYNC',
+          user: 'ฝ่ายวางแผน'
+        });
+      }
+    });
+
+    return events.sort((a, b) => b.dateObj.getTime() - a.dateObj.getTime());
+  }, [typeFilteredItems]);
+
+  // Filtered Continuous History based on search & stage filter
+  const filteredHistory = useMemo(() => {
+    return continuousHistory.filter((evt) => {
+      if (historyStageFilter !== 'ALL' && evt.stage !== historyStageFilter) return false;
+      if (historySearchQuery) {
+        const q = historySearchQuery.toLowerCase();
+        return (
+          evt.itemCode.toLowerCase().includes(q) ||
+          evt.itemName.toLowerCase().includes(q) ||
+          evt.poNo.toLowerCase().includes(q) ||
+          evt.controlNo.toLowerCase().includes(q) ||
+          evt.supplier.toLowerCase().includes(q) ||
+          evt.details.toLowerCase().includes(q) ||
+          evt.status.toLowerCase().includes(q) ||
+          evt.user.toLowerCase().includes(q)
+        );
+      }
+      return true;
+    });
+  }, [continuousHistory, historyStageFilter, historySearchQuery]);
+
+  // 1. Export Overview Dashboard
+  const handleExportOverview = () => {
+    const summaryData = [
+      { "ตัวชี้วัด (KPI)": "รายการทั้งหมดในระบบ", "จำนวน": activeItemsCount, "หน่วย": "รายการ" },
+      { "ตัวชี้วัด (KPI)": "รอของเข้า (Ordered / Delayed / Revised)", "จำนวน": typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY' || i.status === 'ORDERED' || i.status === 'DELAYED' || i.status === 'REVISED').length, "หน่วย": "รายการ" },
+      { "ตัวชี้วัด (KPI)": "รับเข้าคลังแล้ว / รอตรวจ QC", "จำนวน": typeFilteredItems.filter(i => i.status === 'WAITING_QC' || i.status === 'RECEIVED' || i.status === 'QUARANTINED').length, "หน่วย": "รายการ" },
+      { "ตัวชี้วัด (KPI)": "QC ผ่าน / พร้อมใช้ผลิต", "จำนวน": typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED').length, "หน่วย": "รายการ" },
+      { "ตัวชี้วัด (KPI)": "รายการที่เข้าไม่ทันคิวผลิต (เสี่ยงล่าช้า)", "จำนวน": delayedItems.length, "หน่วย": "รายการ" }
+    ];
+
+    const delayedData = delayedItems.map((item, idx) => ({
+      "ลำดับ": idx + 1,
+      "SKU สินค้า": getDisplaySku(item),
+      "LOT การผลิต": getDisplayLot(item),
+      "รหัสวัตถุดิบ": item.rm_code || '-',
+      "ชื่อวัตถุดิบ": item.rm_name || '-',
+      "คิวชั่งสาร/บรรจุ": item.production_lots?.production_logs?.[0]?.activity_date ? new Date(item.production_lots.production_logs[0].activity_date).toLocaleDateString('th-TH') : '-',
+      "กำหนดของเข้า ETA": item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-',
+      "ผู้ขาย / Supplier": item.supplier || '-',
+      "สถานะ": item.status || '-'
+    }));
+
+    const allItemsData = typeFilteredItems.map((item, idx) => ({
+      "ลำดับ": idx + 1,
+      "เลขที่ PO": item.po_no || '-',
+      "ผู้ขาย": item.supplier || '-',
+      "รหัสสินค้า": item.rm_code || '-',
+      "ชื่อสินค้า": item.rm_name || '-',
+      "จำนวน": item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+      "หน่วยนับ": item.unit || '-',
+      "กำหนดเข้า ETA": item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-',
+      "วันที่รับเข้า": item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-',
+      "รหัสควบคุม Control No": item.control_no || '-',
+      "สถานะ QC": item.qc_status || '-',
+      "สถานะระบบ": item.status || '-'
+    }));
+
+    const wb = XLSX.utils.book_new();
+    const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+    const wsDelayed = XLSX.utils.json_to_sheet(delayedData.length > 0 ? delayedData : [{ "สถานะ": "ไม่มีรายการล่าช้า" }]);
+    const wsAll = XLSX.utils.json_to_sheet(allItemsData);
+
+    XLSX.utils.book_append_sheet(wb, wsSummary, "Overview_KPI");
+    XLSX.utils.book_append_sheet(wb, wsDelayed, "Delayed_Items");
+    XLSX.utils.book_append_sheet(wb, wsAll, "All_Materials");
+
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_Material_Overview_Report_${dateStr}.xlsx`);
+    toast.success(`ส่งออกรายงาน Overview Dashboard สำเร็จ (${typeFilteredItems.length} รายการ)`);
+  };
+
+  // 2. Export Purchasing View
+  const handleExportPurchasing = () => {
+    const exportData = purchasingItems.map((item, idx) => ({
+      "ลำดับ": idx + 1,
+      "เลขที่ PO": item.po_no || '-',
+      "ผู้ขาย / Supplier": item.supplier || '-',
+      "วันที่สั่งซื้อ (PO Date)": item.po_date ? new Date(item.po_date).toLocaleDateString('th-TH') : '-',
+      "กำหนดส่งมอบ (ETA Date)": item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-',
+      "รหัสวัตถุดิบ (Code)": item.rm_code || '-',
+      "ชื่อวัตถุดิบ / บรรจุภัณฑ์ (Name)": item.rm_name || '-',
+      "จำนวนสั่งซื้อ": item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+      "หน่วยนับ": item.unit || '-',
+      "สถานะ": item.status || '-',
+      "หมายเหตุ / สาเหตุล่าช้า": item.bottom_remark || item.remark || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Purchasing_View");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_Purchasing_Report_${dateStr}.xlsx`);
+    toast.success(`ส่งออกรายงาน Purchasing View สำเร็จ (${exportData.length} รายการ)`);
+  };
+
+  // 3. Export Warehouse View
+  const handleExportWarehouse = () => {
+    const exportData = warehouseItems.map((item, idx) => ({
+      "ลำดับ": idx + 1,
+      "กำหนดเข้า (ETA)": item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-',
+      "วันที่รับจริง (Receive Date)": item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-',
+      "เลขที่ PO": item.po_no || '-',
+      "รหัสควบคุม (Control No.)": item.control_no || '-',
+      "รหัสสินค้า (Code)": item.rm_code || '-',
+      "ชื่อสินค้า (Name)": item.rm_name || '-',
+      "ผู้ส่งมอบ (Supplier)": item.supplier || '-',
+      "ยอดสั่งซื้อ": item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+      "ยอดรับจริง": item.received_qty != null ? Number(item.received_qty).toLocaleString() : '-',
+      "หน่วยนับ": item.unit || '-',
+      "คลังจัดเก็บ": item.warehouse || 'MMPM',
+      "การแบ่งบรรจุ / หมายเหตุ": item.remark || item.bottom_remark || '-',
+      "สถานะ": item.status || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Warehouse_Receiving");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_Warehouse_Receiving_Report_${dateStr}.xlsx`);
+    toast.success(`ส่งออกรายงาน Warehouse View สำเร็จ (${exportData.length} รายการ)`);
+  };
+
+  // 4. Export QC View
+  const handleExportQC = () => {
+    const exportData = qcItems.map((item, idx) => ({
+      "ลำดับ": idx + 1,
+      "วันที่รับตัวอย่าง (Receive Date)": item.receive_date ? new Date(item.receive_date).toLocaleDateString('th-TH') : '-',
+      "รหัสควบคุม (Control No.)": item.control_no || '-',
+      "เลขที่ PO": item.po_no || '-',
+      "ผู้ขาย / ผู้ส่งมอบ": item.supplier || '-',
+      "รหัสสินค้า (Code)": item.rm_code || '-',
+      "ชื่อสินค้า (Name)": item.rm_name || '-',
+      "ยอดรับเข้า": item.received_qty != null ? Number(item.received_qty).toLocaleString() : (item.quantity != null ? Number(item.quantity).toLocaleString() : '-'),
+      "หน่วยนับ": item.unit || '-',
+      "สถานะตรวจ QC": item.qc_status || 'QUARANTINED',
+      "วันที่ปล่อยผ่าน (Release Date)": item.released_date ? new Date(item.released_date).toLocaleDateString('th-TH') : '-',
+      "หมายเหตุ / ผลทดสอบ": item.remark || '-'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "QC_Status");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_QC_Inspection_Report_${dateStr}.xlsx`);
+    toast.success(`ส่งออกรายงาน QC View สำเร็จ (${exportData.length} รายการ)`);
+  };
+
+  // 5. Export Planning View
+  const handleExportPlanning = () => {
+    const exportData = planningItems.map((item, idx) => {
+      let isDelayed = false;
+      if (item.targetDate && item.eta_date) {
+        isDelayed = new Date(item.eta_date).getTime() > item.targetDate.getTime();
+      }
+      return {
+        "ลำดับ": idx + 1,
+        "รหัสสินค้า (SKU)": getDisplaySku(item),
+        "ล็อตการผลิต (LOT)": getDisplayLot(item),
+        "คิวชั่งสาร / บรรจุ": item.targetDate ? item.targetDate.toLocaleDateString('th-TH') : '-',
+        "เลขที่ PO": item.po_no || '-',
+        "รหัสควบคุม (Control No.)": item.control_no || '-',
+        "รหัสวัตถุดิบ (Code)": item.rm_code || '-',
+        "ชื่อวัตถุดิบ (Name)": item.rm_name || '-',
+        "จำนวนที่ต้องใช้": item.quantity != null ? Number(item.quantity).toLocaleString() : '-',
+        "หน่วยนับ": item.unit || '-',
+        "กำหนดเข้า ETA": item.eta_date ? new Date(item.eta_date).toLocaleDateString('th-TH') : '-',
+        "สถานะความพร้อม": item.status || '-',
+        "ทันแผนผลิต": isDelayed ? '⚠️ เสี่ยงล่าช้า' : '✅ ทันแผน'
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Planning_Readiness");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_Planning_Readiness_Report_${dateStr}.xlsx`);
+    toast.success(`ส่งออกรายงาน Planning View สำเร็จ (${exportData.length} รายการ)`);
+  };
+
+  // 6. Export Continuous History (ประวัติการทำงานแบบต่อเนื่อง)
+  const handleExportHistory = () => {
+    const exportData = filteredHistory.map((evt, idx) => ({
+      "ลำดับ": idx + 1,
+      "วันที่และเวลา": evt.timestamp ? new Date(evt.timestamp).toLocaleString('th-TH') : '-',
+      "ขั้นตอนการทำงาน": evt.stageLabel,
+      "รหัสสินค้า": evt.itemCode,
+      "ชื่อสินค้า": evt.itemName,
+      "เลขที่ PO": evt.poNo,
+      "รหัสควบคุม Control No.": evt.controlNo,
+      "ผู้ขาย / Supplier": evt.supplier,
+      "จำนวน": evt.qty,
+      "หน่วยนับ": evt.unit,
+      "รายละเอียดการทำงาน": evt.details,
+      "สถานะ": evt.status,
+      "ผู้ดำเนินการ": evt.user
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Continuous_History");
+    const dateStr = new Date().toISOString().split('T')[0];
+    XLSX.writeFile(wb, `CosmeFlow_Material_Continuous_History_${dateStr}.xlsx`);
+    toast.success(`ส่งออกประวัติการทำงานแบบต่อเนื่องสำเร็จ (${exportData.length} รายการ)`);
+  };
+
+  // Unified Handler to Export the Current Active View
+  const handleExportCurrentView = () => {
+    if (activeViewTab === 'dashboard') handleExportOverview();
+    else if (activeViewTab === 'purchasing') handleExportPurchasing();
+    else if (activeViewTab === 'warehouse') handleExportWarehouse();
+    else if (activeViewTab === 'qc') handleExportQC();
+    else if (activeViewTab === 'planning') handleExportPlanning();
+    else handleExportOverview();
+  };
+
   return (
     <div className="p-3 sm:p-5 md:p-6 w-full max-w-full mx-auto space-y-6 min-w-0">
         {/* Top Toggle for RM/PM */}
@@ -2420,9 +2785,75 @@ export default function RMControlCenterPage() {
           </TabsTrigger>
         </TabsList>
 
-        <div className="mt-6">
+        {/* Continuous Work History & Report Action Bar (Both History & Export Excel for All 5 Menus) */}
+        <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between gap-3 mt-3.5 mb-2">
+          {/* Left: Current View & Continuous Status Information */}
+          <div className="flex flex-wrap items-center gap-2.5">
+            <div className="flex items-center gap-2 bg-amber-50 border border-amber-200/80 px-3 py-1.5 rounded-xl shadow-2xs">
+              <History className="w-4 h-4 text-amber-700 animate-pulse shrink-0" />
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-amber-950">ประวัติการทำงานแบบต่อเนื่อง:</span>
+                <Badge className="bg-amber-600 text-white font-mono text-[11px] px-2 py-0.2 font-bold">
+                  {viewNameMap[activeViewTab] || activeViewTab}
+                </Badge>
+              </div>
+            </div>
+
+            {/* Quick stats pills */}
+            <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
+              <span className="bg-slate-100 px-2.5 py-1 rounded-lg font-medium border border-slate-200 flex items-center gap-1">
+                📦 <strong className="text-slate-900">{currentViewItemsCount}</strong> รายการในหน้านี้
+              </span>
+              <span className="inline-flex bg-purple-50 text-purple-900 px-2.5 py-1 rounded-lg font-medium border border-purple-200 items-center gap-1">
+                ⚡ บันทึกประวัติสะสม <strong className="text-purple-800">{continuousHistory.length}</strong> ไทม์ไลน์
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Action Buttons (History Modal & Export Excel) */}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* View Full Continuous History Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsHistoryModalOpen(true)}
+              className="h-9 text-xs font-bold text-amber-900 border-amber-300 hover:bg-amber-50 hover:text-amber-950 shadow-2xs cursor-pointer flex items-center gap-1.5"
+            >
+              <History className="w-4 h-4 text-amber-600" />
+              ดูประวัติแบบต่อเนื่อง ({continuousHistory.length})
+            </Button>
+
+            {/* Export Current View Excel Button */}
+            <Button
+              size="sm"
+              onClick={handleExportCurrentView}
+              className="h-9 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm cursor-pointer flex items-center gap-1.5"
+            >
+              <FileSpreadsheet className="w-4 h-4 text-emerald-100" />
+              Export Excel ({viewShortNameMap[activeViewTab] || 'Report'})
+            </Button>
+          </div>
+        </div>
+
+        <div className="mt-4">
           <TabsContent value="dashboard" className="space-y-4">
-             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-[#F8F6F0]/60 p-3 rounded-xl border border-slate-200 shadow-2xs">
+              <div className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <LayoutDashboard className="w-4 h-4 text-[#D4AF37]" />
+                <span>ภาพรวมสถานะ {mainTab === 'rm' ? 'วัตถุดิบ (Raw Material)' : 'บรรจุภัณฑ์ (Packaging)'}</span>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleExportOverview}
+                className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-2xs cursor-pointer flex items-center gap-1.5"
+              >
+                <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                Export Excel (Overview Dashboard)
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <Card className="bg-[#D4AF37]/ border-[#D4AF37]/30">
                   <CardHeader className="pb-2"><CardTitle className="text-sm font-medium text-[#4A4238]">รายการทั้งหมด</CardTitle></CardHeader>
                   <CardContent><div className="text-3xl font-bold text-[#D4AF37]">{activeItemsCount}</div></CardContent>
@@ -2531,6 +2962,20 @@ export default function RMControlCenterPage() {
             </Card>
 
             <Card className="shadow-sm">
+              <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
+                <CardTitle className="text-base text-slate-700">รายการสั่งซื้อ (PO Tracking)</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportPurchasing}
+                    className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-2xs cursor-pointer flex items-center gap-1.5"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    Export Excel (Purchasing)
+                  </Button>
+                </div>
+              </CardHeader>
               <CardContent className="p-0">
                 {puActiveCount > 0 && (
                   <div className="flex items-center justify-between px-4 py-2 bg-amber-50/70 border-b border-amber-200/50">
@@ -2775,16 +3220,27 @@ export default function RMControlCenterPage() {
              <Card className="shadow-sm">
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-base text-slate-700">Receiving Plan (รอรับของเข้า)</CardTitle>
-                {whActiveCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearWhSearch} 
-                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                <div className="flex items-center gap-2">
+                  {whActiveCount > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearWhSearch} 
+                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                    >
+                      <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({whActiveCount})
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportWarehouse}
+                    className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
-                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({whActiveCount})
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    Export Excel (Warehouse)
                   </Button>
-                )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
@@ -3099,16 +3555,27 @@ export default function RMControlCenterPage() {
              <Card className="shadow-sm">
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-base text-slate-700">QC Status (รายการรอตรวจ)</CardTitle>
-                {qcActiveCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearQcSearch} 
-                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                <div className="flex items-center gap-2">
+                  {qcActiveCount > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearQcSearch} 
+                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                    >
+                      <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({qcActiveCount})
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportQC}
+                    className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
-                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({qcActiveCount})
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    Export Excel (QC)
                   </Button>
-                )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
@@ -3331,16 +3798,27 @@ export default function RMControlCenterPage() {
              <Card className="shadow-sm">
               <CardHeader className="bg-[#F8F6F0]/ border-b pb-4 flex flex-row items-center justify-between">
                 <CardTitle className="text-base text-slate-700">{mainTab === 'rm' ? 'RM' : 'PM'} Readiness (เรียงตาม LOT การผลิต)</CardTitle>
-                {planActiveCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={clearPlanSearch} 
-                    className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                <div className="flex items-center gap-2">
+                  {planActiveCount > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={clearPlanSearch} 
+                      className="h-7 text-xs text-red-600 hover:text-red-700 hover:bg-red-100/50 px-2 flex items-center gap-1 font-medium"
+                    >
+                      <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({planActiveCount})
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleExportPlanning}
+                    className="h-8 text-xs font-bold text-emerald-700 border-emerald-300 hover:bg-emerald-50 shadow-2xs cursor-pointer flex items-center gap-1.5"
                   >
-                    <X className="w-3.5 h-3.5" /> ล้างการค้นหาคอลัมน์ ({planActiveCount})
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    Export Excel (Planning)
                   </Button>
-                )}
+                </div>
               </CardHeader>
               <CardContent className="p-0">
                 <div className="rounded-md border-0 overflow-x-auto">
@@ -5116,6 +5594,162 @@ export default function RMControlCenterPage() {
         onOpenChange={setIsQuarantineTagOpen} 
         initialData={quarantineTagData} 
       />
+
+      {/* Continuous History Audit Trail Modal */}
+      <Dialog open={isHistoryModalOpen} onOpenChange={setIsHistoryModalOpen}>
+        <DialogContent className="sm:!max-w-5xl md:!max-w-6xl w-[96vw] max-w-[96vw] max-h-[92vh] h-auto flex flex-col p-4 sm:p-5 bg-slate-50">
+          <DialogHeader className="border-b pb-3 flex-shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle className="flex items-center gap-2 text-slate-800 text-lg font-bold">
+                <History className="w-5 h-5 text-amber-600" />
+                ประวัติการทำงานแบบต่อเนื่อง (Continuous Work History & Audit Trail)
+              </DialogTitle>
+              <Badge variant="outline" className="bg-amber-50 text-amber-900 border-amber-300 font-mono text-xs font-bold">
+                {filteredHistory.length} รายการ
+              </Badge>
+            </div>
+            <DialogDescription className="text-xs text-slate-500 mt-1">
+              บันทึกไทม์ไลน์การทำงานต่อเนื่องของวัตถุดิบและบรรจุภัณฑ์ทุกขั้นตอน (สั่งซื้อ ➔ รับเข้าคลัง ➔ ตรวจรับรอง QC ➔ ปล่อยผลิต)
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Filter Bar inside Modal */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 py-2 flex-shrink-0">
+            <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+              <span className="text-xs font-bold text-slate-600">ขั้นตอน:</span>
+              <Button
+                variant={historyStageFilter === 'ALL' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryStageFilter('ALL')}
+                className={`h-7 text-xs ${historyStageFilter === 'ALL' ? 'bg-slate-800 text-white' : 'bg-white text-slate-700'}`}
+              >
+                ทั้งหมด
+              </Button>
+              <Button
+                variant={historyStageFilter === 'PURCHASING' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryStageFilter('PURCHASING')}
+                className={`h-7 text-xs ${historyStageFilter === 'PURCHASING' ? 'bg-amber-600 text-white' : 'bg-white text-amber-900'}`}
+              >
+                🛒 สั่งซื้อ (PO)
+              </Button>
+              <Button
+                variant={historyStageFilter === 'WAREHOUSE' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryStageFilter('WAREHOUSE')}
+                className={`h-7 text-xs ${historyStageFilter === 'WAREHOUSE' ? 'bg-blue-600 text-white' : 'bg-white text-blue-900'}`}
+              >
+                📦 รับเข้าคลัง (WH)
+              </Button>
+              <Button
+                variant={historyStageFilter === 'QC' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryStageFilter('QC')}
+                className={`h-7 text-xs ${historyStageFilter === 'QC' ? 'bg-emerald-600 text-white' : 'bg-white text-emerald-900'}`}
+              >
+                🔬 ตรวจรับรอง (QC)
+              </Button>
+              <Button
+                variant={historyStageFilter === 'PLANNING' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setHistoryStageFilter('PLANNING')}
+                className={`h-7 text-xs ${historyStageFilter === 'PLANNING' ? 'bg-indigo-600 text-white' : 'bg-white text-indigo-900'}`}
+              >
+                📅 แผนผลิต (Plan)
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+              <Input
+                placeholder="ค้นหาประวัติ..."
+                value={historySearchQuery}
+                onChange={e => setHistorySearchQuery(e.target.value)}
+                className="h-8 text-xs bg-white w-48 sm:w-60"
+              />
+              <Button
+                size="sm"
+                onClick={handleExportHistory}
+                className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shrink-0 cursor-pointer"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 mr-1" />
+                Export ประวัติ (.xlsx)
+              </Button>
+            </div>
+          </div>
+
+          {/* Table Container */}
+          <div className="flex-1 min-h-0 overflow-y-auto border border-slate-200 rounded-xl bg-white shadow-xs max-h-[55vh]">
+            <Table className="text-xs">
+              <TableHeader className="bg-slate-100/80 sticky top-0 z-10">
+                <TableRow>
+                  <TableHead className="w-24">วันที่/เวลา</TableHead>
+                  <TableHead className="w-24">ขั้นตอน</TableHead>
+                  <TableHead className="w-28">เลขที่ PO</TableHead>
+                  <TableHead className="w-28">Control No.</TableHead>
+                  <TableHead className="w-32">รหัสสินค้า</TableHead>
+                  <TableHead className="min-w-[200px]">ชื่อสินค้า / ผู้ขาย</TableHead>
+                  <TableHead className="w-24 text-right">จำนวน</TableHead>
+                  <TableHead className="min-w-[220px]">รายละเอียดการทำงาน</TableHead>
+                  <TableHead className="w-20">ผู้รับผิดชอบ</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredHistory.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-slate-400">
+                      ไม่พบประวัติการทำงานตามเงื่อนไขที่เลือก
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredHistory.map(evt => (
+                    <TableRow key={evt.id} className="hover:bg-amber-50/40">
+                      <TableCell className="font-mono text-slate-600 whitespace-nowrap">
+                        {evt.timestamp ? new Date(evt.timestamp).toLocaleDateString('th-TH') : '-'}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={`text-[10px] font-bold px-1.5 py-0.5 ${evt.stageBadgeClass}`}>
+                          {evt.stageLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="font-mono font-bold text-amber-900 truncate">
+                        {evt.poNo}
+                      </TableCell>
+                      <TableCell className="font-mono font-bold text-purple-900 truncate">
+                        {evt.controlNo}
+                      </TableCell>
+                      <TableCell className="font-mono font-bold text-slate-800">
+                        {evt.itemCode}
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-semibold text-slate-800 line-clamp-1">{evt.itemName}</div>
+                        <div className="text-[10.5px] text-slate-500 truncate">{evt.supplier}</div>
+                      </TableCell>
+                      <TableCell className="text-right font-bold font-mono">
+                        {evt.qty} <span className="text-[10px] text-slate-500 font-normal">{evt.unit}</span>
+                      </TableCell>
+                      <TableCell className="text-slate-700 text-[11px] leading-relaxed">
+                        {evt.details}
+                      </TableCell>
+                      <TableCell className="text-slate-500 text-[10.5px] whitespace-nowrap">
+                        {evt.user}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          <DialogFooter className="pt-3 border-t flex items-center justify-between flex-shrink-0">
+            <span className="text-xs text-slate-500">
+              แสดง {filteredHistory.length} จากทั้งหมด {continuousHistory.length} รายการในระบบ
+            </span>
+            <Button variant="outline" size="sm" onClick={() => setIsHistoryModalOpen(false)} className="h-8 text-xs">
+              ปิดหน้าต่าง
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
