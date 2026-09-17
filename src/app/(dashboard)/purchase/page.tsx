@@ -52,9 +52,12 @@ import {
   DelayInfo,
   SupplierScorecard
 } from '@/lib/delayTracking'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 export default function PurchasePage() {
   const supabase = createClient()
+  const kpiPeriod = useKpiPeriod()
   const [items, setItems] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'delayed' | 'scorecard' | 'analytics' | 'all_po'>('delayed')
@@ -136,14 +139,20 @@ export default function PurchasePage() {
   // Check if item is PM
   const isPM = (code: string) => code?.startsWith('CMD1') || code?.startsWith('CMD2')
 
-  // Calculate Metrics
+  // KPI Period Scoped Filtering
+  const kpiFilteredItems = useMemo(() => {
+    return kpiPeriod.filterByPeriod(items, i => i.eta_date || i.receive_date || i.po_date || i.created_at)
+  }, [items, kpiPeriod])
+
+  // Calculate Metrics (Scoped to KPI Period)
   const metrics = useMemo(() => {
-    return calculateSupplierOtifMetrics(items)
-  }, [items])
+    return calculateSupplierOtifMetrics(kpiFilteredItems)
+  }, [kpiFilteredItems])
 
   // Filtered Items for List
   const filteredItems = useMemo(() => {
-    return items.filter(item => {
+    const baseItems = kpiPeriod.syncTableWithPeriod ? kpiFilteredItems : items
+    return baseItems.filter(item => {
       const itemIsPM = isPM(item.rm_code)
       if (typeFilter === 'RM' && itemIsPM) return false
       if (typeFilter === 'PM' && !itemIsPM) return false
@@ -166,7 +175,7 @@ export default function PurchasePage() {
 
       return true
     })
-  }, [items, typeFilter, selectedSupplier, selectedCategoryFilter, searchQuery])
+  }, [items, kpiFilteredItems, kpiPeriod.syncTableWithPeriod, typeFilter, selectedSupplier, selectedCategoryFilter, searchQuery])
 
   // Delayed / Action Required Items
   const delayedItems = useMemo(() => {
@@ -301,6 +310,14 @@ export default function PurchasePage() {
         </div>
       </div>
 
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลรายงานจัดซื้อและ OTIF (Purchase Reporting Period)"
+        showSyncCheckbox
+        syncCheckboxLabel="กรองรายการจัดซื้อและประเมินคู่ค้าตามช่วงเวลาที่เลือกด้วย"
+      />
+
       {/* 1. Executive Procurement & Supplier OTIF KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -348,7 +365,7 @@ export default function PurchasePage() {
             <div className="text-xl sm:text-2xl font-black text-[#D4AF37] tracking-tight">
               {metrics.totalItems} <span className="text-xs font-normal text-stone-300">รายการ</span>
             </div>
-            <div className="text-[9px] sm:text-[10px] text-stone-400 mt-0.5">({items.filter(i => !isPM(i.rm_code)).length} RM / {items.filter(i => isPM(i.rm_code)).length} PM)</div>
+            <div className="text-[9px] sm:text-[10px] text-stone-400 mt-0.5">({kpiFilteredItems.filter(i => !isPM(i.rm_code)).length} RM / {kpiFilteredItems.filter(i => isPM(i.rm_code)).length} PM)</div>
           </div>
 
           {/* Active Suppliers */}

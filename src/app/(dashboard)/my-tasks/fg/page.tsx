@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -22,9 +22,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 export default function FgTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
+  const kpiPeriod = useKpiPeriod()
   const [rooms, setRooms] = useState<any[]>([])
   const [locations, setLocations] = useState<any[]>([])
   const [searchQuery, setSearchQuery] = useState('')
@@ -469,34 +472,44 @@ export default function FgTasksPage() {
     )
   }
 
-  // Executive Finished Goods KPI Calculations
-  const totalStockPcs = inventory.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
-  const totalStockCartons = inventory.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
-  const uniqueSkus = new Set(inventory.map(i => i.products?.sku || i.sku_id)).size
+  // KPI Period Scoped Filtering
+  const kpiFilteredTasks = useMemo(() => {
+    return kpiPeriod.filterByPeriod(tasks, t => t.activity_date || t.start_time || (t.production_lots as any)?.created_at)
+  }, [tasks, kpiPeriod])
 
-  const releasedItems = inventory.filter(i => i.qc_status === 'RELEASED')
+  const kpiFilteredInventory = useMemo(() => {
+    return kpiPeriod.filterByPeriod(inventory, i => i.receive_date || i.created_at || i.mfg_date)
+  }, [inventory, kpiPeriod])
+
+  // Executive Finished Goods KPI Calculations (scoped to KPI Period)
+  const targetInventory = kpiFilteredInventory
+  const totalStockPcs = targetInventory.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
+  const totalStockCartons = targetInventory.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
+  const uniqueSkus = new Set(targetInventory.map(i => i.products?.sku || i.sku_id)).size
+
+  const releasedItems = targetInventory.filter(i => i.qc_status === 'RELEASED')
   const releasedPcs = releasedItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
   const releasedCartons = releasedItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
   const releasedPct = totalStockPcs > 0 ? ((releasedPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
 
-  const quaranItems = inventory.filter(i => i.qc_status === 'QUARANTINE')
+  const quaranItems = targetInventory.filter(i => i.qc_status === 'QUARANTINE')
   const quaranPcs = quaranItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
   const quaranCartons = quaranItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
   const quaranPct = totalStockPcs > 0 ? ((quaranPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
 
-  const rejectedItems = inventory.filter(i => i.qc_status === 'REJECTED')
+  const rejectedItems = targetInventory.filter(i => i.qc_status === 'REJECTED')
   const rejectedPcs = rejectedItems.reduce((acc, i) => acc + (Number(i.available_qty_pcs) || 0), 0)
   const rejectedCartons = rejectedItems.reduce((acc, i) => acc + (Number(i.receive_qty_cartons) || 0), 0)
   const rejectedPct = totalStockPcs > 0 ? ((rejectedPcs / totalStockPcs) * 100).toFixed(1) : '0.0'
 
-  // Inbound stats
-  const pendingInboundTasks = tasks.filter(t => t.status !== 'DONE')
-  const completedInboundTasks = tasks.filter(t => t.status === 'DONE')
-  const totalInboundTasks = tasks.length
+  // Inbound stats (scoped to KPI Period)
+  const pendingInboundTasks = kpiFilteredTasks.filter(t => t.status !== 'DONE')
+  const completedInboundTasks = kpiFilteredTasks.filter(t => t.status === 'DONE')
+  const totalInboundTasks = kpiFilteredTasks.length
   const inboundFulfillmentPct = totalInboundTasks > 0 ? ((completedInboundTasks.length / totalInboundTasks) * 100).toFixed(1) : '100.0'
 
   // Storage utilization
-  const occupiedLocIds = new Set(inventory.map(i => i.location_id).filter(Boolean))
+  const occupiedLocIds = new Set(targetInventory.map(i => i.location_id).filter(Boolean))
   const totalLocCount = locations.length || 1
   const storageUtilizationPct = ((occupiedLocIds.size / totalLocCount) * 100).toFixed(0)
 
@@ -507,7 +520,8 @@ export default function FgTasksPage() {
     toast.success('รีเฟรชข้อมูลคลัง FG ล่าสุดเรียบร้อย')
   }
 
-  const filteredInventory = inventory.filter(item => {
+  const effectiveInventory = kpiPeriod.syncTableWithPeriod ? kpiFilteredInventory : inventory
+  const filteredInventory = effectiveInventory.filter(item => {
     const term = searchQuery.toLowerCase()
     const sku = (item.products?.sku || '').toLowerCase()
     const lotNo = (item.lot_no || '').toLowerCase()
@@ -549,6 +563,14 @@ export default function FgTasksPage() {
           </Button>
         </div>
       </div>
+
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลรายงานคลังสินค้า (FG Reporting Period)"
+        showSyncCheckbox
+        syncCheckboxLabel="กรองรายการรับเข้าและสต๊อกสินค้าตามช่วงเวลาที่เลือกด้วย"
+      />
 
       {/* 1. Executive Finished Goods KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
@@ -866,7 +888,7 @@ export default function FgTasksPage() {
                 คิวงานรอรับเข้าจาก POF
               </h2>
               <Badge variant="outline" className="bg-white text-indigo-700 border-indigo-200 font-bold">
-                {tasks.length} รายการ
+                {(kpiPeriod.syncTableWithPeriod ? kpiFilteredTasks : tasks).length} รายการ
               </Badge>
             </div>
             <CardContent className="p-0">
@@ -888,14 +910,14 @@ export default function FgTasksPage() {
                   <TableBody>
                     {loading ? (
                       <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500"><Loader2 className="w-6 h-6 animate-spin mx-auto" />กำลังโหลด...</TableCell></TableRow>
-                    ) : tasks.filter(t => {
+                    ) : (kpiPeriod.syncTableWithPeriod ? kpiFilteredTasks : tasks).filter(t => {
                       const term = searchQuery.toLowerCase()
                       const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
                       const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()
                       return sku.includes(term) || lotNo.includes(term)
                     }).length === 0 ? (
                       <TableRow><TableCell colSpan={6} className="text-center h-32 text-slate-500">ไม่มีคิวงานนำส่ง FG</TableCell></TableRow>
-                    ) : tasks.filter(t => {
+                    ) : (kpiPeriod.syncTableWithPeriod ? kpiFilteredTasks : tasks).filter(t => {
                       const term = searchQuery.toLowerCase()
                       const sku = ((t.production_lots as any)?.products?.sku || '').toLowerCase()
                       const lotNo = ((t.production_lots as any)?.lot_no || '').toLowerCase()

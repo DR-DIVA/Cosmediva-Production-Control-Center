@@ -99,12 +99,18 @@ export const APP_MODULES: AppModuleItem[] = [
     shortLabel: 'ข้อมูลหลัก & ผู้ใช้งาน',
     href: '/master-data',
   },
+  {
+    id: 'sales-pipeline',
+    label: 'CosmeFlow Sales Pipeline',
+    shortLabel: 'บริหารงานขาย (Sales Pipeline)',
+    href: '/sales-pipeline',
+  },
 ]
 
 export const ALL_MODULE_IDS = [
   'dashboard', 'planner', 'incoming-rm', 'production_overview', 'production_weighing', 
   'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 
-  'fg', 'purchase', 'maintenance', 'people', 'costing', 'improve', 'master-data'
+  'fg', 'purchase', 'maintenance', 'people', 'costing', 'improve', 'master-data', 'sales-pipeline'
 ]
 
 export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<string, 'VIEW' | 'EDIT'> }> = {
@@ -367,6 +373,7 @@ export function getRouteAccessLevel(href: string, userRole?: string | null): Acc
   else if (href.startsWith('/costing')) key = 'costing'
   else if (href.startsWith('/improve')) key = 'improve'
   else if (href.startsWith('/master-data')) key = 'master-data'
+  else if (href.startsWith('/sales-pipeline')) key = 'sales-pipeline'
 
   return perms[key] || 'NONE'
 }

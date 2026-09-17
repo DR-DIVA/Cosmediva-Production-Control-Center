@@ -23,7 +23,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Input } from "@/components/ui/input"
@@ -33,6 +33,8 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
 import { getUsers } from "@/app/actions/users"
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
@@ -64,174 +66,173 @@ export default function IssuesPage() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('')
   const [streamFilter, setStreamFilter] = useState<'ALL' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
+  const kpiPeriod = useKpiPeriod()
 
-  // Quality KPI Metrics state
-  const [qualityStats, setQualityStats] = useState<{
-    rm: QualityStreamMetrics
-    pm: QualityStreamMetrics
-    bulk: QualityStreamMetrics
-    fg: QualityStreamMetrics
-    overall: {
-      total: number
-      passed: number
-      hold: number
-      reject: number
-      fpyPct: string
-    }
-  }>({
-    rm: { total: 0, passed: 0, hold: 0, reject: 0, passedPct: '100.0', holdPct: '0.0', rejectPct: '0.0' },
-    pm: { total: 0, passed: 0, hold: 0, reject: 0, passedPct: '100.0', holdPct: '0.0', rejectPct: '0.0' },
-    bulk: { total: 0, passed: 0, hold: 0, reject: 0, passedPct: '100.0', holdPct: '0.0', rejectPct: '0.0' },
-    fg: { total: 0, passed: 0, hold: 0, reject: 0, passedPct: '100.0', holdPct: '0.0', rejectPct: '0.0' },
-    overall: { total: 0, passed: 0, hold: 0, reject: 0, fpyPct: '100.0' }
+  const [rawQualityData, setRawQualityData] = useState<{ rmData: any[]; logsData: any[]; bulkData: any[]; fgData: any[] }>({
+    rmData: [], logsData: [], bulkData: [], fgData: []
   })
   
   const fetchQualityMetrics = async () => {
     try {
       // 1. Fetch RM & PM data and logs for historical hold events
       const [{ data: rmData }, { data: logsData }, { data: bulkData }, { data: fgData }] = await Promise.all([
-        supabase.from('production_lot_rms').select('id, rm_code, rm_name, qc_status, status, receive_date'),
-        supabase.from('production_logs').select('id, note, status, tank_details, processes(process_name)'),
-        supabase.from('production_logs').select('id, status, tank_start, tank_end, total_tanks, tank_details, note, processes(process_name)'),
-        supabase.from('fg_inventory').select('id, qc_status')
+        supabase.from('production_lot_rms').select('id, rm_code, rm_name, qc_status, status, receive_date, created_at'),
+        supabase.from('production_logs').select('id, note, status, tank_details, activity_date, created_at, processes(process_name)'),
+        supabase.from('production_logs').select('id, status, tank_start, tank_end, total_tanks, tank_details, note, activity_date, created_at, processes(process_name)'),
+        supabase.from('fg_inventory').select('id, qc_status, created_at, updated_at')
       ])
 
-      // Extract all RM / PM hold logs from production_logs note
-      const rmHoldCodes = new Set<string>()
-      const pmHoldCodes = new Set<string>()
-      ;(logsData || []).forEach(l => {
-        const note = l.note || ''
-        if (note.includes('[QC HOLD]')) {
-          if (note.includes(' PM [') || note.includes(' PM:')) {
-            pmHoldCodes.add(note)
-          } else if (note.includes(' RM [') || note.includes(' RM:') || note.includes('RM/PM')) {
-            rmHoldCodes.add(note)
-          }
-        }
-      })
-
-      // 1. RM & PM Calculation
-      let rmTotal = 0, rmPassed = 0, rmHold = 0, rmReject = 0
-      let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
-
-      ;(rmData || []).forEach((item: any) => {
-        const isPM = item.rm_code?.toLowerCase().startsWith('p') || item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
-        const qc = item.qc_status?.toUpperCase()
-        const isReceived = item.receive_date != null || item.status === 'RECEIVED' || item.status === 'READY' || item.status === 'REJECTED'
-
-        if (isReceived || qc) {
-          if (isPM) {
-            pmTotal++
-            if (qc === 'PASSED') pmPassed++
-            if (qc === 'REJECTED') pmReject++
-            
-            const inHoldLogs = Array.from(pmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
-            if (qc === 'HOLD' || inHoldLogs) {
-              pmHold++
-            }
-          } else {
-            rmTotal++
-            if (qc === 'PASSED') rmPassed++
-            if (qc === 'REJECTED') rmReject++
-            
-            const inHoldLogs = Array.from(rmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
-            if (qc === 'HOLD' || inHoldLogs) {
-              rmHold++
-            }
-          }
-        }
-      })
-
-      // 2. Bulk Calculation (with historical hold / reprocess per tank)
-      let bulkTotal = 0, bulkPassed = 0, bulkHold = 0, bulkReject = 0
-      const qcLogs = (bulkData || []).filter(t => {
-        const pName = Array.isArray(t.processes) ? t.processes[0]?.process_name : (t.processes as any)?.process_name
-        return pName === 'รอ QC'
-      })
-
-      qcLogs.forEach((task: any) => {
-        const details = task.tank_details || {}
-        const start = parseInt(task.tank_start) || 1
-        const end = parseInt(task.tank_end) || start
-        for (let i = start; i <= end; i++) {
-          const s = details[i]
-          bulkTotal++
-          if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
-            bulkPassed++
-          }
-          if (s === 'FAILED' || s === 'REJECTED') {
-            bulkReject++
-          }
-
-          const historyKey = `${i}_history`
-          const histories = details[historyKey]
-          const hasHoldHistory = Array.isArray(histories) && histories.some((h: any) => 
-            h.status === 'PAUSED' || h.status === 'REPROCESS' || h.status === 'HOLD' || (h.note && (h.note.includes('HOLD') || h.note.includes('REPROCESS')))
-          )
-
-          if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD' || hasHoldHistory) {
-            bulkHold++
-          }
-        }
-      })
-
-      // 3. FG Calculation
-      let fgTotal = 0, fgPassed = 0, fgHold = 0, fgReject = 0
-
-      ;(fgData || []).forEach((item: any) => {
-        const qc = item.qc_status?.toUpperCase()
-        if (qc) {
-          fgTotal++
-          if (qc === 'RELEASED' || qc === 'PASSED' || qc === 'QC_PASS') {
-            fgPassed++
-          } else if (qc === 'QUARANTINE' || qc === 'HOLD' || qc === 'PAUSED') {
-            fgHold++
-          } else if (qc === 'REJECTED' || qc === 'FAILED') {
-            fgReject++
-          }
-        }
-      })
-
-      const calcPcts = (total: number, passed: number, hold: number, reject: number) => {
-        const t = total > 0 ? total : 0
-        return {
-          total: t,
-          passed,
-          hold,
-          reject,
-          passedPct: t > 0 ? ((passed / t) * 100).toFixed(1) : '100.0',
-          holdPct: t > 0 ? ((hold / t) * 100).toFixed(1) : '0.0',
-          rejectPct: t > 0 ? ((reject / t) * 100).toFixed(1) : '0.0'
-        }
-      }
-
-      const rmMetrics = calcPcts(rmTotal, rmPassed, rmHold, rmReject)
-      const pmMetrics = calcPcts(pmTotal, pmPassed, pmHold, pmReject)
-      const bulkMetrics = calcPcts(bulkTotal, bulkPassed, bulkHold, bulkReject)
-      const fgMetrics = calcPcts(fgTotal, fgPassed, fgHold, fgReject)
-
-      const grandTotal = rmTotal + pmTotal + bulkTotal + fgTotal
-      const grandPassed = rmPassed + pmPassed + bulkPassed + fgPassed
-      const grandHold = rmHold + pmHold + bulkHold + fgHold
-      const grandReject = rmReject + pmReject + bulkReject + fgReject
-
-      setQualityStats({
-        rm: rmMetrics,
-        pm: pmMetrics,
-        bulk: bulkMetrics,
-        fg: fgMetrics,
-        overall: {
-          total: grandTotal,
-          passed: grandPassed,
-          hold: grandHold,
-          reject: grandReject,
-          fpyPct: grandTotal > 0 ? ((grandPassed / grandTotal) * 100).toFixed(1) : '100.0'
-        }
+      setRawQualityData({
+        rmData: rmData || [],
+        logsData: logsData || [],
+        bulkData: bulkData || [],
+        fgData: fgData || []
       })
     } catch (err) {
       console.error('Error fetching quality metrics:', err)
     }
   }
+
+  // Reactive Quality KPI Metrics (Scoped to KPI Period)
+  const qualityStats = useMemo(() => {
+    const rmData = kpiPeriod.filterByPeriod(rawQualityData.rmData, (i: any) => i.receive_date || i.created_at)
+    const logsData = kpiPeriod.filterByPeriod(rawQualityData.logsData, (l: any) => l.activity_date || l.created_at)
+    const bulkData = kpiPeriod.filterByPeriod(rawQualityData.bulkData, (b: any) => b.activity_date || b.created_at)
+    const fgData = kpiPeriod.filterByPeriod(rawQualityData.fgData, (f: any) => f.created_at || f.updated_at)
+
+    // Extract all RM / PM hold logs from production_logs note
+    const rmHoldCodes = new Set<string>()
+    const pmHoldCodes = new Set<string>()
+    logsData.forEach((l: any) => {
+      const note = l.note || ''
+      if (note.includes('[QC HOLD]')) {
+        if (note.includes(' PM [') || note.includes(' PM:')) {
+          pmHoldCodes.add(note)
+        } else if (note.includes(' RM [') || note.includes(' RM:') || note.includes('RM/PM')) {
+          rmHoldCodes.add(note)
+        }
+      }
+    })
+
+    // 1. RM & PM Calculation
+    let rmTotal = 0, rmPassed = 0, rmHold = 0, rmReject = 0
+    let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
+
+    rmData.forEach((item: any) => {
+      const isPM = item.rm_code?.toLowerCase().startsWith('p') || item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
+      const qc = item.qc_status?.toUpperCase()
+      const isReceived = item.receive_date != null || item.status === 'RECEIVED' || item.status === 'READY' || item.status === 'REJECTED'
+
+      if (isReceived || qc) {
+        if (isPM) {
+          pmTotal++
+          if (qc === 'PASSED') pmPassed++
+          if (qc === 'REJECTED') pmReject++
+          
+          const inHoldLogs = Array.from(pmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+          if (qc === 'HOLD' || inHoldLogs) {
+            pmHold++
+          }
+        } else {
+          rmTotal++
+          if (qc === 'PASSED') rmPassed++
+          if (qc === 'REJECTED') rmReject++
+          
+          const inHoldLogs = Array.from(rmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+          if (qc === 'HOLD' || inHoldLogs) {
+            rmHold++
+          }
+        }
+      }
+    })
+
+    // 2. Bulk Calculation (with historical hold / reprocess per tank)
+    let bulkTotal = 0, bulkPassed = 0, bulkHold = 0, bulkReject = 0
+    const qcLogs = bulkData.filter((t: any) => {
+      const pName = Array.isArray(t.processes) ? t.processes[0]?.process_name : (t.processes as any)?.process_name
+      return pName === 'รอ QC'
+    })
+
+    qcLogs.forEach((task: any) => {
+      const details = task.tank_details || {}
+      const start = parseInt(task.tank_start) || 1
+      const end = parseInt(task.tank_end) || start
+      for (let i = start; i <= end; i++) {
+        const s = details[i]
+        bulkTotal++
+        if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
+          bulkPassed++
+        }
+        if (s === 'FAILED' || s === 'REJECTED') {
+          bulkReject++
+        }
+
+        const historyKey = `${i}_history`
+        const histories = details[historyKey]
+        const hasHoldHistory = Array.isArray(histories) && histories.some((h: any) => 
+          h.status === 'PAUSED' || h.status === 'REPROCESS' || h.status === 'HOLD' || (h.note && (h.note.includes('HOLD') || h.note.includes('REPROCESS')))
+        )
+
+        if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD' || hasHoldHistory) {
+          bulkHold++
+        }
+      }
+    })
+
+    // 3. FG Calculation
+    let fgTotal = 0, fgPassed = 0, fgHold = 0, fgReject = 0
+
+    fgData.forEach((item: any) => {
+      const qc = item.qc_status?.toUpperCase()
+      if (qc) {
+        fgTotal++
+        if (qc === 'RELEASED' || qc === 'PASSED' || qc === 'QC_PASS') {
+          fgPassed++
+        } else if (qc === 'QUARANTINE' || qc === 'HOLD' || qc === 'PAUSED') {
+          fgHold++
+        } else if (qc === 'REJECTED' || qc === 'FAILED') {
+          fgReject++
+        }
+      }
+    })
+
+    const calcPcts = (total: number, passed: number, hold: number, reject: number) => {
+      const t = total > 0 ? total : 0
+      return {
+        total: t,
+        passed,
+        hold,
+        reject,
+        passedPct: t > 0 ? ((passed / t) * 100).toFixed(1) : '100.0',
+        holdPct: t > 0 ? ((hold / t) * 100).toFixed(1) : '0.0',
+        rejectPct: t > 0 ? ((reject / t) * 100).toFixed(1) : '0.0'
+      }
+    }
+
+    const rmMetrics = calcPcts(rmTotal, rmPassed, rmHold, rmReject)
+    const pmMetrics = calcPcts(pmTotal, pmPassed, pmHold, pmReject)
+    const bulkMetrics = calcPcts(bulkTotal, bulkPassed, bulkHold, bulkReject)
+    const fgMetrics = calcPcts(fgTotal, fgPassed, fgHold, fgReject)
+
+    const grandTotal = rmTotal + pmTotal + bulkTotal + fgTotal
+    const grandPassed = rmPassed + pmPassed + bulkPassed + fgPassed
+    const grandHold = rmHold + pmHold + bulkHold + fgHold
+    const grandReject = rmReject + pmReject + bulkReject + fgReject
+
+    return {
+      rm: rmMetrics,
+      pm: pmMetrics,
+      bulk: bulkMetrics,
+      fg: fgMetrics,
+      overall: {
+        total: grandTotal,
+        passed: grandPassed,
+        hold: grandHold,
+        reject: grandReject,
+        fpyPct: grandTotal > 0 ? ((grandPassed / grandTotal) * 100).toFixed(1) : '100.0'
+      }
+    }
+  }, [rawQualityData, kpiPeriod])
 
   const fetchIssues = async () => {
     const { data, error } = await supabase.from('production_logs')
@@ -539,9 +540,12 @@ export default function IssuesPage() {
     return 'bg-[#F8F6F0] text-slate-700 border-slate-200'
   }
 
-  // Filter issues based on search & active quality stream
+  // Filter issues based on search & active quality stream (with KPI period sync option)
   const filterIssuesList = (list: any[]) => {
-    return list.filter(i => {
+    const periodScopedList = kpiPeriod.syncTableWithPeriod 
+      ? kpiPeriod.filterByPeriod(list, i => i.updated_at || i.created_at || i.activity_date)
+      : list;
+    return periodScopedList.filter(i => {
       // 1. Search Query
       const term = searchQuery.toLowerCase()
       const sku = (i.production_lots?.products?.sku || '').toLowerCase()
@@ -630,6 +634,14 @@ export default function IssuesPage() {
           </div>
         </div>
       </div>
+
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลรายงานปัญหาคุณภาพ NC/CAR (Assurance KPI Period)"
+        showSyncCheckbox
+        syncCheckboxLabel="กรองรายการปัญหา NC/CAR และประวัติการแก้ไขตามช่วงเวลาที่เลือกด้วย"
+      />
 
       {/* 1. Executive Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">

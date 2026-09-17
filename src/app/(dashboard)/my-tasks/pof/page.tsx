@@ -15,6 +15,8 @@ import { differenceInDays, startOfDay, format } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
 import { TaskCalendar } from '@/components/ui/TaskCalendar'
 import { MasterPlanningTimeline } from '@/components/planner/MasterPlanningTimeline'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle , DialogFooter} from '@/components/ui/dialog'
 import { Calendar as CalendarIcon, List as ListIcon, User, History, ClipboardCheck } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
@@ -22,6 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function PofTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
+  const kpiPeriod = useKpiPeriod()
   const [allTasks, setAllTasks] = useState<any[]>([])
   const [rooms, setRooms] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -929,13 +932,18 @@ export default function PofTasksPage() {
     toast.success('รีเฟรชข้อมูลคิวงานลงลังล่าสุดเรียบร้อยแล้ว')
   }
 
-  // POF Metric Calculations
+  // Filter tasks for KPI calculations scoped to selected reporting period
+  const kpiFilteredTasks = useMemo(() => {
+    return kpiPeriod.filterByPeriod(tasks, t => t.activity_date || t.start_time || (t.production_lots as any)?.created_at)
+  }, [tasks, kpiPeriod])
+
+  // POF Metric Calculations (Scoped to Selected Reporting Period)
   let totalTanksCount = 0;
   let inProgressTanksCount = 0;
   let doneTanksCount = 0;
   let totalCartonsProduced = 0;
 
-  tasks.forEach(t => {
+  kpiFilteredTasks.forEach(t => {
     const lot = t.production_lots;
     const total = lot?.total_tanks || 1;
     const start = parseInt(t.tank_start) || 1;
@@ -960,6 +968,14 @@ export default function PofTasksPage() {
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       if (filterDate && t.activity_date !== filterDate) return false
+
+      if (kpiPeriod.syncTableWithPeriod && kpiPeriod.dateRange.start && kpiPeriod.dateRange.end) {
+        const rawDate = t.activity_date || t.start_time
+        if (rawDate) {
+          const dStr = rawDate.substring(0, 10)
+          if (dStr < kpiPeriod.dateRange.start || dStr > kpiPeriod.dateRange.end) return false
+        }
+      }
 
       if (searchQuery.trim()) {
         const term = searchQuery.toLowerCase().trim()
@@ -1114,6 +1130,15 @@ export default function PofTasksPage() {
         </div>
       </div>
 
+      {/* 0. KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        summaryBadge={`(${kpiFilteredTasks.length} งาน • ${totalTanksCount} ถังในคิว)`}
+        showSyncCheckbox={true}
+        syncCheckboxLabel="ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Queue Table with Period)"
+        summaryFooter={`พบ ${kpiFilteredTasks.length} งานในงวดนี้ • ${totalCartonsProduced.toLocaleString()} ลัง`}
+      />
+
       {/* 1. Executive POF & Cartoning KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
@@ -1138,7 +1163,7 @@ export default function PofTasksPage() {
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
             <div className="text-[11px] text-stone-300 font-medium">คิวงานลงลังรวม</div>
             <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
-              {tasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
+              {kpiFilteredTasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
             </div>
             <div className="text-[10px] text-stone-400 mt-0.5">({totalTanksCount} ถังในคิว)</div>
           </div>

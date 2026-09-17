@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { format, startOfMonth, endOfMonth, startOfDay, endOfDay, addDays } from 'date-fns'
 import { RollingMasterRadar } from '@/components/dashboard/RollingMasterRadar'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 function ThemeToggleButton({ 
   isNight, 
@@ -70,6 +72,8 @@ const parseRanges = (str: string) => {
 }
 
 export default function DashboardPage() {
+  const kpiPeriod = useKpiPeriod()
+
   // 1. 21-Day Rolling Master Radar theme state
   const [theme21Day, setTheme21Day] = useState<'night' | 'light'>('light')
 
@@ -204,7 +208,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchDashboardData()
-  }, [dashboardDate])
+  }, [dashboardDate, kpiPeriod.dateRange.start, kpiPeriod.dateRange.end, kpiPeriod.syncTableWithPeriod])
 
   const fetchDashboardData = async () => {
     const today = new Date(dashboardDate)
@@ -212,6 +216,14 @@ export default function DashboardPage() {
     const todayEnd = endOfDay(today).toISOString()
     const monthStart = startOfMonth(today).toISOString()
     const monthEnd = endOfMonth(today).toISOString()
+
+    const periodStartIso = kpiPeriod.dateRange.start ? `${kpiPeriod.dateRange.start}T00:00:00.000Z` : todayStart
+    const periodEndIso = kpiPeriod.dateRange.end ? `${kpiPeriod.dateRange.end}T23:59:59.999Z` : todayEnd
+    const periodStartStr = kpiPeriod.dateRange.start || dashboardDate
+    const periodEndStr = kpiPeriod.dateRange.end || dashboardDate
+
+    const activeRangeStart = kpiPeriod.syncTableWithPeriod ? periodStartIso : todayStart
+    const activeRangeEnd = kpiPeriod.syncTableWithPeriod ? periodEndIso : todayEnd
 
     // 1. Fetch Active Logs & Lots (For Production Overview)
     const logSelect = `
@@ -242,8 +254,12 @@ export default function DashboardPage() {
 
     const [ { data: activeLogsInitial }, { data: todayLogsInitial }, { data: activityLogsInitial } ] = await Promise.all([
       supabase.from('production_logs').select(logSelect).in('production_lot_id', activeLotIds),
-      supabase.from('production_logs').select(logSelect).gte('updated_at', todayStart).lte('updated_at', todayEnd),
-      supabase.from('production_logs').select(logSelect).or(`and(activity_date.lte.${dashboardDate},end_date.gte.${dashboardDate}),activity_date.eq.${dashboardDate}`)
+      supabase.from('production_logs').select(logSelect).gte('updated_at', activeRangeStart).lte('updated_at', activeRangeEnd),
+      supabase.from('production_logs').select(logSelect).or(
+        kpiPeriod.syncTableWithPeriod
+          ? `and(activity_date.lte.${periodEndStr},end_date.gte.${periodStartStr}),and(activity_date.gte.${periodStartStr},activity_date.lte.${periodEndStr})`
+          : `and(activity_date.lte.${dashboardDate},end_date.gte.${dashboardDate}),activity_date.eq.${dashboardDate}`
+      )
     ])
 
     const logsMap = new Map()
@@ -299,12 +315,12 @@ export default function DashboardPage() {
       setActiveLots(sortedLots)
     }
 
-    // 2. Fetch Defects (Today)
+    // 2. Fetch Defects (Filtered by Period)
     const { data: defects } = await supabase.from('production_logs')
       .select('*, processes(process_name)')
       .eq('status', 'DEFECT')
-      .gte('created_at', todayStart)
-      .lte('created_at', todayEnd)
+      .gte('created_at', activeRangeStart)
+      .lte('created_at', activeRangeEnd)
     if (defects) setAllDefects(defects)
 
     // 3. Fetch Comprehensive QC & QA & FG & Planner metrics
@@ -372,7 +388,11 @@ export default function DashboardPage() {
       fgTotalPcs += pcs
       fgTotalCartons += ctn
 
-      if (f.created_at >= monthStart && f.created_at <= monthEnd) {
+      const inPeriod = kpiPeriod.syncTableWithPeriod
+        ? (f.created_at >= periodStartIso && f.created_at <= periodEndIso)
+        : (f.created_at >= monthStart && f.created_at <= monthEnd)
+
+      if (inPeriod) {
         fgMonthPcs += pcs
       }
       if (f.created_at >= todayStart && f.created_at <= todayEnd) {
@@ -447,6 +467,10 @@ export default function DashboardPage() {
   const prodTarget = { weighing: 0, mixing: 0, packing: 0, pof: 0, qc: 0 }
 
   const todayStr = dashboardDate;
+  const periodStartStr = kpiPeriod.dateRange.start || dashboardDate;
+  const periodEndStr = kpiPeriod.dateRange.end || dashboardDate;
+  const periodStartMs = kpiPeriod.dateRange.start ? new Date(kpiPeriod.dateRange.start).setHours(0,0,0,0) : new Date(dashboardDate).setHours(0,0,0,0);
+  const periodEndMs = kpiPeriod.dateRange.end ? new Date(kpiPeriod.dateRange.end).setHours(23,59,59,999) : new Date(dashboardDate).setHours(23,59,59,999);
 
   activeLogs.forEach(log => {
     if (selectedFilter !== 'all' && log.production_lot_id !== selectedFilter) return;
@@ -458,32 +482,44 @@ export default function DashboardPage() {
     const rawEnd = log.end_date || log.activity_date;
     const effStart = rawStart && rawEnd ? (rawStart <= rawEnd ? rawStart : rawEnd) : rawStart;
     const effEnd = rawStart && rawEnd ? (rawStart <= rawEnd ? rawEnd : rawStart) : rawEnd;
+
     const isPlannedForToday = (effStart && effEnd)
       ? (todayStr >= effStart && todayStr <= effEnd)
       : (log.activity_date === todayStr || log.end_date === todayStr);
-    const isUpdatedToday = new Date(log.updated_at).getTime() >= new Date(new Date(dashboardDate).setHours(0,0,0,0)).getTime() && new Date(log.updated_at).getTime() <= new Date(new Date(dashboardDate).setHours(23,59,59,999)).getTime();
+
+    const isPlannedInPeriod = (effStart && effEnd)
+      ? (effStart <= periodEndStr && effEnd >= periodStartStr)
+      : ((log.activity_date && log.activity_date >= periodStartStr && log.activity_date <= periodEndStr) || 
+         (log.end_date && log.end_date >= periodStartStr && log.end_date <= periodEndStr));
+
+    const isPlannedActive = kpiPeriod.syncTableWithPeriod ? isPlannedInPeriod : isPlannedForToday;
+
+    const logUpdatedMs = new Date(log.updated_at).getTime();
+    const isUpdatedToday = logUpdatedMs >= new Date(new Date(dashboardDate).setHours(0,0,0,0)).getTime() && logUpdatedMs <= new Date(new Date(dashboardDate).setHours(23,59,59,999)).getTime();
+    const isUpdatedInPeriod = logUpdatedMs >= periodStartMs && logUpdatedMs <= periodEndMs;
+    const isUpdatedActive = kpiPeriod.syncTableWithPeriod ? isUpdatedInPeriod : isUpdatedToday;
     
-    let hasActivityToday = false;
+    let hasActivityActive = false;
     if (log.tank_details && Object.keys(log.tank_details).length > 0) {
       Object.keys(log.tank_details).forEach(key => {
         if (key.endsWith('_history')) {
           const history = log.tank_details[key] || [];
           if (Array.isArray(history)) {
-             const workedToday = history.some(h => {
+             const workedActive = history.some(h => {
                 if (!h.timestamp) return false;
                 const t = new Date(h.timestamp).getTime();
-                const start = new Date(dashboardDate).setHours(0,0,0,0);
-                const end = new Date(dashboardDate).setHours(23,59,59,999);
+                const start = kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0);
+                const end = kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999);
                 return t >= start && t <= end;
              });
-             if (workedToday) hasActivityToday = true;
+             if (workedActive) hasActivityActive = true;
           }
         }
       });
     }
 
-    // If it's not planned for today and nobody worked on it today, ignore it completely for this dashboard.
-    if (!isPlannedForToday && !isUpdatedToday && !hasActivityToday) return;
+    // If it's not planned and nobody worked on it, ignore it
+    if (!isPlannedActive && !isUpdatedActive && !hasActivityActive) return;
     
     const taskTanks = (log.tank_start && log.tank_end) ? (log.tank_end - log.tank_start + 1) : (lot.total_tanks || 0)
     const calculatedQty = (taskTanks && lot.kg_per_tank && lot.g_per_piece) ? Math.floor(taskTanks * (lot.kg_per_tank * 1000 / lot.g_per_piece)) : 0;
@@ -503,20 +539,21 @@ export default function DashboardPage() {
         const s = typeof val === 'string' ? val : (val?.status || '')
         const isDone = ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(s)
         
-        let completedToday = false;
+        let completedInTime = false;
         const historyKey = `${key}_history`
         const history = log.tank_details[historyKey] || []
         
         if (Array.isArray(history) && history.length > 0) {
            const doneEvents = history.filter(h => ['DONE', 'MOVED', 'SENT_TO_QC', 'QC_PASS', 'SENT_TO_PACKING', 'SENT_TO_POF', 'SENT_TO_QA', 'SENT_TO_WH'].includes(h.status));
            if (doneEvents.length > 0) {
-              const doneToday = doneEvents.some(h => {
+              const doneInRange = doneEvents.some(h => {
+                 if (!h.timestamp) return false;
                  const t = new Date(h.timestamp).getTime();
-                 const start = new Date(dashboardDate).setHours(0,0,0,0);
-                 const end = new Date(dashboardDate).setHours(23,59,59,999);
+                 const start = kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0);
+                 const end = kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999);
                  return t >= start && t <= end;
               });
-              if (doneToday) completedToday = true;
+              if (doneInRange) completedInTime = true;
            }
         }
         
@@ -534,7 +571,7 @@ export default function DashboardPage() {
 
            completedPieces += thisTankPieces
            
-           if (completedToday || (isPlannedForToday && !Array.isArray(history))) {
+           if (completedInTime || (isPlannedActive && !Array.isArray(history))) {
               todayOutputTanks++
               todayOutputPieces += thisTankPieces
            }
@@ -558,7 +595,7 @@ export default function DashboardPage() {
          outputPieces = log.piece_quantity || targetQty;
       }
       
-      if (isUpdatedToday || isPlannedForToday) {
+      if (isUpdatedActive || isPlannedActive) {
         if (pName.includes('ชั่ง')) prodOutput.weighing += completedTanks;
         if (pName.includes('ผสม')) prodOutput.mixing += completedTanks;
         if (pName.includes('บรรจุ')) prodOutput.packing += outputPieces;
@@ -566,8 +603,8 @@ export default function DashboardPage() {
       }
     }
     
-    // Targets: Only count if it's explicitly planned for TODAY
-    if (isPlannedForToday) {
+    // Targets: Only count if it's planned in active range
+    if (isPlannedActive) {
       if (pName.includes('ชั่ง')) prodTarget.weighing += taskTanks;
       if (pName.includes('ผสม')) prodTarget.mixing += taskTanks;
       if (pName.includes('บรรจุ')) prodTarget.packing += targetQty;
@@ -579,18 +616,18 @@ export default function DashboardPage() {
       }
     }
 
-    // Bulk QC Output: Check history for QC_PASS on dashboardDate
+    // Bulk QC Output: Check history for QC_PASS
     if (pName === 'รอ QC' && log.tank_details) {
       Object.keys(log.tank_details).forEach(key => {
         if (key.endsWith('_history')) {
           const histories = log.tank_details[key] as any[]
           if (Array.isArray(histories)) {
-             const hasPassToday = histories.some(h => 
+             const hasPass = histories.some(h => 
                h.status === 'QC_PASS' && 
-               new Date(h.timestamp).getTime() >= new Date(dashboardDate).setHours(0,0,0,0) && 
-               new Date(h.timestamp).getTime() <= new Date(dashboardDate).setHours(23,59,59,999)
+               new Date(h.timestamp).getTime() >= (kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0)) && 
+               new Date(h.timestamp).getTime() <= (kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999))
              )
-             if (hasPassToday) prodOutput.qc += 1;
+             if (hasPass) prodOutput.qc += 1;
           }
         }
       })
@@ -599,13 +636,16 @@ export default function DashboardPage() {
 
   // Add RM and FG Queues to QC Metric
   rmQcLogs.forEach(rm => {
-     if (rm.status === 'RECEIVED' && rm.receive_date === dashboardDate) {
+     const inRcv = kpiPeriod.syncTableWithPeriod 
+        ? (rm.receive_date && rm.receive_date >= periodStartStr && rm.receive_date <= periodEndStr)
+        : (rm.receive_date === dashboardDate);
+     if (rm.status === 'RECEIVED' && inRcv) {
         prodTarget.qc += 1;
      }
      if (rm.qc_status && rm.updated_at) {
         const updateTime = new Date(rm.updated_at).getTime();
-        const start = new Date(dashboardDate).setHours(0,0,0,0);
-        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        const start = kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0);
+        const end = kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999);
         if (updateTime >= start && updateTime <= end) {
            prodOutput.qc += 1;
         }
@@ -615,16 +655,16 @@ export default function DashboardPage() {
   fgQcLogs.forEach(fg => {
      if (fg.qc_status === 'QUARANTINE' && fg.created_at) {
         const createTime = new Date(fg.created_at).getTime();
-        const start = new Date(dashboardDate).setHours(0,0,0,0);
-        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        const start = kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0);
+        const end = kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999);
         if (createTime >= start && createTime <= end) {
            prodTarget.qc += 1;
         }
      }
      if (fg.qc_status !== 'QUARANTINE' && fg.updated_at) {
         const updateTime = new Date(fg.updated_at).getTime();
-        const start = new Date(dashboardDate).setHours(0,0,0,0);
-        const end = new Date(dashboardDate).setHours(23,59,59,999);
+        const start = kpiPeriod.syncTableWithPeriod ? periodStartMs : new Date(dashboardDate).setHours(0,0,0,0);
+        const end = kpiPeriod.syncTableWithPeriod ? periodEndMs : new Date(dashboardDate).setHours(23,59,59,999);
         if (updateTime >= start && updateTime <= end) {
            prodOutput.qc += 1;
         }
@@ -969,9 +1009,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {/* 📊 KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลบริหารโรงงาน (Executive Reporting Period)"
+        showSyncCheckbox={true}
+        syncCheckboxLabel="ซิงค์ข้อมูลสรุปสถิติ กำลังการผลิต และเรดาร์ตามช่วงเวลาที่เลือก (Period Sync)"
+      />
+
       {/* 🧭 21-Day Rolling Master Radar & AI Plant Director Strategic Directives */}
       <RollingMasterRadar 
-        startDateStr={dashboardDate} 
+        startDateStr={kpiPeriod.syncTableWithPeriod && kpiPeriod.dateRange.start ? kpiPeriod.dateRange.start : dashboardDate} 
         onSelectLot={(lotId) => setSelectedFilter(lotId)} 
         themeRadar={theme21Day}
         onToggleThemeRadar={toggleTheme21Day}
@@ -1070,7 +1118,7 @@ export default function DashboardPage() {
         isNight ? 'border-slate-800' : 'border-[#D4AF37]/30'
       }`}>
         <h3 className={`text-xl font-bold flex items-center gap-2 ${isNight ? 'text-white' : 'text-[#4A4238]'}`}>
-          <span className="text-yellow-400 text-2xl font-black">1.</span> กำลังการผลิตวันนี้ (Production Volume)
+          <span className="text-yellow-400 text-2xl font-black">1.</span> กำลังการผลิต{kpiPeriod.syncTableWithPeriod ? ` (${kpiPeriod.dateRange.label})` : 'วันนี้'} (Production Volume)
         </h3>
         <ThemeToggleButton 
           isNight={isNight} 
@@ -1362,9 +1410,9 @@ export default function DashboardPage() {
                    <h4 className={`font-bold text-xs uppercase tracking-wider flex items-center gap-1.5 ${isNight ? 'text-slate-200' : 'text-[#4A4238]'}`}>
                      <span className="w-2 h-2 rounded-full bg-emerald-500"></span> คลังสินค้าสำเร็จรูป (FG)
                    </h4>
-                   <span className={`text-[10px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
-                     เข้าเดือนนี้ {fgInventoryStats.fgMonthPcs.toLocaleString()}
-                   </span>
+                    <span className={`text-[10px] font-medium ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
+                      เข้าช่วงนี้ ({kpiPeriod.dateRange.label}) {fgInventoryStats.fgMonthPcs.toLocaleString()}
+                    </span>
                  </div>
 
                  <div className="space-y-2">

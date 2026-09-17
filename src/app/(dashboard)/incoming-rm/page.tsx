@@ -27,6 +27,8 @@ import {
   formatDelayRemark, 
   parseDelayInfo 
 } from '@/lib/delayTracking';
+import { useKpiPeriod } from '@/hooks/useKpiPeriod';
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar';
 
 type RMItem = {
   id: string;
@@ -141,6 +143,7 @@ const DEFAULT_CMD2_PRESETS = [
 
 export default function RMControlCenterPage() {
   const supabase = createClient();
+  const kpiPeriod = useKpiPeriod();
   const [items, setItems] = useState<RMItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -1782,7 +1785,12 @@ export default function RMControlCenterPage() {
   
   const typeFilteredItems = items.filter(item => mainTab === 'pm' ? isPM(item.rm_code) : !isPM(item.rm_code));
 
-  const filteredItems = typeFilteredItems.filter(item => {
+  const kpiFilteredItems = useMemo(() => {
+    return kpiPeriod.filterByPeriod(typeFilteredItems, i => i.receive_date || i.eta_date || i.po_date || i.created_at);
+  }, [typeFilteredItems, kpiPeriod]);
+
+  const baseItems = kpiPeriod.syncTableWithPeriod ? kpiFilteredItems : typeFilteredItems;
+  const filteredItems = baseItems.filter(item => {
     if (statusFilter !== 'ALL') {
       if (statusFilter === 'QC_PASS' || statusFilter === 'READY') {
         if (item.status !== 'READY' && item.status !== 'QC_PASS' && item.status !== 'PASSED') return false;
@@ -2008,21 +2016,21 @@ export default function RMControlCenterPage() {
     toast.success('รีเฟรชข้อมูลวัตถุดิบล่าสุดเรียบร้อยแล้ว');
   };
 
-  // Executive Material Supply Chain Calculations
-  const pendingDeliveryItems = typeFilteredItems.filter(i => i.status === 'PENDING_DELIVERY' || i.status === 'ORDERED' || i.status === 'DELAYED' || i.status === 'REVISED');
-  const receivedItems = typeFilteredItems.filter(i => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.status === 'QUARANTINED');
-  const readyItems = typeFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED');
-  const rejectedItems = typeFilteredItems.filter(i => i.status === 'REJECTED');
+  // Executive Material Supply Chain Calculations (Scoped to KPI Period)
+  const pendingDeliveryItems = kpiFilteredItems.filter(i => i.status === 'PENDING_DELIVERY' || i.status === 'ORDERED' || i.status === 'DELAYED' || i.status === 'REVISED');
+  const receivedItems = kpiFilteredItems.filter(i => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.status === 'QUARANTINED');
+  const readyItems = kpiFilteredItems.filter(i => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED');
+  const rejectedItems = kpiFilteredItems.filter(i => i.status === 'REJECTED');
 
   const pendingWeight = pendingDeliveryItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
   const receivedWeight = receivedItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
   const readyWeight = readyItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
-  const totalWeight = typeFilteredItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
+  const totalWeight = kpiFilteredItems.reduce((sum, i) => sum + (Number(i.quantity) || 0), 0);
 
-  const controlNoCount = typeFilteredItems.filter(i => !!i.control_no).length;
-  const readyPct = activeItemsCount > 0 ? ((readyItems.length / activeItemsCount) * 100).toFixed(1) : '0.0';
-  const fulfillmentPct = activeItemsCount > 0 ? (((receivedItems.length + readyItems.length) / activeItemsCount) * 100).toFixed(1) : '0.0';
-  const uniqueSuppliers = new Set(typeFilteredItems.map(i => i.supplier).filter(Boolean)).size;
+  const controlNoCount = kpiFilteredItems.filter(i => !!i.control_no).length;
+  const readyPct = kpiFilteredItems.length > 0 ? ((readyItems.length / kpiFilteredItems.length) * 100).toFixed(1) : '0.0';
+  const fulfillmentPct = kpiFilteredItems.length > 0 ? (((receivedItems.length + readyItems.length) / kpiFilteredItems.length) * 100).toFixed(1) : '0.0';
+  const uniqueSuppliers = new Set(kpiFilteredItems.map(i => i.supplier).filter(Boolean)).size;
   const unitLabel = mainTab === 'rm' ? 'KG' : 'PCS';
 
   // ----------------------------------------------------
@@ -2449,6 +2457,14 @@ export default function RMControlCenterPage() {
         </div>
       </div>
 
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title={`ช่วงเวลาสรุปผลรายงานควบคุม${mainTab === 'rm' ? 'วัตถุดิบ' : 'บรรจุภัณฑ์'} (Material Control Reporting Period)`}
+        showSyncCheckbox
+        syncCheckboxLabel="กรองรายการและตารางในทุกแผนกด้านล่างตามช่วงเวลาที่เลือกด้วย"
+      />
+
       {/* 1. Executive Material Control & Supply Chain KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
@@ -2473,7 +2489,7 @@ export default function RMControlCenterPage() {
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
             <div className="text-[11px] text-stone-300 font-medium">รายการ{mainTab === 'rm' ? 'วัตถุดิบ' : 'บรรจุภัณฑ์'}ทั้งหมด</div>
             <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
-              {activeItemsCount} <span className="text-xs font-normal text-stone-300">รายการ</span>
+              {kpiFilteredItems.length} <span className="text-xs font-normal text-stone-300">รายการ</span>
             </div>
             <div className="text-[10px] text-stone-400 mt-0.5">({uniqueSuppliers} คู่ค้า / ซัพพลายเออร์)</div>
           </div>

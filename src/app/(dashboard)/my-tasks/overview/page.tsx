@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
@@ -14,9 +14,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
+import { createClient } from '@/utils/supabase/client'
 import { cleanDisplayNote } from '@/lib/planTracking'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 const COLUMNS = [
   { id: 'MM-RM', title: '1. ชั่งสาร (MM-RM)', keywords: ['ชั่ง', 'mm-rm'], colorClasses: { bg: 'bg-amber-50', header: 'bg-amber-100', border: 'border-amber-200', text: 'text-amber-800', badge: 'bg-amber-200 text-amber-800', cardBorder: 'border-t-amber-500' } },
@@ -81,6 +83,7 @@ export default function MyTasksPage() {
   const [cartonsQuantity, setCartonsQuantity] = useState('')
   const [piecesPerCarton, setPiecesPerCarton] = useState('')
   const [pofAggregates, setPofAggregates] = useState<Record<string, number>>({})
+  const kpiPeriod = useKpiPeriod()
   
   const supabase = createClient()
 
@@ -130,6 +133,8 @@ export default function MyTasksPage() {
     const { data } = await supabase.from('production_logs')
       .select(`
         id,
+        created_at,
+        activity_date,
         status,
         note,
         tank_start,
@@ -782,37 +787,41 @@ export default function MyTasksPage() {
     toast.success('รีเฟรชสถานะไลน์ผลิตล่าสุดเรียบร้อยแล้ว');
   };
 
-  // Executive Production Floor Calculations
-  const activeWipTasks = tasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'WAITING' || t.status === 'PAUSED');
-  const inProgressTasks = tasks.filter(t => t.status === 'IN_PROGRESS');
-  const pausedTasks = tasks.filter(t => t.status === 'PAUSED' || (t.note && t.note.includes('[สารขาด]')));
-  const waitingTasks = tasks.filter(t => t.status === 'WAITING' && (!t.note || !t.note.includes('[สารขาด]')));
+  // Executive Production Floor Calculations (KPI Period scoped)
+  const kpiFilteredTasks = useMemo(() => {
+    return kpiPeriod.filterByPeriod(tasks, t => t.activity_date || t.start_time || t.created_at || (t.production_lots as any)?.created_at);
+  }, [tasks, kpiPeriod]);
+
+  const activeWipTasks = kpiFilteredTasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'WAITING' || t.status === 'PAUSED');
+  const inProgressTasks = kpiFilteredTasks.filter(t => t.status === 'IN_PROGRESS');
+  const pausedTasks = kpiFilteredTasks.filter(t => t.status === 'PAUSED' || (t.note && t.note.includes('[สารขาด]')));
+  const waitingTasks = kpiFilteredTasks.filter(t => t.status === 'WAITING' && (!t.note || !t.note.includes('[สารขาด]')));
 
   // Category Tasks
-  const weighingTasks = tasks.filter(t => getTaskColumn(t) === 'MM-RM');
+  const weighingTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'MM-RM');
   const weighingReady = weighingTasks.filter(t => (t.rm_items || []).every((r: any) => r.status === 'READY')).length;
   const weighingWaiting = weighingTasks.length - weighingReady;
 
-  const mixingTasks = tasks.filter(t => getTaskColumn(t) === 'MIX');
+  const mixingTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'MIX');
   const mixingRunning = mixingTasks.filter(t => t.status === 'IN_PROGRESS').length;
   const mixingWaiting = mixingTasks.filter(t => t.status === 'WAITING').length;
 
-  const qcTasks = tasks.filter(t => getTaskColumn(t) === 'QC');
-  const packingTasks = tasks.filter(t => getTaskColumn(t) === 'PACKING');
+  const qcTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'QC');
+  const packingTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'PACKING');
   const packingRunning = packingTasks.filter(t => t.status === 'IN_PROGRESS').length;
 
-  const pofTasks = tasks.filter(t => getTaskColumn(t) === 'POF');
-  const fgTasks = tasks.filter(t => getTaskColumn(t) === 'FG');
+  const pofTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'POF');
+  const fgTasks = kpiFilteredTasks.filter(t => getTaskColumn(t) === 'FG');
 
-  const totalTanksInProduction = tasks.reduce((sum, t) => {
+  const totalTanksInProduction = kpiFilteredTasks.reduce((sum, t) => {
     if (t.tank_start && t.tank_end) {
       return sum + (parseInt(t.tank_end) - parseInt(t.tank_start) + 1);
     }
     return sum + 1;
   }, 0);
 
-  const flowRatePct = tasks.length > 0 
-    ? (((tasks.length - pausedTasks.length) / tasks.length) * 100).toFixed(1)
+  const flowRatePct = kpiFilteredTasks.length > 0 
+    ? (((kpiFilteredTasks.length - pausedTasks.length) / kpiFilteredTasks.length) * 100).toFixed(1)
     : '100.0';
 
   return (
@@ -857,6 +866,14 @@ export default function MyTasksPage() {
         </div>
       </div>
 
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลรายสถานี (Overview KPI Period)"
+        showSyncCheckbox
+        syncCheckboxLabel="กรองการ์ดงานในคอลัมน์ด้านล่างตามช่วงเวลาที่เลือกด้วย"
+      />
+
       {/* 1. Executive Production Floor & Shopfloor Capacity KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
         <div className="flex items-center gap-3 sm:gap-4">
@@ -881,7 +898,7 @@ export default function MyTasksPage() {
           <div className="bg-white/10 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-white/15 text-center">
             <div className="text-[10px] sm:text-[11px] text-stone-300 font-medium">งานในกระบวนการผลิตรวม</div>
             <div className="text-xl sm:text-2xl font-black text-[#D4AF37] tracking-tight">
-              {tasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
+              {kpiFilteredTasks.length} <span className="text-xs font-normal text-stone-300">งาน</span>
             </div>
             <div className="text-[9px] sm:text-[10px] text-stone-400 mt-0.5">({totalTanksInProduction} ถัง/ล็อตทั้งหมด)</div>
           </div>
@@ -910,7 +927,7 @@ export default function MyTasksPage() {
             <div className="text-xl sm:text-2xl font-black text-blue-300">
               {flowRatePct}%
             </div>
-            <div className="text-[9px] sm:text-[10px] text-blue-300 mt-0.5">({tasks.length - pausedTasks.length} งานไหลลื่น)</div>
+            <div className="text-[9px] sm:text-[10px] text-blue-300 mt-0.5">({kpiFilteredTasks.length - pausedTasks.length} งานไหลลื่น)</div>
           </div>
         </div>
       </div>
@@ -1140,7 +1157,8 @@ export default function MyTasksPage() {
 
       <div className="flex-1 overflow-x-auto overflow-y-hidden flex gap-4 pb-4 snap-x snap-mandatory">
         {COLUMNS.map(col => {
-          let colTasks = tasks.filter(t => getTaskColumn(t) === col.id)
+          const sourceTasks = kpiPeriod.syncTableWithPeriod ? kpiFilteredTasks : tasks;
+          let colTasks = sourceTasks.filter(t => getTaskColumn(t) === col.id)
           
           if (searchQuery) {
             colTasks = colTasks.filter(t => {

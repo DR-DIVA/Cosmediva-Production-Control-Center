@@ -20,9 +20,12 @@ import { format, differenceInDays, startOfDay } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
 import { cleanDisplayNote } from '@/lib/planTracking'
 import { MasterPlanningTimeline } from '@/components/planner/MasterPlanningTimeline'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 export default function MixingTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
+  const kpiPeriod = useKpiPeriod()
   const [loading, setLoading] = useState(true)
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'timeline'>('list')
@@ -709,7 +712,12 @@ export default function MixingTasksPage() {
     toast.success('รีเฟรชข้อมูลคิวงานผสมล่าสุดเรียบร้อยแล้ว')
   }
 
-  // Mixing Metric Calculations
+  // Filter tasks for KPI calculations scoped to selected reporting period
+  const kpiFilteredTasks = useMemo(() => {
+    return kpiPeriod.filterByPeriod(tasks, t => t.activity_date || t.start_time || (t.production_lots as any)?.created_at)
+  }, [tasks, kpiPeriod])
+
+  // Mixing Metric Calculations (Scoped to Selected Reporting Period)
   let totalTanksCount = 0;
   let inProgressTanksCount = 0;
   let soakTanksCount = 0;
@@ -717,7 +725,7 @@ export default function MixingTasksPage() {
   let qcSentTanksCount = 0;
   let pausedTanksCount = 0;
 
-  tasks.forEach(t => {
+  kpiFilteredTasks.forEach(t => {
     const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {};
     const total = t.production_lots?.total_tanks || 1;
     const start = parseInt(t.tank_start) || 1;
@@ -735,7 +743,7 @@ export default function MixingTasksPage() {
     }
   });
 
-  const totalBulkVolume = tasks.reduce((sum, t) => {
+  const totalBulkVolume = kpiFilteredTasks.reduce((sum, t) => {
     const kgPerTank = t.production_lots?.kg_per_tank || 0;
     const total = t.production_lots?.total_tanks || 1;
     const start = parseInt(t.tank_start) || 1;
@@ -750,6 +758,14 @@ export default function MixingTasksPage() {
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       if (filterDate && t.activity_date !== filterDate) return false
+
+      if (kpiPeriod.syncTableWithPeriod && kpiPeriod.dateRange.start && kpiPeriod.dateRange.end) {
+        const rawDate = t.activity_date || t.start_time
+        if (rawDate) {
+          const dStr = rawDate.substring(0, 10)
+          if (dStr < kpiPeriod.dateRange.start || dStr > kpiPeriod.dateRange.end) return false
+        }
+      }
 
       if (searchQuery.trim()) {
         const term = searchQuery.toLowerCase().trim()
@@ -859,6 +875,15 @@ export default function MixingTasksPage() {
         </div>
       </div>
 
+      {/* 0. KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        summaryBadge={`(${kpiFilteredTasks.length} ล็อต • ${totalTanksCount} ถังในคิว)`}
+        showSyncCheckbox={true}
+        syncCheckboxLabel="ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Queue Table with Period)"
+        summaryFooter={`พบ ${kpiFilteredTasks.length} ล็อตในงวดนี้ • ${totalTanksCount} ถังผสม`}
+      />
+
       {/* 1. Executive Mixing KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
@@ -883,7 +908,7 @@ export default function MixingTasksPage() {
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
             <div className="text-[11px] text-stone-300 font-medium">งานผสมทั้งหมด</div>
             <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
-              {tasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
+              {kpiFilteredTasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
             </div>
             <div className="text-[10px] text-stone-400 mt-0.5">({totalTanksCount} ถังในคิว)</div>
           </div>

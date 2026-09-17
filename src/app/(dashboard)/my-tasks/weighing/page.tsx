@@ -19,6 +19,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { format, differenceInDays, startOfDay } from 'date-fns'
 import { DefectPopup } from '@/components/production/DefectPopup'
 import { MasterPlanningTimeline } from '@/components/planner/MasterPlanningTimeline'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 export default function WeighingTasksPage() {
   const [tasks, setTasks] = useState<any[]>([])
@@ -30,6 +32,7 @@ export default function WeighingTasksPage() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [filterDate, setFilterDate] = useState<string>('')
   const [searchQuery, setSearchQuery] = useState('')
+  const kpiPeriod = useKpiPeriod()
 
   // Column-specific header filters for Queue table
   const [colFilterSku, setColFilterSku] = useState('')
@@ -585,16 +588,21 @@ export default function WeighingTasksPage() {
     toast.success('รีเฟรชข้อมูลคิวงานชั่งสารล่าสุดเรียบร้อยแล้ว')
   }
 
-  // Weighing Metric Calculations
-  const readyLots = tasks.filter(t => (t.rm_items || []).length > 0 && (t.rm_items || []).every((r: any) => r.status === 'READY')).length;
-  const waitingRmLots = tasks.filter(t => (t.rm_items || []).some((r: any) => r.status !== 'READY')).length;
+  // Filter tasks for KPI calculations scoped to selected reporting period
+  const kpiFilteredTasks = useMemo(() => {
+    return kpiPeriod.filterByPeriod(tasks, t => t.activity_date || t.start_time || (t.production_lots as any)?.created_at)
+  }, [tasks, kpiPeriod])
+
+  // Weighing Metric Calculations (Scoped to Selected Reporting Period)
+  const readyLots = kpiFilteredTasks.filter(t => (t.rm_items || []).length > 0 && (t.rm_items || []).every((r: any) => r.status === 'READY')).length;
+  const waitingRmLots = kpiFilteredTasks.filter(t => (t.rm_items || []).some((r: any) => r.status !== 'READY')).length;
   
   let totalBasketsCount = 0;
   let inProgressBasketsCount = 0;
   let doneBasketsCount = 0;
   let movedToMixCount = 0;
 
-  tasks.forEach(t => {
+  kpiFilteredTasks.forEach(t => {
     const details = typeof t.tank_details === 'object' && t.tank_details !== null ? t.tank_details : {};
     const total = t.production_lots?.total_tanks || 1;
     const start = parseInt(t.tank_start) || 1;
@@ -610,7 +618,7 @@ export default function WeighingTasksPage() {
     }
   });
 
-  const totalCompoundWeight = tasks.reduce((sum, t) => {
+  const totalCompoundWeight = kpiFilteredTasks.reduce((sum, t) => {
     const kgPerTank = t.production_lots?.kg_per_tank || 0;
     const total = t.production_lots?.total_tanks || 1;
     const start = parseInt(t.tank_start) || 1;
@@ -619,11 +627,19 @@ export default function WeighingTasksPage() {
     return sum + (count * kgPerTank);
   }, 0);
 
-  const readyPct = tasks.length > 0 ? ((readyLots / tasks.length) * 100).toFixed(1) : '100.0';
+  const readyPct = kpiFilteredTasks.length > 0 ? ((readyLots / kpiFilteredTasks.length) * 100).toFixed(1) : '100.0';
 
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       if (filterDate && t.activity_date !== filterDate) return false
+
+      if (kpiPeriod.syncTableWithPeriod && kpiPeriod.dateRange.start && kpiPeriod.dateRange.end) {
+        const rawDate = t.activity_date || t.start_time
+        if (rawDate) {
+          const dStr = rawDate.substring(0, 10)
+          if (dStr < kpiPeriod.dateRange.start || dStr > kpiPeriod.dateRange.end) return false
+        }
+      }
 
       if (searchQuery.trim()) {
         const term = searchQuery.toLowerCase().trim()
@@ -733,6 +749,15 @@ export default function WeighingTasksPage() {
         </div>
       </div>
 
+      {/* 0. KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        summaryBadge={`(${kpiFilteredTasks.length} ล็อต • ${totalBasketsCount} ชุดชั่ง)`}
+        showSyncCheckbox={true}
+        syncCheckboxLabel="ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Queue Table with Period)"
+        summaryFooter={`พบ ${kpiFilteredTasks.length} ล็อตในงวดนี้ • ${totalBasketsCount} ชุดชั่งสาร`}
+      />
+
       {/* 1. Executive Weighing KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-5">
         <div className="flex items-center gap-4">
@@ -757,7 +782,7 @@ export default function WeighingTasksPage() {
           <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
             <div className="text-[11px] text-stone-300 font-medium">คิวงานชั่งสารรวม</div>
             <div className="text-2xl font-black text-[#D4AF37] tracking-tight">
-              {tasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
+              {kpiFilteredTasks.length} <span className="text-xs font-normal text-stone-300">ล็อต</span>
             </div>
             <div className="text-[10px] text-stone-400 mt-0.5">({totalBasketsCount} ชุดชั่งสาร)</div>
           </div>
@@ -814,7 +839,7 @@ export default function WeighingTasksPage() {
             <div className="flex items-baseline justify-between pt-1">
               <div>
                 <span className="text-2xl font-black text-emerald-600">{readyLots}</span>
-                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {tasks.length} ล็อตสารพร้อม</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">/ {kpiFilteredTasks.length} ล็อตสารพร้อม</span>
               </div>
               <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
                 พร้อมชั่ง 100%

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -28,9 +28,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '@/components/ui/tooltip'
 import { cleanDisplayNote } from '@/lib/planTracking'
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
 
 export default function QCQueuePage() {
   const [activeTab, setActiveTab] = useState('bulk')
+  const kpiPeriod = useKpiPeriod()
   
   // Bulk State
   const [tasks, setTasks] = useState<any[]>([])
@@ -76,75 +79,68 @@ export default function QCQueuePage() {
 
   const supabase = createClient()
 
-  // --- Global Executive Quality Statistics ---
-  const [globalQcStats, setGlobalQcStats] = useState({
-    rmTotal: 0,
-    rmPending: 0,
-    rmPassed: 0,
-    rmHold: 0,
-    pmTotal: 0,
-    pmPending: 0,
-    pmPassed: 0,
-    pmHold: 0,
-    bulkTotalTanks: 0,
-    bulkPendingTanks: 0,
-    bulkPassedTanks: 0,
-    fgTotal: 0,
-    fgQuarantine: 0,
-    fgReleased: 0
-  });
+  const [rawQcData, setRawQcData] = useState<{ rms: any[]; bulkLogs: any[]; fg: any[] }>({ rms: [], bulkLogs: [], fg: [] });
 
   const fetchGlobalStats = async () => {
     try {
       const [rmsRes, bulkRes, fgRes] = await Promise.all([
-        supabase.from('production_lot_rms').select('id, rm_code, status, qc_status'),
-        supabase.from('production_logs').select('id, tank_details, total_tanks, processes(process_name)').ilike('processes.process_name', '%ผสม%'),
-        supabase.from('fg_inventory').select('id, qc_status')
+        supabase.from('production_lot_rms').select('id, rm_code, status, qc_status, receive_date, created_at'),
+        supabase.from('production_logs').select('id, tank_details, total_tanks, activity_date, created_at, processes(process_name)').ilike('processes.process_name', '%ผสม%'),
+        supabase.from('fg_inventory').select('id, qc_status, created_at, updated_at')
       ]);
 
-      const rms = rmsRes.data || [];
-      const rmOnly = rms.filter((i: any) => !i.rm_code?.startsWith('CMD1') && !i.rm_code?.startsWith('CMD2'));
-      const pmOnly = rms.filter((i: any) => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2'));
-      const bulkLogs = bulkRes.data || [];
-      const fg = fgRes.data || [];
-
-      let totalTanks = 0;
-      let pendingTanks = 0;
-      let passedTanks = 0;
-
-      bulkLogs.forEach((b: any) => {
-        const d = (typeof b.tank_details === 'object' && b.tank_details !== null) ? b.tank_details : {};
-        const count = Number(b.total_tanks) || 0;
-        totalTanks += count;
-        Object.keys(d).forEach(k => {
-          if (!isNaN(Number(k))) {
-            const s = d[k]?.status || d[k];
-            if (s === 'SENT_TO_QC' || s === 'PAUSED' || s === 'REPROCESS') pendingTanks++;
-            if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'DONE') passedTanks++;
-          }
-        });
-      });
-
-      setGlobalQcStats({
-        rmTotal: rmOnly.length,
-        rmPending: rmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
-        rmPassed: rmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
-        rmHold: rmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
-        pmTotal: pmOnly.length,
-        pmPending: pmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
-        pmPassed: pmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
-        pmHold: pmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
-        bulkTotalTanks: totalTanks || 100,
-        bulkPendingTanks: pendingTanks,
-        bulkPassedTanks: passedTanks,
-        fgTotal: fg.length,
-        fgQuarantine: fg.filter((i: any) => i.qc_status === 'QUARANTINE').length,
-        fgReleased: fg.filter((i: any) => i.qc_status === 'RELEASED').length
+      setRawQcData({
+        rms: rmsRes.data || [],
+        bulkLogs: bulkRes.data || [],
+        fg: fgRes.data || []
       });
     } catch (err) {
       console.error('Error fetching global quality stats:', err);
     }
   };
+
+  // --- Global Executive Quality Statistics (Scoped to KPI Period) ---
+  const globalQcStats = useMemo(() => {
+    const rms = kpiPeriod.filterByPeriod(rawQcData.rms, (i: any) => i.receive_date || i.created_at);
+    const rmOnly = rms.filter((i: any) => !i.rm_code?.startsWith('CMD1') && !i.rm_code?.startsWith('CMD2'));
+    const pmOnly = rms.filter((i: any) => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2'));
+    const bulkLogs = kpiPeriod.filterByPeriod(rawQcData.bulkLogs, (b: any) => b.activity_date || b.created_at);
+    const fg = kpiPeriod.filterByPeriod(rawQcData.fg, (f: any) => f.created_at || f.updated_at);
+
+    let totalTanks = 0;
+    let pendingTanks = 0;
+    let passedTanks = 0;
+
+    bulkLogs.forEach((b: any) => {
+      const d = (typeof b.tank_details === 'object' && b.tank_details !== null) ? b.tank_details : {};
+      const count = Number(b.total_tanks) || 0;
+      totalTanks += count;
+      Object.keys(d).forEach(k => {
+        if (!isNaN(Number(k))) {
+          const s = d[k]?.status || d[k];
+          if (s === 'SENT_TO_QC' || s === 'PAUSED' || s === 'REPROCESS') pendingTanks++;
+          if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'DONE') passedTanks++;
+        }
+      });
+    });
+
+    return {
+      rmTotal: rmOnly.length,
+      rmPending: rmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
+      rmPassed: rmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
+      rmHold: rmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
+      pmTotal: pmOnly.length,
+      pmPending: pmOnly.filter((i: any) => i.status === 'RECEIVED' || i.status === 'WAITING_QC' || i.qc_status === 'QUARANTINED').length,
+      pmPassed: pmOnly.filter((i: any) => i.status === 'READY' || i.status === 'QC_PASS' || i.status === 'PASSED' || i.qc_status === 'PASSED').length,
+      pmHold: pmOnly.filter((i: any) => i.qc_status === 'HOLD' || i.status === 'REJECTED').length,
+      bulkTotalTanks: totalTanks || 100,
+      bulkPendingTanks: pendingTanks,
+      bulkPassedTanks: passedTanks,
+      fgTotal: fg.length,
+      fgQuarantine: fg.filter((i: any) => i.qc_status === 'QUARANTINE').length,
+      fgReleased: fg.filter((i: any) => i.qc_status === 'RELEASED').length
+    };
+  }, [rawQcData, kpiPeriod]);
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
@@ -764,6 +760,14 @@ export default function QCQueuePage() {
           </Button>
         </div>
       </div>
+
+      {/* KPI Reporting Period Toolbar */}
+      <KpiReportingPeriodToolbar
+        period={kpiPeriod}
+        title="ช่วงเวลาสรุปผลรายงานควบคุมคุณภาพ (QA/QC Reporting Period)"
+        showSyncCheckbox
+        syncCheckboxLabel="กรองรายการคิวตรวจในตารางด้านล่างตามช่วงเวลาที่เลือกด้วย"
+      />
 
       {/* 1. Executive Quality Assurance KPI Summary Bar */}
       <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">

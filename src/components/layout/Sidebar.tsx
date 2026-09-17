@@ -21,7 +21,8 @@ import {
   ShoppingCart, 
   Users,
   KeyRound,
-  TrendingUp
+  TrendingUp,
+  Briefcase
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
@@ -39,6 +40,13 @@ const routes = [
     subtitle: 'Turn Factory Data into Business Decisions.',
     icon: LayoutDashboard,
     href: '/dashboard',
+    color: 'text-[#D4AF37]'
+  },
+  {
+    label: 'CosmeFlow Sales Pipeline',
+    subtitle: 'Manage Deals, Drive Growth & Close Faster.',
+    icon: Briefcase,
+    href: '/sales-pipeline',
     color: 'text-[#D4AF37]'
   },
   {
