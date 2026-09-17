@@ -59,7 +59,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '68px',
     bannerFontSize: '11pt',
     revFontSize: '7.2pt',
-    qrSize: 32,
+    qrSize: 62,
     barcodeHeight: 20,
     barcodeWidth: 140
   },
@@ -76,7 +76,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '72px',
     bannerFontSize: '11.5pt',
     revFontSize: '7.5pt',
-    qrSize: 32,
+    qrSize: 66,
     barcodeHeight: 22,
     barcodeWidth: 140
   },
@@ -93,7 +93,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '60px',
     bannerFontSize: '11pt',
     revFontSize: '7pt',
-    qrSize: 30,
+    qrSize: 62,
     barcodeHeight: 20,
     barcodeWidth: 120
   },
@@ -110,7 +110,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '58px',
     bannerFontSize: '10.5pt',
     revFontSize: '7pt',
-    qrSize: 28,
+    qrSize: 58,
     barcodeHeight: 20,
     barcodeWidth: 115
   },
@@ -127,7 +127,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '50px',
     bannerFontSize: '8.5pt',
     revFontSize: '5.5pt',
-    qrSize: 22,
+    qrSize: 42,
     barcodeHeight: 15,
     barcodeWidth: 100
   },
@@ -144,7 +144,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '48px',
     bannerFontSize: '8.5pt',
     revFontSize: '5.5pt',
-    qrSize: 21,
+    qrSize: 40,
     barcodeHeight: 15,
     barcodeWidth: 95
   },
@@ -161,7 +161,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '46px',
     bannerFontSize: '8pt',
     revFontSize: '5.5pt',
-    qrSize: 20,
+    qrSize: 40,
     barcodeHeight: 14,
     barcodeWidth: 90
   },
@@ -178,7 +178,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '32px',
     bannerFontSize: '6pt',
     revFontSize: '4.2pt',
-    qrSize: 15,
+    qrSize: 26,
     barcodeHeight: 10,
     barcodeWidth: 65
   },
@@ -195,7 +195,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '75px',
     bannerFontSize: '12pt',
     revFontSize: '8pt',
-    qrSize: 34,
+    qrSize: 76,
     barcodeHeight: 24,
     barcodeWidth: 150
   },
@@ -212,7 +212,7 @@ export const LABEL_SIZES: Record<string, LabelSizeConfig> = {
     labelColWidth: '85px',
     bannerFontSize: '14pt',
     revFontSize: '9pt',
-    qrSize: 45,
+    qrSize: 100,
     barcodeHeight: 30,
     barcodeWidth: 170
   }
@@ -1088,6 +1088,7 @@ export function QuarantineTagModal({
                   const baseH = Math.round((baseW * activeSize.height) / activeSize.width);
                   const dispW = isRot ? baseH : baseW;
                   const dispH = isRot ? baseW : baseH;
+                  const previewQrSize = Math.round((activeSize.qrSize / (activeSize.width * 3.7795)) * baseW);
 
                   return (
                     <div 
@@ -1126,30 +1127,33 @@ export function QuarantineTagModal({
                             </span>
                           </div>
 
-                          {/* Code */}
-                          <div className="flex items-center">
-                            <span className="w-16 font-bold shrink-0">Code</span>
-                            <span className="w-2 text-center shrink-0">:</span>
-                            <span className="flex-1 font-mono font-bold tracking-tight">
-                              {code || '-'}
-                            </span>
-                          </div>
-
-                          {/* Control No. + Barcode */}
+                          {/* Block: Code + Control No. with right-aligned QR Code/Barcode */}
                           <div className="flex items-center justify-between gap-1">
-                            <div className="flex items-center flex-1 min-w-0">
-                              <span className="w-16 font-bold shrink-0">Control No.</span>
-                              <span className="w-2 text-center shrink-0">:</span>
-                              <span className="font-mono font-bold text-[10.5px] tracking-tight text-purple-950 truncate">
-                                {controlNo || '-'}
-                              </span>
+                            <div className="flex flex-col justify-center flex-1 min-w-0 space-y-0.5">
+                              {/* Code */}
+                              <div className="flex items-center">
+                                <span className="w-16 font-bold shrink-0">Code</span>
+                                <span className="w-2 text-center shrink-0">:</span>
+                                <span className="flex-1 font-mono font-bold tracking-tight truncate">
+                                  {code || '-'}
+                                </span>
+                              </div>
+                              {/* Control No. */}
+                              <div className="flex items-center">
+                                <span className="w-16 font-bold shrink-0">Control No.</span>
+                                <span className="w-2 text-center shrink-0">:</span>
+                                <span className="font-mono font-bold text-[10.5px] tracking-tight text-purple-950 truncate">
+                                  {controlNo || '-'}
+                                </span>
+                              </div>
                             </div>
+
                             {controlNo && codeType !== 'none' && (
-                              <div className="shrink-0 pl-1 flex items-center">
+                              <div className="shrink-0 pl-1.5 flex items-center justify-center">
                                 {codeType === 'qrcode' ? (
-                                  <QRCodeSvg value={controlNo} size={24} />
+                                  <QRCodeSvg value={controlNo} size={previewQrSize} />
                                 ) : (
-                                  <Code128Barcode value={controlNo} height={15} width={90} />
+                                  <Code128Barcode value={controlNo} height={16} width={88} />
                                 )}
                               </div>
                             )}
@@ -1356,28 +1360,29 @@ export function QuarantineTagModal({
                   </span>
                 </div>
 
-                {/* Code */}
-                <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                    <span className="label-col">Code</span>
-                    <span className="colon-col">:</span>
-                    <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize }}>
-                      {code || '-'}
-                    </span>
+                {/* Block: Code + Control No. on the left, QR Code / Barcode on the right */}
+                <div className="tag-row" style={{ alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1, minWidth: 0, gap: '2px' }}>
+                    {/* Code */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className="label-col">Code</span>
+                      <span className="colon-col">:</span>
+                      <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize }}>
+                        {code || '-'}
+                      </span>
+                    </div>
+                    {/* Control No. */}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      <span className="label-col">Control No.</span>
+                      <span className="colon-col">:</span>
+                      <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize, fontWeight: 'bold' }}>
+                        {controlNo || '-'}
+                      </span>
+                    </div>
                   </div>
-                </div>
 
-                {/* Control No. + Barcode */}
-                <div className="tag-row">
-                  <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                    <span className="label-col">Control No.</span>
-                    <span className="colon-col">:</span>
-                    <span className="val-col val-mono" style={{ fontSize: activeSize.bodyFontSize }}>
-                      {controlNo || '-'}
-                    </span>
-                  </div>
                   {controlNo && codeType !== 'none' && (
-                    <div style={{ flexShrink: 0, paddingLeft: '4px', display: 'flex', alignItems: 'center' }}>
+                    <div style={{ flexShrink: 0, paddingLeft: '6px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                       {codeType === 'qrcode' ? (
                         <QRCodeSvg value={controlNo} size={activeSize.qrSize} />
                       ) : (
