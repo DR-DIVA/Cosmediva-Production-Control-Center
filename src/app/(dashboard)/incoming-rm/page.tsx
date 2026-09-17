@@ -2378,12 +2378,46 @@ export default function RMControlCenterPage() {
       </div>
 
         <Tabs value={activeViewTab} onValueChange={setActiveViewTab} className="w-full">
-        <TabsList className="bg-[#D4AF37] p-1.5 rounded-xl border-none shadow-md w-full justify-start h-auto gap-1">
-          <TabsTrigger value="dashboard" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><LayoutDashboard className="w-4 h-4 mr-2"/> Overview Dashboard</TabsTrigger>
-          <TabsTrigger value="purchasing" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><ShoppingCart className="w-4 h-4 mr-2"/> Purchasing View</TabsTrigger>
-          <TabsTrigger value="warehouse" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Box className="w-4 h-4 mr-2"/> Warehouse View</TabsTrigger>
-          <TabsTrigger value="qc" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Activity className="w-4 h-4 mr-2"/> QC View</TabsTrigger>
-          <TabsTrigger value="planning" className="data-[state=active]:bg-white data-[state=active]:text-[#D4AF37] data-[state=active]:shadow-sm py-2 px-4 text-white/80 hover:text-white hover:bg-white/20 font-medium transition-all rounded-lg"><Calendar className="w-4 h-4 mr-2"/> Planning View</TabsTrigger>
+        <TabsList className="bg-gradient-to-r from-amber-600 via-[#C59B27] to-amber-600 p-2 sm:p-2.5 rounded-2xl border border-amber-400/50 shadow-lg w-full grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 h-auto">
+          <TabsTrigger 
+            value="dashboard" 
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+          >
+            <LayoutDashboard className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-100 transition-colors"/> 
+            <span className="truncate">Overview Dashboard</span>
+          </TabsTrigger>
+
+          <TabsTrigger 
+            value="purchasing" 
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+          >
+            <ShoppingCart className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-amber-600 text-amber-100 transition-colors"/> 
+            <span className="truncate">Purchasing View</span>
+          </TabsTrigger>
+
+          <TabsTrigger 
+            value="warehouse" 
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+          >
+            <Box className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-blue-600 text-blue-100 transition-colors"/> 
+            <span className="truncate">Warehouse View</span>
+          </TabsTrigger>
+
+          <TabsTrigger 
+            value="qc" 
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+          >
+            <Activity className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-emerald-600 text-emerald-100 transition-colors"/> 
+            <span className="truncate">QC View</span>
+          </TabsTrigger>
+
+          <TabsTrigger 
+            value="planning" 
+            className="group data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-md data-[state=active]:ring-2 data-[state=active]:ring-white/90 py-3 sm:py-3.5 px-3 sm:px-4 bg-black/20 hover:bg-black/30 text-white font-bold text-xs sm:text-sm md:text-[14px] transition-all rounded-xl flex items-center justify-center gap-2 border border-white/10 cursor-pointer"
+          >
+            <Calendar className="w-4.5 h-4.5 sm:w-5 sm:h-5 shrink-0 group-data-[state=active]:text-indigo-600 text-indigo-100 transition-colors"/> 
+            <span className="truncate">Planning View</span>
+          </TabsTrigger>
         </TabsList>
 
         <div className="mt-6">
