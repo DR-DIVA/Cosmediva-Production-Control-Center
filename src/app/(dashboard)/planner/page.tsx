@@ -1057,13 +1057,135 @@ export default function PlannerPage() {
     }
   }
 
-  const completedLotsCount = useMemo(() => lots.filter(lot => lot.current_status === "DONE").length, [lots]);
-  const activeLotsCount = useMemo(() => lots.filter(lot => lot.current_status !== "DONE").length, [lots]);
+  // Thai Month Constants
+  const THAI_MONTHS_SHORT = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+  const THAI_MONTHS_FULL = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ]
+
+  // KPI Period Filter State (Default to current month)
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
+  const currentMonthIdx = useMemo(() => new Date().getMonth(), []) // 0-11
+  
+  const [kpiPeriodMode, setKpiPeriodMode] = useState<'month' | 'custom' | 'all'>('month')
+  const [kpiYear, setKpiYear] = useState<number>(currentYear)
+  const [kpiMonth, setKpiMonth] = useState<number>(currentMonthIdx) // 0-11
+  
+  const defaultCustomStart = useMemo(() => format(new Date(currentYear, currentMonthIdx, 1), 'yyyy-MM-dd'), [currentYear, currentMonthIdx])
+  const defaultCustomEnd = useMemo(() => format(new Date(currentYear, currentMonthIdx + 1, 0), 'yyyy-MM-dd'), [currentYear, currentMonthIdx])
+  const [kpiCustomStart, setKpiCustomStart] = useState<string>(defaultCustomStart)
+  const [kpiCustomEnd, setKpiCustomEnd] = useState<string>(defaultCustomEnd)
+  const [syncTableWithPeriod, setSyncTableWithPeriod] = useState<boolean>(false)
+
+  const kpiDateRange = useMemo(() => {
+    if (kpiPeriodMode === 'all') {
+      return { start: null, end: null, label: 'ทุกช่วงเวลาสะสม (All Time)' }
+    }
+    if (kpiPeriodMode === 'custom') {
+      const s = kpiCustomStart || defaultCustomStart
+      const e = kpiCustomEnd || defaultCustomEnd
+      return { 
+        start: s, 
+        end: e, 
+        label: `ช่วงวันที่กำหนด: ${format(new Date(s), 'dd/MM/yyyy')} - ${format(new Date(e), 'dd/MM/yyyy')}` 
+      }
+    }
+    // month mode
+    const startObj = new Date(kpiYear, kpiMonth, 1)
+    const endObj = new Date(kpiYear, kpiMonth + 1, 0)
+    const s = format(startObj, 'yyyy-MM-dd')
+    const e = format(endObj, 'yyyy-MM-dd')
+    return {
+      start: s,
+      end: e,
+      label: `ประจำเดือน ${THAI_MONTHS_FULL[kpiMonth]} ${kpiYear} (1 - ${endObj.getDate()} ${THAI_MONTHS_SHORT[kpiMonth]} ${kpiYear})`
+    }
+  }, [kpiPeriodMode, kpiYear, kpiMonth, kpiCustomStart, kpiCustomEnd, defaultCustomStart, defaultCustomEnd])
+
+  const filteredKpiLogs = useMemo(() => {
+    if (!kpiDateRange.start || !kpiDateRange.end) {
+      return logs
+    }
+    const startStr = kpiDateRange.start
+    const endStr = kpiDateRange.end
+
+    return logs.filter(l => {
+      if (l.activity_date) {
+        const dStr = l.activity_date.substring(0, 10)
+        return dStr >= startStr && dStr <= endStr
+      }
+      if (l.start_time) {
+        const dStr = l.start_time.substring(0, 10)
+        return dStr >= startStr && dStr <= endStr
+      }
+      if (l.created_at) {
+        const dStr = l.created_at.substring(0, 10)
+        return dStr >= startStr && dStr <= endStr
+      }
+      return false
+    })
+  }, [logs, kpiDateRange])
+
+  const filteredKpiLots = useMemo(() => {
+    if (!kpiDateRange.start || !kpiDateRange.end) {
+      return lots
+    }
+    const startStr = kpiDateRange.start
+    const endStr = kpiDateRange.end
+
+    const lotIdsWithLogsInRange = new Set(filteredKpiLogs.map(l => l.production_lot_id).filter(Boolean))
+
+    return lots.filter(lot => {
+      // 1. Lots with tasks in range
+      if (lotIdsWithLogsInRange.has(lot.id)) return true
+
+      // 2. Lots with due date in range
+      if (lot.fg_due_date) {
+        const dStr = lot.fg_due_date.substring(0, 10)
+        if (dStr >= startStr && dStr <= endStr) return true
+      }
+      if (lot.fg_due_date_start) {
+        const dStr = lot.fg_due_date_start.substring(0, 10)
+        if (dStr >= startStr && dStr <= endStr) return true
+      }
+
+      // 3. Lots with planned start date in range
+      if (lot.planned_start_date) {
+        const dStr = lot.planned_start_date.substring(0, 10)
+        if (dStr >= startStr && dStr <= endStr) return true
+      }
+
+      // 4. Lots created in range with no schedule yet
+      if (lot.created_at && !lot.planned_start_date && !lot.fg_due_date) {
+        const dStr = lot.created_at.substring(0, 10)
+        if (dStr >= startStr && dStr <= endStr) return true
+      }
+
+      return false
+    })
+  }, [lots, filteredKpiLogs, kpiDateRange])
+
+  const kpiPeriodLotIds = useMemo(() => new Set(filteredKpiLots.map(l => l.id)), [filteredKpiLots])
+
+  const completedLotsCount = useMemo(() => {
+    const base = (syncTableWithPeriod && kpiDateRange.start && kpiDateRange.end) ? filteredKpiLots : lots
+    return base.filter(lot => lot.current_status === "DONE").length
+  }, [lots, filteredKpiLots, syncTableWithPeriod, kpiDateRange]);
+
+  const activeLotsCount = useMemo(() => {
+    const base = (syncTableWithPeriod && kpiDateRange.start && kpiDateRange.end) ? filteredKpiLots : lots
+    return base.filter(lot => lot.current_status !== "DONE").length
+  }, [lots, filteredKpiLots, syncTableWithPeriod, kpiDateRange]);
 
   const filteredLots = lots.filter(lot => {
     if (activeTab === "completed" && lot.current_status !== "DONE") return false;
     if (activeTab !== "completed" && lot.current_status === "DONE") return false;
     if (filterOrderType !== "ALL" && lot.order_type !== filterOrderType) return false;
+
+    if (syncTableWithPeriod && kpiDateRange.start && kpiDateRange.end) {
+      if (!kpiPeriodLotIds.has(lot.id)) return false;
+    }
 
     return (lot.po_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
       (lot.lot_no?.toLowerCase() || "").includes(searchQuery.toLowerCase()) ||
@@ -1164,20 +1286,20 @@ export default function PlannerPage() {
     return Array.from({ length: totalTimelineDays }).map((_, i) => addDays(timelineStartDate, i))
   }, [timelineStartDate, totalTimelineDays])
 
-  // Executive Planning Calculations
-  const totalLotsCount = lots.length
-  const uniqueSkusCount = new Set(lots.map(l => l.products?.sku || l.sku_id)).size
-  const totalTargetUnits = lots.reduce((acc, l) => acc + (Number(l.planned_quantity) || Number(l.order_quantity) || 0), 0)
-  const totalBulksKg = lots.reduce((acc, l) => acc + ((Number(l.total_tanks) || 0) * (Number(l.kg_per_tank) || 0)), 0)
-  const totalTanksCount = lots.reduce((acc, l) => acc + (Number(l.total_tanks) || 0), 0)
+  // Executive Planning Calculations (Scoped to Selected KPI Reporting Period)
+  const totalLotsCount = filteredKpiLots.length
+  const uniqueSkusCount = new Set(filteredKpiLots.map(l => l.products?.sku || l.sku_id)).size
+  const totalTargetUnits = filteredKpiLots.reduce((acc, l) => acc + (Number(l.planned_quantity) || Number(l.order_quantity) || 0), 0)
+  const totalBulksKg = filteredKpiLots.reduce((acc, l) => acc + ((Number(l.total_tanks) || 0) * (Number(l.kg_per_tank) || 0)), 0)
+  const totalTanksCount = filteredKpiLots.reduce((acc, l) => acc + (Number(l.total_tanks) || 0), 0)
 
-  const mtsLots = lots.filter(l => l.order_type === 'MTS')
-  const mtoLots = lots.filter(l => l.order_type !== 'MTS')
-  const lotsWithDueDate = lots.filter(l => l.fg_due_date || l.fg_due_date_start)
+  const mtsLots = filteredKpiLots.filter(l => l.order_type === 'MTS')
+  const mtoLots = filteredKpiLots.filter(l => l.order_type !== 'MTS')
+  const lotsWithDueDate = filteredKpiLots.filter(l => l.fg_due_date || l.fg_due_date_start)
 
-  // Accurate task progression & on-time stats
-  const totalTasksCount = logs.length
-  const doneTasks = logs.filter(l => l.status === 'DONE')
+  // Accurate task progression & on-time stats (Scoped to Selected KPI Reporting Period)
+  const totalTasksCount = filteredKpiLogs.length
+  const doneTasks = filteredKpiLogs.filter(l => l.status === 'DONE')
   const doneTasksCount = doneTasks.length
   const progressPct = totalTasksCount > 0 ? ((doneTasksCount / totalTasksCount) * 100).toFixed(1) : '0.0'
 
@@ -1186,7 +1308,7 @@ export default function PlannerPage() {
   let delayedTasksCount = 0
   let upcomingTasksCount = 0
 
-  logs.forEach(l => {
+  filteredKpiLogs.forEach(l => {
     if (l.status === 'DONE') {
       if (l.activity_date && l.end_time) {
         const planned = startOfDay(new Date(l.activity_date))
@@ -1212,20 +1334,20 @@ export default function PlannerPage() {
     ? ((onTimeTasksCount / (onTimeTasksCount + delayedTasksCount)) * 100).toFixed(1)
     : '100.0'
 
-  // Department Process Breakdown
-  const rmTasks = logs.filter(l => {
+  // Department Process Breakdown (Scoped to Selected KPI Reporting Period)
+  const rmTasks = filteredKpiLogs.filter(l => {
     const pName = l.processes?.process_name || ''
     return pName.includes('ชั่ง') || l.process_id?.includes('RM')
   })
   const rmDone = rmTasks.filter(l => l.status === 'DONE').length
 
-  const mxTasks = logs.filter(l => {
+  const mxTasks = filteredKpiLogs.filter(l => {
     const pName = l.processes?.process_name || ''
     return pName.includes('ผสม') || l.process_id?.includes('MX')
   })
   const mxDone = mxTasks.filter(l => l.status === 'DONE').length
 
-  const pkTasks = logs.filter(l => {
+  const pkTasks = filteredKpiLogs.filter(l => {
     const pName = l.processes?.process_name || ''
     return pName.includes('บรรจุ') || pName.includes('ลงลัง') || l.process_id?.includes('PK')
   })
@@ -1260,7 +1382,7 @@ export default function PlannerPage() {
 
     const todayStart = startOfDay(new Date())
 
-    logs.forEach(log => {
+    filteredKpiLogs.forEach(log => {
       const process = processes.find(p => p.id === log.process_id)
       const pName = (process?.process_name || log.processes?.process_name || '').toLowerCase()
 
@@ -1403,7 +1525,7 @@ export default function PlannerPage() {
       sortedBottlenecks,
       totalBottleneckIncidents
     }
-  }, [logs, processes])
+  }, [filteredKpiLogs, processes])
 
   const handleRefreshData = () => {
     fetchData()
@@ -1472,6 +1594,226 @@ export default function PlannerPage() {
               <Plus className="w-4 h-4 mr-2" /> เพิ่มออเดอร์ใหม่ (Project)
             </Button>
           )}
+        </div>
+      </div>
+
+      {/* 0. KPI Reporting Period & Horizon Control Toolbar */}
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-[#D4AF37]/35 space-y-3">
+        {/* Row 1: Header + Active Period Badge + Quick Action Presets */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+            <div className="p-2.5 rounded-xl bg-gradient-to-br from-[#D4AF37]/20 to-amber-500/10 border border-[#D4AF37]/30 text-[#8B7355] shadow-2xs shrink-0">
+              <CalendarDays className="w-5 h-5 text-[#D4AF37]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm font-black text-[#4A4238] tracking-tight">
+                  ช่วงเวลาสรุปผลรายงาน KPI (Reporting Period)
+                </span>
+                <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 shadow-2xs flex items-center gap-1.5">
+                  <Clock className="w-3 h-3 text-[#D4AF37]" />
+                  <span>{kpiDateRange.label}</span>
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                <span>คำนวณและสรุปผลตัวเลข KPI 4 ด้านตามช่วงเวลา</span>
+                {kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear && (
+                  <span className="text-emerald-700 font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-600" /> ค่าเริ่มต้น: เดือนปัจจุบัน
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Preset Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5 self-start lg:self-center">
+            {/* Current Month Shortcut */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setKpiPeriodMode('month')
+                setKpiYear(currentYear)
+                setKpiMonth(currentMonthIdx)
+              }}
+              className={cn(
+                "h-8 px-2.5 text-xs font-bold transition-all rounded-xl",
+                kpiPeriodMode === 'month' && kpiMonth === currentMonthIdx && kpiYear === currentYear
+                  ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
+                  : "bg-amber-50/80 text-amber-900 border-amber-200 hover:bg-amber-100"
+              )}
+            >
+              📍 เดือนปัจจุบัน ({THAI_MONTHS_SHORT[currentMonthIdx]})
+            </Button>
+
+            {/* Previous Month Shortcut */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setKpiPeriodMode('month')
+                const prevMonthDate = new Date(currentYear, currentMonthIdx - 1, 1)
+                setKpiYear(prevMonthDate.getFullYear())
+                setKpiMonth(prevMonthDate.getMonth())
+              }}
+              className={cn(
+                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
+                kpiPeriodMode === 'month' && (kpiMonth === (currentMonthIdx === 0 ? 11 : currentMonthIdx - 1)) && (kpiYear === (currentMonthIdx === 0 ? currentYear - 1 : currentYear))
+                  ? "bg-[#D4AF37] text-slate-950 border-[#D4AF37] shadow-xs font-black ring-1 ring-[#B8962A]"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              เดือนที่แล้ว
+            </Button>
+
+            {/* Custom Range */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setKpiPeriodMode(kpiPeriodMode === 'custom' ? 'month' : 'custom')}
+              className={cn(
+                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
+                kpiPeriodMode === 'custom'
+                  ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              📆 กำหนดช่วงวันเอง
+            </Button>
+
+            {/* All Time */}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setKpiPeriodMode('all')}
+              className={cn(
+                "h-8 px-2.5 text-xs font-semibold transition-all rounded-xl",
+                kpiPeriodMode === 'all'
+                  ? "bg-[#2D2721] text-amber-300 border-slate-700 shadow-xs font-bold"
+                  : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+              )}
+            >
+              🌐 ทั้งหมด (All Time)
+            </Button>
+          </div>
+        </div>
+
+        {/* Row 2: 12-Month Selector Bar & Year Selector */}
+        {kpiPeriodMode === 'month' && (
+          <div className="pt-2.5 border-t border-slate-150 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            {/* Year Selector */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="text-xs font-bold text-slate-500">ปี:</span>
+              <div className="inline-flex rounded-xl border border-slate-200 p-0.5 bg-slate-50">
+                {[currentYear - 1, currentYear, currentYear + 1].map(y => (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => setKpiYear(y)}
+                    className={cn(
+                      "px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer",
+                      kpiYear === y
+                        ? "bg-[#2D2721] text-amber-300 shadow-2xs"
+                        : "text-slate-600 hover:text-slate-900"
+                    )}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 12 Months Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 md:pb-0 scrollbar-thin w-full md:w-auto">
+              {THAI_MONTHS_SHORT.map((mName, idx) => {
+                const isSelected = kpiPeriodMode === 'month' && kpiMonth === idx
+                const isCurrent = idx === currentMonthIdx && kpiYear === currentYear
+                return (
+                  <button
+                    key={mName}
+                    type="button"
+                    onClick={() => {
+                      setKpiPeriodMode('month')
+                      setKpiMonth(idx)
+                    }}
+                    className={cn(
+                      "px-3 py-1 rounded-lg text-xs font-bold transition-all shrink-0 cursor-pointer flex items-center gap-1",
+                      isSelected
+                        ? "bg-[#D4AF37] text-slate-950 font-black shadow-xs ring-1 ring-[#B8962A]"
+                        : isCurrent
+                        ? "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
+                    )}
+                    title={`ดูรายงานประจำเดือน ${THAI_MONTHS_FULL[idx]} ${kpiYear}`}
+                  >
+                    <span>{mName}</span>
+                    {isCurrent && !isSelected && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-600"></span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Row 2 (Alternative): Custom Date Inputs */}
+        {kpiPeriodMode === 'custom' && (
+          <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-bold text-slate-600">จากวันที่:</span>
+              <input
+                type="date"
+                value={kpiCustomStart}
+                onChange={e => setKpiCustomStart(e.target.value)}
+                className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+              />
+            </div>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="font-bold text-slate-600">ถึงวันที่:</span>
+              <input
+                type="date"
+                value={kpiCustomEnd}
+                onChange={e => setKpiCustomEnd(e.target.value)}
+                className="px-2.5 py-1 border border-slate-300 rounded-lg text-xs font-medium focus:ring-1 focus:ring-[#D4AF37] focus:border-[#D4AF37]"
+              />
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setKpiCustomStart(defaultCustomStart)
+                setKpiCustomEnd(defaultCustomEnd)
+              }}
+              className="h-7 px-2 text-[11px] font-semibold text-slate-600 hover:bg-slate-100"
+            >
+              รีเซ็ตเป็นเดือนนี้
+            </Button>
+          </div>
+        )}
+
+        {/* Row 3: Table Sync Toggle (Optional) */}
+        <div className="pt-2.5 border-t border-slate-150 flex flex-wrap items-center justify-between text-xs text-slate-500 gap-2">
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={syncTableWithPeriod}
+              onChange={e => setSyncTableWithPeriod(e.target.checked)}
+              className="rounded border-slate-300 text-[#D4AF37] focus:ring-[#D4AF37]"
+            />
+            <span className="font-medium text-[#4A4238]">
+              ซิงค์ตัวกรองช่วงเวลานี้กับตารางรายการด้านล่างด้วย (Sync Table with Selected Period)
+            </span>
+          </label>
+          <div className="text-[11px] font-medium text-slate-400">
+            พบ {totalLotsCount} ล็อตการผลิต • {totalTasksCount} คิวงาน ในช่วงเวลานี้
+          </div>
         </div>
       </div>
 
