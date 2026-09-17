@@ -212,11 +212,14 @@ export function TimelinePrintModal({
     const iframe = document.createElement('iframe')
     iframe.id = 'timeline-print-iframe'
     iframe.style.position = 'fixed'
-    iframe.style.top = '-9999px'
-    iframe.style.left = '-9999px'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
     iframe.style.width = '297mm'
     iframe.style.height = '210mm'
-    iframe.style.border = 'none'
+    iframe.style.border = '0'
+    iframe.style.opacity = '0'
+    iframe.style.pointerEvents = 'none'
+    iframe.style.zIndex = '-9999'
     document.body.appendChild(iframe)
 
     const iframeDoc = iframe.contentWindow?.document || iframe.contentDocument
@@ -224,6 +227,13 @@ export function TimelinePrintModal({
       toast.error('ไม่สามารถสร้างหน้าต่างการพิมพ์ได้')
       return
     }
+
+    // Collect all parent stylesheets and style tags to maintain Tailwind rules
+    const parentStyles = typeof document !== 'undefined'
+      ? Array.from(document.querySelectorAll('link[rel="stylesheet"], style'))
+          .map(el => el.outerHTML)
+          .join('\n')
+      : ''
 
     const htmlContent = printElement.innerHTML
 
@@ -234,6 +244,7 @@ export function TimelinePrintModal({
       <head>
         <meta charset="UTF-8" />
         <title>CosmeDiva - แผนผังกำหนดการผลิต (Timeline)</title>
+        ${parentStyles}
         <style>
           @page {
             size: A4 landscape;
@@ -244,32 +255,62 @@ export function TimelinePrintModal({
             -webkit-print-color-adjust: exact !important;
             print-color-adjust: exact !important;
           }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, "Sarabun", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+          html, body {
+            width: 100% !important;
+            min-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
             background: #ffffff;
             color: #0f172a;
+            font-family: -apple-system, BlinkMacSystemFont, "Sarabun", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
             font-size: 10px;
             line-height: 1.25;
           }
-          table {
-            width: 100%;
-            border-collapse: collapse;
-            table-layout: fixed;
+          #timeline-printable-markup {
+            width: 100% !important;
+            min-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+          }
+          table.timeline-table, table {
+            width: 100% !important;
+            min-width: 100% !important;
+            table-layout: fixed !important;
+            border-collapse: collapse !important;
+          }
+          @media print {
+            @page {
+              size: A4 landscape;
+              margin: 6mm 8mm 8mm 8mm;
+            }
+            html, body {
+              width: 100% !important;
+              min-width: 100% !important;
+              max-width: 100% !important;
+              margin: 0 !important;
+              padding: 0 !important;
+            }
+            #timeline-printable-markup,
+            table.timeline-table,
+            table {
+              width: 100% !important;
+              min-width: 100% !important;
+              max-width: 100% !important;
+              table-layout: fixed !important;
+            }
           }
           thead {
-            display: table-header-group;
+            display: table-header-group !important;
           }
           tbody {
-            display: table-row-group;
+            display: table-row-group !important;
           }
           tfoot {
             display: none !important;
           }
           tr {
-            page-break-inside: avoid;
-            break-inside: avoid;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           .lot-header-row {
             page-break-after: avoid !important;
@@ -281,68 +322,171 @@ export function TimelinePrintModal({
             margin-top: 14px;
           }
           .signature-grid {
-            display: flex;
-            justify-content: space-between;
-            gap: 24px;
-            text-align: center;
+            display: flex !important;
+            justify-content: space-between !important;
+            gap: 24px !important;
+            text-align: center !important;
           }
           .signature-col {
-            flex: 1;
-            border-top: 1px solid #94a3b8;
-            padding-top: 4px;
+            flex: 1 1 0% !important;
+            border-top: 1px solid #94a3b8 !important;
+            padding-top: 4px !important;
           }
           .page-break {
             page-break-after: always;
             break-after: page;
           }
-          /* Utilities */
-          .border-all { border: 1px solid #cbd5e1; }
-          .border-b { border-bottom: 1px solid #cbd5e1; }
-          .border-r { border-right: 1px solid #e2e8f0; }
-          .border-t { border-top: 1px solid #cbd5e1; }
-          .bg-slate-50 { background-color: #f8fafc; }
-          .bg-slate-100 { background-color: #f1f5f9; }
-          .bg-slate-200 { background-color: #e2e8f0; }
-          .bg-slate-700 { background-color: #334155; }
-          .bg-slate-800 { background-color: #1e293b; }
-          .bg-slate-900 { background-color: #0f172a; }
-          .text-white { color: #ffffff; }
-          .text-red-300 { color: #fca5a5; }
-          .text-yellow-200 { color: #fef08a; }
-          .bg-blue-600 { background-color: #2563eb; }
-          .bg-amber-50 { background-color: #fffbeb; }
-          .bg-amber-100 { background-color: #fef3c7; }
-          .text-amber-800 { color: #92400e; }
-          .text-amber-900 { color: #78350f; }
-          .border-amber-200 { border-color: #fde68a; }
-          .border-amber-300 { border-color: #fcd34d; }
-          .bg-blue-50 { background-color: #eff6ff; }
-          .bg-blue-100 { background-color: #dbeafe; }
-          .text-blue-900 { color: #1e3a8a; }
-          .border-blue-300 { border-color: #93c5fd; }
-          .bg-emerald-50 { background-color: #ecfdf5; }
-          .bg-emerald-100 { background-color: #d1fae5; }
-          .text-emerald-900 { color: #064e3b; }
-          .border-emerald-300 { border-color: #6ee7b7; }
-          .bg-purple-100 { background-color: #f3e8ff; }
-          .bg-purple-200 { background-color: #e9d5ff; }
-          .text-purple-800 { color: #6b21a8; }
-          .text-purple-900 { color: #581c87; }
-          .border-purple-300 { border-color: #d8b4fe; }
-          .bg-rose-100 { background-color: #ffe4e6; }
-          .text-rose-900 { color: #881337; }
-          .border-rose-300 { border-color: #fda4af; }
-          .font-bold { font-weight: 700; }
-          .font-semibold { font-weight: 600; }
-          .font-black { font-weight: 900; }
-          .text-center { text-align: center; }
-          .text-right { text-align: right; }
-          .text-left { text-align: left; }
-          .truncate {
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-          }
+
+          /* Structural Layout & Utilities */
+          .w-full { width: 100% !important; }
+          .h-full { height: 100% !important; }
+          .flex { display: flex !important; }
+          .flex-col { flex-direction: column !important; }
+          .items-center { align-items: center !important; }
+          .items-start { align-items: flex-start !important; }
+          .justify-between { justify-content: space-between !important; }
+          .justify-end { justify-content: flex-end !important; }
+          .justify-center { justify-content: center !important; }
+          .shrink-0 { flex-shrink: 0 !important; }
+          .relative { position: relative !important; }
+          .overflow-hidden { overflow: hidden !important; }
+          .ml-auto { margin-left: auto !important; }
+
+          /* Spacing & Heights */
+          .h-5 { height: 20px !important; }
+          .h-6 { height: 24px !important; }
+          .h-7 { height: 28px !important; }
+          .p-0 { padding: 0 !important; }
+          .p-0.5 { padding: 2px !important; }
+          .p-1 { padding: 4px !important; }
+          .p-1.5 { padding: 6px !important; }
+          .p-2 { padding: 8px !important; }
+          .px-1 { padding-left: 4px !important; padding-right: 4px !important; }
+          .px-1.5 { padding-left: 6px !important; padding-right: 6px !important; }
+          .px-2 { padding-left: 8px !important; padding-right: 8px !important; }
+          .px-3 { padding-left: 12px !important; padding-right: 12px !important; }
+          .py-0.5 { padding-top: 2px !important; padding-bottom: 2px !important; }
+          .py-1 { padding-top: 4px !important; padding-bottom: 4px !important; }
+          .py-1.5 { padding-top: 6px !important; padding-bottom: 6px !important; }
+          .pl-2 { padding-left: 8px !important; }
+          .pl-4 { padding-left: 16px !important; }
+          .pb-3 { padding-bottom: 12px !important; }
+          .mt-0.5 { margin-top: 2px !important; }
+          .mt-1 { margin-top: 4px !important; }
+          .mt-3 { margin-top: 12px !important; }
+          .mt-4 { margin-top: 16px !important; }
+          .pt-1 { padding-top: 4px !important; }
+          .pt-2 { padding-top: 8px !important; }
+          .pt-3 { padding-top: 12px !important; }
+          .gap-1 { gap: 4px !important; }
+          .gap-1.5 { gap: 6px !important; }
+          .gap-2 { gap: 8px !important; }
+          .gap-3 { gap: 12px !important; }
+          .gap-4 { gap: 16px !important; }
+          .gap-6 { gap: 24px !important; }
+
+          /* Borders */
+          .border { border: 1px solid #cbd5e1 !important; }
+          .border-all { border: 1px solid #cbd5e1 !important; }
+          .border-b { border-bottom: 1px solid #cbd5e1 !important; }
+          .border-b-2 { border-bottom: 2px solid #cbd5e1 !important; }
+          .border-r { border-right: 1px solid #e2e8f0 !important; }
+          .border-t { border-top: 1px solid #cbd5e1 !important; }
+          .border-t-2 { border-top: 2px solid #cbd5e1 !important; }
+          .border-slate-100 { border-color: #f1f5f9 !important; }
+          .border-slate-200 { border-color: #e2e8f0 !important; }
+          .border-slate-300 { border-color: #cbd5e1 !important; }
+          .border-slate-400 { border-color: #94a3b8 !important; }
+          .border-slate-700 { border-color: #334155 !important; }
+          .border-slate-900 { border-color: #0f172a !important; }
+
+          /* Colors */
+          .bg-white { background-color: #ffffff !important; }
+          .bg-slate-50 { background-color: #f8fafc !important; }
+          .bg-slate-100 { background-color: #f1f5f9 !important; }
+          .bg-slate-200 { background-color: #e2e8f0 !important; }
+          .bg-slate-700 { background-color: #334155 !important; }
+          .bg-slate-800 { background-color: #1e293b !important; }
+          .bg-slate-900 { background-color: #0f172a !important; }
+          .text-white { color: #ffffff !important; }
+          .text-slate-300 { color: #cbd5e1 !important; }
+          .text-slate-400 { color: #94a3b8 !important; }
+          .text-slate-500 { color: #64748b !important; }
+          .text-slate-600 { color: #475569 !important; }
+          .text-slate-700 { color: #334155 !important; }
+          .text-slate-800 { color: #1e293b !important; }
+          .text-slate-900 { color: #0f172a !important; }
+          .text-red-300 { color: #fca5a5 !important; }
+          .text-yellow-200 { color: #fef08a !important; }
+          .bg-blue-600 { background-color: #2563eb !important; }
+
+          /* Palettes */
+          .bg-amber-50 { background-color: #fffbeb !important; }
+          .bg-amber-100 { background-color: #fef3c7 !important; }
+          .bg-amber-200 { background-color: #fde68a !important; }
+          .text-amber-800 { color: #92400e !important; }
+          .text-amber-900 { color: #78350f !important; }
+          .border-amber-200 { border-color: #fde68a !important; }
+          .border-amber-300 { border-color: #fcd34d !important; }
+
+          .bg-blue-50 { background-color: #eff6ff !important; }
+          .bg-blue-100 { background-color: #dbeafe !important; }
+          .text-blue-900 { color: #1e3a8a !important; }
+          .border-blue-300 { border-color: #93c5fd !important; }
+
+          .bg-emerald-50 { background-color: #ecfdf5 !important; }
+          .bg-emerald-100 { background-color: #d1fae5 !important; }
+          .text-emerald-900 { color: #064e3b !important; }
+          .border-emerald-300 { border-color: #6ee7b7 !important; }
+
+          .bg-purple-100 { background-color: #f3e8ff !important; }
+          .bg-purple-200 { background-color: #e9d5ff !important; }
+          .text-purple-800 { color: #6b21a8 !important; }
+          .text-purple-900 { color: #581c87 !important; }
+          .border-purple-300 { border-color: #d8b4fe !important; }
+
+          .bg-rose-100 { background-color: #ffe4e6 !important; }
+          .text-rose-900 { color: #881337 !important; }
+          .border-rose-300 { border-color: #fda4af !important; }
+
+          /* Badges & Dots */
+          .w-2 { width: 8px !important; }
+          .h-2 { height: 8px !important; }
+          .rounded { border-radius: 4px !important; }
+          .rounded-sm { border-radius: 2px !important; }
+          .rounded-full { border-radius: 9999px !important; }
+          .bg-amber-500 { background-color: #f59e0b !important; }
+          .bg-blue-500 { background-color: #3b82f6 !important; }
+          .bg-emerald-500 { background-color: #10b981 !important; }
+          .bg-purple-500 { background-color: #a855f7 !important; }
+          .bg-rose-500 { background-color: #f43f5e !important; }
+          .bg-indigo-500 { background-color: #6366f1 !important; }
+          .bg-teal-500 { background-color: #14b8a6 !important; }
+          .bg-slate-400 { background-color: #94a3b8 !important; }
+
+          /* Typography */
+          .font-normal { font-weight: 400 !important; }
+          .font-medium { font-weight: 500 !important; }
+          .font-semibold { font-weight: 600 !important; }
+          .font-bold { font-weight: 700 !important; }
+          .font-black { font-weight: 900 !important; }
+          .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important; }
+          .text-left { text-align: left !important; }
+          .text-center { text-align: center !important; }
+          .text-right { text-align: right !important; }
+          .truncate { overflow: hidden !important; text-overflow: ellipsis !important; white-space: nowrap !important; }
+          .italic { font-style: italic !important; }
+          .tracking-wider { letter-spacing: 0.05em !important; }
+
+          .text-[8px] { font-size: 8px !important; line-height: 10px !important; }
+          .text-[8.5px] { font-size: 8.5px !important; line-height: 11px !important; }
+          .text-[9px] { font-size: 9px !important; line-height: 12px !important; }
+          .text-[9.5px] { font-size: 9.5px !important; line-height: 12px !important; }
+          .text-[10px] { font-size: 10px !important; line-height: 13px !important; }
+          .text-[11px] { font-size: 11px !important; line-height: 14px !important; }
+          .text-xs { font-size: 11px !important; line-height: 14px !important; }
+          .text-sm { font-size: 12px !important; line-height: 16px !important; }
+          .text-base { font-size: 14px !important; line-height: 18px !important; }
         </style>
       </head>
       <body>
@@ -596,8 +740,14 @@ export function TimelinePrintModal({
         <div className="flex-1 overflow-y-auto py-4 px-1 sm:px-3 bg-slate-200/70 rounded-lg my-2 border border-slate-300">
           <div className="max-w-[1150px] mx-auto bg-white shadow-md rounded-sm border border-slate-300 p-4 sm:p-6 transition-all">
             {/* The Actual Printable Element */}
-            <div id="timeline-printable-markup" ref={printContainerRef}>
-              <table className="w-full border-collapse" style={{ tableLayout: 'fixed' }}>
+            <div id="timeline-printable-markup" ref={printContainerRef} style={{ width: '100%', minWidth: '100%' }}>
+              <table className="timeline-table w-full border-collapse" style={{ tableLayout: 'fixed', width: '100%', minWidth: '100%' }}>
+                <colgroup>
+                  <col style={{ width: '22%', minWidth: '22%' }} />
+                  {horizonDates.map((_, idx) => (
+                    <col key={idx} style={{ width: `${78 / lookaheadDays}%`, minWidth: `${78 / lookaheadDays}%` }} />
+                  ))}
+                </colgroup>
                 <thead>
                   {/* Document Header Row */}
                   <tr>
