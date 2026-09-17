@@ -88,6 +88,19 @@ export function TimelinePrintModal({
   useEffect(() => {
     if (initialViewMode) {
       setViewMode(initialViewMode)
+      if (initialViewMode === 'actual') {
+        // ในโหมดทำจริง วันนี้อยู่คอลัมน์สุดท้าย ดูย้อนหลัง 14 วัน
+        setStartDateStr(format(addDays(new Date(), -13), 'yyyy-MM-dd'))
+        setLookaheadDays(14)
+      } else if (initialViewMode === 'compare') {
+        // ในโหมดเปรียบเทียบ วันนี้อยู่กึ่งกลาง ดูย้อนหลัง 7 วัน + หน้า 7 วัน (รวม 15 วัน)
+        setStartDateStr(format(addDays(new Date(), -7), 'yyyy-MM-dd'))
+        setLookaheadDays(15)
+      } else {
+        // ในโหมดแผนงาน วันนี้อยู่คอลัมน์แรก ดูล่วงหน้า 14 วัน
+        setStartDateStr(format(new Date(), 'yyyy-MM-dd'))
+        setLookaheadDays(14)
+      }
     }
   }, [initialViewMode, isOpen])
 
@@ -868,37 +881,52 @@ export function TimelinePrintModal({
               <div className="inline-flex w-full bg-slate-100 p-0.5 rounded-md border border-slate-200 text-xs font-bold">
                 <button
                   type="button"
-                  onClick={() => setViewMode('plan')}
+                  onClick={() => {
+                    setViewMode('plan')
+                    setStartDateStr(format(new Date(), 'yyyy-MM-dd'))
+                    setLookaheadDays(14)
+                  }}
                   className={cn(
                     "flex-1 py-1 text-center rounded transition-all cursor-pointer text-[10.5px]",
                     viewMode === 'plan'
                       ? "bg-white text-indigo-900 shadow-xs font-black ring-1 ring-slate-200"
                       : "text-slate-600 hover:text-slate-900"
                   )}
+                  title="วันนี้อยู่คอลัมน์แรก (ดูไปข้างหน้า 14 วัน)"
                 >
                   🅿️ แผนงาน
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('actual')}
+                  onClick={() => {
+                    setViewMode('actual')
+                    setStartDateStr(format(addDays(new Date(), -13), 'yyyy-MM-dd'))
+                    setLookaheadDays(14)
+                  }}
                   className={cn(
                     "flex-1 py-1 text-center rounded transition-all cursor-pointer text-[10.5px]",
                     viewMode === 'actual'
                       ? "bg-white text-emerald-900 shadow-xs font-black ring-1 ring-slate-200"
                       : "text-slate-600 hover:text-slate-900"
                   )}
+                  title="วันนี้อยู่คอลัมน์สุดท้าย (ดูประวัติย้อนหลัง 14 วัน)"
                 >
                   🅰️ ทำจริง
                 </button>
                 <button
                   type="button"
-                  onClick={() => setViewMode('compare')}
+                  onClick={() => {
+                    setViewMode('compare')
+                    setStartDateStr(format(addDays(new Date(), -7), 'yyyy-MM-dd'))
+                    setLookaheadDays(15)
+                  }}
                   className={cn(
                     "flex-1 py-1 text-center rounded transition-all cursor-pointer text-[10.5px]",
                     viewMode === 'compare'
                       ? "bg-indigo-600 text-white font-black shadow-xs"
                       : "text-slate-600 hover:text-slate-900"
                   )}
+                  title="วันนี้อยู่กึ่งกลาง (ย้อนหลัง 7 วัน + หน้า 7 วัน รวม 15 วัน)"
                 >
                   ⚖️ เทียบ P/A
                 </button>
@@ -915,6 +943,7 @@ export function TimelinePrintModal({
                 <SelectContent>
                   <SelectItem value="7">7 วัน (1 สัปดาห์)</SelectItem>
                   <SelectItem value="14">14 วัน (2 สัปดาห์ - แนะนำ)</SelectItem>
+                  <SelectItem value="15">15 วัน (กึ่งกลาง - ย้อน 7d / หน้า 7d)</SelectItem>
                   <SelectItem value="21">21 วัน (3 สัปดาห์)</SelectItem>
                 </SelectContent>
               </Select>

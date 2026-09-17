@@ -83,8 +83,8 @@ export default function PlannerPage() {
   // Toggle Switch: Show/Hide Shopfloor Operational Handover Tasks (รอ QC, รอ POF, รอเข้าคลัง FG, ลงลัง)
   const [showShopfloorHandovers, setShowShopfloorHandovers] = useState(false)
   const [isTimelinePrintOpen, setIsTimelinePrintOpen] = useState(false)
-  const [timelineViewMode, setTimelineViewMode] = useState<'plan' | 'actual' | 'compare'>('compare')
-  const [timelineRangeMode, setTimelineRangeMode] = useState<'15_centered' | '21_extended' | '14_future'>('15_centered')
+  const [timelineViewMode, setTimelineViewMode] = useState<'plan' | 'actual' | 'compare'>('plan')
+  const [timelineRangeMode, setTimelineRangeMode] = useState<'auto' | '15_centered' | '21_extended' | '14_future' | '14_past'>('auto')
   const [timelineOffsetDays, setTimelineOffsetDays] = useState<number>(0)
 
   useEffect(() => {
@@ -998,15 +998,32 @@ export default function PlannerPage() {
   const today = useMemo(() => startOfDay(new Date()), [])
 
   const { timelinePastDays, timelineFutureDays, totalTimelineDays } = useMemo(() => {
+    // 1. Explicit manual overrides
+    if (timelineRangeMode === '15_centered') {
+      return { timelinePastDays: 7, timelineFutureDays: 7, totalTimelineDays: 15 }
+    }
     if (timelineRangeMode === '21_extended') {
       return { timelinePastDays: 7, timelineFutureDays: 13, totalTimelineDays: 21 }
     }
     if (timelineRangeMode === '14_future') {
       return { timelinePastDays: 0, timelineFutureDays: 13, totalTimelineDays: 14 }
     }
-    // Default: 15_centered (ย้อนหลัง 7 วัน + วันนี้กึ่งกลาง + ล่วงหน้า 7 วัน)
+    if (timelineRangeMode === '14_past') {
+      return { timelinePastDays: 13, timelineFutureDays: 0, totalTimelineDays: 14 }
+    }
+
+    // 2. Default: 'auto' (ปรับตำแหน่งอัตโนมัติตามโหมดมุมมอง)
+    // - โหมด Plan: "วันนี้ = วันปัจจุบัน" อยู่แถวแรก (คอลัมน์แรกสุด) ดูไปข้างหน้า 14 วัน
+    if (timelineViewMode === 'plan') {
+      return { timelinePastDays: 0, timelineFutureDays: 13, totalTimelineDays: 14 }
+    }
+    // - โหมด Actual: "วันนี้ = วันปัจจุบัน" อยู่คอลัมน์สุดท้าย ดูประวัติย้อนหลัง 14 วัน (13 วันก่อน + วันนี้)
+    if (timelineViewMode === 'actual') {
+      return { timelinePastDays: 13, timelineFutureDays: 0, totalTimelineDays: 14 }
+    }
+    // - โหมด Compare P vs A: "วันนี้ = วันปัจจุบัน" อยู่กึ่งกลางหน้าต่าง (ย้อนหลัง 7 วัน + วันนี้กึ่งกลาง + ล่วงหน้า 7 วัน รวม 15 วัน)
     return { timelinePastDays: 7, timelineFutureDays: 7, totalTimelineDays: 15 }
-  }, [timelineRangeMode])
+  }, [timelineRangeMode, timelineViewMode])
 
   const timelineStartDate = useMemo(() => {
     return addDays(today, -timelinePastDays + timelineOffsetDays)
@@ -2311,7 +2328,6 @@ export default function PlannerPage() {
                 </div>
               </div>
 
-              {/* View Mode Switcher Toolbar & Print Trigger */}
               {/* View Mode Switcher Toolbar, Horizon Range & Print Trigger */}
               <div className="space-y-2 pt-2 border-t border-slate-100">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2320,37 +2336,52 @@ export default function PlannerPage() {
                     <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs font-bold shadow-2xs">
                       <button
                         type="button"
-                        onClick={() => setTimelineViewMode('plan')}
+                        onClick={() => {
+                          setTimelineViewMode('plan')
+                          setTimelineOffsetDays(0)
+                          setTimelineRangeMode('auto')
+                        }}
                         className={cn(
                           "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
                           timelineViewMode === 'plan'
                             ? "bg-white text-indigo-900 shadow-sm font-black ring-1 ring-slate-200"
                             : "text-slate-600 hover:text-slate-900"
                         )}
+                        title="ดูแผนงาน: วันนี้อยู่คอลัมน์แรก (แถวแรก) ดูล่วงหน้า 14 วัน"
                       >
                         <span>🅿️ แผนงาน (Plan)</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTimelineViewMode('actual')}
+                        onClick={() => {
+                          setTimelineViewMode('actual')
+                          setTimelineOffsetDays(0)
+                          setTimelineRangeMode('auto')
+                        }}
                         className={cn(
                           "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
                           timelineViewMode === 'actual'
                             ? "bg-white text-emerald-900 shadow-sm font-black ring-1 ring-slate-200"
                             : "text-slate-600 hover:text-slate-900"
                         )}
+                        title="ดูทำจริง: วันนี้อยู่คอลัมน์สุดท้าย ดูประวัติย้อนหลัง 14 วัน"
                       >
                         <span>🅰️ ทำจริง (Actual)</span>
                       </button>
                       <button
                         type="button"
-                        onClick={() => setTimelineViewMode('compare')}
+                        onClick={() => {
+                          setTimelineViewMode('compare')
+                          setTimelineOffsetDays(0)
+                          setTimelineRangeMode('auto')
+                        }}
                         className={cn(
                           "px-3 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer",
                           timelineViewMode === 'compare'
                             ? "bg-indigo-600 text-white shadow-sm font-black"
                             : "text-slate-600 hover:text-slate-900"
                         )}
+                        title="เปรียบเทียบ P vs A: วันนี้อยู่กึ่งกลาง ดูย้อนหลัง 7 วัน + ล่วงหน้า 7 วัน"
                       >
                         <span>⚖️ เปรียบเทียบ (Compare P vs A)</span>
                         <span className="bg-amber-400 text-amber-950 text-[8.5px] px-1 py-0 rounded font-black">PRO</span>
@@ -2386,9 +2417,31 @@ export default function PlannerPage() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="text-[11.5px] font-bold text-slate-700 flex items-center gap-1">
                       <CalendarDays className="w-3.5 h-3.5 text-indigo-600" />
-                      ช่วงเวลาแสดงผล:
+                      ช่วงเวลา:
                     </span>
                     <div className="inline-flex bg-white p-0.5 rounded-lg border border-slate-200 text-xs font-medium shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimelineRangeMode('auto')
+                          setTimelineOffsetDays(0)
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer text-[11px]",
+                          timelineRangeMode === 'auto'
+                            ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        )}
+                        title="ปรับตำแหน่งวันนี้อัตโนมัติ: Plan=คอลัมน์แรก, Actual=คอลัมน์สุดท้าย, Compare=กึ่งกลาง"
+                      >
+                        <span>
+                          ⭐ อัตโนมัติ (
+                          {timelineViewMode === 'plan' && 'วันนี้อยู่คอลัมน์แรก'}
+                          {timelineViewMode === 'actual' && 'วันนี้อยู่คอลัมน์สุดท้าย'}
+                          {timelineViewMode === 'compare' && 'วันนี้อยู่กึ่งกลาง'}
+                          )
+                        </span>
+                      </button>
                       <button
                         type="button"
                         onClick={() => {
@@ -2403,7 +2456,39 @@ export default function PlannerPage() {
                         )}
                         title="ย้อนหลัง 7 วัน + วันนี้กึ่งกลาง + ล่วงหน้า 7 วัน (รวม 15 วัน)"
                       >
-                        <span>⭐ 15 วัน (วันนี้อยู่กึ่งกลาง)</span>
+                        <span>15 วัน (กึ่งกลาง)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimelineRangeMode('14_past')
+                          setTimelineOffsetDays(0)
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer text-[11px]",
+                          timelineRangeMode === '14_past'
+                            ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        )}
+                        title="ย้อนหลัง 14 วันจนถึงวันนี้ (วันนี้อยู่คอลัมน์สุดท้าย)"
+                      >
+                        <span>14 วันย้อนหลัง</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTimelineRangeMode('14_future')
+                          setTimelineOffsetDays(0)
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer text-[11px]",
+                          timelineRangeMode === '14_future'
+                            ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shadow-2xs"
+                            : "text-slate-600 hover:text-slate-900"
+                        )}
+                        title="วันนี้ไปข้างหน้า 14 วัน (วันนี้อยู่คอลัมน์แรก)"
+                      >
+                        <span>14 วันล่วงหน้า</span>
                       </button>
                       <button
                         type="button"
@@ -2419,23 +2504,7 @@ export default function PlannerPage() {
                         )}
                         title="ย้อนหลัง 7 วัน + วันนี้ + ล่วงหน้า 13 วัน (รวม 21 วัน)"
                       >
-                        <span>21 วัน (ย้อน 7d + หน้า 13d)</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setTimelineRangeMode('14_future')
-                          setTimelineOffsetDays(0)
-                        }}
-                        className={cn(
-                          "px-2.5 py-1 rounded-md transition-all flex items-center gap-1 cursor-pointer text-[11px]",
-                          timelineRangeMode === '14_future'
-                            ? "bg-indigo-50 text-indigo-700 font-bold border border-indigo-200 shadow-2xs"
-                            : "text-slate-600 hover:text-slate-900"
-                        )}
-                        title="วันนี้ไปข้างหน้า 14 วัน (แบบเดิม)"
-                      >
-                        <span>14 วัน (เฉพาะล่วงหน้า)</span>
+                        <span>21 วัน</span>
                       </button>
                     </div>
                   </div>
@@ -2458,12 +2527,23 @@ export default function PlannerPage() {
                       className={cn(
                         "px-2.5 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 shadow-2xs transition-all cursor-pointer",
                         timelineOffsetDays === 0
-                          ? "bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-300"
-                          : "bg-white text-slate-700 border-slate-200 hover:bg-amber-50"
+                          ? (timelineViewMode === 'actual'
+                              ? "bg-emerald-100 text-emerald-900 border-emerald-300 ring-1 ring-emerald-300"
+                              : timelineViewMode === 'plan'
+                              ? "bg-indigo-100 text-indigo-900 border-indigo-300 ring-1 ring-indigo-300"
+                              : "bg-amber-100 text-amber-900 border-amber-300 ring-1 ring-amber-300")
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                       )}
-                      title="รีเซ็ตกลับมากึ่งกลางที่วันปัจจุบัน (วันนี้)"
+                      title="รีเซ็ตกลับมาที่วันปัจจุบัน (วันนี้)"
                     >
-                      <span>📍 วันนี้ (กึ่งกลาง)</span>
+                      <span>
+                        📍 วันนี้
+                        {timelineOffsetDays === 0 && (
+                          <span className="ml-1 text-[9.5px] opacity-80 font-normal">
+                            ({timelineViewMode === 'plan' ? 'คอลัมน์แรก' : timelineViewMode === 'actual' ? 'คอลัมน์สุดท้าย' : 'กึ่งกลาง'})
+                          </span>
+                        )}
+                      </span>
                     </button>
 
                     <button
@@ -2500,25 +2580,45 @@ export default function PlannerPage() {
                           key={i} 
                           className={cn(
                             "flex-1 min-w-[60px] p-2 text-center border-r border-slate-200 text-xs transition-colors",
-                            isToday 
-                              ? "bg-amber-100/90 border-x-2 border-x-amber-500 shadow-inner" 
-                              : ""
+                            isToday && (
+                              timelineViewMode === 'plan'
+                                ? "bg-indigo-100/90 border-x-2 border-x-indigo-500 shadow-inner"
+                                : timelineViewMode === 'actual'
+                                ? "bg-emerald-100/90 border-x-2 border-x-emerald-500 shadow-inner"
+                                : "bg-amber-100/90 border-x-2 border-x-amber-500 shadow-inner"
+                            )
                           )}
                         >
                           <div className={cn(
                             "font-medium flex items-center justify-center gap-1", 
                             isToday 
-                              ? "text-amber-950 font-black" 
+                              ? (timelineViewMode === 'plan' 
+                                  ? "text-indigo-950 font-black" 
+                                  : timelineViewMode === 'actual' 
+                                  ? "text-emerald-950 font-black" 
+                                  : "text-amber-950 font-black")
                               : (date.getDay() === 0 || date.getDay() === 6 ? "text-red-500 font-bold" : "text-slate-700")
                           )}>
                             {isToday && (
-                              <span className="text-[8.5px] bg-amber-500 text-white px-1 py-0.2 rounded font-black whitespace-nowrap">
-                                วันนี้
+                              <span className={cn(
+                                "text-[8.5px] text-white px-1.5 py-0.2 rounded font-black whitespace-nowrap shadow-2xs",
+                                timelineViewMode === 'plan' 
+                                  ? "bg-indigo-600" 
+                                  : timelineViewMode === 'actual' 
+                                  ? "bg-emerald-600" 
+                                  : "bg-amber-500 animate-pulse"
+                              )}>
+                                {timelineViewMode === 'plan' ? 'วันนี้' : timelineViewMode === 'actual' ? 'วันนี้' : 'วันนี้ (กึ่งกลาง)'}
                               </span>
                             )}
                             <span>{format(date, "EEE")}</span>
                           </div>
-                          <div className={cn("text-xs mt-0.5", isToday ? "text-amber-900 font-black" : "text-slate-500")}>
+                          <div className={cn(
+                            "text-xs mt-0.5", 
+                            isToday 
+                              ? (timelineViewMode === 'plan' ? "text-indigo-950 font-black" : timelineViewMode === 'actual' ? "text-emerald-950 font-black" : "text-amber-900 font-black")
+                              : "text-slate-500"
+                          )}>
                             {format(date, "dd MMM")}
                           </div>
                         </div>
@@ -2537,7 +2637,11 @@ export default function PlannerPage() {
                           className={cn(
                             "flex-1 min-w-[60px] border-r",
                             isToday 
-                              ? "border-x-2 border-x-amber-400/80 bg-amber-50/40 z-0" 
+                              ? (timelineViewMode === 'plan'
+                                  ? "border-x-2 border-x-indigo-400/80 bg-indigo-50/30 z-0"
+                                  : timelineViewMode === 'actual'
+                                  ? "border-x-2 border-x-emerald-400/80 bg-emerald-50/30 z-0"
+                                  : "border-x-2 border-x-amber-400/80 bg-amber-50/40 z-0")
                               : "border-slate-200 border-dashed"
                           )}
                         />
