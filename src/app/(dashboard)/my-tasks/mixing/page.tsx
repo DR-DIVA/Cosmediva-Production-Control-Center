@@ -1144,6 +1144,7 @@ export default function MixingTasksPage() {
       {viewMode === 'timeline' ? (
         <MasterPlanningTimeline
           initialDept="MX"
+          lockDept={true}
           currentUser={userRole || 'MX'}
           onPlanChanged={fetchMixingTasks}
           hideHeaderKpi={true}

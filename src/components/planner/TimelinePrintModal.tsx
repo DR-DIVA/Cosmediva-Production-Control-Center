@@ -34,6 +34,7 @@ import { format, addDays, startOfDay, differenceInDays, isSameDay } from 'date-f
 import { toast } from 'sonner'
 import { parsePlanChangeInfo } from '@/lib/planTracking'
 import { cn } from '@/lib/utils'
+import { isProcessInDept, ProductionDept } from './MasterPlanningTimeline'
 
 interface TimelinePrintModalProps {
   isOpen: boolean
@@ -43,6 +44,7 @@ interface TimelinePrintModalProps {
   processes: any[]
   currentUser?: string
   initialDept?: string
+  lockDept?: boolean
   initialOrderType?: string
   initialShowHandovers?: boolean
   initialViewMode?: 'plan' | 'actual' | 'compare'
@@ -69,6 +71,7 @@ export function TimelinePrintModal({
   processes,
   currentUser = 'PLANNER',
   initialDept = 'ALL',
+  lockDept = false,
   initialOrderType = 'ALL',
   initialShowHandovers = false,
   initialViewMode = 'plan'
@@ -174,12 +177,8 @@ export function TimelinePrintModal({
           })
           .filter(l => {
             const process = processes.find(p => p.id === l.process_id)
-            const pName = (process?.process_name || l.processes?.process_name || '').toLowerCase()
-
-            if (deptFilter === 'RM') return pName.includes('ชั่ง')
-            if (deptFilter === 'MX') return pName.includes('ผสม')
-            if (deptFilter === 'PK') return pName.includes('บรรจุ')
-            return true
+            const pName = process?.process_name || l.processes?.process_name || ''
+            return isProcessInDept(pName, deptFilter as ProductionDept)
           })
           .filter(l => {
             const todayStart = startOfDay(new Date())
@@ -963,17 +962,28 @@ export function TimelinePrintModal({
             {/* 4. Department */}
             <div className="space-y-1">
               <Label className="text-[11px] font-bold text-slate-700">สายงาน / แผนก</Label>
-              <Select value={deptFilter} onValueChange={v => setDeptFilter(v || 'ALL')}>
-                <SelectTrigger className="h-8 text-xs bg-white">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ALL">ทุกสายงาน (All)</SelectItem>
-                  <SelectItem value="RM">ชั่งสาร (RM)</SelectItem>
-                  <SelectItem value="MX">ผสม (MX)</SelectItem>
-                  <SelectItem value="PK">บรรจุ (PK)</SelectItem>
-                </SelectContent>
-              </Select>
+              {lockDept ? (
+                <div className="h-8 text-xs bg-slate-100 flex items-center px-2.5 rounded-md border border-slate-200 font-bold text-slate-700">
+                  {deptFilter === 'RM' && '🟡 ชั่งสาร (RM)'}
+                  {deptFilter === 'MX' && '🔵 ผสม (MX)'}
+                  {deptFilter === 'PK' && '🟢 บรรจุ (PK)'}
+                  {deptFilter === 'POF' && '🟣 ลงลัง/POF'}
+                  {deptFilter === 'ALL' && 'ทุกสายงาน (All)'}
+                </div>
+              ) : (
+                <Select value={deptFilter} onValueChange={v => setDeptFilter(v || 'ALL')}>
+                  <SelectTrigger className="h-8 text-xs bg-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ALL">ทุกสายงาน (All)</SelectItem>
+                    <SelectItem value="RM">ชั่งสาร (RM)</SelectItem>
+                    <SelectItem value="MX">ผสม (MX)</SelectItem>
+                    <SelectItem value="PK">บรรจุ (PK)</SelectItem>
+                    <SelectItem value="POF">ลงลัง/POF</SelectItem>
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             {/* 5. Order Type */}

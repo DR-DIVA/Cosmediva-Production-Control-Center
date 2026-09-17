@@ -1398,7 +1398,8 @@ export default function PofTasksPage() {
         <TabsContent value="queue">
       {viewMode === 'timeline' ? (
         <MasterPlanningTimeline
-          initialDept="PK"
+          initialDept="POF"
+          lockDept={true}
           currentUser={currentUser || 'POF'}
           onPlanChanged={fetchPofTasks}
           hideHeaderKpi={true}

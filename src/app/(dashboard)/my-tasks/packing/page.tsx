@@ -1212,6 +1212,7 @@ export default function PackingTasksPage() {
       {viewMode === 'timeline' ? (
         <MasterPlanningTimeline
           initialDept="PK"
+          lockDept={true}
           currentUser={userRole || 'PK'}
           onPlanChanged={fetchPackingTasks}
           hideHeaderKpi={true}

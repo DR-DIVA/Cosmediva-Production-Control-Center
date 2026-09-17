@@ -46,8 +46,66 @@ import {
   isTaskStartedByShopfloor
 } from '@/lib/planTracking'
 
+export type ProductionDept = 'ALL' | 'RM' | 'MX' | 'PK' | 'POF'
+
+export function getProcessDept(processName?: string): 'RM' | 'MX' | 'PK' | 'POF' | 'OTHER' {
+  if (!processName) return 'OTHER'
+  const p = processName.toLowerCase().trim()
+
+  // 1. POF / Cartoning (check before general packing so POF / ลงลัง isn't captured by packing terms)
+  if (
+    p.includes('pof') ||
+    p.includes('อุโมงค์') ||
+    p.includes('ลงลัง') ||
+    p.includes('fg') ||
+    p.includes('ส่งมอบ')
+  ) {
+    return 'POF'
+  }
+
+  // 2. Weighing / RM
+  if (p.includes('ชั่ง') || p.includes('weigh')) {
+    return 'RM'
+  }
+
+  // 3. Mixing / MX
+  if (
+    p.includes('ผสม') ||
+    p.includes('mix') ||
+    p.includes('แช่') ||
+    p.includes('bulk') ||
+    p.includes('พักสาร') ||
+    p === 'เก็บ'
+  ) {
+    return 'MX'
+  }
+
+  // 4. Packing / PK
+  if (
+    p.includes('บรรจุ') ||
+    p.includes('pack') ||
+    p.includes('qc') ||
+    p.includes('ไลน์') ||
+    p.includes('ยิง') ||
+    p.includes('สติ๊กเกอร์') ||
+    p.includes('กล่อง') ||
+    p.includes('ขวด') ||
+    p.includes('กระปุก')
+  ) {
+    return 'PK'
+  }
+
+  return 'OTHER'
+}
+
+export function isProcessInDept(processName: string | undefined, dept: ProductionDept): boolean {
+  if (dept === 'ALL') return true
+  return getProcessDept(processName) === dept
+}
+
 export interface MasterPlanningTimelineProps {
-  initialDept?: 'ALL' | 'RM' | 'MX' | 'PK'
+  initialDept?: ProductionDept
+  lockDept?: boolean
   initialOrderType?: 'ALL' | 'MTS' | 'MTO'
   initialViewMode?: 'plan' | 'actual' | 'compare'
   currentUser?: string
@@ -60,16 +118,16 @@ export interface MasterPlanningTimelineProps {
   hideHeaderKpi?: boolean
 }
 
-const PROCESS_TYPES = [
+export const PROCESS_TYPES = [
   { id: 'RM', name: 'ชั่งสาร', color: 'bg-amber-100 text-amber-800 border-amber-200' },
   { id: 'MX', name: 'ผสม', color: 'bg-[#D4AF37]/20 text-[#4A4238] border-[#D4AF37]/30' },
-  { id: 'PK', name: 'บรรจุ', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' }
+  { id: 'PK', name: 'บรรจุ', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
+  { id: 'POF', name: 'ลงลัง/POF', color: 'bg-purple-100 text-purple-800 border-purple-200' }
 ]
-
-const searchMap: Record<string, string> = { RM: 'ชั่งสาร', MX: 'ผสม', PK: 'บรรจุ' }
 
 export function MasterPlanningTimeline({
   initialDept = 'ALL',
+  lockDept: lockDeptProp,
   initialOrderType = 'ALL',
   initialViewMode = 'plan',
   currentUser = 'PLPTB1234',
@@ -83,6 +141,9 @@ export function MasterPlanningTimeline({
 }: MasterPlanningTimelineProps) {
   const supabase = useMemo(() => createClient(), [])
 
+  // When lockDept is true or initialDept is given and not 'ALL', lock department switching for station view
+  const lockDept = lockDeptProp !== undefined ? lockDeptProp : (initialDept !== 'ALL')
+
   // Local state for fetched data (if props not provided)
   const [internalLots, setInternalLots] = useState<any[]>([])
   const [internalLogs, setInternalLogs] = useState<any[]>([])
@@ -94,10 +155,15 @@ export function MasterPlanningTimeline({
   const [activeUserIdentifier, setActiveUserIdentifier] = useState<string>(currentUser)
 
   // Filtering & View Controls
-  const [filterDept, setFilterDept] = useState<'ALL' | 'RM' | 'MX' | 'PK'>(initialDept)
+  const [filterDept, setFilterDept] = useState<ProductionDept>(initialDept)
   const [filterOrderType, setFilterOrderType] = useState<'ALL' | 'MTS' | 'MTO'>(initialOrderType)
   const [searchQuery, setSearchQuery] = useState('')
   const [showShopfloorHandovers, setShowShopfloorHandovers] = useState(false)
+
+  // Sync filterDept if initialDept prop updates
+  useEffect(() => {
+    setFilterDept(initialDept)
+  }, [initialDept])
 
   // Timeline Navigation & Mode
   const [timelineViewMode, setTimelineViewMode] = useState<'plan' | 'actual' | 'compare'>(initialViewMode)
@@ -262,12 +328,13 @@ export function MasterPlanningTimeline({
 
     logs.forEach(log => {
       const process = processes.find(p => p.id === log.process_id)
-      const pName = (process?.process_name || log.processes?.process_name || '').toLowerCase()
+      const pName = process?.process_name || log.processes?.process_name || ''
+      const deptCode = getProcessDept(pName)
 
       let deptKey: 'RM' | 'MX' | 'PK' | null = null
-      if (pName.includes('ชั่ง')) deptKey = 'RM'
-      else if (pName.includes('ผสม')) deptKey = 'MX'
-      else if (pName.includes('บรรจุ') || pName.includes('ลงลัง')) deptKey = 'PK'
+      if (deptCode === 'RM') deptKey = 'RM'
+      else if (deptCode === 'MX') deptKey = 'MX'
+      else if (deptCode === 'PK' || deptCode === 'POF') deptKey = 'PK'
 
       if (log.activity_date) {
         totalPlanned++
@@ -421,17 +488,19 @@ export function MasterPlanningTimeline({
     return logs
       .filter(l => {
         if (l.production_lot_id !== lotId) return false
-        if (!includeHandovers) {
-          const process = processes.find(p => p.id === l.process_id)
-          const pName = process?.process_name || l.processes?.process_name || ''
-          if (isHandoverProcess(pName)) return false
-        }
+        const process = processes.find(p => p.id === l.process_id)
+        const pName = process?.process_name || l.processes?.process_name || ''
+
+        // Strict department filter: only include tasks for the selected department
+        if (!isProcessInDept(pName, filterDept)) return false
+
+        if (!includeHandovers && isHandoverProcess(pName)) return false
         return true
       })
       .sort((a, b) => {
         const processA = processes.find(p => p.id === a.process_id)?.process_name || ''
         const processB = processes.find(p => p.id === b.process_id)?.process_name || ''
-        const orderMap: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3 }
+        const orderMap: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3, 'ลงลัง': 4 }
         const weightA = orderMap[processA] || 99
         const weightB = orderMap[processB] || 99
         if (weightA !== weightB) return weightA - weightB
@@ -442,7 +511,64 @@ export function MasterPlanningTimeline({
         const timeB = b.created_at ? new Date(b.created_at).getTime() : 0
         return timeA - timeB
       })
-  }, [logs, processes, showShopfloorHandovers])
+  }, [logs, processes, showShopfloorHandovers, filterDept])
+
+  // Check if a production log has a bar within the active timeline window
+  const checkLogHasInView = useCallback((log: any): boolean => {
+    const timelineStart = timelineStartDate
+    const totalDays = totalTimelineDays
+
+    let hasPlanInView = false
+    if (log.activity_date) {
+      const pStart = startOfDay(new Date(log.activity_date))
+      const pEnd = log.end_date ? startOfDay(new Date(log.end_date)) : pStart
+      const startDiff = differenceInDays(pStart, timelineStart)
+      const duration = differenceInDays(pEnd, pStart) + 1
+      const endDiff = startDiff + duration - 1
+      if (endDiff >= 0 && startDiff < totalDays) {
+        hasPlanInView = true
+      }
+    }
+
+    let hasActualInView = false
+    if (log.start_time || log.status === 'DONE') {
+      const aStart = log.start_time
+        ? startOfDay(new Date(log.start_time))
+        : (log.activity_date ? startOfDay(new Date(log.activity_date)) : startOfDay(new Date(log.created_at)))
+      let aEnd = aStart
+      if (log.end_time) {
+        aEnd = startOfDay(new Date(log.end_time))
+      } else if (log.status === 'DONE') {
+        aEnd = log.updated_at ? startOfDay(new Date(log.updated_at)) : aStart
+      } else if (log.status === 'IN_PROGRESS') {
+        aEnd = today
+      }
+      const startDiff = differenceInDays(aStart, timelineStart)
+      const duration = differenceInDays(aEnd, aStart) + 1
+      const endDiff = startDiff + duration - 1
+      if (endDiff >= 0 && startDiff < totalDays) {
+        hasActualInView = true
+      }
+    }
+
+    if (timelineViewMode === 'plan') return hasPlanInView
+    if (timelineViewMode === 'actual') return hasActualInView
+    return hasPlanInView || hasActualInView
+  }, [timelineStartDate, totalTimelineDays, timelineViewMode, today])
+
+  // Filter lots so that ONLY lots with at least one visible task row in the current timeframe are displayed
+  const lotsWithVisibleTasks = useMemo(() => {
+    return filteredLots
+      .map(lot => {
+        const lotLogs = getSortedLotLogs(lot.id)
+        const visibleLogs = lotLogs.filter(checkLogHasInView)
+        return {
+          lot,
+          visibleLogs
+        }
+      })
+      .filter(item => item.visibleLogs.length > 0)
+  }, [filteredLots, getSortedLotLogs, checkLogHasInView])
 
   // Open Reschedule Modal
   const handleOpenRescheduleDetail = (log: any, lot: any, process: any) => {
@@ -825,51 +951,74 @@ export function MasterPlanningTimeline({
             </div>
 
             {/* Department Filter */}
-            <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs ml-1">
-              <span className="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
-                <Filter className="w-3 h-3 text-slate-400" /> แผนก:
-              </span>
-              <button
-                type="button"
-                onClick={() => setFilterDept('ALL')}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-                  filterDept === 'ALL' ? "bg-[#0B192C] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                )}
-              >
-                All
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterDept('RM')}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-                  filterDept === 'RM' ? "bg-amber-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                )}
-              >
-                ชั่งสาร (RM)
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterDept('MX')}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-                  filterDept === 'MX' ? "bg-[#B8962A] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                )}
-              >
-                ผสม (MX)
-              </button>
-              <button
-                type="button"
-                onClick={() => setFilterDept('PK')}
-                className={cn(
-                  "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
-                  filterDept === 'PK' ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
-                )}
-              >
-                บรรจุ/ลงลัง (PK)
-              </button>
-            </div>
+            {lockDept ? (
+              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 shadow-2xs ml-1">
+                <Lock className="w-3.5 h-3.5 text-slate-500" />
+                <span>
+                  {filterDept === 'RM' && '🟡 แผนกชั่งสาร (Weighing)'}
+                  {filterDept === 'MX' && '🔵 แผนกผสม (Mixing)'}
+                  {filterDept === 'PK' && '🟢 แผนกบรรจุ (Packing)'}
+                  {filterDept === 'POF' && '🟣 แผนกลงลัง/POF'}
+                  {filterDept === 'ALL' && 'ทุกสายงาน (All)'}
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs ml-1">
+                <span className="text-[11px] font-semibold text-slate-400 px-2 flex items-center gap-1">
+                  <Filter className="w-3 h-3 text-slate-400" /> แผนก:
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('ALL')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'ALL' ? "bg-[#0B192C] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('RM')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'RM' ? "bg-amber-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  ชั่งสาร (RM)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('MX')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'MX' ? "bg-[#B8962A] text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  ผสม (MX)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('PK')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'PK' ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  บรรจุ (PK)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('POF')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'POF' ? "bg-purple-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  ลงลัง/POF
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Right Action: Print / PDF Export */}
@@ -1088,8 +1237,11 @@ export function MasterPlanningTimeline({
           )}>
             {/* Timeline Date Headers */}
             <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
-              <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0]">
-                Project / Task {timelineViewMode === 'compare' ? '(P vs A)' : ''}
+              <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0] flex items-center justify-between">
+                <span>Project / Task {timelineViewMode === 'compare' ? '(P vs A)' : ''}</span>
+                <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-white/80 text-slate-600 border-slate-300">
+                  {lotsWithVisibleTasks.length} Lots
+                </Badge>
               </div>
               <div className="flex flex-1">
                 {timelineDates.map((date, i) => {
@@ -1172,41 +1324,41 @@ export function MasterPlanningTimeline({
               </div>
 
               {/* Rows */}
-              {filteredLots.map(lot => {
-                const lotLogs = getSortedLotLogs(lot.id)
-                const showLot = lotLogs.some(log => {
-                  const process = processes.find(p => p.id === log.process_id)
-                  let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
-                  const matchesDept = filterDept === "ALL" || filterDept === pt?.id
-                  if (timelineViewMode === 'actual') {
-                    return matchesDept && (log.start_time || log.status === 'DONE')
-                  }
-                  return matchesDept && (log.activity_date || log.start_time)
-                })
-
-                if (filterDept !== "ALL" && !showLot) return null
-
-                return (
-                  <div key={lot.id} className="group relative z-10">
-                    {/* LOT Header Row */}
-                    <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
-                      <div className="w-[260px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
-                        <div className="font-medium text-sm line-clamp-2 break-words text-wrap">
-                          {lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span>
+              {lotsWithVisibleTasks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-slate-500 bg-white">
+                  <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 mb-3">
+                    <Filter className="w-6 h-6" />
+                  </div>
+                  <div className="text-sm font-semibold text-slate-700">ไม่พบคิวงานในแผนกและช่วงเวลาที่เลือก</div>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">
+                    {filterDept !== 'ALL' 
+                      ? `ไม่มีคิวงานของแผนก ${filterDept === 'RM' ? 'ชั่งสาร' : filterDept === 'MX' ? 'ผสม' : filterDept === 'PK' ? 'บรรจุ' : 'ลงลัง/POF'} ในกรอบเวลานี้`
+                      : 'ลองเปลี่ยนช่วงวัน หรือค้นหาด้วยเงื่อนไขอื่น'}
+                  </p>
+                </div>
+              ) : (
+                lotsWithVisibleTasks.map(({ lot, visibleLogs }) => {
+                  return (
+                    <div key={lot.id} className="group relative z-10">
+                      {/* LOT Header Row */}
+                      <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
+                        <div className="w-[260px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
+                          <div className="font-medium text-sm line-clamp-2 break-words text-wrap">
+                            {lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span>
+                          </div>
                         </div>
+                        <div className="flex flex-1"></div>
                       </div>
-                      <div className="flex flex-1"></div>
-                    </div>
 
-                    {/* Individual Task Rows */}
-                    {lotLogs.map(log => {
-                      const process = processes.find(p => p.id === log.process_id)
-                      let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
-                      if (!pt) {
-                        pt = { id: 'OTHER', name: process?.process_name || 'งานผลิต', color: 'bg-slate-100 text-slate-800 border-slate-200' }
-                      }
-
-                      if (filterDept !== "ALL" && pt.id !== filterDept) return null
+                      {/* Individual Task Rows */}
+                      {visibleLogs.map(log => {
+                        const process = processes.find(p => p.id === log.process_id)
+                        const pName = process?.process_name || log.processes?.process_name || ''
+                        const deptKey = getProcessDept(pName)
+                        let pt = PROCESS_TYPES.find(item => item.id === deptKey)
+                        if (!pt) {
+                          pt = { id: 'OTHER', name: pName || 'งานผลิต', color: 'bg-slate-100 text-slate-800 border-slate-200' }
+                        }
 
                       const timelineStart = timelineStartDate
                       const totalDays = totalTimelineDays
@@ -1573,7 +1725,7 @@ export function MasterPlanningTimeline({
                     })}
                   </div>
                 )
-              })}
+              }))}
             </div>
           </div>
         )}
@@ -1754,6 +1906,7 @@ export function MasterPlanningTimeline({
         processes={processes}
         currentUser={activeUserIdentifier}
         initialDept={filterDept}
+        lockDept={lockDept}
         initialOrderType={filterOrderType}
         initialShowHandovers={showShopfloorHandovers}
         initialViewMode={timelineViewMode}

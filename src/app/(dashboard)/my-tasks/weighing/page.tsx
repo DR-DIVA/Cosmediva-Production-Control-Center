@@ -1018,6 +1018,7 @@ export default function WeighingTasksPage() {
       {viewMode === 'timeline' ? (
         <MasterPlanningTimeline
           initialDept="RM"
+          lockDept={true}
           currentUser={userRole || 'RM'}
           onPlanChanged={fetchWeighingTasks}
           hideHeaderKpi={true}
