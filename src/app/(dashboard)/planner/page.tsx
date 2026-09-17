@@ -86,6 +86,7 @@ export default function PlannerPage() {
   const [timelineViewMode, setTimelineViewMode] = useState<'plan' | 'actual' | 'compare'>('plan')
   const [timelineRangeMode, setTimelineRangeMode] = useState<'auto' | '15_centered' | '21_extended' | '14_future' | '14_past'>('auto')
   const [timelineOffsetDays, setTimelineOffsetDays] = useState<number>(0)
+  const [isTimelineExpanded, setIsTimelineExpanded] = useState<boolean>(false)
 
   useEffect(() => {
     try {
@@ -2556,6 +2557,22 @@ export default function PlannerPage() {
                       <ChevronRight className="w-3.5 h-3.5" />
                     </button>
 
+                    {/* Expand / Collapse Text Width Toggle */}
+                    <button
+                      type="button"
+                      onClick={() => setIsTimelineExpanded(prev => !prev)}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ml-1",
+                        isTimelineExpanded
+                          ? "bg-[#0B192C] text-amber-300 border-slate-800 ring-1 ring-amber-400/40"
+                          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      )}
+                      title={isTimelineExpanded ? "คลิกเพื่อกลับสู่ขนาดปกติ" : "คลิกเพื่อขยายช่องตารางให้อ่านข้อความบนแถบงานได้เต็มชัดเจน ไม่ถูกตัด"}
+                    >
+                      {isTimelineExpanded ? <EyeOff className="w-3.5 h-3.5 text-amber-300" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
+                      <span>{isTimelineExpanded ? 'ย่อมุมมอง' : 'ขยายข้อความเต็ม'}</span>
+                    </button>
+
                     <span className="text-[11px] font-mono text-slate-600 font-semibold ml-1.5 px-2 py-0.5 rounded bg-white border border-slate-200 hidden sm:inline">
                       {format(timelineDates[0], 'dd MMM yyyy')} - {format(timelineDates[timelineDates.length - 1], 'dd MMM yyyy')}
                     </span>
@@ -2566,7 +2583,10 @@ export default function PlannerPage() {
 
             {/* Interactive Timeline Lookahead Table */}
             <div className="overflow-x-auto min-h-[500px]">
-              <div className="min-w-[1200px] border-t border-slate-200 relative">
+              <div className={cn(
+                "border-t border-slate-200 relative transition-all duration-200",
+                isTimelineExpanded ? "min-w-[1850px]" : "min-w-[1200px]"
+              )}>
                 {/* Timeline Date Headers */}
                 <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
                   <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0]">
@@ -2579,7 +2599,8 @@ export default function PlannerPage() {
                         <div 
                           key={i} 
                           className={cn(
-                            "flex-1 min-w-[60px] p-2 text-center border-r border-slate-200 text-xs transition-colors",
+                            "flex-1 p-2 text-center border-r border-slate-200 text-xs transition-all",
+                            isTimelineExpanded ? "min-w-[100px]" : "min-w-[60px]",
                             isToday && (
                               timelineViewMode === 'plan'
                                 ? "bg-indigo-100/90 border-x-2 border-x-indigo-500 shadow-inner"
@@ -2635,7 +2656,8 @@ export default function PlannerPage() {
                         <div 
                           key={i} 
                           className={cn(
-                            "flex-1 min-w-[60px] border-r",
+                            "flex-1 border-r transition-all",
+                            isTimelineExpanded ? "min-w-[100px]" : "min-w-[60px]",
                             isToday 
                               ? (timelineViewMode === 'plan'
                                   ? "border-x-2 border-x-indigo-400/80 bg-indigo-50/30 z-0"
@@ -2794,6 +2816,18 @@ export default function PlannerPage() {
                           if (timelineViewMode === 'compare' && !planData?.inView && !actualData?.inView) return null
 
                           const isCompare = timelineViewMode === 'compare'
+                          const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
+                          const userComment = extractUserComment(log.note)
+                          const tooltipText = [
+                            `📌 SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
+                            `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
+                            `📊 สถานะ: ${variance.label} [${log.status === 'DONE' ? 'เสร็จสิ้นแล้ว' : log.status === 'IN_PROGRESS' ? 'กำลังดำเนินการ' : 'รอดำเนินการ'}]`,
+                            planData ? `📅 กำหนดตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}` : '',
+                            actualData ? `⏱️ ดำเนินการจริง: ${format(actualData.start, 'dd/MM/yyyy')}${log.status === 'DONE' ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ' (ยังไม่เสร็จ)'}` : '',
+                            planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
+                            userComment ? `💬 บันทึก/หมายเหตุหน้างาน: ${userComment}` : '',
+                            canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : ''
+                          ].filter(Boolean).join('\n')
 
                           return (
                             <div
@@ -2807,16 +2841,31 @@ export default function PlannerPage() {
                               <div className="w-[260px] shrink-0 py-1 px-3 pl-6 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0] flex flex-col justify-center">
                                 <div className="flex items-center gap-1.5">
                                   <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
-                                  <span className="text-xs font-semibold text-slate-800 truncate" title={`${process?.process_name || 'งานผลิต'} (T${log.tank_start || 1}-${log.tank_end || 1})`}>
+                                  <span 
+                                    className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors" 
+                                    title={tooltipText}
+                                    onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                  >
                                     {process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})
                                   </span>
                                 </div>
 
                                 {isCompare && (
                                   <div className="flex items-center gap-1 mt-1 pl-3.5">
-                                    <span className={cn("text-[9px] px-1.5 py-0.2 rounded border font-bold shadow-2xs", variance.colorClass)}>
-                                      {variance.label}
-                                    </span>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                      className={cn(
+                                        "text-[9px] px-1.5 py-0.5 rounded border font-bold shadow-2xs cursor-pointer transition-all hover:scale-105 flex items-center gap-1 text-left",
+                                        variance.colorClass,
+                                        "hover:ring-1 hover:ring-rose-400 active:scale-95"
+                                      )}
+                                      title={tooltipText}
+                                    >
+                                      <span>{variance.label}</span>
+                                      {planInfo.isRescheduled && <span title="มีบันทึกการปรับเลื่อนแผน">🔄</span>}
+                                      {userComment && <span title={`มีบันทึกหน้างาน: ${userComment}`}>💬</span>}
+                                    </button>
                                   </div>
                                 )}
                               </div>
@@ -2827,11 +2876,12 @@ export default function PlannerPage() {
                                 {timelineViewMode === 'plan' && planData?.inView && (
                                   <div
                                     className={cn(
-                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-medium overflow-hidden shadow-sm transition-all hover:brightness-95 cursor-pointer z-30",
+                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-medium overflow-hidden shadow-sm transition-all hover:brightness-95 hover:ring-2 hover:ring-indigo-400 cursor-pointer z-30",
                                       pt.color
                                     )}
                                     style={{ left: `calc(${planData.leftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
-                                    title={`[🅿️ แผนงาน] ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nช่วงวันตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}`}
+                                    onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                    title={tooltipText}
                                   >
                                     <span className="truncate">{lot.products?.sku} - {process?.process_name}</span>
                                   </div>
@@ -2841,11 +2891,12 @@ export default function PlannerPage() {
                                 {timelineViewMode === 'actual' && actualData?.inView && (
                                   <div
                                     className={cn(
-                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-bold text-white overflow-hidden shadow-sm transition-all hover:brightness-95 cursor-pointer z-30",
+                                      "absolute rounded-full flex items-center px-3 py-1 text-xs font-bold text-white overflow-hidden shadow-sm transition-all hover:brightness-95 hover:ring-2 hover:ring-emerald-400 cursor-pointer z-30",
                                       log.status === 'DONE' ? "bg-emerald-600" : "bg-amber-600"
                                     )}
                                     style={{ left: `calc(${actualData.leftPercent}% + 4px)`, width: `calc(${actualData.widthPercent}% - 8px)` }}
-                                    title={`[🅰️ ทำจริง] ${lot.products?.sku || '-'}\nขั้นตอน: ${process?.process_name || '-'}\nช่วงวันทำจริง: ${format(actualData.start, 'dd/MM/yyyy')}${actualData.end > actualData.start ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ''}\nสถานะ: ${log.status === 'DONE' ? 'เสร็จสิ้นแล้ว' : 'กำลังดำเนินการ'}`}
+                                    onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                    title={tooltipText}
                                   >
                                     <span className="truncate">{lot.products?.sku} - {process?.process_name} (จริง)</span>
                                   </div>
@@ -2857,14 +2908,16 @@ export default function PlannerPage() {
                                     {/* Top Track: 🅿️ Plan Bar */}
                                     {planData?.inView && (
                                       <div
-                                        className="absolute rounded px-2 flex items-center font-bold text-[9.5px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden z-20"
+                                        className="absolute rounded px-2 flex items-center font-bold text-[9.5px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden z-20 cursor-pointer transition-all hover:bg-indigo-100 hover:border-indigo-600 hover:shadow-sm"
                                         style={{
                                           top: '5px',
                                           height: '22px',
                                           left: `calc(${planData.leftPercent}% + 4px)`,
-                                          width: `calc(${planData.widthPercent}% - 8px)`
+                                          width: `calc(${planData.widthPercent}% - 8px)`,
+                                          minWidth: isTimelineExpanded ? '90px' : '54px'
                                         }}
-                                        title={`[🅿️ แผนงาน (Plan)]\nขั้นตอน: ${process?.process_name || '-'}\nช่วงตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}`}
+                                        onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                        title={tooltipText}
                                       >
                                         <span className="truncate">🅿️ แผน: {format(planData.start, 'dd/MM')}{planData.end > planData.start ? `-${format(planData.end, 'dd/MM')}` : ''}</span>
                                       </div>
@@ -2874,7 +2927,7 @@ export default function PlannerPage() {
                                     {actualData?.inView ? (
                                       <div
                                         className={cn(
-                                          "absolute rounded px-2 flex items-center font-bold text-[9.5px] text-white shadow-xs overflow-hidden z-30",
+                                          "absolute rounded px-2 flex items-center font-bold text-[9.5px] text-white shadow-xs overflow-hidden z-30 cursor-pointer transition-all hover:brightness-110 hover:shadow-md hover:ring-2 hover:ring-white/90 hover:z-40 active:scale-95",
                                           variance.type === 'ON_TIME' && "bg-emerald-600 border border-emerald-700",
                                           variance.type === 'DELAYED' && "bg-rose-600 border border-rose-700",
                                           variance.type === 'EARLY' && "bg-blue-600 border border-blue-700",
@@ -2887,9 +2940,11 @@ export default function PlannerPage() {
                                           top: '30px',
                                           height: '22px',
                                           left: `calc(${actualData.leftPercent}% + 4px)`,
-                                          width: `calc(${actualData.widthPercent}% - 8px)`
+                                          width: `calc(${actualData.widthPercent}% - 8px)`,
+                                          minWidth: isTimelineExpanded ? '90px' : '54px'
                                         }}
-                                        title={`[🅰️ ทำจริง (Actual)]\nขั้นตอน: ${process?.process_name || '-'}\nช่วงทำจริง: ${format(actualData.start, 'dd/MM/yyyy')}${actualData.end > actualData.start ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ''}\nสถานะ: ${variance.label}`}
+                                        onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                        title={tooltipText}
                                       >
                                         <span className="truncate">
                                           🅰️ จริง: {format(actualData.start, 'dd/MM')}{actualData.end > actualData.start ? `-${format(actualData.end, 'dd/MM')}` : ''}
@@ -2898,13 +2953,16 @@ export default function PlannerPage() {
                                     ) : (
                                       planData?.inView && (
                                         <div
-                                          className="absolute rounded px-2 flex items-center font-medium text-[9px] border border-dashed border-slate-300 bg-slate-50 text-slate-400 overflow-hidden z-10"
+                                          className="absolute rounded px-2 flex items-center font-medium text-[9px] border border-dashed border-slate-300 bg-slate-50 text-slate-400 overflow-hidden z-10 cursor-pointer hover:bg-slate-100 hover:text-slate-600 transition-colors"
                                           style={{
                                             top: '30px',
                                             height: '22px',
                                             left: `calc(${planData.leftPercent}% + 4px)`,
-                                            width: `calc(${planData.widthPercent}% - 8px)`
+                                            width: `calc(${planData.widthPercent}% - 8px)`,
+                                            minWidth: isTimelineExpanded ? '90px' : '54px'
                                           }}
+                                          onClick={() => handleOpenRescheduleDetail(log, lot, process)}
+                                          title={tooltipText}
                                         >
                                           <span className="truncate">⏳ ยังไม่บันทึกเริ่มงาน</span>
                                         </div>
@@ -3381,10 +3439,16 @@ export default function PlannerPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-[11px] text-emerald-800 font-medium mb-1">🎯 กำหนดวันใหม่ (Revised)</div>
-                  <div className="text-sm font-bold text-emerald-700">
-                    {rescheduleModal.newDate ? format(new Date(rescheduleModal.newDate), 'dd/MM/yyyy') : '-'}
+                  <div className="text-[11px] text-emerald-800 font-medium mb-1 flex items-center justify-between">
+                    <span>🎯 กำหนดวันใหม่ (Revised)</span>
+                    <span className="text-[10px] text-emerald-600 font-normal">คลิกเลือกวันใหม่</span>
                   </div>
+                  <Input 
+                    type="date"
+                    value={rescheduleModal.newDate || ''}
+                    onChange={(e) => setRescheduleModal({ ...rescheduleModal, newDate: e.target.value })}
+                    className="h-8 text-xs bg-white border-emerald-400 font-bold text-emerald-800 focus:ring-emerald-500"
+                  />
                 </div>
               </div>
 
