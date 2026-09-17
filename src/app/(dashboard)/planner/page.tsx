@@ -11,7 +11,7 @@ import {
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
   ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User,
-  Printer
+  Printer, Lock
 } from 'lucide-react'
 import {
   Table,
@@ -48,7 +48,8 @@ import {
   formatPlanChangeNote, 
   getPlanCategoryLabel,
   cleanDisplayNote,
-  extractUserComment
+  extractUserComment,
+  isTaskStartedByShopfloor
 } from "@/lib/planTracking"
 
 const PROCESS_TYPES = [
@@ -443,6 +444,11 @@ export default function PlannerPage() {
   }
 
   const handleDeleteLog = async (logId: string) => {
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+      toast.error("ไม่อนุญาตให้ลบคิวงานนี้ เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)")
+      return
+    }
     if (!confirm("ยืนยันการลบคิวงานนี้?")) return
     try {
       const { error } = await supabase.from("production_logs").delete().eq("id", logId)
@@ -455,12 +461,17 @@ export default function PlannerPage() {
   }
 
   const handleUpdateLogDirect = async (logId: string, field: string, value: any) => {
+      const existingLog = logs.find(l => l.id === logId)
+      if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+        toast.error("ไม่อนุญาตให้แก้ไขคิวงานนี้ เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)")
+        return
+      }
+
       let updateData: any = { 
         [field]: value,
         updated_at: new Date().toISOString(),
         updated_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
       }
-      const existingLog = logs.find(l => l.id === logId)
       
       if (field === 'activity_date' && value && existingLog) {
         if (!existingLog.end_date || existingLog.end_date === existingLog.activity_date) {
@@ -486,6 +497,11 @@ export default function PlannerPage() {
   }
 
   const handleDateInputChange = (log: any, lot: any, process: any, field: 'activity_date' | 'end_date', newDateValue: string) => {
+    if (isTaskStartedByShopfloor(log)) {
+      toast.error(`ไม่อนุญาตให้แก้ไขวันตามแผน เนื่องจากหน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`)
+      return
+    }
+
     if (!newDateValue) {
       handleUpdateLogDirect(log.id, field, newDateValue)
       return
@@ -539,6 +555,10 @@ export default function PlannerPage() {
   }
 
   const handleOpenRescheduleDetail = (log: any, lot: any, process: any) => {
+    if (isTaskStartedByShopfloor(log)) {
+      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+      return
+    }
     const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
     setRescheduleModal({
       isOpen: true,
@@ -559,6 +579,13 @@ export default function PlannerPage() {
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
     const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)")
+      setRescheduleModal(null)
+      return
+    }
+
     const userIdentifier = (currentUserInfo?.employee_id || currentUser || 'PLANNER').toUpperCase()
 
     const formattedNote = formatPlanChangeNote(currentNote, {
@@ -578,7 +605,6 @@ export default function PlannerPage() {
     }
 
     // If updating activity_date and end_date was same as old activity_date, adjust end_date too
-    const existingLog = logs.find(l => l.id === logId)
     if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
       updateData.end_date = newDate
     }
@@ -600,12 +626,22 @@ export default function PlannerPage() {
   const handleQuickRescheduleWithoutReason = async () => {
     if (!rescheduleModal) return
     const { logId, field, newDate } = rescheduleModal
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)")
+      setRescheduleModal(null)
+      return
+    }
     setRescheduleModal(null)
     await handleUpdateLogDirect(logId, field, newDate)
   }
 
   const handleToggleFirstBatch = async (log: any, lot: any) => {
     if (!canEdit) return
+    if (isTaskStartedByShopfloor(log)) {
+      toast.error("ไม่อนุญาตให้ปรับเปลี่ยน 1st Batch เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)")
+      return
+    }
     const currentNote = log.note || ''
     const hasTag = currentNote.toLowerCase().includes('[1st_batch]')
     let newNote = ''
@@ -2259,11 +2295,21 @@ export default function PlannerPage() {
                         
                         if (filterDept !== "ALL" && filterDept !== pt.id) return null
 
+                        const isStarted = isTaskStartedByShopfloor(log)
+                        const isEditable = canEdit && !isStarted
+
                         return (
-                          <TableRow key={log.id} className="bg-[#F8F6F0]/ hover:bg-slate-100/50">
+                          <TableRow key={log.id} className={cn("hover:bg-slate-100/50", isStarted ? "bg-slate-50/70" : "bg-[#F8F6F0]/")}>
                             <TableCell className="text-center">
-                              {canEdit ? (
-                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleDeleteLog(log.id)}>
+                              {isStarted ? (
+                                <span 
+                                  title="หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้ลบคิวงาน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)" 
+                                  className="inline-flex items-center justify-center p-1 text-slate-400 cursor-not-allowed"
+                                >
+                                  <Lock className="w-3.5 h-3.5 text-amber-600/80" />
+                                </span>
+                              ) : canEdit ? (
+                                <Button variant="ghost" size="icon" className="h-6 w-6 text-red-400 hover:text-red-600 hover:bg-red-50 cursor-pointer" onClick={() => handleDeleteLog(log.id)}>
                                   <Trash2 className="w-3.5 h-3.5" />
                                 </Button>
                               ) : (
@@ -2274,7 +2320,7 @@ export default function PlannerPage() {
                               <div className="flex items-center gap-2 border-l-2 border-slate-300 pl-4 h-full py-1">
                                 <div className={cn("w-2 h-2 rounded-full", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                                 
-                                {canEdit ? (
+                                {isEditable ? (
                                   <Select value={log.process_id} onValueChange={(val) => handleUpdateLogDirect(log.id, "process_id", val)}>
                                     <SelectTrigger className="h-7 text-xs w-[100px] border-none bg-transparent font-medium p-0 shadow-none focus:ring-0">
                                       <span className="line-clamp-2 break-words text-wrap">{process?.process_name || "เลือกงาน"}</span>
@@ -2285,13 +2331,40 @@ export default function PlannerPage() {
                                     </SelectContent>
                                   </Select>
                                 ) : (
-                                  <span className="text-xs font-semibold text-slate-700">{process?.process_name || "-"}</span>
+                                  <span className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                                    {process?.process_name || "-"}
+                                    {isStarted && (
+                                      <span title="หน้างานเริ่มงานแล้ว ล็อกขั้นตอน">
+                                        <Lock className="w-3 h-3 text-amber-600/70 shrink-0" />
+                                      </span>
+                                    )}
+                                  </span>
                                 )}
 
                                 <span className="text-xs text-slate-500 ml-2">(Tanks</span>
-                                <Input disabled={!canEdit} type="number" className="w-12 h-6 text-xs px-1 text-center bg-white" value={log.tank_start || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_start", e.target.value)} />
+                                <Input 
+                                  disabled={!isEditable} 
+                                  type="number" 
+                                  className={cn(
+                                    "w-12 h-6 text-xs px-1 text-center transition-colors",
+                                    isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white"
+                                  )} 
+                                  value={log.tank_start || ""} 
+                                  onChange={e => handleUpdateLogDirect(log.id, "tank_start", e.target.value)} 
+                                  title={isStarted ? "หน้างานเริ่มงานแล้ว ล็อกถัง (เพื่อประเมิน KPI ความแม่นยำ)" : undefined}
+                                />
                                 <span className="text-xs text-slate-500">-</span>
-                                <Input disabled={!canEdit} type="number" className="w-12 h-6 text-xs px-1 text-center bg-white" value={log.tank_end || ""} onChange={e => handleUpdateLogDirect(log.id, "tank_end", e.target.value)} />
+                                <Input 
+                                  disabled={!isEditable} 
+                                  type="number" 
+                                  className={cn(
+                                    "w-12 h-6 text-xs px-1 text-center transition-colors",
+                                    isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white"
+                                  )} 
+                                  value={log.tank_end || ""} 
+                                  onChange={e => handleUpdateLogDirect(log.id, "tank_end", e.target.value)} 
+                                  title={isStarted ? "หน้างานเริ่มงานแล้ว ล็อกถัง (เพื่อประเมิน KPI ความแม่นยำ)" : undefined}
+                                />
                                 <span className="text-xs text-slate-500">)</span>
 
                                 {process?.process_name?.includes('ผสม') && (() => {
@@ -2302,13 +2375,17 @@ export default function PlannerPage() {
                                   return (
                                     <button
                                       type="button"
-                                      disabled={!canEdit}
+                                      disabled={!isEditable}
                                       onClick={() => handleToggleFirstBatch(log, lot)}
-                                      title={isAutoPamh 
+                                      title={isStarted
+                                        ? "หน้างานเริ่มงานแล้ว ล็อก 1st Batch (เพื่อประเมิน KPI ความแม่นยำ)"
+                                        : isAutoPamh 
                                         ? "งาน PAMH-008 ถัง 1 กำหนดเป็น 1st Batch โดยอัตโนมัติตามข้อกำหนด" 
                                         : "คลิกเพื่อเปิด/ปิด สถานะ 1st Batch เพื่อแจ้งเตือน QA เข้าประเมินร่วมกับ MX บนเรดาร์ 21 วัน"}
                                       className={cn(
-                                        "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border transition-all cursor-pointer select-none shrink-0 ml-1.5",
+                                        "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border transition-all select-none shrink-0 ml-1.5",
+                                        isStarted && "opacity-60 cursor-not-allowed",
+                                        !isStarted && "cursor-pointer",
                                         is1stBatch
                                           ? "bg-purple-100 hover:bg-purple-200 text-purple-900 border-purple-300 shadow-2xs ring-1 ring-purple-300"
                                           : "bg-slate-100 hover:bg-purple-50 text-slate-400 hover:text-purple-700 border-slate-200 hover:border-purple-300"
@@ -2328,12 +2405,14 @@ export default function PlannerPage() {
                                   <TableCell className="py-2">
                                     <div className="flex flex-col gap-1">
                                       <Input 
-                                        disabled={!canEdit}
+                                        disabled={!isEditable}
                                         type="date" 
                                         className={cn(
-                                          "h-8 text-xs w-[130px] bg-white transition-colors", 
-                                          planInfo.isRescheduled && "border-amber-400 bg-amber-50/50 text-amber-900 font-medium"
+                                          "h-8 text-xs w-[130px] transition-colors", 
+                                          isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white",
+                                          planInfo.isRescheduled && !isStarted && "border-amber-400 bg-amber-50/50 text-amber-900 font-medium"
                                         )} 
+                                        title={isStarted ? "หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกเพื่อประเมิน KPI ความแม่นยำ)" : undefined}
                                         value={log.activity_date || ""} 
                                         onChange={(e) => handleDateInputChange(log, lot, process, "activity_date", e.target.value)}
                                       />
@@ -2341,19 +2420,28 @@ export default function PlannerPage() {
                                         <button 
                                           type="button"
                                           onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                          title={`คลิกเพื่อดู/แก้ไขบันทึกเลื่อนแผน (เดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel})`}
+                                          title={isStarted 
+                                            ? `บันทึกเลื่อนแผนเดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel} (เริ่มงานแล้ว ล็อกการแก้ไข)` 
+                                            : `คลิกเพื่อดู/แก้ไขบันทึกเลื่อนแผน (เดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel})`
+                                          }
                                           className="text-[10px] text-amber-800 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit transition-colors text-left font-medium"
                                         >
                                           <span>🔄 เดิม:</span>
                                           <span>{planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yy') : '-'}</span>
+                                          {isStarted && <Lock className="w-2.5 h-2.5 text-amber-700 ml-0.5" />}
                                         </button>
                                       )}
                                     </div>
                                   </TableCell>
                                   <TableCell className="py-2">
                                     <Input 
+                                      disabled={!isEditable}
                                       type="date" 
-                                      className="h-8 text-xs w-[130px]" 
+                                      className={cn(
+                                        "h-8 text-xs w-[130px] transition-colors",
+                                        isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white"
+                                      )} 
+                                      title={isStarted ? "หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกเพื่อประเมิน KPI ความแม่นยำ)" : undefined}
                                       value={log.end_date || ""} 
                                       onChange={(e) => handleDateInputChange(log, lot, process, "end_date", e.target.value)}
                                     />
@@ -2362,23 +2450,32 @@ export default function PlannerPage() {
                               )
                             })()}
                             <TableCell className="py-2">
-                              <Select 
-                                value={log.status || "PLANNED"} 
-                                onValueChange={(val) => handleUpdateLogDirect(log.id, "status", val)}
-                              >
-                                <SelectTrigger className={cn("h-8 text-xs w-[120px] font-medium border-0", 
-                                    log.status === 'COMPLETED' ? 'bg-emerald-100 text-emerald-800' :
-                                    log.status === 'IN_PROGRESS' ? 'bg-[#D4AF37]/ text-[#4A4238]' :
-                                    'bg-slate-200 text-slate-800'
-                                )}>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PLANNED">วางแผน</SelectItem>
-                                  <SelectItem value="IN_PROGRESS">กำลังดำเนินการ</SelectItem>
-                                  <SelectItem value="COMPLETED">เสร็จสิ้น</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              {isStarted ? (
+                                <div className="flex items-center gap-1">
+                                  <Badge className={cn("h-8 text-xs px-2.5 py-1 rounded-lg border-0 inline-flex items-center gap-1.5 font-bold shadow-2xs select-none",
+                                    log.status === 'COMPLETED' || log.status === 'DONE' 
+                                      ? 'bg-emerald-100 text-emerald-800' 
+                                      : 'bg-[#D4AF37]/20 text-[#6D5A1A]'
+                                  )}>
+                                    <Lock className="w-3 h-3 opacity-70" />
+                                    <span>{log.status === 'COMPLETED' || log.status === 'DONE' ? 'เสร็จสิ้น (DONE)' : 'กำลังดำเนินการ'}</span>
+                                  </Badge>
+                                </div>
+                              ) : (
+                                <Select 
+                                  value={log.status || "PLANNED"} 
+                                  onValueChange={(val) => handleUpdateLogDirect(log.id, "status", val)}
+                                >
+                                  <SelectTrigger className="h-8 text-xs w-[120px] font-medium border-0 bg-slate-200 text-slate-800">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="PLANNED">วางแผน</SelectItem>
+                                    <SelectItem value="IN_PROGRESS">กำลังดำเนินการ</SelectItem>
+                                    <SelectItem value="COMPLETED">เสร็จสิ้น</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              )}
                             </TableCell>
                             <TableCell colSpan={2}></TableCell>
                           </TableRow>
@@ -3017,6 +3114,8 @@ export default function PlannerPage() {
                           const isCompare = timelineViewMode === 'compare'
                           const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
                           const userComment = extractUserComment(log.note)
+                          const isStarted = isTaskStartedByShopfloor(log)
+
                           const tooltipText = [
                             `📌 SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
                             `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
@@ -3025,7 +3124,9 @@ export default function PlannerPage() {
                             actualData ? `⏱️ ดำเนินการจริง: ${format(actualData.start, 'dd/MM/yyyy')}${log.status === 'DONE' ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ' (ยังไม่เสร็จ)'}` : '',
                             planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
                             userComment ? `💬 บันทึก/หมายเหตุหน้างาน: ${userComment}` : '',
-                            canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : ''
+                            isStarted 
+                              ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`
+                              : (canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : '')
                           ].filter(Boolean).join('\n')
 
                           return (
@@ -3041,11 +3142,12 @@ export default function PlannerPage() {
                                 <div className="flex items-center gap-1.5">
                                   <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                                   <span 
-                                    className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors" 
+                                    className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors flex items-center gap-1" 
                                     title={tooltipText}
                                     onClick={() => handleOpenRescheduleDetail(log, lot, process)}
                                   >
-                                    {process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})
+                                    <span className="truncate">{process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})</span>
+                                    {isStarted && <Lock className="w-3 h-3 text-amber-600/80 shrink-0" />}
                                   </span>
                                 </div>
 

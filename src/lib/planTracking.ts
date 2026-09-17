@@ -140,3 +140,18 @@ export function formatPlanChangeNote(
     ? `${humanSummary} ${tag}\n${cleanNote}` 
     : `${humanSummary} ${tag}`
 }
+
+/**
+ * Checks if a production task/log has already been started by the shopfloor.
+ * If true, Planning is strictly disallowed from modifying, deleting, or rescheduling
+ * the planned dates/process/tanks/status to protect Plan Adherence KPI accuracy.
+ */
+export function isTaskStartedByShopfloor(log: any): boolean {
+  if (!log) return false
+  // Explicit start time recorded by shopfloor button
+  if (log.start_time) return true
+  // Statuses indicating work has begun or finished
+  const status = (log.status || '').toUpperCase()
+  return status === 'IN_PROGRESS' || status === 'DONE' || status === 'COMPLETED'
+}
+

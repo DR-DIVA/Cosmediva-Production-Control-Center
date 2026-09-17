@@ -14,7 +14,8 @@ import {
   Filter,
   Search,
   X,
-  Loader2
+  Loader2,
+  Lock
 } from 'lucide-react'
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
@@ -39,7 +40,8 @@ import {
   parsePlanChangeInfo,
   formatPlanChangeNote,
   cleanDisplayNote,
-  extractUserComment
+  extractUserComment,
+  isTaskStartedByShopfloor
 } from '@/lib/planTracking'
 
 export interface MasterPlanningTimelineProps {
@@ -432,6 +434,10 @@ export function MasterPlanningTimeline({
       toast.info('คุณอยู่ในโหมดดูอย่างเดียว ไม่สามารถปรับเลื่อนแผนได้')
       return
     }
+    if (isTaskStartedByShopfloor(log)) {
+      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+      return
+    }
     const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
     setRescheduleModal({
       isOpen: true,
@@ -453,6 +459,13 @@ export function MasterPlanningTimeline({
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
     const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)')
+      setRescheduleModal(null)
+      return
+    }
+
     const userIdentifier = (activeUserIdentifier || 'PLANNER').toUpperCase()
 
     const formattedNote = formatPlanChangeNote(currentNote, {
@@ -471,7 +484,6 @@ export function MasterPlanningTimeline({
       updated_by: activeUserId || '54168226-988e-4d63-93d2-1a742aafdd84'
     }
 
-    const existingLog = logs.find(l => l.id === logId)
     if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
       updateData.end_date = newDate
     }
@@ -498,6 +510,12 @@ export function MasterPlanningTimeline({
   const handleQuickRescheduleWithoutReason = async () => {
     if (!rescheduleModal) return
     const { logId, field, newDate } = rescheduleModal
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
+      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)')
+      setRescheduleModal(null)
+      return
+    }
     setRescheduleModal(null)
 
     const updateData: any = {
@@ -506,7 +524,6 @@ export function MasterPlanningTimeline({
       updated_by: activeUserId || '54168226-988e-4d63-93d2-1a742aafdd84'
     }
 
-    const existingLog = logs.find(l => l.id === logId)
     if (field === 'activity_date' && existingLog && (!existingLog.end_date || existingLog.end_date === existingLog.activity_date)) {
       updateData.end_date = newDate
     }
@@ -1194,6 +1211,8 @@ export function MasterPlanningTimeline({
                       const isCompare = timelineViewMode === 'compare'
                       const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
                       const userComment = extractUserComment(log.note)
+                      const isStarted = isTaskStartedByShopfloor(log)
+
                       const tooltipText = [
                         `📌 SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
                         `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
@@ -1202,7 +1221,9 @@ export function MasterPlanningTimeline({
                         actualData ? `⏱️ ดำเนินการจริง: ${format(actualData.start, 'dd/MM/yyyy')}${log.status === 'DONE' ? ` ถึง ${format(actualData.end, 'dd/MM/yyyy')}` : ' (ยังไม่เสร็จ)'}` : '',
                         planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
                         userComment ? `💬 บันทึก/หมายเหตุหน้างาน: ${userComment}` : '',
-                        canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : ''
+                        isStarted 
+                          ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`
+                          : (canEdit ? `👉 คลิกที่แถบนี้เพื่อ: เปิดหน้าต่างบันทึกสาเหตุ หรือปรับเลื่อนแผนผลิต` : '')
                       ].filter(Boolean).join('\n')
 
                       return (
@@ -1218,11 +1239,12 @@ export function MasterPlanningTimeline({
                             <div className="flex items-center gap-1.5">
                               <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                               <span
-                                className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors"
+                                className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors flex items-center gap-1"
                                 title={tooltipText}
                                 onClick={() => handleOpenRescheduleDetail(log, lot, process)}
                               >
-                                {process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})
+                                <span className="truncate">{process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})</span>
+                                {isStarted && <Lock className="w-3 h-3 text-amber-600/80 shrink-0" />}
                               </span>
                             </div>
                             {/* Variance Label Badge */}
