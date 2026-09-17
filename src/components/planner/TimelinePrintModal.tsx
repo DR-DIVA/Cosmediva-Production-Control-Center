@@ -773,15 +773,15 @@ export function TimelinePrintModal({
     }, 400)
   }
 
-  // Direct PDF Download using jsPDF & html2canvas
+  // Direct PDF Download using jsPDF & html2canvas-pro (supports lab, oklch, modern CSS colors)
   const handleDirectDownloadPdf = async () => {
     setIsExportingDirectPdf(true)
-    toast.loading('กำลังสร้างไฟล์ PDF ขนาด A4 แนวนอน...')
+    const toastId = toast.loading('กำลังสร้างไฟล์ PDF ขนาด A4 แนวนอน...')
     try {
       const printElement = document.getElementById('timeline-printable-markup')
-      if (!printElement) throw new Error('ไม่พบข้อมูลตาราง')
+      if (!printElement) throw new Error('ไม่พบข้อมูลตารางสำหรับสร้าง PDF')
 
-      const html2canvas = (await import('html2canvas')).default
+      const html2canvas = (await import('html2canvas-pro')).default
       const { jsPDF } = await import('jspdf')
 
       const canvas = await html2canvas(printElement, {
@@ -818,12 +818,12 @@ export function TimelinePrintModal({
 
       const fileName = `CosmeDiva_Timeline_${format(startDate, 'yyyyMMdd')}_${lookaheadDays}d.pdf`
       pdf.save(fileName)
-      toast.dismiss()
+      toast.dismiss(toastId)
       toast.success(`ดาวน์โหลดไฟล์ ${fileName} สำเร็จ!`)
     } catch (err: any) {
       console.error('PDF generation error:', err)
-      toast.dismiss()
-      toast.error('ไม่สามารถส่งออก PDF ได้: ' + err.message)
+      toast.dismiss(toastId)
+      toast.error('ไม่สามารถส่งออก PDF ได้: ' + (err?.message || err))
     } finally {
       setIsExportingDirectPdf(false)
     }
@@ -1100,7 +1100,7 @@ export function TimelinePrintModal({
                         </div>
 
                         <div className="text-right text-[11px] text-slate-600">
-                          <div>พิมพ์เมื่อ: <strong>{format(new Date(), 'dd MMM yyyy HH:mm')}</strong> | ผู้จัดทำ: <strong className="text-slate-900">{currentUser}</strong></div>
+                          <div>พิมพ์เมื่อ: <strong>{format(new Date(), 'dd MMM yyyy HH:mm')}</strong> | ผู้จัดทำแผน: <strong className="text-slate-900">PLPTB1234 (คุณพรทิพย์)</strong>{currentUser && currentUser !== 'PLPTB1234' ? <span> | ผู้พิมพ์: <strong>{currentUser}</strong></span> : ''}</div>
                           <div className="flex items-center gap-2 justify-end mt-1 text-[10px]">
                             {viewMode === 'compare' ? (
                               <>
@@ -1643,7 +1643,7 @@ export function TimelinePrintModal({
                   <div className="signature-grid flex justify-between gap-6 pt-2 text-center text-slate-700">
                     <div className="signature-col flex-1 border-t border-slate-400 pt-1">
                       <div className="text-xs font-bold text-slate-900">ผู้จัดทำแผนงาน (Planner)</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">({currentUser})</div>
+                      <div className="text-[10px] text-slate-700 font-semibold mt-0.5">คุณพรทิพย์ บูรณ์รัตน์ธรรม (PLPTB1234)</div>
                       <div className="text-[9.5px] text-slate-400 mt-1">วันที่: ..... / ..... / ..........</div>
                     </div>
 
