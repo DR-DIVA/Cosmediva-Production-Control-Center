@@ -30,7 +30,7 @@ export default function DashboardLayout({
   }, [])
 
   return (
-    <div className="min-h-screen relative transition-all duration-300 w-full overflow-x-hidden">
+    <div className="min-h-screen relative transition-all duration-300 w-full overflow-x-clip">
       {/* Desktop & Tablet Sidebar */}
       <div 
         className={`hidden h-full md:flex md:flex-col md:fixed md:inset-y-0 z-[80] bg-[#2D2721] transition-all duration-300 ${
@@ -87,7 +87,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <main className="flex-1 bg-[#F8F6F0] flex flex-col w-full max-w-full p-2 sm:p-4 md:p-6 overflow-x-hidden">
+        <main className="flex-1 bg-[#F8F6F0] flex flex-col w-full max-w-full p-2 sm:p-4 md:p-6 overflow-x-clip">
           {children}
         </main>
       </div>

@@ -16,7 +16,10 @@ import {
   X,
   Loader2,
   Lock,
-  GripVertical
+  GripVertical,
+  Pin,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react'
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
@@ -170,6 +173,8 @@ export function MasterPlanningTimeline({
   const [timelineRangeMode, setTimelineRangeMode] = useState<'auto' | '15_centered' | '21_extended' | '14_future' | '14_past'>('auto')
   const [timelineOffsetDays, setTimelineOffsetDays] = useState<number>(0)
   const [isTimelineExpanded, setIsTimelineExpanded] = useState<boolean>(false)
+  const [isFitScreen, setIsFitScreen] = useState<boolean>(true)
+  const [isKpiCollapsed, setIsKpiCollapsed] = useState<boolean>(false)
 
   // Modals & Sliding Reschedule
   const [isTimelinePrintOpen, setIsTimelinePrintOpen] = useState(false)
@@ -783,114 +788,142 @@ export function MasterPlanningTimeline({
   }
 
   return (
-    <div className="space-y-4 bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+    <div className="space-y-0 bg-white rounded-xl shadow-xs border border-slate-200">
       {/* 1. Schedule Adherence KPI Summary Header */}
       {!hideHeaderKpi && (
-        <div className="p-3 sm:p-4 bg-white border-b border-slate-200">
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-3">
-            {/* 1. Overall Plan Accuracy */}
-            <div className="bg-gradient-to-br from-indigo-50/80 to-white p-2.5 rounded-xl border border-indigo-200 shadow-xs">
-              <div className="text-[10.5px] font-bold text-indigo-700 flex items-center justify-between">
-                <span>ความแม่นยำรวม (Accuracy)</span>
-                <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
-              </div>
-              <div className="text-xl font-black text-indigo-950 mt-1">
-                {scheduleAdherenceStats.overallAccuracy}%
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
-                ตรงแผน <strong className="text-emerald-700 font-bold">{scheduleAdherenceStats.totalOnTime}</strong> • ล่าช้า <strong className="text-rose-700 font-bold">{scheduleAdherenceStats.totalDelayed}</strong>
-              </div>
+        <div className="p-3 sm:p-4 bg-white border-b border-slate-200 rounded-t-xl">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5 text-indigo-600" />
+              <span>สรุปภาพรวม KPI ความแม่นยำแผนงานผลิต (Schedule Adherence)</span>
             </div>
-
-            {/* 2. RM Weighing */}
-            <div className="bg-gradient-to-br from-amber-50/80 to-white p-2.5 rounded-xl border border-amber-200 shadow-xs">
-              <div className="text-[10.5px] font-bold text-amber-800 flex items-center justify-between">
-                <span>🟡 ฝ่ายชั่งสาร (RM)</span>
-                <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.RM.accuracy}%</span>
-              </div>
-              <div className="text-xl font-black text-amber-950 mt-1">
-                {scheduleAdherenceStats.deptStats.RM.accuracy}%
-              </div>
-              <div className="w-full bg-amber-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                <div className="bg-amber-500 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.RM.accuracy}%` }} />
-              </div>
-            </div>
-
-            {/* 3. MX Mixing */}
-            <div className="bg-gradient-to-br from-blue-50/80 to-white p-2.5 rounded-xl border border-blue-200 shadow-xs">
-              <div className="text-[10.5px] font-bold text-blue-800 flex items-center justify-between">
-                <span>🔵 ฝ่ายผสม (MX)</span>
-                <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.MX.accuracy}%</span>
-              </div>
-              <div className="text-xl font-black text-blue-950 mt-1">
-                {scheduleAdherenceStats.deptStats.MX.accuracy}%
-              </div>
-              <div className="w-full bg-blue-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                <div className="bg-blue-600 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.MX.accuracy}%` }} />
-              </div>
-            </div>
-
-            {/* 4. PK Packing */}
-            <div className={cn(
-              "p-2.5 rounded-xl border shadow-xs transition-all",
-              Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90
-                ? "bg-gradient-to-br from-rose-50/90 to-white border-rose-300 ring-1 ring-rose-200"
-                : "bg-gradient-to-br from-emerald-50/80 to-white border-emerald-200"
-            )}>
-              <div className={cn(
-                "text-[10.5px] font-bold flex items-center justify-between",
-                Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-800" : "text-emerald-800"
-              )}>
-                <span>🟣 ฝ่ายบรรจุ/ลงลัง (PK)</span>
-                <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.PK.accuracy}%</span>
-              </div>
-              <div className={cn(
-                "text-xl font-black mt-1",
-                Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-950" : "text-emerald-950"
-              )}>
-                {scheduleAdherenceStats.deptStats.PK.accuracy}%
-              </div>
-              <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                <div
-                  className={cn("h-full rounded-full", Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "bg-rose-500" : "bg-emerald-500")}
-                  style={{ width: `${scheduleAdherenceStats.deptStats.PK.accuracy}%` }}
-                />
-              </div>
-            </div>
-
-            {/* 5. Average Delay */}
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
-                <span>ความล่าช้าเฉลี่ย</span>
-                <Clock className="w-3.5 h-3.5 text-slate-400" />
-              </div>
-              <div className="text-xl font-black text-slate-900 mt-1">
-                +{scheduleAdherenceStats.avgDelay} <span className="text-xs font-normal text-slate-500">วัน</span>
-              </div>
-              <div className="text-[10px] text-slate-500 mt-0.5">
-                เร็วกว่าแผน: <strong className="text-blue-600 font-bold">{scheduleAdherenceStats.totalEarly}</strong> งาน
-              </div>
-            </div>
-
-            {/* 6. Bottleneck Insights */}
-            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
-              <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
-                <span>วิเคราะห์คอขวดสะสม</span>
-                <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
-              </div>
-              <div className="text-[10.5px] font-bold text-slate-900 mt-1 truncate" title={scheduleAdherenceStats.topBottleneckText}>
-                {scheduleAdherenceStats.topBottleneckText}
-              </div>
-              <div className="text-[9.5px] text-slate-500 mt-0.5 truncate" title={scheduleAdherenceStats.bottleneckSummaryText}>
-                {scheduleAdherenceStats.bottleneckSummaryText}
-              </div>
-            </div>
+            <button
+              type="button"
+              onClick={() => setIsKpiCollapsed(prev => !prev)}
+              className="text-[11px] text-indigo-700 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded border border-indigo-200 font-semibold flex items-center gap-1 cursor-pointer transition-all"
+            >
+              {isKpiCollapsed ? (
+                <>
+                  <span>แสดง KPI การผลิต ({scheduleAdherenceStats.overallAccuracy}%)</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </>
+              ) : (
+                <>
+                  <span>ย่อแถบ KPI</span>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </>
+              )}
+            </button>
           </div>
+          {!isKpiCollapsed && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 mb-1">
+              {/* 1. Overall Plan Accuracy */}
+              <div className="bg-gradient-to-br from-indigo-50/80 to-white p-2.5 rounded-xl border border-indigo-200 shadow-xs">
+                <div className="text-[10.5px] font-bold text-indigo-700 flex items-center justify-between">
+                  <span>ความแม่นยำรวม (Accuracy)</span>
+                  <TrendingUp className="w-3.5 h-3.5 text-indigo-500" />
+                </div>
+                <div className="text-xl font-black text-indigo-950 mt-1">
+                  {scheduleAdherenceStats.overallAccuracy}%
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  ตรงแผน <strong className="text-emerald-700 font-bold">{scheduleAdherenceStats.totalOnTime}</strong> • ล่าช้า <strong className="text-rose-700 font-bold">{scheduleAdherenceStats.totalDelayed}</strong>
+                </div>
+              </div>
+
+              {/* 2. RM Weighing */}
+              <div className="bg-gradient-to-br from-amber-50/80 to-white p-2.5 rounded-xl border border-amber-200 shadow-xs">
+                <div className="text-[10.5px] font-bold text-amber-800 flex items-center justify-between">
+                  <span>🟡 ฝ่ายชั่งสาร (RM)</span>
+                  <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.RM.accuracy}%</span>
+                </div>
+                <div className="text-xl font-black text-amber-950 mt-1">
+                  {scheduleAdherenceStats.deptStats.RM.accuracy}%
+                </div>
+                <div className="w-full bg-amber-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div className="bg-amber-500 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.RM.accuracy}%` }} />
+                </div>
+              </div>
+
+              {/* 3. MX Mixing */}
+              <div className="bg-gradient-to-br from-blue-50/80 to-white p-2.5 rounded-xl border border-blue-200 shadow-xs">
+                <div className="text-[10.5px] font-bold text-blue-800 flex items-center justify-between">
+                  <span>🔵 ฝ่ายผสม (MX)</span>
+                  <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.MX.accuracy}%</span>
+                </div>
+                <div className="text-xl font-black text-blue-950 mt-1">
+                  {scheduleAdherenceStats.deptStats.MX.accuracy}%
+                </div>
+                <div className="w-full bg-blue-200/70 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div className="bg-blue-600 h-full rounded-full" style={{ width: `${scheduleAdherenceStats.deptStats.MX.accuracy}%` }} />
+                </div>
+              </div>
+
+              {/* 4. PK Packing */}
+              <div className={cn(
+                "p-2.5 rounded-xl border shadow-xs transition-all",
+                Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90
+                  ? "bg-gradient-to-br from-rose-50/90 to-white border-rose-300 ring-1 ring-rose-200"
+                  : "bg-gradient-to-br from-emerald-50/80 to-white border-emerald-200"
+              )}>
+                <div className={cn(
+                  "text-[10.5px] font-bold flex items-center justify-between",
+                  Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-800" : "text-emerald-800"
+                )}>
+                  <span>🟣 ฝ่ายบรรจุ/ลงลัง (PK)</span>
+                  <span className="text-[10px] font-bold font-mono">{scheduleAdherenceStats.deptStats.PK.accuracy}%</span>
+                </div>
+                <div className={cn(
+                  "text-xl font-black mt-1",
+                  Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "text-rose-950" : "text-emerald-950"
+                )}>
+                  {scheduleAdherenceStats.deptStats.PK.accuracy}%
+                </div>
+                <div className="w-full bg-slate-200 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                  <div
+                    className={cn("h-full rounded-full", Number(scheduleAdherenceStats.deptStats.PK.accuracy) < 90 ? "bg-rose-500" : "bg-emerald-500")}
+                    style={{ width: `${scheduleAdherenceStats.deptStats.PK.accuracy}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* 5. Average Delay */}
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
+                  <span>ความล่าช้าเฉลี่ย</span>
+                  <Clock className="w-3.5 h-3.5 text-slate-400" />
+                </div>
+                <div className="text-xl font-black text-slate-900 mt-1">
+                  +{scheduleAdherenceStats.avgDelay} <span className="text-xs font-normal text-slate-500">วัน</span>
+                </div>
+                <div className="text-[10px] text-slate-500 mt-0.5">
+                  เร็วกว่าแผน: <strong className="text-blue-600 font-bold">{scheduleAdherenceStats.totalEarly}</strong> งาน
+                </div>
+              </div>
+
+              {/* 6. Bottleneck Insights */}
+              <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 shadow-xs">
+                <div className="text-[10.5px] font-bold text-slate-700 flex items-center justify-between">
+                  <span>วิเคราะห์คอขวดสะสม</span>
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                </div>
+                <div className="text-[10.5px] font-bold text-slate-900 mt-1 truncate" title={scheduleAdherenceStats.topBottleneckText}>
+                  {scheduleAdherenceStats.topBottleneckText}
+                </div>
+                <div className="text-[9.5px] text-slate-500 mt-0.5 truncate" title={scheduleAdherenceStats.bottleneckSummaryText}>
+                  {scheduleAdherenceStats.bottleneckSummaryText}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. Unified Toolbar & Filter Section */}
-      <div className="px-4 py-3 bg-[#FAF9F6] border-b border-slate-200 space-y-2.5">
+      {/* 2. Unified Toolbar & Filter Section (Sticky at top below dashboard header) */}
+      <div className={cn(
+        "px-4 py-3 bg-[#FAF9F6] border-b border-slate-200 space-y-2.5 sticky top-14 z-30 shadow-2xs backdrop-blur-xs transition-all",
+        hideHeaderKpi ? "rounded-t-xl" : ""
+      )}>
         {/* Row 1: View Modes, Department & Print Button */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2">
@@ -1196,6 +1229,22 @@ export function MasterPlanningTimeline({
               <span>{isTimelineExpanded ? 'ย่อมุมมอง' : 'ขยายข้อความเต็ม'}</span>
             </button>
 
+            {/* Fit Screen / Full Height Toggle (Pin Table Headers) */}
+            <button
+              type="button"
+              onClick={() => setIsFitScreen(prev => !prev)}
+              className={cn(
+                "px-2.5 py-1 rounded-lg border text-[11px] font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer ml-1",
+                isFitScreen
+                  ? "bg-indigo-50 text-indigo-700 border-indigo-200 font-bold ring-1 ring-indigo-200"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              )}
+              title={isFitScreen ? "คลิกเพื่อปลดการล็อกความสูง (ขยายตารางเต็มความยาว)" : "คลิกเพื่อตรึงแนวหัวตารางและล็อกความสูงตารางพอดีหน้าจอ"}
+            >
+              <Pin className={cn("w-3.5 h-3.5", isFitScreen ? "text-indigo-600 fill-indigo-600/30" : "text-slate-500")} />
+              <span>{isFitScreen ? 'ตรึงหัวตาราง (พอดีจอ)' : 'ขยายความสูงเต็ม'}</span>
+            </button>
+
             {/* Quick SKU/LOT Search Box in Timeline */}
             <div className="relative ml-1 w-36 sm:w-44">
               <Search className="w-3.5 h-3.5 absolute left-2 top-2 text-slate-400" />
@@ -1224,7 +1273,14 @@ export function MasterPlanningTimeline({
       </div>
 
       {/* 3. Interactive Gantt Timeline Matrix */}
-      <div className="overflow-x-auto min-h-[500px]">
+      <div className={cn(
+        "rounded-b-xl transition-all duration-200 relative",
+        isFitScreen
+          ? (hideHeaderKpi || isKpiCollapsed 
+              ? "overflow-auto min-h-[460px] max-h-[calc(100vh-210px)]" 
+              : "overflow-auto min-h-[460px] max-h-[calc(100vh-325px)]")
+          : "overflow-x-auto min-h-[500px] max-h-none"
+      )}>
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-slate-500">
             <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mb-2" />
@@ -1232,12 +1288,12 @@ export function MasterPlanningTimeline({
           </div>
         ) : (
           <div className={cn(
-            "border-t border-slate-200 relative transition-all duration-200",
+            "relative transition-all duration-200",
             isTimelineExpanded ? "min-w-[1850px]" : "min-w-[1200px]"
           )}>
             {/* Timeline Date Headers */}
-            <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-20 shadow-[0_1px_0_0_#e2e8f0]">
-              <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 bg-[#F8F6F0] z-30 shadow-[1px_0_0_0_#e2e8f0] flex items-center justify-between">
+            <div className="flex border-b border-slate-200 bg-[#F8F6F0] sticky top-0 z-30 shadow-[0_1px_0_0_#e2e8f0]">
+              <div className="w-[260px] shrink-0 p-3 font-semibold text-sm border-r border-slate-200 sticky left-0 top-0 bg-[#F8F6F0] z-40 shadow-[1px_1px_0_0_#e2e8f0] flex items-center justify-between">
                 <span>Project / Task {timelineViewMode === 'compare' ? '(P vs A)' : ''}</span>
                 <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-white/80 text-slate-600 border-slate-300">
                   {lotsWithVisibleTasks.length} Lots
@@ -1342,7 +1398,7 @@ export function MasterPlanningTimeline({
                     <div key={lot.id} className="group relative z-10">
                       {/* LOT Header Row */}
                       <div className="flex bg-white hover:bg-[#F8F6F0] transition-colors h-[40px] items-center border-b border-slate-100">
-                        <div className="w-[260px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0]">
+                        <div className="w-[260px] shrink-0 p-2 border-r border-slate-200 sticky left-0 bg-white group-hover:bg-[#F8F6F0] z-20 shadow-[1px_0_0_0_#e2e8f0] transition-colors">
                           <div className="font-medium text-sm line-clamp-2 break-words text-wrap">
                             {lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span>
                           </div>
@@ -1503,7 +1559,7 @@ export function MasterPlanningTimeline({
                           )}
                         >
                           {/* Left Task Label Cell */}
-                          <div className="w-[260px] shrink-0 py-1 px-3 pl-6 border-r border-slate-200 sticky left-0 bg-inherit z-20 shadow-[1px_0_0_0_#e2e8f0] flex flex-col justify-center">
+                          <div className="w-[260px] shrink-0 py-1 px-3 pl-6 border-r border-slate-200 sticky left-0 bg-white group-hover:bg-[#F8F6F0] z-20 shadow-[1px_0_0_0_#e2e8f0] flex flex-col justify-center transition-colors">
                             <div className="flex items-center gap-1.5">
                               <div className={cn("w-2 h-2 rounded-full shrink-0", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                               <span
