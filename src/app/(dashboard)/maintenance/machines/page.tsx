@@ -145,14 +145,13 @@ export default function MachinesMasterPage() {
             ))}
           </select>
 
-          <Button
-            type="button"
-            onClick={handleBulkPrint}
-            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-[#2A2521] hover:bg-stone-800 text-white shadow-sm flex items-center gap-1.5"
+          <Link
+            href="/maintenance/qr-print"
+            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-[#2A2521] hover:bg-stone-800 text-white shadow-sm flex items-center gap-1.5 transition"
           >
             <Printer className="w-3.5 h-3.5 text-[#D4AF37]" />
-            <span>พิมพ์ป้าย QR ทั้งหมด ({machines.length})</span>
-          </Button>
+            <span>สตูดิโอพิมพ์สติกเกอร์ QR ({machines.length})</span>
+          </Link>
 
           <Button
             type="button"

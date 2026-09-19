@@ -135,6 +135,7 @@ const routes = [
       { label: '📋 บอร์ดงานซ่อม (Kanban)', href: '/maintenance/work-orders', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
       { label: '🗓️ แผน PM 2026 (PM Plan)', href: '/maintenance/pm', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
       { label: '🏭 ทะเบียนเครื่องจักร (Machines 360°)', href: '/maintenance/machines', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🖨️ พิมพ์สติกเกอร์ QR (QR Print)', href: '/maintenance/qr-print', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
       { label: '📦 คลังอะไหล่ (Spare Parts)', href: '/maintenance/spare-parts', allowedRoles: ['admin', 'maintenance', 'planner', 'warehouse_mmrm_bu', 'purchase'] },
       { label: '📊 แดชบอร์ด & KPI', href: '/maintenance/dashboard', allowedRoles: ['admin', 'maintenance', 'planner'] },
       { label: '🔍 ค้นหาประวัติ (Search)', href: '/maintenance/search', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
