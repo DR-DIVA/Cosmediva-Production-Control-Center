@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { MaintenancePMPlan, MaintenancePMAdjustmentLog } from '@/types/maintenance'
+import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
 import { Calendar, ShieldCheck, History, Sliders } from 'lucide-react'
 import { useRouter } from 'next/navigation'
@@ -64,7 +64,7 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
         <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200">
           <span className="text-stone-400 block font-medium">รอบความถี่ปัจจุบัน</span>
           <span className="text-sm font-black text-stone-800 font-mono mt-0.5 block">
-            {pmPlan.frequency_type} ({pmPlan.frequency_interval} เดือน)
+            {getPmFrequencyInfo(pmPlan.frequency_type, pmPlan.frequency_interval).full}
           </span>
         </div>
 

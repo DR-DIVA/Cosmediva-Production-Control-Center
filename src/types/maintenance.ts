@@ -331,4 +331,36 @@ export interface MaintenanceMachineAuditLog {
   created_at: string
 }
 
+export interface PmFrequencyInfo {
+  code: 'PM1' | 'PM2' | 'PM3' | 'PM4' | 'PM6' | 'PM12'
+  interval: number
+  label: string
+  full: string
+  color: string
+}
+
+export function getPmFrequencyInfo(frequencyType?: string | null, interval?: number): PmFrequencyInfo {
+  const norm = (frequencyType || '').toLowerCase().trim()
+  const intVal = Number(interval) || 0
+
+  if (norm === 'pm12' || norm.includes('12') || norm === 'yearly' || intVal === 12) {
+    return { code: 'PM12', interval: 12, label: 'ทุก 12 เดือน', full: 'PM12 = ทุก 12 เดือน', color: 'bg-amber-50 border-amber-300 text-amber-900' }
+  }
+  if (norm === 'pm6' || norm.includes('6') || norm.includes('biannual') || intVal === 6) {
+    return { code: 'PM6', interval: 6, label: 'ทุก 6 เดือน', full: 'PM6 = ทุก 6 เดือน', color: 'bg-emerald-50 border-emerald-300 text-emerald-900' }
+  }
+  if (norm === 'pm4' || norm.includes('4') || intVal === 4) {
+    return { code: 'PM4', interval: 4, label: 'ทุก 4 เดือน', full: 'PM4 = ทุก 4 เดือน', color: 'bg-purple-50 border-purple-300 text-purple-900' }
+  }
+  if (norm === 'pm3' || norm.includes('3') || norm.includes('quarter') || intVal === 3) {
+    return { code: 'PM3', interval: 3, label: 'ทุก 3 เดือน', full: 'PM3 = ทุก 3 เดือน', color: 'bg-indigo-50 border-indigo-300 text-indigo-900' }
+  }
+  if (norm === 'pm2' || norm.includes('2') || intVal === 2) {
+    return { code: 'PM2', interval: 2, label: 'ทุก 2 เดือน', full: 'PM2 = ทุก 2 เดือน', color: 'bg-blue-50 border-blue-300 text-blue-900' }
+  }
+  // Default to PM1
+  return { code: 'PM1', interval: 1, label: 'ทุก 1 เดือน', full: 'PM1 = ทุก 1 เดือน', color: 'bg-cyan-50 border-cyan-300 text-cyan-900' }
+}
+
+
 

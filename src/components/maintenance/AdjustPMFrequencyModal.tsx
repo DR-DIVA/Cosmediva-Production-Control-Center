@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { MaintenancePMPlan } from '@/types/maintenance'
+import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { adjustPMPlanFrequency } from '@/app/actions/maintenance'
 
 interface Props {
@@ -12,12 +12,12 @@ interface Props {
 }
 
 const FREQUENCY_OPTIONS = [
-  { type: 'Monthly', interval: 1, label: 'รายเดือน (PM1)', desc: 'เข้าตรวจเช็คทุกๆ 1 เดือน (12 ครั้ง/ปี)' },
-  { type: 'Every 2 Months', interval: 2, label: 'ทุก 2 เดือน (PM2)', desc: 'เข้าตรวจเช็คทุกๆ 2 เดือน (6 ครั้ง/ปี)' },
-  { type: 'Quarterly', interval: 3, label: 'รายไตรมาส (PM3)', desc: 'เข้าตรวจเช็คทุกๆ 3 เดือน (4 ครั้ง/ปี)' },
-  { type: 'Every 4 Months', interval: 4, label: 'ทุก 4 เดือน (PM4)', desc: 'เข้าตรวจเช็คทุกๆ 4 เดือน (3 ครั้ง/ปี)' },
-  { type: 'BiAnnually', interval: 6, label: 'รายครึ่งปี (PM6)', desc: 'เข้าตรวจเช็คทุกๆ 6 เดือน (2 ครั้ง/ปี)' },
-  { type: 'Yearly', interval: 12, label: 'รายปี (PM12)', desc: 'เข้าตรวจเช็คใหญ่ประจำปี (1 ครั้ง/ปี)' }
+  { type: 'Monthly', interval: 1, label: 'PM1 = ทุก 1 เดือน', desc: 'เข้าตรวจเช็คทุกๆ 1 เดือน (12 ครั้ง/ปี)' },
+  { type: 'Every 2 Months', interval: 2, label: 'PM2 = ทุก 2 เดือน', desc: 'เข้าตรวจเช็คทุกๆ 2 เดือน (6 ครั้ง/ปี)' },
+  { type: 'Quarterly', interval: 3, label: 'PM3 = ทุก 3 เดือน', desc: 'เข้าตรวจเช็คทุกๆ 3 เดือน (4 ครั้ง/ปี)' },
+  { type: 'Every 4 Months', interval: 4, label: 'PM4 = ทุก 4 เดือน', desc: 'เข้าตรวจเช็คทุกๆ 4 เดือน (3 ครั้ง/ปี)' },
+  { type: 'BiAnnually', interval: 6, label: 'PM6 = ทุก 6 เดือน', desc: 'เข้าตรวจเช็คทุกๆ 6 เดือน (2 ครั้ง/ปี)' },
+  { type: 'Yearly', interval: 12, label: 'PM12 = ทุก 12 เดือน', desc: 'เข้าตรวจเช็คใหญ่ประจำปี (1 ครั้ง/ปี)' }
 ]
 
 const QUICK_REASONS = [
@@ -115,7 +115,7 @@ export default function AdjustPMFrequencyModal({ isOpen, onClose, plan, onSucces
             <div>
               <span className="text-stone-500 font-medium">รอบความถี่เดิม:</span>
               <span className="ml-2 px-2 py-0.5 rounded-md bg-stone-200/80 text-stone-800 font-bold font-mono">
-                {plan.frequency_type} ({plan.frequency_interval} เดือน)
+                {getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval).full}
               </span>
             </div>
             <div>

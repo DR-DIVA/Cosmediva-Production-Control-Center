@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { MaintenancePMPlan, MaintenancePMAdjustmentLog } from '@/types/maintenance'
+import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
 import { useRouter } from 'next/navigation'
 
@@ -45,12 +45,8 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
       }
       // Freq filter
       if (selectedFreq !== 'ALL') {
-        if (selectedFreq === 'PM1' && p.frequency_type !== 'Monthly') return false
-        if (selectedFreq === 'PM2' && p.frequency_type !== 'Every 2 Months') return false
-        if (selectedFreq === 'PM3' && p.frequency_type !== 'Quarterly') return false
-        if (selectedFreq === 'PM4' && p.frequency_type !== 'Every 4 Months') return false
-        if (selectedFreq === 'PM6' && p.frequency_type !== 'BiAnnually') return false
-        if (selectedFreq === 'PM12' && p.frequency_type !== 'Yearly') return false
+        const freq = getPmFrequencyInfo(p.frequency_type, p.frequency_interval)
+        if (freq.code !== selectedFreq) return false
       }
       // Search
       if (searchQuery.trim()) {
@@ -67,12 +63,12 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
   // Metric summaries
   const metrics = useMemo(() => {
     const total = plans.length
-    const pm1 = plans.filter(p => p.frequency_type === 'Monthly').length
-    const pm2 = plans.filter(p => p.frequency_type === 'Every 2 Months').length
-    const pm3 = plans.filter(p => p.frequency_type === 'Quarterly').length
-    const pm4 = plans.filter(p => p.frequency_type === 'Every 4 Months').length
-    const pm6 = plans.filter(p => p.frequency_type === 'BiAnnually').length
-    const pm12 = plans.filter(p => p.frequency_type === 'Yearly').length
+    const pm1 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM1').length
+    const pm2 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM2').length
+    const pm3 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM3').length
+    const pm4 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM4').length
+    const pm6 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM6').length
+    const pm12 = plans.filter(p => getPmFrequencyInfo(p.frequency_type, p.frequency_interval).code === 'PM12').length
     const totalAdjustments = logs.length
 
     return { total, pm1, pm2, pm3, pm4, pm6, pm12, totalAdjustments }
@@ -90,60 +86,68 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
   return (
     <div className="space-y-6 text-stone-900 font-sans">
       {/* Top Header & Metrics Bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-white border border-stone-200 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-stone-500 font-bold">แผน PM ทั้งหมด</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-stone-900 font-mono">{metrics.total}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+        <div className="bg-white border border-stone-200 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-stone-500 font-bold block truncate">แผน PM ทั้งหมด</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-stone-900 font-mono">{metrics.total}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-white border border-cyan-200/80 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-cyan-700 font-bold">รายเดือน (PM1)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-cyan-600 font-mono">{metrics.pm1}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+        <div className="bg-white border border-cyan-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-cyan-700 font-bold block truncate" title="PM1 = ทุก 1 เดือน">PM1 (1 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-cyan-600 font-mono">{metrics.pm1}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-white border border-blue-200/80 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-blue-700 font-bold">ทุก 2 เดือน (PM2)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-blue-600 font-mono">{metrics.pm2}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+        <div className="bg-white border border-blue-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-blue-700 font-bold block truncate" title="PM2 = ทุก 2 เดือน">PM2 (2 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-blue-600 font-mono">{metrics.pm2}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-white border border-indigo-200/80 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-indigo-700 font-bold">รายไตรมาส (PM3)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-indigo-600 font-mono">{metrics.pm3}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+        <div className="bg-white border border-indigo-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-indigo-700 font-bold block truncate" title="PM3 = ทุก 3 เดือน">PM3 (3 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-indigo-600 font-mono">{metrics.pm3}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-white border border-purple-200/80 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-purple-700 font-bold">ทุก 4 เดือน (PM4)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-purple-600 font-mono">{metrics.pm4}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+        <div className="bg-white border border-purple-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-purple-700 font-bold block truncate" title="PM4 = ทุก 4 เดือน">PM4 (4 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-purple-600 font-mono">{metrics.pm4}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-white border border-emerald-200/80 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-emerald-700 font-bold">รายครึ่งปี (PM6)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-emerald-600 font-mono">{metrics.pm6}</span>
-            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
+        <div className="bg-white border border-emerald-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-emerald-700 font-bold block truncate" title="PM6 = ทุก 6 เดือน">PM6 (6 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-emerald-600 font-mono">{metrics.pm6}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl shadow-2xs">
-          <span className="text-[11px] uppercase tracking-wider text-amber-800 font-bold">ประวัติปรับรอบ (AUDIT)</span>
-          <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-black text-amber-700 font-mono">{metrics.totalAdjustments}</span>
-            <span className="text-xs text-amber-600">ครั้ง</span>
+        <div className="bg-white border border-amber-200/80 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-amber-700 font-bold block truncate" title="PM12 = ทุก 12 เดือน">PM12 (12 เดือน)</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-amber-600 font-mono">{metrics.pm12}</span>
+            <span className="text-[11px] text-stone-400 font-medium">เครื่อง</span>
+          </div>
+        </div>
+
+        <div className="bg-amber-50/80 border border-amber-200 p-3 rounded-2xl shadow-2xs">
+          <span className="text-[10px] uppercase tracking-wider text-amber-800 font-bold block truncate">บันทึกปรับรอบ</span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl font-black text-amber-700 font-mono">{metrics.totalAdjustments}</span>
+            <span className="text-[11px] text-amber-600 font-medium">ครั้ง</span>
           </div>
         </div>
       </div>
@@ -241,13 +245,13 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
               onChange={(e) => setSelectedFreq(e.target.value)}
               className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-[#D4AF37] font-medium"
             >
-              <option value="ALL">🔄 ทุกรอบความถี่</option>
-              <option value="PM1">รายเดือน (PM1)</option>
-              <option value="PM2">ทุก 2 เดือน (PM2)</option>
-              <option value="PM3">รายไตรมาส (PM3)</option>
-              <option value="PM4">ทุก 4 เดือน (PM4)</option>
-              <option value="PM6">รายครึ่งปี (PM6)</option>
-              <option value="PM12">รายปี (PM12)</option>
+              <option value="ALL">🔄 ทุกรอบความถี่ (All Frequencies)</option>
+              <option value="PM1">PM1 = ทุก 1 เดือน</option>
+              <option value="PM2">PM2 = ทุก 2 เดือน</option>
+              <option value="PM3">PM3 = ทุก 3 เดือน</option>
+              <option value="PM4">PM4 = ทุก 4 เดือน</option>
+              <option value="PM6">PM6 = ทุก 6 เดือน</option>
+              <option value="PM12">PM12 = ทุก 12 เดือน</option>
             </select>
           </div>
         </div>
@@ -266,6 +270,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
             ) : (
               filteredPlans.map((plan) => {
                 const machine = (plan as any).machine
+                const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
                 return (
                   <div key={plan.id} className="p-4 space-y-3 bg-white hover:bg-stone-50/70 transition">
                     <div className="flex items-start justify-between gap-2">
@@ -282,16 +287,8 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                       </div>
 
                       <div className="flex flex-col items-end gap-1">
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono shrink-0 ${
-                          plan.frequency_type === 'Monthly'
-                            ? 'bg-cyan-50 border border-cyan-300 text-cyan-800'
-                            : plan.frequency_type === 'Every 2 Months'
-                            ? 'bg-blue-50 border border-blue-300 text-blue-800'
-                            : plan.frequency_type === 'Quarterly'
-                            ? 'bg-indigo-50 border border-indigo-300 text-indigo-800'
-                            : 'bg-amber-50 border border-amber-300 text-amber-800'
-                        }`}>
-                          {plan.frequency_type} ({plan.frequency_interval} ด.)
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono shrink-0 border ${freq.color}`}>
+                          {freq.full}
                         </span>
                         {plan.adjustment_count && plan.adjustment_count > 0 ? (
                           <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold">
@@ -354,6 +351,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                 ) : (
                   filteredPlans.map((plan) => {
                     const machine = (plan as any).machine
+                    const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
                     return (
                       <tr key={plan.id} className="hover:bg-stone-50/80 transition">
                         <td className="p-3.5 pl-5">
@@ -383,20 +381,8 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
                         <td className="p-3.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono ${
-                              plan.frequency_type === 'Monthly'
-                                ? 'bg-cyan-50 border border-cyan-300 text-cyan-800'
-                                : plan.frequency_type === 'Every 2 Months'
-                                ? 'bg-blue-50 border border-blue-300 text-blue-800'
-                                : plan.frequency_type === 'Quarterly'
-                                ? 'bg-indigo-50 border border-indigo-300 text-indigo-800'
-                                : plan.frequency_type === 'Every 4 Months'
-                                ? 'bg-purple-50 border border-purple-300 text-purple-800'
-                                : plan.frequency_type === 'BiAnnually'
-                                ? 'bg-emerald-50 border border-emerald-300 text-emerald-800'
-                                : 'bg-amber-50 border border-amber-300 text-amber-800'
-                            }`}>
-                              {plan.frequency_type} ({plan.frequency_interval} ด.)
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono border ${freq.color}`}>
+                              {freq.full}
                             </span>
                             {plan.adjustment_count && plan.adjustment_count > 0 ? (
                               <span
@@ -482,14 +468,15 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
               <tbody className="divide-y divide-stone-100 font-mono">
                 {filteredPlans.slice(0, 100).map((plan) => {
                   const scheduleMonths: string[] = (plan as any).schedule_months || []
+                  const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
                   const hasMonth = (m: string) => {
                     if (scheduleMonths.length > 0) return scheduleMonths.includes(m)
-                    if (plan.frequency_type === 'Monthly') return true
-                    if (plan.frequency_type === 'BiAnnually') return ['JAN', 'JUN'].includes(m)
-                    if (plan.frequency_type === 'Every 4 Months') return ['JAN', 'MAY', 'SEP'].includes(m)
-                    if (plan.frequency_type === 'Quarterly') return ['JAN', 'APR', 'JUL', 'OCT'].includes(m)
-                    if (plan.frequency_type === 'Every 2 Months') return ['JAN', 'MAR', 'MAY', 'JUL', 'SEP', 'NOV'].includes(m)
-                    if (plan.frequency_type === 'Yearly') return m === 'JUN'
+                    if (freq.code === 'PM1') return true
+                    if (freq.code === 'PM2') return ['JAN', 'MAR', 'MAY', 'JUL', 'SEP', 'NOV'].includes(m)
+                    if (freq.code === 'PM3') return ['JAN', 'APR', 'JUL', 'OCT'].includes(m)
+                    if (freq.code === 'PM4') return ['JAN', 'MAY', 'SEP'].includes(m)
+                    if (freq.code === 'PM6') return ['JAN', 'JUN'].includes(m)
+                    if (freq.code === 'PM12') return m === 'JUN'
                     return false
                   }
 
@@ -504,7 +491,9 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         {plan.machine_name}
                       </td>
                       <td className="p-3 font-sans text-xs">
-                        <span className="text-cyan-700 font-bold">{plan.frequency_type.substring(0, 4)}</span>
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono border ${freq.color}`} title={freq.full}>
+                          {freq.code}
+                        </span>
                       </td>
 
                       {MONTHS.map((m) => {
@@ -567,24 +556,27 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                 ยังไม่มีประวัติการปรับเปลี่ยนความถี่รอบ PM
               </div>
             ) : (
-              logs.map((log) => (
-                <div key={log.id} className="p-4 hover:bg-stone-50 transition flex flex-col md:flex-row md:items-start justify-between gap-4">
-                  <div className="space-y-2 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-stone-900 font-mono bg-stone-100 border border-stone-300 px-2 py-0.5 rounded text-xs">
-                        {log.machine_code}
-                      </span>
-                      <span className="text-xs text-stone-500">
-                        ปรับรอบจาก:
-                      </span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-mono border border-stone-200">
-                        {log.old_frequency_type || 'มาตรฐาน'}
-                      </span>
-                      <span className="text-cyan-700 font-bold">➔</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-cyan-50 border border-cyan-300 text-cyan-800 font-bold font-mono">
-                        {log.new_frequency_type}
-                      </span>
-                    </div>
+              logs.map((log) => {
+                const oldFreq = getPmFrequencyInfo(log.old_frequency_type)
+                const newFreq = getPmFrequencyInfo(log.new_frequency_type)
+                return (
+                  <div key={log.id} className="p-4 hover:bg-stone-50 transition flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div className="space-y-2 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-stone-900 font-mono bg-stone-100 border border-stone-300 px-2 py-0.5 rounded text-xs">
+                          {log.machine_code}
+                        </span>
+                        <span className="text-xs text-stone-500">
+                          ปรับรอบจาก:
+                        </span>
+                        <span className="text-xs px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-mono border border-stone-200">
+                          {oldFreq.full}
+                        </span>
+                        <span className="text-cyan-700 font-bold">➔</span>
+                        <span className={`text-xs px-2 py-0.5 rounded border font-bold font-mono ${newFreq.color}`}>
+                          {newFreq.full}
+                        </span>
+                      </div>
 
                     {/* Prominent Mandatory Reason */}
                     <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 text-xs">
@@ -614,8 +606,9 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                     })}
                   </div>
                 </div>
-              ))
-            )}
+              )
+            })
+          )}
           </div>
         </div>
       )}
