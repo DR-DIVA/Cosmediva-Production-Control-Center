@@ -1304,6 +1304,113 @@ export async function getSpareParts(filters?: {
 }
 
 /**
+ * Update Spare Part Safety Stock & Reorder Point
+ */
+export async function updateSparePartSafetyStock(id: string, payload: {
+  min_stock: number
+  reorder_point?: number
+  max_stock?: number
+  storage_location?: string
+}) {
+  const supabase = createAdminClient()
+  const updateData: any = {
+    min_stock: Math.max(0, Number(payload.min_stock) || 0),
+    updated_at: new Date().toISOString()
+  }
+  if (payload.reorder_point !== undefined) {
+    updateData.reorder_point = Math.max(0, Number(payload.reorder_point) || 0)
+  }
+  if (payload.max_stock !== undefined) {
+    updateData.max_stock = Math.max(0, Number(payload.max_stock) || 0)
+  }
+  if (payload.storage_location !== undefined) {
+    updateData.storage_location = payload.storage_location.trim()
+  }
+
+  const { data, error } = await supabase
+    .from('maintenance_spare_parts')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/maintenance/spare-parts')
+  return { success: true, data }
+}
+
+/**
+ * Create Purchase Requisition (PR) for Spare Part
+ */
+export async function createSparePartPR(payload: {
+  partId: string
+  partCode: string
+  partName: string
+  quantity: number
+  unit: string
+  estimatedCost: number
+  supplier?: string
+  reason: string
+  requesterName: string
+  dccFormRef?: string
+}): Promise<{ success: boolean; data?: any; error?: string }> {
+  try {
+    const supabase = createAdminClient()
+
+    // Generate PR Number format: PR-MT-YYMM-XXXX
+    const now = new Date()
+    const yy = String(now.getFullYear()).slice(-2)
+    const mm = String(now.getMonth() + 1).padStart(2, '0')
+    const dateStr = `${now.getDate().toString().padStart(2, '0')}/${mm}/${yy}`
+    const randSeq = Math.floor(1000 + Math.random() * 9000)
+    const prNo = `PR-MT${yy}${mm}-${randSeq}`
+
+    // Fetch current spare part to update latest PR note in specification
+    const { data: part } = await supabase
+      .from('maintenance_spare_parts')
+      .select('*')
+      .eq('id', payload.partId)
+      .single()
+
+    if (part) {
+      const currentSpec = part.specification || ''
+      // Append or replace latest PR line
+      const prLine = `Latest PR: ${prNo} ลว.${dateStr} (${payload.quantity} ${payload.unit})`
+      let updatedSpec = currentSpec
+      if (currentSpec.includes('Latest PR:')) {
+        updatedSpec = currentSpec.replace(/Latest PR:.*$/m, prLine)
+      } else {
+        updatedSpec = currentSpec ? `${currentSpec}\n${prLine}` : prLine
+      }
+
+      await supabase
+        .from('maintenance_spare_parts')
+        .update({
+          specification: updatedSpec,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', payload.partId)
+    }
+
+    revalidatePath('/maintenance/spare-parts')
+    return {
+      success: true,
+      data: {
+        prNo,
+        dateStr,
+        ...payload
+      }
+    }
+  } catch (err: any) {
+    console.error('Error creating spare part PR:', err)
+    return { success: false, error: err.message || 'Failed to create PR' }
+  }
+}
+
+/**
  * AI Maintenance Assistant: Find Similar Failures & Recommend Fixes
  */
 export async function getAISimilarFailures(params: {
