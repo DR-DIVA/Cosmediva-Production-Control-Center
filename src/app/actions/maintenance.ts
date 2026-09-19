@@ -6,6 +6,8 @@ import {
   MaintenanceMachine, 
   MaintenanceWorkOrder, 
   MaintenanceSparePart,
+  MaintenancePMPlan,
+  MaintenancePMAdjustmentLog,
   PriorityLevel,
   WorkOrderStatus 
 } from '@/types/maintenance'
@@ -205,6 +207,23 @@ export async function getMachine360(machineCode: string) {
   const recentFailures = completedJobs.filter((j: any) => new Date(j.reported_at) >= ninetyDaysAgo)
   const isRepeatedBadActor = recentFailures.length >= 2
 
+  // 5. Fetch PM Plan & PM Adjustment Logs
+  const { data: pmPlan } = await supabase
+    .from('maintenance_pm_plans')
+    .select('*')
+    .or(`machine_id.eq.${machine.id},machine_code.eq.${machine.machine_code}`)
+    .maybeSingle()
+
+  let pmAdjustmentLogs: any[] = []
+  if (pmPlan) {
+    const { data: logs } = await supabase
+      .from('maintenance_pm_adjustment_logs')
+      .select('*')
+      .eq('pm_plan_id', pmPlan.id)
+      .order('created_at', { ascending: false })
+    pmAdjustmentLogs = logs || []
+  }
+
   return {
     success: true,
     data: {
@@ -212,6 +231,8 @@ export async function getMachine360(machineCode: string) {
       activeWorkOrders: activeWOs || [],
       historyWorkOrders: completedJobs,
       partsConsumed: partsConsumed || [],
+      pmPlan: pmPlan as MaintenancePMPlan | null,
+      pmAdjustmentLogs: pmAdjustmentLogs,
       metrics: {
         totalBreakdowns,
         totalDowntimeMinutes: totalDowntimeMin,
@@ -931,3 +952,267 @@ export async function searchMaintenance(query: string) {
     }
   }
 }
+
+/**
+ * -----------------------------------------------------------------------------
+ * PREVENTIVE MAINTENANCE (PM) 2026 ENGINE & AUDITED ADJUSTMENTS
+ * -----------------------------------------------------------------------------
+ */
+
+/**
+ * Get all PM plans with filtering and adjustment log counts
+ */
+export async function getPMPlans(filters?: {
+  department?: string
+  frequency?: string
+  search?: string
+  status?: string
+}) {
+  const supabase = createAdminClient()
+  let query = supabase
+    .from('maintenance_pm_plans')
+    .select(`
+      *,
+      machine:maintenance_machines(id, machine_code, machine_name, category, department_code, production_area, status, criticality)
+    `)
+    .eq('is_active', true)
+    .order('plan_code', { ascending: true })
+
+  if (filters?.frequency && filters.frequency !== 'all') {
+    if (filters.frequency === 'PM1') {
+      query = query.eq('frequency_type', 'Monthly')
+    } else if (filters.frequency === 'PM2') {
+      query = query.eq('frequency_type', 'Every 2 Months')
+    } else if (filters.frequency === 'PM3') {
+      query = query.eq('frequency_type', 'Quarterly')
+    } else if (filters.frequency === 'PM4') {
+      query = query.eq('frequency_type', 'Every 4 Months')
+    } else if (filters.frequency === 'PM6') {
+      query = query.eq('frequency_type', 'BiAnnually')
+    } else if (filters.frequency === 'PM12') {
+      query = query.eq('frequency_type', 'Yearly')
+    } else {
+      query = query.eq('frequency_type', filters.frequency)
+    }
+  }
+
+  const { data, error } = await query
+
+  if (error) {
+    console.error('Error fetching PM plans:', error)
+    return { success: false, error: error.message, data: [] }
+  }
+
+  let plans: MaintenancePMPlan[] = data || []
+
+  // Filter by department if requested
+  if (filters?.department && filters.department !== 'all') {
+    const dept = filters.department.toUpperCase()
+    plans = plans.filter(p => (p as any).machine?.department_code === dept)
+  }
+
+  // Filter by search term
+  if (filters?.search && filters.search.trim()) {
+    const s = filters.search.trim().toLowerCase()
+    plans = plans.filter(p => 
+      p.machine_code.toLowerCase().includes(s) ||
+      p.machine_name.toLowerCase().includes(s) ||
+      p.plan_code.toLowerCase().includes(s)
+    )
+  }
+
+  // Fetch adjustment log counts
+  const { data: logCounts } = await supabase
+    .from('maintenance_pm_adjustment_logs')
+    .select('pm_plan_id')
+
+  const countMap: Record<string, number> = {}
+  if (logCounts) {
+    for (const log of logCounts) {
+      countMap[log.pm_plan_id] = (countMap[log.pm_plan_id] || 0) + 1
+    }
+  }
+
+  plans = plans.map(p => ({
+    ...p,
+    adjustment_count: countMap[p.id] || 0
+  }))
+
+  return { success: true, data: plans }
+}
+
+/**
+ * Get single PM Plan by ID or Machine Code with full adjustment logs
+ */
+export async function getPMPlanDetails(planIdOrCode: string) {
+  const supabase = createAdminClient()
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(planIdOrCode)
+
+  let query = supabase
+    .from('maintenance_pm_plans')
+    .select(`
+      *,
+      machine:maintenance_machines(*)
+    `)
+
+  if (isUUID) {
+    query = query.eq('id', planIdOrCode)
+  } else {
+    query = query.or(`plan_code.eq.${planIdOrCode},machine_code.eq.${planIdOrCode}`)
+  }
+
+  const { data, error } = await query.maybeSingle()
+
+  if (error || !data) {
+    return { success: false, error: error?.message || 'ไม่พบแผน PM นี้', data: null }
+  }
+
+  // Fetch adjustment logs
+  const { data: logs } = await supabase
+    .from('maintenance_pm_adjustment_logs')
+    .select('*')
+    .eq('pm_plan_id', data.id)
+    .order('created_at', { ascending: false })
+
+  return {
+    success: true,
+    data: {
+      ...data,
+      adjustment_logs: (logs || []) as MaintenancePMAdjustmentLog[]
+    }
+  }
+}
+
+/**
+ * Adjust PM Plan Frequency with MANDATORY reason requirement
+ */
+export async function adjustPMPlanFrequency(params: {
+  planId: string
+  newFrequencyType: string
+  newFrequencyInterval: number
+  newDueDate?: string
+  reason: string
+  adjustedByName?: string
+  adjustedById?: string
+}) {
+  const {
+    planId,
+    newFrequencyType,
+    newFrequencyInterval,
+    newDueDate,
+    reason,
+    adjustedByName = 'Supervisor',
+    adjustedById = null
+  } = params
+
+  // 1. STRICT REASON VALIDATION (Mandatory per factory requirement)
+  if (!reason || reason.trim().length < 5) {
+    return {
+      success: false,
+      error: '⚠️ กรุณาระบุเหตุผลในการปรับเปลี่ยนความถี่รอบ PM เสมอ (จำเป็นต้องระบุอย่างน้อย 5 ตัวอักษร เพื่อบันทึกประวัติการตรวจสอบ)'
+    }
+  }
+
+  const supabase = createAdminClient()
+
+  // 2. Fetch current plan details
+  const { data: currentPlan, error: fetchErr } = await supabase
+    .from('maintenance_pm_plans')
+    .select('*')
+    .eq('id', planId)
+    .single()
+
+  if (fetchErr || !currentPlan) {
+    return { success: false, error: 'ไม่พบข้อมูลแผน PM ที่ต้องการปรับแก้' }
+  }
+
+  // 3. Update the PM plan
+  const updatePayload: Record<string, any> = {
+    frequency_type: newFrequencyType,
+    frequency_interval: newFrequencyInterval,
+    updated_at: new Date().toISOString()
+  }
+
+  if (newDueDate) {
+    updatePayload.next_due_date = newDueDate
+  }
+
+  const { error: updateErr } = await supabase
+    .from('maintenance_pm_plans')
+    .update(updatePayload)
+    .eq('id', planId)
+
+  if (updateErr) {
+    console.error('Failed to update PM plan frequency:', updateErr)
+    return { success: false, error: `ไม่สามารถปรับเปลี่ยนความถี่ได้: ${updateErr.message}` }
+  }
+
+  // 4. Log the audited adjustment with mandatory reason
+  const { error: logErr } = await supabase
+    .from('maintenance_pm_adjustment_logs')
+    .insert({
+      pm_plan_id: currentPlan.id,
+      machine_id: currentPlan.machine_id,
+      machine_code: currentPlan.machine_code,
+      old_frequency_type: currentPlan.frequency_type,
+      new_frequency_type: newFrequencyType,
+      old_frequency_interval: currentPlan.frequency_interval,
+      new_frequency_interval: newFrequencyInterval,
+      old_due_date: currentPlan.next_due_date,
+      new_due_date: newDueDate || currentPlan.next_due_date,
+      reason: reason.trim(),
+      adjusted_by_name: adjustedByName,
+      adjusted_by_id: adjustedById
+    })
+
+  if (logErr) {
+    console.error('Failed to record PM adjustment audit log:', logErr)
+  }
+
+  // 5. Revalidate cache
+  revalidatePath('/maintenance/pm')
+  revalidatePath('/maintenance')
+  if (currentPlan.machine_id) {
+    revalidatePath(`/maintenance/machines/${currentPlan.machine_id}`)
+  }
+
+  return {
+    success: true,
+    message: `ปรับความถี่รอบ PM ของเครื่องจักร ${currentPlan.machine_code} เป็น ${newFrequencyType} เรียบร้อยแล้ว (บันทึกเหตุผลใน Audit Log)`
+  }
+}
+
+/**
+ * Get all PM adjustment audit logs across all machines or for a specific machine
+ */
+export async function getPMAdjustmentLogs(filters?: {
+  planId?: string
+  machineCode?: string
+  limit?: number
+}) {
+  const supabase = createAdminClient()
+  let query = supabase
+    .from('maintenance_pm_adjustment_logs')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (filters?.planId) {
+    query = query.eq('pm_plan_id', filters.planId)
+  }
+  if (filters?.machineCode) {
+    query = query.eq('machine_code', filters.machineCode)
+  }
+  if (filters?.limit) {
+    query = query.limit(filters.limit)
+  } else {
+    query = query.limit(50)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    return { success: false, error: error.message, data: [] }
+  }
+
+  return { success: true, data: (data || []) as MaintenancePMAdjustmentLog[] }
+}
+

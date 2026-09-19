@@ -15,7 +15,7 @@ export default function MaintenanceHubClient({ machines }: Props) {
 
   return (
     <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Card 1: Emergency / Fast Report */}
         <Link
           href="/maintenance/report"
@@ -95,6 +95,31 @@ export default function MaintenanceHubClient({ machines }: Props) {
           </div>
           <div className="flex items-center text-xs font-bold text-blue-700 pt-4 group-hover:translate-x-1 transition-transform">
             <span>เปิดกระดานควบคุม</span>
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </div>
+        </Link>
+
+        {/* Card 5: PM 2026 Plans & Audited Adjustments */}
+        <Link
+          href="/maintenance/pm"
+          className="group relative p-5 rounded-3xl bg-gradient-to-br from-indigo-900 to-slate-900 text-white shadow-md hover:shadow-xl hover:scale-[1.02] transition-all border border-indigo-700 flex flex-col justify-between sm:col-span-2 lg:col-span-1"
+        >
+          <div>
+            <div className="w-12 h-12 rounded-2xl bg-indigo-600/30 flex items-center justify-center text-indigo-300 mb-3 border border-indigo-500/50">
+              <span className="text-2xl">🗓️</span>
+            </div>
+            <h3 className="text-lg font-black tracking-tight flex items-center gap-1.5">
+              <span>แผน PM 2026</span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">
+                168 เครื่อง
+              </span>
+            </h3>
+            <p className="text-xs text-indigo-200 mt-1">
+              แผนบำรุงรักษาประจำปี • ปรับความถี่รอบ PM ยืดหยุ่นพร้อมบันทึกเหตุผลกำกับทุกครั้ง
+            </p>
+          </div>
+          <div className="flex items-center text-xs font-bold text-cyan-300 pt-4 group-hover:translate-x-1 transition-transform">
+            <span>ดูแผนและปรับรอบ PM</span>
             <ArrowRight className="w-4 h-4 ml-1" />
           </div>
         </Link>

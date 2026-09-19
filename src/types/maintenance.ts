@@ -227,19 +227,40 @@ export interface MaintenancePMPlan {
   machine_id: string | null
   machine_code: string
   machine_name: string
-  frequency_type: 'Daily' | 'Weekly' | 'Monthly' | 'Quarterly' | 'BiAnnually' | 'Yearly' | 'Meter_Hours'
+  frequency_type: 'Daily' | 'Weekly' | 'Monthly' | 'Every 2 Months' | 'Quarterly' | 'Every 4 Months' | 'BiAnnually' | 'Yearly' | 'Meter_Hours' | string
   frequency_interval: number
   estimated_minutes: number
   checklist_template: { item: string; standard: string; method: string }[]
   safety_requirements: string | null
   required_tools: string | null
   required_parts: string | null
+  schedule_months?: string[]
   is_active: boolean
   last_completed_at: string | null
   next_due_date: string | null
   created_at: string
   updated_at: string
+  machine?: MaintenanceMachine
+  adjustment_count?: number
 }
+
+export interface MaintenancePMAdjustmentLog {
+  id: string
+  pm_plan_id: string
+  machine_id: string | null
+  machine_code: string
+  old_frequency_type: string | null
+  new_frequency_type: string
+  old_frequency_interval: number | null
+  new_frequency_interval: number
+  old_due_date: string | null
+  new_due_date: string | null
+  reason: string
+  adjusted_by_name: string
+  adjusted_by_id: string | null
+  created_at: string
+}
+
 
 export interface MaintenanceNotification {
   id: string

@@ -11,7 +11,8 @@ import {
   Package, 
   BarChart3, 
   Search,
-  HardHat
+  HardHat,
+  Calendar
 } from 'lucide-react'
 
 interface MaintenanceHeaderProps {
@@ -26,6 +27,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
     { label: 'ภาพรวมระบบ', href: '/maintenance', icon: Cpu },
     { label: 'โหมดช่างซ่อม', href: '/maintenance/technician', icon: HardHat, badge: 'Tech' },
     { label: 'บอร์ดงานซ่อม', href: '/maintenance/work-orders', icon: KanbanSquare },
+    { label: 'แผน PM 2026', href: '/maintenance/pm', icon: Calendar, badge: 'PM' },
     { label: 'ทะเบียนเครื่องจักร', href: '/maintenance/machines', icon: Wrench },
     { label: 'คลังอะไหล่', href: '/maintenance/spare-parts', icon: Package },
     { label: 'แดชบอร์ด KPI', href: '/maintenance/dashboard', icon: BarChart3 },

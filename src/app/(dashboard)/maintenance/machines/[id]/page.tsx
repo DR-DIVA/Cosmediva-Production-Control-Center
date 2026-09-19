@@ -21,6 +21,7 @@ import {
   History
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import MachinePMSection from '@/components/maintenance/MachinePMSection'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export default async function Machine360Page({ params }: Props) {
     )
   }
 
-  const { machine, activeWorkOrders, historyWorkOrders, partsConsumed, metrics } = res.data
+  const { machine, activeWorkOrders, historyWorkOrders, partsConsumed, pmPlan, pmAdjustmentLogs, metrics } = res.data
 
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
@@ -232,6 +233,13 @@ export default async function Machine360Page({ params }: Props) {
           </div>
         </div>
       )}
+
+      {/* PREVENTIVE MAINTENANCE SECTION (PM 2026) */}
+      <MachinePMSection
+        pmPlan={pmPlan}
+        pmAdjustmentLogs={pmAdjustmentLogs || []}
+        machineCode={machine.machine_code}
+      />
 
       {/* MAINTENANCE HISTORY TIMELINE */}
       <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
