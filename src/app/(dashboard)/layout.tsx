@@ -35,7 +35,7 @@ export default function DashboardLayout({
       <div 
         className={`hidden h-full md:flex md:flex-col md:fixed md:inset-y-0 z-[80] bg-[#2D2721] transition-all duration-300 ${
           isCollapsed ? 'md:w-16' : 'md:w-64 lg:w-72'
-        }`}
+        } print:hidden`}
       >
         <Sidebar isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
       </div>
@@ -44,10 +44,10 @@ export default function DashboardLayout({
       <div 
         className={`flex flex-col min-h-screen transition-all duration-300 w-full max-w-full ${
           isCollapsed ? 'md:pl-16' : 'md:pl-64 lg:pl-72'
-        }`}
+        } print:pl-0 print:m-0 print:w-full print:max-w-none`}
       >
         {/* Top Header */}
-        <header className="h-14 bg-white border-b border-[#D4AF37]/30 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-[70] shadow-xs">
+        <header className="h-14 bg-white border-b border-[#D4AF37]/30 flex items-center justify-between px-4 sm:px-6 sticky top-0 z-[70] shadow-xs print:hidden">
           
           <div className="flex items-center gap-2">
             {/* Mobile Hamburger Menu (Full Page Navigation) */}
@@ -87,7 +87,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <main className="flex-1 bg-[#F8F6F0] flex flex-col w-full max-w-full p-2 sm:p-4 md:p-6 overflow-x-clip">
+        <main className="flex-1 bg-[#F8F6F0] flex flex-col w-full max-w-full p-2 sm:p-4 md:p-6 overflow-x-clip print:p-0 print:m-0 print:bg-white print:overflow-visible print:w-full">
           {children}
         </main>
       </div>
