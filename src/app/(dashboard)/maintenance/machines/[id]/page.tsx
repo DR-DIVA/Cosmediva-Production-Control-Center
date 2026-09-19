@@ -62,6 +62,13 @@ export default async function Machine360Page({ params }: Props) {
         </Link>
 
         <div className="flex items-center gap-2">
+          <a
+            href="#pm-section"
+            className="inline-flex items-center gap-1.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-1.5 rounded-xl shadow-xs transition-colors"
+          >
+            <Calendar className="w-3.5 h-3.5" />
+            📋 ตรวจเช็ค PM ประจำรอบ
+          </a>
           <Link
             href={`/maintenance/report/${machine.machine_code}`}
             className="inline-flex items-center gap-1.5 text-xs font-bold bg-red-600 hover:bg-red-700 text-white px-3.5 py-1.5 rounded-xl shadow-xs transition-colors"

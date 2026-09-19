@@ -2,7 +2,7 @@ import React from 'react'
 import { getMachines, getMachine360 } from '@/app/actions/maintenance'
 import FastReportForm from '@/components/maintenance/FastReportForm'
 import Link from 'next/link'
-import { ChevronLeft, QrCode, Package, History } from 'lucide-react'
+import { ChevronLeft, QrCode, Package, History, FileCheck } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -60,7 +60,15 @@ export default async function MachineDirectReportPage({ params }: Props) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <Link
+                href={`/maintenance/machines/${initialMachine.machine_code}#pm-section`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs transition"
+              >
+                <FileCheck className="w-3.5 h-3.5 text-emerald-200" />
+                <span>📋 ตรวจเช็ค PM ประจำรอบ</span>
+              </Link>
+
               <Link
                 href={`/maintenance/spare-parts?search=${initialMachine.machine_code}`}
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl transition"
@@ -74,7 +82,7 @@ export default async function MachineDirectReportPage({ params }: Props) {
                 className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl transition"
               >
                 <History className="w-3.5 h-3.5 text-stone-600" />
-                <span>ประวัติ & รอบ PM</span>
+                <span>สเปก & ประวัติ 360°</span>
               </Link>
             </div>
           </div>

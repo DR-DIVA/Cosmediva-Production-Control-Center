@@ -1910,5 +1910,80 @@ export async function submitPMChecksheet(params: {
   }
 }
 
+/**
+ * Dispatch / Assign a technician to a PM Plan, creating an ASSIGNED PM Work Order
+ */
+export async function dispatchPMWorkOrder(params: {
+  planId: string
+  technicianName: string
+  targetDate?: string
+  priority?: string
+  notes?: string
+  assignedByName?: string
+}) {
+  const supabase = createAdminClient()
+  const now = new Date()
 
+  // 1. Fetch PM Plan
+  const { data: plan, error: pErr } = await supabase
+    .from('maintenance_pm_plans')
+    .select('*, machine:maintenance_machines(*)')
+    .eq('id', params.planId)
+    .single()
+
+  if (pErr || !plan) {
+    return { success: false, error: 'ไม่พบข้อมูลแผน PM' }
+  }
+
+  const woNumber = `WO-PM-${plan.machine_code}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}-${String(Math.floor(100 + Math.random() * 900))}`
+
+  const { data: wo, error: woErr } = await supabase
+    .from('maintenance_work_orders')
+    .insert({
+      wo_number: woNumber,
+      machine_id: plan.machine_id,
+      machine_code: plan.machine_code,
+      machine_name: plan.machine_name,
+      requester_name: params.assignedByName || 'หัวหน้าฝ่ายซ่อมบำรุง',
+      priority: params.priority || 'P3_NORMAL',
+      status: 'ASSIGNED',
+      symptom_category: 'Preventive Maintenance',
+      symptom_description: `งานบำรุงรักษาเชิงป้องกันตามแผน ${plan.plan_code} (${plan.frequency_type}) - กำหนดเข้าทำ: ${params.targetDate || plan.next_due_date || 'ตามรอบ'}`,
+      production_impact: 'Production can continue',
+      is_emergency_breakdown: false,
+      assigned_technician_name: params.technicianName,
+      reported_at: now.toISOString(),
+      acknowledged_at: now.toISOString(),
+      corrective_action: `ตรวจเช็คตามรายการ PM Checklist (${Array.isArray(plan.checklist_template) ? plan.checklist_template.length : 0} รายการ). คำสั่งการ: ${params.notes || 'ตรวจเช็คตามมาตรฐาน PM ประจำเดือน'}`,
+      problem_category: 'Preventive Maintenance'
+    })
+    .select()
+    .single()
+
+  if (woErr) {
+    return { success: false, error: woErr.message }
+  }
+
+  // Also update responsible technician on machine if needed
+  if (plan.machine_id) {
+    await supabase
+      .from('maintenance_machines')
+      .update({ responsible_technician_name: params.technicianName, updated_at: now.toISOString() })
+      .eq('id', plan.machine_id)
+  }
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/pm')
+  revalidatePath('/maintenance/technician')
+  revalidatePath('/maintenance/work-orders')
+  if (plan.machine_code) {
+    revalidatePath(`/maintenance/machines/${plan.machine_code}`)
+  }
+
+  return {
+    success: true,
+    data: wo,
+    message: `มอบหมายงาน PM เครื่อง ${plan.machine_code} ให้ ${params.technicianName} สำเร็จ! ใบสั่งงานเลขที่ ${woNumber}`
+  }
+}
 

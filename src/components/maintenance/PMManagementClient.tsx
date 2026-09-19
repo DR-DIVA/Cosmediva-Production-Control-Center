@@ -4,6 +4,8 @@ import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
+import AssignPMTechnicianModal from '@/components/maintenance/AssignPMTechnicianModal'
+import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -24,6 +26,10 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
   const [selectedFreq, setSelectedFreq] = useState('ALL')
   const [selectedPlanForAdjust, setSelectedPlanForAdjust] = useState<MaintenancePMPlan | null>(null)
   const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false)
+  const [selectedPlanForAssign, setSelectedPlanForAssign] = useState<MaintenancePMPlan | null>(null)
+  const [isAssignModalOpen, setIsAssignModalOpen] = useState(false)
+  const [selectedPlanForExecute, setSelectedPlanForExecute] = useState<MaintenancePMPlan | null>(null)
+  const [isExecuteModalOpen, setIsExecuteModalOpen] = useState(false)
 
   // Departments list
   const departments = useMemo(() => {
@@ -77,6 +83,16 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
   const handleOpenAdjustModal = (plan: MaintenancePMPlan) => {
     setSelectedPlanForAdjust(plan)
     setIsAdjustModalOpen(true)
+  }
+
+  const handleOpenAssignModal = (plan: MaintenancePMPlan) => {
+    setSelectedPlanForAssign(plan)
+    setIsAssignModalOpen(true)
+  }
+
+  const handleOpenExecuteModal = (plan: MaintenancePMPlan) => {
+    setSelectedPlanForExecute(plan)
+    setIsExecuteModalOpen(true)
   }
 
   const handleAdjustmentSuccess = () => {
@@ -309,17 +325,34 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between pt-1 gap-2">
-                      <span className="text-[11px] text-stone-500">
-                        {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} รายการตรวจเช็ค` : 'ตามมาตรฐาน'}
-                      </span>
-                      <button
-                        onClick={() => handleOpenAdjustModal(plan)}
-                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#D4AF37] hover:bg-amber-600 text-stone-950 transition shadow-xs inline-flex items-center gap-1.5 active:scale-95 shrink-0"
-                      >
-                        <span>⚙️</span>
-                        <span>ปรับความถี่รอบ PM</span>
-                      </button>
+                    <div className="pt-2 border-t border-stone-200/80 space-y-2">
+                      <div className="flex items-center justify-between text-[11px] text-stone-500">
+                        <span>รายการตรวจ: {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} ข้อ` : 'ตามมาตรฐาน'}</span>
+                        <span className="font-mono text-cyan-700 font-bold">{plan.plan_code}</span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          onClick={() => handleOpenExecuteModal(plan)}
+                          className="flex-1 min-w-[110px] py-1.5 px-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs inline-flex items-center justify-center gap-1 active:scale-95"
+                        >
+                          <span>🚀 ตรวจ PM</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenAssignModal(plan)}
+                          className="flex-1 min-w-[110px] py-1.5 px-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-2xs inline-flex items-center justify-center gap-1 active:scale-95"
+                        >
+                          <span>👷 มอบหมาย</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleOpenAdjustModal(plan)}
+                          className="py-1.5 px-2.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-700 hover:text-white border border-stone-200 transition shadow-2xs inline-flex items-center justify-center gap-1 active:scale-95"
+                        >
+                          <span>⚙️ ปรับรอบ</span>
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
@@ -338,7 +371,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   <th className="p-3.5 min-w-[150px]">ความถี่รอบ PM</th>
                   <th className="p-3.5 min-w-[110px]">กำหนดการถัดไป</th>
                   <th className="p-3.5 min-w-[140px]">รายการตรวจสอบ (Checklist)</th>
-                  <th className="p-3.5 pr-5 text-right min-w-[120px]">การจัดการ</th>
+                  <th className="p-3.5 pr-5 text-right min-w-[260px]">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -408,13 +441,31 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         </td>
 
                         <td className="p-3.5 pr-5 text-right">
-                          <button
-                            onClick={() => handleOpenAdjustModal(plan)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 hover:border-stone-900 transition shadow-2xs inline-flex items-center gap-1.5 whitespace-nowrap"
-                          >
-                            <span>⚙️</span>
-                            <span>ปรับความถี่</span>
-                          </button>
+                          <div className="inline-flex items-center justify-end gap-1.5 flex-nowrap">
+                            <button
+                              onClick={() => handleOpenExecuteModal(plan)}
+                              title="เปิดแบบฟอร์มตรวจเช็ค PM หน้างาน (E-Form)"
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-2xs inline-flex items-center gap-1 whitespace-nowrap active:scale-95"
+                            >
+                              <span>🚀 ตรวจ PM</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenAssignModal(plan)}
+                              title="มอบหมายงาน PM ให้ช่างพร้อมออกใบสั่งซ่อมบำรุง"
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white transition shadow-2xs inline-flex items-center gap-1 whitespace-nowrap active:scale-95"
+                            >
+                              <span>👷 มอบหมาย</span>
+                            </button>
+
+                            <button
+                              onClick={() => handleOpenAdjustModal(plan)}
+                              title="ปรับเปลี่ยนความถี่รอบ PM"
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 hover:border-stone-900 transition shadow-2xs inline-flex items-center gap-1 whitespace-nowrap active:scale-95"
+                            >
+                              <span>⚙️ ปรับ</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -462,7 +513,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                       {m}
                     </th>
                   ))}
-                  <th className="p-3 pr-5 text-right min-w-[100px]">จัดการ</th>
+                  <th className="p-3 pr-5 text-right min-w-[170px]">จัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100 font-mono">
@@ -516,12 +567,29 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                       })}
 
                       <td className="p-3 pr-5 text-right font-sans">
-                        <button
-                          onClick={() => handleOpenAdjustModal(plan)}
-                          className="px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 font-bold transition"
-                        >
-                          ปรับ
-                        </button>
+                        <div className="inline-flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleOpenExecuteModal(plan)}
+                            title="เปิดแบบฟอร์มตรวจเช็ค PM หน้างาน"
+                            className="px-2 py-1 rounded-lg text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold transition whitespace-nowrap active:scale-95"
+                          >
+                            🚀 ตรวจ
+                          </button>
+                          <button
+                            onClick={() => handleOpenAssignModal(plan)}
+                            title="มอบหมายงาน PM ให้ช่างพร้อมออกใบสั่งงาน"
+                            className="px-2 py-1 rounded-lg text-xs bg-blue-600 hover:bg-blue-700 text-white font-bold transition whitespace-nowrap active:scale-95"
+                          >
+                            👷 มอบหมาย
+                          </button>
+                          <button
+                            onClick={() => handleOpenAdjustModal(plan)}
+                            title="ปรับความถี่รอบ PM"
+                            className="px-2 py-1 rounded-lg text-xs bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 font-bold transition whitespace-nowrap active:scale-95"
+                          >
+                            ⚙️ ปรับ
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -618,6 +686,22 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
         isOpen={isAdjustModalOpen}
         onClose={() => setIsAdjustModalOpen(false)}
         plan={selectedPlanForAdjust}
+        onSuccess={handleAdjustmentSuccess}
+      />
+
+      {/* Assign Technician Modal */}
+      <AssignPMTechnicianModal
+        isOpen={isAssignModalOpen}
+        onClose={() => setIsAssignModalOpen(false)}
+        plan={selectedPlanForAssign}
+        onSuccess={handleAdjustmentSuccess}
+      />
+
+      {/* Execute PM Checksheet Modal */}
+      <ExecutePMChecksheetModal
+        isOpen={isExecuteModalOpen}
+        onClose={() => setIsExecuteModalOpen(false)}
+        plan={selectedPlanForExecute}
         onSuccess={handleAdjustmentSuccess}
       />
     </div>

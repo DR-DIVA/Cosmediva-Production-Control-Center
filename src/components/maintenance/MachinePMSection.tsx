@@ -3,7 +3,8 @@
 import React, { useState } from 'react'
 import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
-import { Calendar, ShieldCheck, History, Sliders } from 'lucide-react'
+import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
+import { Calendar, ShieldCheck, History, Sliders, FileCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -15,6 +16,7 @@ interface Props {
 export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode }: Props) {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isExecuteModalOpen, setIsExecuteModalOpen] = useState(false)
 
   if (!pmPlan) {
     return (
@@ -35,8 +37,8 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
   }
 
   return (
-    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-5">
-      {/* Header with adjust button */}
+    <div id="pm-section" className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-5 scroll-mt-6">
+      {/* Header with action buttons */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-stone-100">
         <div className="flex items-center gap-2">
           <Calendar className="w-5 h-5 text-[#D4AF37]" />
@@ -50,13 +52,23 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
           </div>
         </div>
 
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#2A2521] text-white hover:bg-[#3A332B] transition-colors shadow-sm self-start sm:self-auto"
-        >
-          <Sliders className="w-4 h-4 text-[#D4AF37]" />
-          <span>⚙️ ปรับความถี่รอบ PM (พร้อมบันทึกเหตุผล)</span>
-        </button>
+        <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
+          <button
+            onClick={() => setIsExecuteModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition shadow-sm active:scale-95"
+          >
+            <FileCheck className="w-4 h-4 text-emerald-100" />
+            <span>📋 บันทึกตรวจเช็ค PM ประจำรอบ (E-Form)</span>
+          </button>
+
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#2A2521] text-white hover:bg-[#3A332B] transition-colors shadow-sm"
+          >
+            <Sliders className="w-4 h-4 text-[#D4AF37]" />
+            <span>⚙️ ปรับความถี่รอบ PM</span>
+          </button>
+        </div>
       </div>
 
       {/* Plan Status & Interval Info */}
@@ -153,10 +165,17 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
         </div>
       )}
 
-      {/* Modal */}
+      {/* Modals */}
       <AdjustPMFrequencyModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
+        plan={pmPlan}
+        onSuccess={() => router.refresh()}
+      />
+
+      <ExecutePMChecksheetModal
+        isOpen={isExecuteModalOpen}
+        onClose={() => setIsExecuteModalOpen(false)}
         plan={pmPlan}
         onSuccess={() => router.refresh()}
       />

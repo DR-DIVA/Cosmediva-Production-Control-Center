@@ -28,7 +28,7 @@ interface ExecutePMChecksheetModalProps {
   isOpen: boolean
   onClose: () => void
   plan: MaintenancePMPlan | null
-  technicianName: string
+  technicianName?: string
   onSuccess: () => void
 }
 
@@ -43,6 +43,9 @@ export default function ExecutePMChecksheetModal({
 
   const checklistItems = Array.isArray(plan.checklist_template) ? plan.checklist_template : []
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
+
+  const [execTechName, setExecTechName] = useState(technicianName || 'ช่างสมหมาย เก่งการช่าง')
+  const [isEditingTech, setIsEditingTech] = useState(false)
 
   // Results state for each checklist item
   const [results, setResults] = useState<{ [index: number]: { status: 'PASS' | 'REMARK' | 'FAIL'; remark: string } }>(
@@ -102,7 +105,7 @@ export default function ExecutePMChecksheetModal({
 
       const res = await submitPMChecksheet({
         planId: plan.id,
-        technicianName,
+        technicianName: execTechName,
         executionNotes: generalNotes,
         checklistResults: checklistPayload,
         overallStatus,
@@ -145,11 +148,39 @@ export default function ExecutePMChecksheetModal({
               </DialogDescription>
             </div>
 
-            <div className="text-right">
+            <div className="text-left sm:text-right">
               <span className="text-[11px] text-stone-400 block">ช่างผู้ตรวจเช็ค:</span>
-              <span className="font-bold text-xs text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg">
-                {technicianName}
-              </span>
+              {isEditingTech ? (
+                <div className="flex items-center gap-1 mt-1">
+                  <Input
+                    type="text"
+                    value={execTechName}
+                    onChange={e => setExecTechName(e.target.value)}
+                    className="h-7 text-xs w-48"
+                    placeholder="พิมพ์ชื่อช่างผู้ตรวจ"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTech(false)}
+                    className="text-[11px] font-bold px-2 py-1 bg-stone-900 text-white rounded-md"
+                  >
+                    ตกลง
+                  </button>
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 mt-0.5">
+                  <span className="font-bold text-xs text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg">
+                    {execTechName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTech(true)}
+                    className="text-[10px] text-cyan-700 hover:underline font-medium"
+                  >
+                    (เปลี่ยน)
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </DialogHeader>
