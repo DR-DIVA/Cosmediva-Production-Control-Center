@@ -15,6 +15,7 @@ import {
   MachineRequestStatus,
   MaintenanceMachineAuditLog
 } from '@/types/maintenance'
+import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
 
 /**
  * Generate sequential WO number: WO-YYYY-XXXXXX
@@ -784,6 +785,13 @@ export async function createRepairRequest(payload: {
       link_url: `/maintenance/technician`
     })
 
+  // 9. Dispatch LINE notification in background
+  dispatchWorkOrderLineAlert({
+    eventType: 'NEW_REPORT',
+    workOrder: newWO,
+    machine
+  }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
+
   revalidatePath('/maintenance')
   revalidatePath('/maintenance/work-orders')
   revalidatePath('/maintenance/technician')
@@ -1029,6 +1037,17 @@ export async function transitionWorkOrderStatus(payload: {
       changed_by_name: payload.changed_by_name,
       notes: payload.notes || `เปลี่ยนสถานะเป็น ${updateFields.status}`
     })
+
+  // Dispatch LINE notification in background
+  if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CLOSED'].includes(payload.to_status)) {
+    dispatchWorkOrderLineAlert({
+      eventType: (payload.to_status === 'COMPLETED' || payload.to_status === 'CLOSED') ? 'CLOSED' : 'STATUS_CHANGED',
+      workOrder: updatedWO,
+      machine: wo.machine,
+      changedByName: payload.changed_by_name,
+      notes: payload.notes || payload.corrective_action
+    }).catch(err => console.error('[LINE] Dispatch status transition error:', err))
+  }
 
   revalidatePath('/maintenance')
   revalidatePath('/maintenance/work-orders')

@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { 
@@ -13,8 +13,10 @@ import {
   Search,
   HardHat,
   Calendar,
-  QrCode
+  QrCode,
+  MessageSquare
 } from 'lucide-react'
+import LineSettingsModal from '@/components/maintenance/LineSettingsModal'
 
 interface MaintenanceHeaderProps {
   onOpenReport?: () => void
@@ -23,6 +25,7 @@ interface MaintenanceHeaderProps {
 
 export default function MaintenanceHeader({ onOpenReport, onOpenQR }: MaintenanceHeaderProps) {
   const pathname = usePathname()
+  const [isLineOpen, setIsLineOpen] = useState(false)
 
   const navItems = [
     { 
@@ -122,6 +125,17 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
             <HardHat className="w-4 h-4" />
             โหมดช่างซ่อม
           </Link>
+
+          {/* LINE Notification Settings Button */}
+          <button
+            type="button"
+            onClick={() => setIsLineOpen(true)}
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md transition-all text-sm active:scale-95 border border-[#06C755]/40"
+            title="ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)"
+          >
+            <MessageSquare className="w-4 h-4 fill-white" />
+            <span>ตั้งค่า LINE</span>
+          </button>
         </div>
       </div>
 
@@ -170,6 +184,12 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
           })}
         </div>
       </div>
+
+      {/* LINE Notification Settings Modal */}
+      <LineSettingsModal
+        isOpen={isLineOpen}
+        onClose={() => setIsLineOpen(false)}
+      />
     </div>
   )
 }
