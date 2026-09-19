@@ -327,16 +327,25 @@ export async function deleteMachine(id: string) {
 /**
  * Get complete Machine 360° Profile
  */
-export async function getMachine360(machineCode: string) {
+export async function getMachine360(identifier: string) {
   const supabase = createAdminClient()
 
-  // 1. Fetch Machine
-  const { data: machine, error: mErr } = await supabase
+  // 1. Fetch Machine by UUID (id) or Machine Code
+  const decoded = decodeURIComponent(identifier).trim()
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(decoded)
+
+  let query = supabase
     .from('maintenance_machines')
     .select('*')
-    .eq('machine_code', machineCode)
     .eq('is_deleted', false)
-    .single()
+
+  if (isUuid) {
+    query = query.eq('id', decoded)
+  } else {
+    query = query.eq('machine_code', decoded)
+  }
+
+  const { data: machine, error: mErr } = await query.maybeSingle()
 
   if (mErr || !machine) {
     return { success: false, error: mErr?.message || 'ไม่พบเครื่องจักร' }

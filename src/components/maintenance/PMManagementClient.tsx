@@ -285,7 +285,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                           <div className="flex flex-col">
                             <span className="font-mono text-xs text-cyan-700 font-bold">{plan.plan_code}</span>
                             <Link
-                              href={machine?.id ? `/maintenance/machines/${machine.id}` : '#'}
+                              href={`/maintenance/machines/${plan.machine_code || machine?.machine_code || machine?.id || ''}`}
                               className="font-bold text-stone-900 hover:text-cyan-700 transition mt-0.5 inline-flex items-center gap-1 font-mono"
                             >
                               <span>{plan.machine_code}</span>
@@ -421,7 +421,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   return (
                     <tr key={plan.id} className="hover:bg-stone-50 transition">
                       <td className="p-3 pl-5 font-bold text-stone-900 font-sans">
-                        <Link href={`/maintenance/machines/${(plan as any).machine?.id || ''}`} className="hover:text-cyan-700">
+                        <Link href={`/maintenance/machines/${plan.machine_code || (plan as any).machine?.machine_code || (plan as any).machine?.id || ''}`} className="hover:text-cyan-700">
                           {plan.machine_code}
                         </Link>
                       </td>
