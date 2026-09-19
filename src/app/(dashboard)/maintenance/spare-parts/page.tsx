@@ -125,8 +125,54 @@ export default function SparePartsPage() {
 
       {/* Parts Table */}
       <div className="bg-white rounded-3xl border border-stone-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+        {/* Mobile Cards (< md) */}
+        <div className="block md:hidden divide-y divide-stone-150">
+          {parts.length === 0 ? (
+            <div className="py-12 text-center text-stone-400">
+              ไม่พบรายการอะไหล่ที่ค้นหา
+            </div>
+          ) : (
+            parts.map(p => {
+              const isLow = p.stock_qty <= p.min_stock
+              return (
+                <div key={p.id} className="p-4 space-y-2.5 bg-white hover:bg-stone-50/70 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="font-mono font-bold text-xs text-stone-500 block">{p.part_code}</span>
+                      <h4 className="font-bold text-sm text-stone-900">{p.part_name}</h4>
+                      <p className="text-[11px] text-stone-500">{p.specification || p.model}</p>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full font-bold text-xs shrink-0 ${
+                      isLow ? 'bg-red-100 text-red-800 border border-red-300 animate-pulse' : 'bg-stone-100 text-stone-800'
+                    }`}>
+                      {p.stock_qty} {p.unit}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px] bg-stone-50 p-2.5 rounded-xl border border-stone-150">
+                    <div>
+                      <span className="text-stone-400 block">หมวด & แบรนด์:</span>
+                      <span className="font-medium text-stone-700">{p.category} • {p.brand || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block">ตำแหน่งจัดเก็บ:</span>
+                      <span className="font-medium text-stone-700">{p.storage_location || 'คลังกลาง'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1">
+                    <span className="text-stone-400 text-[11px]">Min: {p.min_stock} / Max: {p.max_stock}</span>
+                    <span className="font-bold text-[#8B7355]">ราคาเฉลี่ย: ฿{Number(p.average_cost).toLocaleString()}</span>
+                  </div>
+                </div>
+              )
+            })
+          )}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-left text-xs min-w-[850px]">
             <thead className="bg-stone-50 border-b border-stone-200 text-stone-500">
               <tr>
                 <th className="py-3 px-4 font-bold">รหัสอะไหล่</th>

@@ -150,12 +150,12 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
       {/* Tabs & Search Filter Controls */}
       <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-stone-100">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-100">
           {/* Tabs */}
-          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100 rounded-xl border border-stone-200/60 text-xs sm:text-sm">
+          <div className="flex items-center gap-1.5 p-1 bg-stone-100 rounded-xl border border-stone-200/60 text-xs sm:text-sm overflow-x-auto no-scrollbar max-w-full">
             <button
               onClick={() => setActiveTab('list')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
                 activeTab === 'list'
                   ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
@@ -167,7 +167,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
             <button
               onClick={() => setActiveTab('matrix')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
                 activeTab === 'matrix'
                   ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
@@ -179,7 +179,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
             <button
               onClick={() => setActiveTab('logs')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
                 activeTab === 'logs'
                   ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
                   : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
@@ -191,14 +191,14 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
           </div>
 
           {/* Quick Notice */}
-          <div className="text-xs text-stone-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+          <div className="text-xs text-stone-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 shrink-0 self-start lg:self-center">
             <span className="text-amber-700 font-bold">⚠️ บันทึกตรวจสอบ:</span>
             <span>ระบบกำหนดให้ระบุเหตุผลทุกครั้งที่ปรับแก้ความถี่รอบ PM</span>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Search Box */}
           <div>
             <label className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
@@ -256,17 +256,92 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
       {/* TAB 1: LIST VIEW */}
       {activeTab === 'list' && (
         <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs text-stone-700">
+          
+          {/* Mobile Card List (Viewports < md: Tablet portrait & Mobile) */}
+          <div className="block md:hidden divide-y divide-stone-150">
+            {filteredPlans.length === 0 ? (
+              <div className="p-8 text-center text-stone-400 font-medium">
+                ไม่พบข้อมูลแผน PM ตามเงื่อนไขที่เลือก
+              </div>
+            ) : (
+              filteredPlans.map((plan) => {
+                const machine = (plan as any).machine
+                return (
+                  <div key={plan.id} className="p-4 space-y-3 bg-white hover:bg-stone-50/70 transition">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <span className="font-mono text-xs text-cyan-700 font-bold block">{plan.plan_code}</span>
+                        <Link
+                          href={`/maintenance/machines/${plan.machine_code || machine?.machine_code || machine?.id || ''}`}
+                          className="font-bold text-stone-900 hover:text-cyan-700 transition inline-flex items-center gap-1 font-mono text-sm"
+                        >
+                          <span>{plan.machine_code}</span>
+                          <span className="text-xs text-stone-400">↗</span>
+                        </Link>
+                        <h4 className="text-xs font-bold text-stone-900 mt-0.5">{plan.machine_name}</h4>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono shrink-0 ${
+                          plan.frequency_type === 'Monthly'
+                            ? 'bg-cyan-50 border border-cyan-300 text-cyan-800'
+                            : plan.frequency_type === 'Every 2 Months'
+                            ? 'bg-blue-50 border border-blue-300 text-blue-800'
+                            : plan.frequency_type === 'Quarterly'
+                            ? 'bg-indigo-50 border border-indigo-300 text-indigo-800'
+                            : 'bg-amber-50 border border-amber-300 text-amber-800'
+                        }`}>
+                          {plan.frequency_type} ({plan.frequency_interval} ด.)
+                        </span>
+                        {plan.adjustment_count && plan.adjustment_count > 0 ? (
+                          <span className="px-1.5 py-0.2 rounded text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold">
+                            🔄 ปรับ {plan.adjustment_count}x
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-[11px] bg-stone-50 p-2.5 rounded-xl border border-stone-200">
+                      <div>
+                        <span className="text-stone-400 block">แผนก / พื้นที่:</span>
+                        <span className="font-bold text-stone-700">{machine?.department_code || 'PD'} • {machine?.production_area || 'Factory'}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-400 block">กำหนดการถัดไป:</span>
+                        <span className="font-mono font-bold text-stone-700">{plan.next_due_date || 'ตามรอบปี'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 gap-2">
+                      <span className="text-[11px] text-stone-500">
+                        {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} รายการตรวจเช็ค` : 'ตามมาตรฐาน'}
+                      </span>
+                      <button
+                        onClick={() => handleOpenAdjustModal(plan)}
+                        className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#D4AF37] hover:bg-amber-600 text-stone-950 transition shadow-xs inline-flex items-center gap-1.5 active:scale-95 shrink-0"
+                      >
+                        <span>⚙️</span>
+                        <span>ปรับความถี่รอบ PM</span>
+                      </button>
+                    </div>
+                  </div>
+                )
+              })
+            )}
+          </div>
+
+          {/* Desktop Table View (Viewports >= md) */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs text-stone-700 min-w-[880px]">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase text-stone-600 tracking-wider">
-                  <th className="p-3.5 pl-5">รหัสแผน / เครื่องจักร</th>
-                  <th className="p-3.5">ชื่อเครื่องจักร</th>
-                  <th className="p-3.5">แผนก / สถานที่</th>
-                  <th className="p-3.5">ความถี่รอบ PM</th>
-                  <th className="p-3.5">กำหนดการถัดไป</th>
-                  <th className="p-3.5">รายการตรวจสอบ (Checklist)</th>
-                  <th className="p-3.5 pr-5 text-right">การจัดการ</th>
+                  <th className="p-3.5 pl-5 min-w-[140px]">รหัสแผน / เครื่องจักร</th>
+                  <th className="p-3.5 min-w-[200px]">ชื่อเครื่องจักร</th>
+                  <th className="p-3.5 min-w-[120px]">แผนก / สถานที่</th>
+                  <th className="p-3.5 min-w-[150px]">ความถี่รอบ PM</th>
+                  <th className="p-3.5 min-w-[110px]">กำหนดการถัดไป</th>
+                  <th className="p-3.5 min-w-[140px]">รายการตรวจสอบ (Checklist)</th>
+                  <th className="p-3.5 pr-5 text-right min-w-[120px]">การจัดการ</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-100">
@@ -349,7 +424,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         <td className="p-3.5 pr-5 text-right">
                           <button
                             onClick={() => handleOpenAdjustModal(plan)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 hover:border-stone-900 transition shadow-2xs inline-flex items-center gap-1.5"
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 hover:border-stone-900 transition shadow-2xs inline-flex items-center gap-1.5 whitespace-nowrap"
                           >
                             <span>⚙️</span>
                             <span>ปรับความถี่</span>
@@ -368,7 +443,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
       {/* TAB 2: YEARLY MATRIX VIEW */}
       {activeTab === 'matrix' && (
         <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
-          <div className="p-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+          <div className="p-4 bg-stone-50 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="text-xs text-stone-600 font-medium">
               ตารางแสดงกำหนดการบำรุงรักษาประจำปี 2026 (12 เดือน) | เดือนปัจจุบัน: <span className="text-[#8B7355] font-black underline">{CURRENT_MONTH} (กันยายน)</span>
             </div>
@@ -385,10 +460,10 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-xs">
+            <table className="w-full text-left border-collapse text-xs min-w-[960px]">
               <thead>
                 <tr className="bg-stone-100 border-b border-stone-200 font-bold uppercase text-stone-600 tracking-wider text-[11px]">
-                  <th className="p-3 pl-5 min-w-[150px]">รหัสเครื่องจักร</th>
+                  <th className="p-3 pl-5 min-w-[150px] sticky left-0 bg-stone-100 z-10">รหัสเครื่องจักร</th>
                   <th className="p-3 min-w-[200px]">ชื่อเครื่องจักร</th>
                   <th className="p-3 min-w-[80px]">รอบ</th>
                   {MONTHS.map((m) => (
@@ -420,7 +495,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
                   return (
                     <tr key={plan.id} className="hover:bg-stone-50 transition">
-                      <td className="p-3 pl-5 font-bold text-stone-900 font-sans">
+                      <td className="p-3 pl-5 font-bold text-stone-900 font-sans sticky left-0 bg-white z-10 border-r border-stone-150">
                         <Link href={`/maintenance/machines/${plan.machine_code || (plan as any).machine?.machine_code || (plan as any).machine?.id || ''}`} className="hover:text-cyan-700">
                           {plan.machine_code}
                         </Link>

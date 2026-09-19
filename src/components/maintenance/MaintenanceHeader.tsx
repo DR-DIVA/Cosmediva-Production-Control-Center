@@ -86,7 +86,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
             <Link
               key={item.href}
               href={item.href}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
                 isActive
                   ? 'bg-[#2A2521] text-[#D4AF37] shadow-xs border border-[#2A2521]'
                   : 'bg-white hover:bg-stone-200/80 text-stone-700 hover:text-stone-950 border border-stone-200/70 shadow-2xs'
