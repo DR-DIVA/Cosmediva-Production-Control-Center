@@ -15,6 +15,7 @@ interface MachineQRBadgeProps {
   supplier?: string | null
   serialNumber?: string | null
   model?: string | null
+  pmFrequency?: string | null
 }
 
 export default function MachineQRBadge({
@@ -26,7 +27,8 @@ export default function MachineQRBadge({
   assetId,
   supplier,
   serialNumber,
-  model
+  model,
+  pmFrequency
 }: MachineQRBadgeProps) {
   const badgeRef = useRef<HTMLDivElement>(null)
 
@@ -49,25 +51,27 @@ export default function MachineQRBadge({
             <style>
               body { font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; background: #fff; }
               .badge-card { border: 3px solid #000; border-radius: 16px; padding: 24px; text-align: center; width: 340px; }
-              .header { font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #555; text-transform: uppercase; margin-bottom: 4px; }
-              .title { font-size: 28px; font-weight: 900; margin: 6px 0; }
-              .asset-id { font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 6px; }
-              .subtitle { font-size: 14px; color: #333; margin-bottom: 12px; line-height: 1.3; }
-              .meta { font-size: 12px; color: #666; margin-bottom: 12px; }
-              .qr-img { width: 200px; height: 200px; margin: 0 auto; display: block; }
-              .footer { margin-top: 14px; font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 8px; border-radius: 8px; }
-              .emergency { color: #dc2626; font-size: 14px; font-weight: bold; margin-top: 10px; }
+              .header { font-size: 13px; font-weight: bold; letter-spacing: 1px; color: #555; text-transform: uppercase; margin-bottom: 4px; }
+              .title { font-size: 28px; font-weight: 900; margin: 4px 0; }
+              .asset-id { font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 4px; }
+              .pm-freq { font-size: 12px; font-weight: bold; color: #0284c7; background: #f0f9ff; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; border: 1px solid #bae6fd; }
+              .subtitle { font-size: 13px; color: #333; margin-bottom: 10px; line-height: 1.3; }
+              .meta { font-size: 11px; color: #666; margin-bottom: 10px; }
+              .qr-img { width: 190px; height: 190px; margin: 0 auto; display: block; }
+              .footer { margin-top: 12px; font-size: 12px; font-weight: bold; background: #f0fdf4; color: #166534; padding: 6px 10px; border-radius: 8px; border: 1px solid #bbf7d0; }
+              .emergency { color: #dc2626; font-size: 13px; font-weight: bold; margin-top: 8px; }
             </style>
           </head>
           <body>
             <div class="badge-card">
-              <div class="header">CosmeFlow Maintenance • Asset QR</div>
+              <div class="header">CosmeFlow Maintenance • Smart Asset QR</div>
               <div class="title">${machineCode}</div>
               ${assetId ? `<div class="asset-id">เลขทรัพย์สิน: ${assetId}</div>` : ''}
+              ${pmFrequency ? `<div class="pm-freq">รอบความถี่ PM: ${pmFrequency}</div>` : ''}
               <div class="subtitle">${machineName}<br/><b>${productionArea || ''}</b></div>
               ${supplier && supplier !== 'N/A' ? `<div class="meta">ผู้จำหน่าย: ${supplier}</div>` : ''}
               <img class="qr-img" src="${qrImageUrl}" alt="QR" />
-              <div class="emergency">🚨 สแกนแจ้งซ่อม / เบิกอะไหล่ (≤ 60 วินาที)</div>
+              <div class="emergency">🚨 สแกนเพื่อ: แจ้งซ่อม | เบิกอะไหล่ | ตรวจ PM</div>
               <div class="footer">สแกนดูประวัติเครื่องจักร & Maintenance 360°</div>
             </div>
             <script>
@@ -84,7 +88,7 @@ export default function MachineQRBadge({
     <div className="bg-white border-2 border-[#D4AF37]/50 rounded-2xl p-5 shadow-lg flex flex-col items-center text-center max-w-sm w-full mx-auto">
       <div ref={badgeRef} className="w-full flex flex-col items-center">
         <div className="text-[11px] font-bold text-[#8B7355] tracking-widest uppercase mb-1">
-          CosmeFlow Asset QR
+          CosmeFlow Smart Asset QR
         </div>
         <div className="flex items-center gap-2 mb-1">
           <span className="text-2xl font-black text-stone-900 tracking-tight">{machineCode}</span>
@@ -97,6 +101,11 @@ export default function MachineQRBadge({
         {assetId && (
           <div className="text-xs font-mono font-bold text-blue-700 mb-1">
             เลขทรัพย์สิน: {assetId}
+          </div>
+        )}
+        {pmFrequency && (
+          <div className="text-xs font-mono font-bold text-cyan-700 bg-cyan-50 px-2.5 py-0.5 rounded-md border border-cyan-200 mb-1">
+            รอบ PM: {pmFrequency}
           </div>
         )}
         <p className="text-xs text-stone-600 font-medium line-clamp-2 px-2 mb-2">
@@ -119,8 +128,8 @@ export default function MachineQRBadge({
           />
         </div>
 
-        <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-xl text-xs font-bold w-full flex items-center justify-center gap-1.5 mb-2">
-          <span>🚨</span> สแกนแจ้งเครื่องเสียใน 30–60 วิ
+        <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 rounded-xl text-xs font-bold w-full flex items-center justify-center gap-1.5 mb-2">
+          <span>📱</span> สแกนเพื่อ: แจ้งซ่อม | เบิกอะไหล่ | ดูรอบ PM
         </div>
 
         <div className="text-[11px] text-stone-500 font-mono break-all px-2 line-clamp-1">

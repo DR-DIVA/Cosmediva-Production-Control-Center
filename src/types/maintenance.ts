@@ -100,6 +100,10 @@ export interface MaintenanceMachine {
   is_deleted: boolean
   created_at: string
   updated_at: string
+  pm_plan?: MaintenancePMPlan | null
+  pm_frequency_type?: string | null
+  pm_frequency_interval?: number | null
+  pm_next_due_date?: string | null
 }
 
 export interface MaintenanceSparePart {
@@ -339,7 +343,7 @@ export interface PmFrequencyInfo {
   color: string
 }
 
-export function getPmFrequencyInfo(frequencyType?: string | null, interval?: number): PmFrequencyInfo {
+export function getPmFrequencyInfo(frequencyType?: string | null, interval?: number | null): PmFrequencyInfo {
   const norm = (frequencyType || '').toLowerCase().trim()
   const intVal = Number(interval) || 0
 

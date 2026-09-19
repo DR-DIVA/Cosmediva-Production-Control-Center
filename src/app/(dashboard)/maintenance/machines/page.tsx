@@ -21,7 +21,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
-import { MaintenanceMachine, MachineRequestType } from '@/types/maintenance'
+import { MaintenanceMachine, MachineRequestType, getPmFrequencyInfo } from '@/types/maintenance'
 import { getMachines } from '@/app/actions/maintenance'
 import MachineQRBadge from '@/components/maintenance/MachineQRBadge'
 import AddMachineModal from '@/components/maintenance/AddMachineModal'
@@ -189,6 +189,7 @@ export default function MachinesMasterPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {machines.map(m => {
           const isBreakdown = m.status === 'Breakdown' || m.status === 'Under Repair'
+          const pmFreq = m.pm_frequency_type ? getPmFrequencyInfo(m.pm_frequency_type, m.pm_frequency_interval) : null
 
           return (
             <div
@@ -201,13 +202,23 @@ export default function MachinesMasterPage() {
             >
               <div>
                 <div className="flex items-start justify-between mb-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-mono text-base font-black text-stone-900">{m.machine_code}</span>
                     <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
                       m.criticality === 'A' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
                     }`}>
                       Grade {m.criticality}
                     </span>
+                    {m.asset_id && (
+                      <span className="px-1.5 py-0.5 rounded-md text-[10px] font-mono font-bold bg-blue-50 text-blue-700 border border-blue-200" title="เลขทรัพย์สิน">
+                        {m.asset_id}
+                      </span>
+                    )}
+                    {pmFreq && (
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${pmFreq.color}`} title={pmFreq.full}>
+                        {pmFreq.code}
+                      </span>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-1.5">
@@ -252,11 +263,19 @@ export default function MachinesMasterPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center gap-2">
-                    <span className="text-stone-400 shrink-0">หมายเลข / ทรัพย์สิน:</span>
-                    <span className="font-mono text-stone-700 text-right truncate max-w-[170px]" title={(m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '') || m.asset_id || '-'}>
-                      {(m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '') || m.asset_id || '-'}
+                    <span className="text-stone-400 shrink-0">หมายเลขเครื่อง:</span>
+                    <span className="font-mono text-stone-700 text-right truncate max-w-[170px]" title={m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '-'}>
+                      {m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '-'}
                     </span>
                   </div>
+                  {pmFreq && (
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">รอบความถี่ PM:</span>
+                      <span className="font-medium text-cyan-800 text-right truncate max-w-[170px]">
+                        {pmFreq.full}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-1 border-t border-stone-200/60">
                     <span className="text-stone-400">ต้นทุน Downtime:</span>
                     <span className="font-bold text-[#8B7355]">฿{Number(m.hourly_downtime_cost).toLocaleString()} / ชม.</span>
@@ -345,6 +364,7 @@ export default function MachinesMasterPage() {
               supplier={qrMachine.supplier}
               serialNumber={qrMachine.serial_number}
               model={qrMachine.model}
+              pmFrequency={qrMachine.pm_frequency_type ? getPmFrequencyInfo(qrMachine.pm_frequency_type, qrMachine.pm_frequency_interval).full : undefined}
             />
           </DialogContent>
         </Dialog>

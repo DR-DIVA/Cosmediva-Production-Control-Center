@@ -78,7 +78,31 @@ export async function getMachines(filters?: {
     return { success: false, error: error.message, data: [] }
   }
 
-  return { success: true, data: data as MaintenanceMachine[] }
+  // Fetch PM plans to attach PM frequency to each machine
+  const { data: allPlans } = await supabase
+    .from('maintenance_pm_plans')
+    .select('id, machine_id, machine_code, frequency_type, frequency_interval, next_due_date, plan_code')
+
+  const planMap = new Map<string, any>()
+  if (allPlans) {
+    allPlans.forEach(p => {
+      if (p.machine_id) planMap.set(p.machine_id, p)
+      if (p.machine_code) planMap.set(p.machine_code, p)
+    })
+  }
+
+  const enrichedMachines = (data || []).map(m => {
+    const p = planMap.get(m.id) || planMap.get(m.machine_code)
+    return {
+      ...m,
+      pm_plan: p || null,
+      pm_frequency_type: p?.frequency_type || null,
+      pm_frequency_interval: p?.frequency_interval || null,
+      pm_next_due_date: p?.next_due_date || null
+    }
+  })
+
+  return { success: true, data: enrichedMachines as MaintenanceMachine[] }
 }
 
 /**
@@ -916,6 +940,141 @@ export async function useSparePart(payload: {
 
   return { success: true, data: woPart, remainingStock: newStock }
 }
+
+/**
+ * Direct consumable spare part requisition from machine QR scan
+ * Deducts stock immediately and records in machine history and WO parts
+ */
+export async function issueDirectConsumablePart(payload: {
+  machine_code: string
+  spare_part_id: string
+  quantity: number
+  issued_by_name: string
+  department?: string
+  reason?: string
+}) {
+  const supabase = createAdminClient()
+  const now = new Date()
+
+  // 1. Fetch Spare Part
+  const { data: part, error: pErr } = await supabase
+    .from('maintenance_spare_parts')
+    .select('*')
+    .eq('id', payload.spare_part_id)
+    .single()
+
+  if (pErr || !part) {
+    return { success: false, error: 'ไม่พบข้อมูลอะไหล่' }
+  }
+
+  if (part.stock_qty < payload.quantity) {
+    return {
+      success: false,
+      error: `อะไหล่คงเหลือไม่พอ (มีคงเหลือ ${part.stock_qty} ${part.unit}, ต้องการเบิก ${payload.quantity} ${part.unit})`
+    }
+  }
+
+  // 2. Fetch Machine
+  const { data: machine } = await supabase
+    .from('maintenance_machines')
+    .select('id, machine_code, machine_name, department_name')
+    .eq('machine_code', payload.machine_code)
+    .maybeSingle()
+
+  const unitCost = Number(part.average_cost || part.last_purchase_price || 0)
+  const totalCost = unitCost * payload.quantity
+  const newStock = part.stock_qty - payload.quantity
+
+  // 3. Decrement stock
+  const { error: stockErr } = await supabase
+    .from('maintenance_spare_parts')
+    .update({
+      stock_qty: newStock,
+      updated_at: now.toISOString()
+    })
+    .eq('id', part.id)
+
+  if (stockErr) {
+    return { success: false, error: 'ไม่สามารถตัดสต็อกอะไหล่ได้: ' + stockErr.message }
+  }
+
+  // 4. Create completed Requisition Work Order
+  const woNumber = `REQ-${payload.machine_code}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${String(Math.floor(100 + Math.random() * 900))}`
+
+  const { data: wo, error: woErr } = await supabase
+    .from('maintenance_work_orders')
+    .insert({
+      wo_number: woNumber,
+      machine_id: machine?.id || null,
+      machine_code: payload.machine_code,
+      machine_name: machine?.machine_name || payload.machine_code,
+      requester_name: payload.issued_by_name,
+      priority: 'P3_NORMAL',
+      status: 'VERIFIED',
+      symptom_category: 'Consumable',
+      problem_category: 'Consumable Requisition',
+      symptom_description: `เบิกอะไหล่สิ้นเปลืองหน้าเครื่อง: ${part.part_name} (${part.part_code}) จำนวน ${payload.quantity} ${part.unit}`,
+      production_impact: 'Normal Operation',
+      is_emergency_breakdown: false,
+      assigned_technician_name: payload.issued_by_name,
+      reported_at: now.toISOString(),
+      acknowledged_at: now.toISOString(),
+      repair_started_at: now.toISOString(),
+      repair_completed_at: now.toISOString(),
+      verified_at: now.toISOString(),
+      closed_at: now.toISOString(),
+      total_downtime_minutes: 0,
+      repair_time_minutes: 10,
+      total_part_cost: totalCost,
+      total_maintenance_cost: totalCost,
+      corrective_action: `เบิกใช้งานอะไหล่สิ้นเปลือง: ${part.part_name} จำนวน ${payload.quantity} ${part.unit}. วัตถุประสงค์: ${payload.reason || 'บำรุงรักษาประจำวัน / สิ้นเปลืองตามรอบ'}`,
+      root_cause: 'Routine Consumable Usage',
+      verified_by_name: payload.issued_by_name,
+      verification_status: 'ACCEPTED',
+      verification_notes: 'ตัดสต๊อกเรียบร้อย'
+    })
+    .select()
+    .single()
+
+  // 5. Record in maintenance_wo_parts
+  if (wo) {
+    await supabase
+      .from('maintenance_wo_parts')
+      .insert({
+        work_order_id: wo.id,
+        spare_part_id: part.id,
+        part_code: part.part_code,
+        part_name: part.part_name,
+        quantity: payload.quantity,
+        unit: part.unit,
+        unit_cost: unitCost,
+        total_cost: totalCost,
+        issued_by_name: payload.issued_by_name,
+        notes: payload.reason || 'เบิกอะไหล่สิ้นเปลืองหน้าเครื่อง'
+      })
+  }
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/spare-parts')
+  revalidatePath('/maintenance/machines')
+  revalidatePath(`/maintenance/machines/${payload.machine_code}`)
+  revalidatePath(`/maintenance/report/${payload.machine_code}`)
+  revalidatePath('/maintenance/work-orders')
+
+  return {
+    success: true,
+    data: {
+      woNumber,
+      partName: part.part_name,
+      quantity: payload.quantity,
+      unit: part.unit,
+      remainingStock: newStock,
+      totalCost
+    },
+    message: `เบิก ${part.part_name} จำนวน ${payload.quantity} ${part.unit} สำเร็จ! ตัดสต๊อกคงเหลือ ${newStock} ${part.unit}`
+  }
+}
+
 
 /**
  * Get Spare Parts List

@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button'
 import MachinePMSection from '@/components/maintenance/MachinePMSection'
 import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
+import { getPmFrequencyInfo } from '@/types/maintenance'
 
 export const dynamic = 'force-dynamic'
 
@@ -223,6 +224,7 @@ export default async function Machine360Page({ params }: Props) {
             supplier={machine.supplier}
             serialNumber={machine.serial_number}
             model={machine.model}
+            pmFrequency={pmPlan ? getPmFrequencyInfo(pmPlan.frequency_type, pmPlan.frequency_interval).full : undefined}
           />
         </div>
       </div>
