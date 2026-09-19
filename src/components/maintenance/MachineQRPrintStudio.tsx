@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { QRCodeSvg } from '@/lib/barcode'
-import { MaintenanceMachine } from '@/types/maintenance'
+import { MaintenanceMachine, getPmFrequencyInfo } from '@/types/maintenance'
 import Link from 'next/link'
 
 interface Props {
@@ -511,8 +511,20 @@ export default function MachineQRPrintStudio({ initialMachines }: Props) {
 
                     {/* Machine Details */}
                     <div className="flex-1 min-w-0 space-y-1">
-                      <div className="font-mono font-black text-stone-950 tracking-tight leading-none text-lg sm:text-xl print:text-xl truncate">
-                        {machine.machine_code}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="font-mono font-black text-stone-950 tracking-tight leading-none text-lg sm:text-xl print:text-xl truncate">
+                          {machine.machine_code}
+                        </span>
+                        {machine.asset_id && (
+                          <span className="text-[9px] font-mono font-bold bg-blue-50 text-blue-700 px-1 py-0.2 rounded border border-blue-200">
+                            {machine.asset_id}
+                          </span>
+                        )}
+                        {machine.pm_frequency_type && (
+                          <span className="text-[9px] font-mono font-bold bg-cyan-50 text-cyan-800 px-1 py-0.2 rounded border border-cyan-200">
+                            {getPmFrequencyInfo(machine.pm_frequency_type, machine.pm_frequency_interval).code}
+                          </span>
+                        )}
                       </div>
 
                       <div className="font-bold text-stone-800 text-xs sm:text-sm print:text-xs leading-snug line-clamp-2">
@@ -530,14 +542,14 @@ export default function MachineQRPrintStudio({ initialMachines }: Props) {
                     </div>
                   </div>
 
-                  {/* Bottom Action Footer (Emergency Breakdown CTA) */}
+                  {/* Bottom Action Footer (Smart QR 3-in-1 CTA) */}
                   <div className="mt-2 pt-1.5 border-t border-stone-200 flex items-center justify-between">
-                    <div className="bg-red-600 text-white font-black text-[9px] sm:text-[10px] px-2 py-0.5 rounded flex items-center gap-1">
-                      <span>🚨</span>
-                      <span>สแกนแจ้งเครื่องเสีย (≤ 60 วินาที)</span>
+                    <div className="bg-emerald-700 text-white font-black text-[8px] sm:text-[9.5px] px-2 py-0.5 rounded flex items-center gap-1">
+                      <span>📱</span>
+                      <span>สแกนเพื่อ: แจ้งซ่อม | เบิกอะไหล่ | ตรวจ PM</span>
                     </div>
                     <span className="text-[8px] text-stone-400 font-mono uppercase tracking-widest hidden sm:inline print:inline">
-                      ALCOA+ Tag
+                      GMP/ISO Tag
                     </span>
                   </div>
 
