@@ -386,9 +386,15 @@ export default function TechnicianCockpitPage() {
                   )}
                 </div>
 
-                {/* Quick Link to Machine 360 */}
+                {/* Quick Link to DCC E-form & Machine 360 */}
                 <div className="flex justify-between items-center text-[11px] pt-2 border-t border-stone-100">
-                  <span className="text-stone-400">ผู้แจ้ง: {wo.requester_name}</span>
+                  <Link
+                    href={`/maintenance/work-orders/${wo.wo_number}/eform`}
+                    target="_blank"
+                    className="text-stone-800 hover:text-stone-950 font-bold hover:underline inline-flex items-center gap-1 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200"
+                  >
+                    <span>📄 E-form (DCC)</span>
+                  </Link>
                   <Link
                     href={`/maintenance/machines/${wo.machine_code}`}
                     className="text-[#8B7355] font-bold hover:underline inline-flex items-center gap-1"

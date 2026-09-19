@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { 
   AlertOctagon, 
   Camera, 
@@ -254,6 +255,14 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           >
             ไปที่หน้าจอช่างซ่อมบำรุง
           </Button>
+
+          <Link
+            href={`/maintenance/work-orders/${submittedWO.wo_number}/eform`}
+            target="_blank"
+            className="w-full inline-flex items-center justify-center gap-2 border-2 border-stone-800 bg-white hover:bg-stone-50 text-stone-900 font-bold h-11 rounded-xl text-xs transition shadow-xs"
+          >
+            <span>📄 เปิดดูใบแจ้งซ่อม E-form (DCC MT-PF-001D)</span>
+          </Link>
 
           <Button
             variant="outline"

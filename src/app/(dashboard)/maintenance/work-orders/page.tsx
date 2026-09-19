@@ -304,10 +304,17 @@ export default function WorkOrdersKanbanPage() {
                 ปิด
               </Button>
               <Link
-                href={`/maintenance/machines/${detailWO.machine_code}`}
-                className="flex-1 inline-flex items-center justify-center text-xs font-bold bg-stone-900 text-white rounded-xl hover:bg-stone-800"
+                href={`/maintenance/work-orders/${detailWO.wo_number}/eform`}
+                target="_blank"
+                className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-[#D4AF37] hover:bg-amber-400 text-stone-900 rounded-xl transition shadow-xs"
               >
-                ดูประวัติ 360° เครื่อง
+                <span>📄 ออกใบแจ้งซ่อม DCC</span>
+              </Link>
+              <Link
+                href={`/maintenance/machines/${detailWO.machine_code}`}
+                className="flex-1 inline-flex items-center justify-center text-xs font-bold bg-stone-900 text-white rounded-xl hover:bg-stone-800 transition"
+              >
+                ดูประวัติ 360°
               </Link>
             </div>
           </div>

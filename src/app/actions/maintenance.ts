@@ -1216,3 +1216,35 @@ export async function getPMAdjustmentLogs(filters?: {
   return { success: true, data: (data || []) as MaintenancePMAdjustmentLog[] }
 }
 
+/**
+ * Get Complete Work Order Details for DCC E-form
+ */
+export async function getWorkOrderDCCDetails(idOrWoNumber: string) {
+  const supabase = createAdminClient()
+  const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(idOrWoNumber)
+
+  let query = supabase
+    .from('maintenance_work_orders')
+    .select(`
+      *,
+      machine:maintenance_machines(*),
+      parts:maintenance_wo_parts(*),
+      status_logs:maintenance_wo_status_logs(*)
+    `)
+
+  if (isUUID) {
+    query = query.eq('id', idOrWoNumber)
+  } else {
+    query = query.eq('wo_number', idOrWoNumber)
+  }
+
+  const { data, error } = await query.maybeSingle()
+
+  if (error || !data) {
+    return { success: false, error: error?.message || 'ไม่พบข้อมูลใบแจ้งซ่อมนี้', data: null }
+  }
+
+  return { success: true, data }
+}
+
+
