@@ -1796,5 +1796,119 @@ export async function rejectMachineRequest(
   return { success: true, data, message: `ปฏิเสธคำร้องเรียบร้อยแล้ว` }
 }
 
+/**
+ * Submit PM Checksheet execution and generate completed PM record / Work Order
+ */
+export async function submitPMChecksheet(params: {
+  planId: string
+  technicianName: string
+  executionNotes?: string
+  checklistResults: { item: string; standard: string; status: 'PASS' | 'FAIL' | 'REMARK'; remark?: string }[]
+  overallStatus: 'PASSED' | 'PASSED_WITH_REMARKS' | 'FAILED'
+  ownerSignName: string
+  photoBeforeUrls?: string[]
+  photoAfterUrls?: string[]
+}) {
+  const supabase = createAdminClient()
+  const now = new Date()
+
+  // 1. Fetch PM Plan
+  const { data: plan, error: pErr } = await supabase
+    .from('maintenance_pm_plans')
+    .select('*, machine:maintenance_machines(*)')
+    .eq('id', params.planId)
+    .single()
+
+  if (pErr || !plan) {
+    return { success: false, error: 'ไม่พบข้อมูลแผน PM' }
+  }
+
+  // 2. Calculate next due date
+  const nextDate = new Date(now)
+  const interval = plan.frequency_interval || 1
+  const freqType = plan.frequency_type?.toLowerCase() || ''
+
+  if (freqType.includes('monthly') || freqType.includes('pm1')) {
+    nextDate.setMonth(nextDate.getMonth() + 1)
+  } else if (freqType.includes('every 2') || freqType.includes('pm2')) {
+    nextDate.setMonth(nextDate.getMonth() + 2)
+  } else if (freqType.includes('quarterly') || freqType.includes('every 3') || freqType.includes('pm3')) {
+    nextDate.setMonth(nextDate.getMonth() + 3)
+  } else if (freqType.includes('every 4') || freqType.includes('pm4')) {
+    nextDate.setMonth(nextDate.getMonth() + 4)
+  } else if (freqType.includes('biannually') || freqType.includes('every 6') || freqType.includes('pm6')) {
+    nextDate.setMonth(nextDate.getMonth() + 6)
+  } else if (freqType.includes('yearly') || freqType.includes('every 12') || freqType.includes('pm12')) {
+    nextDate.setFullYear(nextDate.getFullYear() + 1)
+  } else {
+    nextDate.setMonth(nextDate.getMonth() + interval)
+  }
+
+  const nextDueStr = nextDate.toISOString().split('T')[0]
+
+  // 3. Update PM Plan status
+  await supabase
+    .from('maintenance_pm_plans')
+    .update({
+      last_completed_at: now.toISOString(),
+      next_due_date: nextDueStr,
+      updated_at: now.toISOString()
+    })
+    .eq('id', plan.id)
+
+  // 4. Create completed Work Order for this PM execution
+  const woNumber = `PM-${plan.machine_code}-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+  const passCount = params.checklistResults.filter(r => r.status === 'PASS').length
+  const totalCount = params.checklistResults.length
+
+  const { data: wo, error: woErr } = await supabase
+    .from('maintenance_work_orders')
+    .insert({
+      wo_number: woNumber,
+      machine_id: plan.machine_id,
+      machine_code: plan.machine_code,
+      machine_name: plan.machine_name,
+      requester_name: 'ระบบจัดตาราง PM ประจำงวด',
+      priority: 'P3_NORMAL',
+      status: 'VERIFIED',
+      symptom_category: 'Other',
+      symptom_description: `งานตรวจเช็คบำรุงรักษาเชิงป้องกัน (PM) ตามแผน ${plan.plan_code} (${plan.frequency_type}): ผ่านเกณฑ์ ${passCount}/${totalCount} ข้อ`,
+      production_impact: 'Production can continue',
+      is_emergency_breakdown: false,
+      assigned_technician_name: params.technicianName,
+      reported_at: now.toISOString(),
+      acknowledged_at: now.toISOString(),
+      repair_started_at: now.toISOString(),
+      repair_completed_at: now.toISOString(),
+      verified_at: now.toISOString(),
+      closed_at: now.toISOString(),
+      total_downtime_minutes: 0,
+      repair_time_minutes: plan.estimated_minutes || 60,
+      corrective_action: `ตรวจเช็คบำรุงรักษาตามมาตรฐาน PM Checklist ${totalCount} ข้อ ผลการตรวจ: ${params.overallStatus}. หมายเหตุ: ${params.executionNotes || '-'}`,
+      root_cause: `รอบการบำรุงรักษาเชิงป้องกันตามแผน (PM Plan ${plan.frequency_type})`,
+      problem_category: 'Preventive Maintenance',
+      verified_by_name: params.ownerSignName || 'หัวหน้าแผนกผู้เป็นเจ้าของเครื่อง',
+      verification_status: 'ACCEPTED',
+      verification_notes: 'เจ้าของเครื่องลงนามตรวจรับมอบงาน PM สมบูรณ์',
+      photo_before_urls: params.photoBeforeUrls || [],
+      photo_after_urls: params.photoAfterUrls || []
+    })
+    .select()
+    .single()
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/technician')
+  revalidatePath('/maintenance/pm')
+  if (plan.machine_code) {
+    revalidatePath(`/maintenance/machines/${plan.machine_code}`)
+  }
+
+  return { 
+    success: true, 
+    data: wo, 
+    message: `บันทึกผลตรวจเช็ค PM เครื่อง ${plan.machine_code} และส่งมอบงานให้แผนกเจ้าของเครื่องเรียบร้อยแล้ว!` 
+  }
+}
+
 
 

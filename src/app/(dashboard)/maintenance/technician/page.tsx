@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import MaintenanceHeader from '@/components/maintenance/MaintenanceHeader'
 import { 
   Wrench, 
@@ -17,26 +17,42 @@ import {
   Layers, 
   ArrowRight,
   RefreshCw,
-  ExternalLink
+  ExternalLink,
+  Calendar,
+  FileCheck,
+  Search,
+  Filter,
+  Check
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { MaintenanceWorkOrder } from '@/types/maintenance'
+import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { 
   getWorkOrders, 
   transitionWorkOrderStatus, 
-  getAISimilarFailures 
+  getAISimilarFailures,
+  getPMPlans
 } from '@/app/actions/maintenance'
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
+import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
 
 export default function TechnicianCockpitPage() {
   const [workOrders, setWorkOrders] = useState<MaintenanceWorkOrder[]>([])
+  const [pmPlans, setPmPlans] = useState<MaintenancePMPlan[]>([])
+  const [activeGroupTab, setActiveGroupTab] = useState<'breakdown' | 'pm_plan'>('breakdown')
   const [technicianName, setTechnicianName] = useState('ช่างสมหมาย เก่งการช่าง')
   const [isLoading, setIsLoading] = useState(true)
+
+  // PM Filter state
+  const [selectedPlanForExecute, setSelectedPlanForExecute] = useState<MaintenancePMPlan | null>(null)
+  const [pmSearchQuery, setPmSearchQuery] = useState('')
+  const [pmMonthFilter, setPmMonthFilter] = useState<'SEP' | 'ALL'>('SEP')
+  const [pmDeptFilter, setPmDeptFilter] = useState('ALL')
+  const [pmFreqFilter, setPmFreqFilter] = useState('ALL')
 
   // Modals state
   const [partModalWO, setPartModalWO] = useState<MaintenanceWorkOrder | null>(null)
@@ -51,11 +67,15 @@ export default function TechnicianCockpitPage() {
   const loadJobs = async () => {
     setIsLoading(true)
     try {
-      const res = await getWorkOrders()
-      if (res.success) {
-        setWorkOrders(res.data)
+      const [woRes, pmRes] = await Promise.all([
+        getWorkOrders(),
+        getPMPlans()
+      ])
+
+      if (woRes.success) {
+        setWorkOrders(woRes.data)
         // Check if there's any active breakdown to load AI insight for
-        const active = res.data.find(w => !['CLOSED', 'VERIFIED'].includes(w.status))
+        const active = woRes.data.find(w => !['CLOSED', 'VERIFIED'].includes(w.status))
         if (active) {
           setSelectedWOForAI(active)
           getAISimilarFailures({
@@ -65,6 +85,10 @@ export default function TechnicianCockpitPage() {
             if (aiRes.success) setAiInsight(aiRes.data)
           })
         }
+      }
+
+      if (pmRes.success) {
+        setPmPlans(pmRes.data)
       }
     } finally {
       setIsLoading(false)
@@ -128,11 +152,53 @@ export default function TechnicianCockpitPage() {
     }
   }
 
-  // Filter groups
+  // Filter groups for Breakdowns
   const criticalJobs = workOrders.filter(w => w.priority === 'P1_CRITICAL' && !['CLOSED', 'VERIFIED'].includes(w.status))
   const inProgressJobs = workOrders.filter(w => ['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(w.status) && w.priority !== 'P1_CRITICAL')
   const newPendingJobs = workOrders.filter(w => ['NEW', 'ACKNOWLEDGED', 'ASSIGNED'].includes(w.status) && w.priority !== 'P1_CRITICAL')
   const recentlyCompleted = workOrders.filter(w => ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(w.status)).slice(0, 5)
+  const activeBreakdownCount = workOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
+
+  // Filter groups for PM Plans
+  const currentMonthPMCount = pmPlans.filter(p => p.schedule_months?.includes('SEP') || p.frequency_type === 'Monthly').length
+
+  const pmDepartments = useMemo(() => {
+    const set = new Set<string>()
+    pmPlans.forEach(p => {
+      const d = (p as any).machine?.department_code
+      if (d) set.add(d)
+    })
+    return ['ALL', ...Array.from(set).sort()]
+  }, [pmPlans])
+
+  const filteredPMPlans = useMemo(() => {
+    return pmPlans.filter(p => {
+      // Month schedule filter (default SEP or ALL)
+      if (pmMonthFilter !== 'ALL') {
+        const hasMonth = p.schedule_months?.includes(pmMonthFilter) || p.frequency_type === 'Monthly'
+        if (!hasMonth) return false
+      }
+      // Dept filter
+      if (pmDeptFilter !== 'ALL') {
+        const d = (p as any).machine?.department_code
+        if (d !== pmDeptFilter) return false
+      }
+      // Freq filter
+      if (pmFreqFilter !== 'ALL') {
+        const freq = getPmFrequencyInfo(p.frequency_type, p.frequency_interval)
+        if (freq.code !== pmFreqFilter) return false
+      }
+      // Search
+      if (pmSearchQuery.trim()) {
+        const q = pmSearchQuery.toLowerCase()
+        const code = p.machine_code.toLowerCase()
+        const name = p.machine_name.toLowerCase()
+        const pcode = p.plan_code.toLowerCase()
+        if (!code.includes(q) && !name.includes(q) && !pcode.includes(q)) return false
+      }
+      return true
+    })
+  }, [pmPlans, pmMonthFilter, pmDeptFilter, pmFreqFilter, pmSearchQuery])
 
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
@@ -184,385 +250,611 @@ export default function TechnicianCockpitPage() {
         </div>
       </div>
 
-      {/* AI MAINTENANCE ASSISTANT PANEL */}
-      {aiInsight && selectedWOForAI && (
-        <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 p-5 rounded-3xl text-white shadow-xl border border-[#D4AF37]/50 relative overflow-hidden">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <span className="p-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/40 rounded-xl text-[#D4AF37]">
-                <Sparkles className="w-4 h-4 animate-spin" />
-              </span>
-              <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
-                AI Maintenance Assistant • ระบบช่วยวินิจฉัยหน้างาน
-              </span>
-            </div>
-            <span className="text-[11px] bg-amber-500/20 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
-              วิเคราะห์สำหรับ {selectedWOForAI.machine_code}
-            </span>
-          </div>
+      {/* 2-GROUP CLASSIFICATION TABS (แยกหมวดหมู่งาน: ใบแจ้งซ่อม vs แผน PM) */}
+      <div className="bg-white p-2 rounded-3xl border border-stone-200 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+        <button
+          onClick={() => setActiveGroupTab('breakdown')}
+          className={`flex-1 py-3.5 px-5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2.5 ${
+            activeGroupTab === 'breakdown'
+              ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-lg shadow-red-900/20'
+              : 'bg-stone-50 text-stone-600 hover:text-stone-950 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <Flame className={`w-4 h-4 ${activeGroupTab === 'breakdown' ? 'text-amber-300 animate-bounce' : 'text-red-500'}`} />
+          <span>กลุ่ม 1: งานจากใบแจ้งซ่อม (Breakdown)</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-black ${
+            activeGroupTab === 'breakdown' ? 'bg-white/20 text-white' : 'bg-red-100 text-red-700'
+          }`}>
+            {activeBreakdownCount} งาน
+          </span>
+        </button>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
-            {/* Box 1: Probable Root Causes */}
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-              <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
-                <Wrench className="w-3.5 h-3.5" />
-                สาเหตุที่พบบ่อยในอดีต (Probable Causes)
+        <button
+          onClick={() => setActiveGroupTab('pm_plan')}
+          className={`flex-1 py-3.5 px-5 rounded-2xl text-xs sm:text-sm font-black transition flex items-center justify-center gap-2.5 ${
+            activeGroupTab === 'pm_plan'
+              ? 'bg-gradient-to-r from-cyan-700 to-teal-700 text-white shadow-lg shadow-cyan-900/20'
+              : 'bg-stone-50 text-stone-600 hover:text-stone-950 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <Calendar className={`w-4 h-4 ${activeGroupTab === 'pm_plan' ? 'text-cyan-200' : 'text-cyan-600'}`} />
+          <span>กลุ่ม 2: งานตามแผน PM ประจำเดือน (PM Plan)</span>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-black ${
+            activeGroupTab === 'pm_plan' ? 'bg-white/20 text-white' : 'bg-cyan-100 text-cyan-800'
+          }`}>
+            {currentMonthPMCount} เครื่อง
+          </span>
+        </button>
+      </div>
+
+      {/* GROUP 1: BREAKDOWN WORK ORDERS */}
+      {activeGroupTab === 'breakdown' && (
+        <div className="space-y-6">
+          {/* AI MAINTENANCE ASSISTANT PANEL */}
+          {aiInsight && selectedWOForAI && (
+            <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 p-5 rounded-3xl text-white shadow-xl border border-[#D4AF37]/50 relative overflow-hidden">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/40 rounded-xl text-[#D4AF37]">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
+                    AI Maintenance Assistant • ระบบช่วยวินิจฉัยหน้างาน
+                  </span>
+                </div>
+                <span className="text-[11px] bg-amber-500/20 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                  วิเคราะห์สำหรับ {selectedWOForAI.machine_code}
+                </span>
               </div>
-              <ul className="space-y-1 text-stone-200">
-                {aiInsight.suggestedRootCauses?.map((c: string, i: number) => (
-                  <li key={i} className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span>
-                    <span>{c}</span>
-                  </li>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+                {/* Box 1: Probable Root Causes */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5" />
+                    สาเหตุที่พบบ่อยในอดีต (Probable Causes)
+                  </div>
+                  <ul className="space-y-1 text-stone-200">
+                    {aiInsight.suggestedRootCauses?.map((c: string, i: number) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span>
+                        <span>{c}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Box 2: Suggested Spare Parts */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5" />
+                    อะไหล่ที่แนะนำให้เตรียมไป (Recommended Parts)
+                  </div>
+                  {aiInsight.recommendedParts && aiInsight.recommendedParts.length > 0 ? (
+                    <ul className="space-y-1 text-stone-200">
+                      {aiInsight.recommendedParts.map((p: any, i: number) => (
+                        <li key={i} className="flex items-center justify-between">
+                          <span className="truncate">{p.name}</span>
+                          <span className="text-amber-300 font-mono text-[10px] shrink-0 ml-1">เคยใช้ {p.count} ครั้ง</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-stone-400 text-[11px]">ยังไม่มีประวัติการใช้อะไหล่เฉพาะ</p>
+                  )}
+                </div>
+
+                {/* Box 3: Safety & Inspection */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-rose-300 font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                    ข้อควรระวังความปลอดภัย (Safety Note)
+                  </div>
+                  <p className="text-stone-300 text-[11px] leading-relaxed">
+                    {aiInsight.safetyPrecautions || 'ตัดไฟหลัก (LOTO) ก่อนเปิดฝาครอบเครื่องทุกครั้ง'}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 1. CRITICAL BREAKDOWNS (P1) */}
+          {criticalJobs.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Flame className="w-5 h-5 text-red-600 animate-bounce" />
+                <h3 className="text-base sm:text-lg font-black text-red-600 tracking-tight">
+                  🚨 งานด่วนฉุกเฉิน / เครื่องจักรหยุดการผลิต ({criticalJobs.length})
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {criticalJobs.map(wo => (
+                  <div
+                    key={wo.id}
+                    className="bg-white border-2 border-red-500 rounded-3xl p-5 shadow-xl shadow-red-900/10 space-y-4 ring-4 ring-red-500/10"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-red-600 text-white tracking-wide">
+                            P1 CRITICAL
+                          </span>
+                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                        </div>
+                        <h4 className="text-lg font-black text-stone-900 mt-1">
+                          {wo.machine_code} - {wo.machine_name}
+                        </h4>
+                        <div className="text-xs text-red-700 font-bold flex items-center gap-1 mt-0.5">
+                          <AlertOctagon className="w-3.5 h-3.5" />
+                          <span>{wo.symptom_category}: {wo.symptom_description || wo.production_impact}</span>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <span className="text-[10px] text-stone-400 block font-medium">แจ้งเมื่อ:</span>
+                        <span className="font-mono text-xs font-bold text-stone-700">
+                          {new Date(wo.reported_at).toLocaleTimeString('th-TH')} น.
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Photo/Video Attachments with Download & Share */}
+                    {((wo.photo_before_urls && wo.photo_before_urls.length > 0) || (wo.photo_after_urls && wo.photo_after_urls.length > 0)) && (
+                      <div className="space-y-2 py-1">
+                        {wo.photo_before_urls && wo.photo_before_urls.length > 0 && (
+                          <MediaAttachmentViewer
+                            urls={wo.photo_before_urls}
+                            title="ภาพถ่าย/วิดีโออาการที่แจ้ง"
+                            woNumber={wo.wo_number}
+                          />
+                        )}
+                        {wo.photo_after_urls && wo.photo_after_urls.length > 0 && (
+                          <MediaAttachmentViewer
+                            urls={wo.photo_after_urls}
+                            title="ภาพถ่ายหลังการซ่อมเสร็จ"
+                            woNumber={wo.wo_number}
+                          />
+                        )}
+                      </div>
+                    )}
+
+                    {/* Status and Timer */}
+                    <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2">
+                        <span className="text-stone-500">สถานะงาน:</span>
+                        <span className="font-bold px-2 py-0.5 rounded bg-stone-900 text-white">
+                          {wo.status}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 text-stone-700 font-semibold">
+                        <Clock className="w-3.5 h-3.5 text-red-600 animate-spin" />
+                        <span>Downtime: {wo.total_downtime_minutes} นาที</span>
+                      </div>
+                    </div>
+
+                    {/* Big Action Buttons */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {wo.status === 'NEW' && (
+                        <Button
+                          onClick={() => handleAcceptJob(wo)}
+                          className="col-span-2 h-12 bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-red-900/20"
+                        >
+                          ACCEPT JOB (รับงานด่วน)
+                        </Button>
+                      )}
+
+                      {wo.status === 'ACKNOWLEDGED' && (
+                        <Button
+                          onClick={() => handleStartRepair(wo)}
+                          className="col-span-2 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
+                        >
+                          <Play className="w-4 h-4 fill-white" />
+                          START REPAIR (เริ่มซ่อม & จับเวลา)
+                        </Button>
+                      )}
+
+                      {['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(wo.status) && (
+                        <>
+                          <Button
+                            onClick={() => setPartModalWO(wo)}
+                            className="h-11 bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <Package className="w-4 h-4" />
+                            + ใช้อะไหล่
+                          </Button>
+
+                          <Button
+                            onClick={() => handlePauseWaitingPart(wo)}
+                            variant="outline"
+                            className="h-11 border-stone-300 hover:bg-stone-100 text-stone-700 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
+                          >
+                            <Pause className="w-4 h-4" />
+                            รออะไหล่
+                          </Button>
+
+                          <Button
+                            onClick={() => setCompleteModalData({ wo, targetStatus: 'TEST_RUN' })}
+                            className="h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <Play className="w-4 h-4" />
+                            TEST RUN
+                          </Button>
+
+                          <Button
+                            onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
+                            className="h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            ซ่อมเสร็จ (COMPLETE)
+                          </Button>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-stone-100 text-[11px] text-stone-500">
+                      <span className="px-2 py-0.5 rounded bg-stone-100 font-mono">E-form (DCC)</span>
+                      <Link
+                        href={`/maintenance/machines/${wo.machine_code}`}
+                        className="text-stone-600 hover:text-stone-900 hover:underline flex items-center gap-1 font-medium"
+                      >
+                        <span>ดูประวัติเครื่อง 360°</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </Link>
+                    </div>
+                  </div>
                 ))}
-              </ul>
-            </div>
-
-            {/* Box 2: Suggested Spare Parts */}
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-              <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5" />
-                อะไหล่ที่แนะนำให้เตรียมไป (Recommended Parts)
               </div>
-              {aiInsight.recommendedParts && aiInsight.recommendedParts.length > 0 ? (
-                <ul className="space-y-1 text-stone-200">
-                  {aiInsight.recommendedParts.map((p: any, i: number) => (
-                    <li key={i} className="flex items-center justify-between">
-                      <span className="truncate">{p.name}</span>
-                      <span className="text-amber-300 font-mono text-[10px] shrink-0 ml-1">เคยใช้ {p.count} ครั้ง</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="text-stone-400 text-[11px]">ยังไม่มีประวัติการใช้อะไหล่เฉพาะ</p>
-              )}
             </div>
+          )}
 
-            {/* Box 3: Safety & Inspection */}
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-              <div className="text-rose-300 font-bold flex items-center gap-1.5">
-                <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                ข้อควรระวังความปลอดภัย (Safety Note)
-              </div>
-              <p className="text-stone-300 text-[11px] leading-relaxed">
-                {aiInsight.safetyPrecautions || 'ตัดไฟหลัก (LOTO) ก่อนเปิดฝาครอบเครื่องทุกครั้ง'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 1. CRITICAL BREAKDOWNS (P1) */}
-      {criticalJobs.length > 0 && (
-        <div className="space-y-3">
-          <div className="flex items-center gap-2">
-            <Flame className="w-5 h-5 text-red-600 animate-bounce" />
-            <h3 className="text-base sm:text-lg font-black text-red-600 tracking-tight">
-              🚨 งานด่วนฉุกเฉิน / เครื่องจักรหยุดการผลิต ({criticalJobs.length})
+          {/* 2. IN PROGRESS / WAITING PART */}
+          <div className="space-y-3">
+            <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+              <Wrench className="w-5 h-5 text-amber-600" />
+              งานที่กำลังดำเนินการ (In Progress & Waiting) ({inProgressJobs.length})
             </h3>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {criticalJobs.map(wo => (
-              <div
-                key={wo.id}
-                className="bg-white border-2 border-red-500 rounded-3xl p-5 shadow-xl shadow-red-900/10 space-y-4 ring-4 ring-red-500/10"
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="px-2.5 py-0.5 rounded-full text-xs font-black bg-red-600 text-white tracking-wide">
-                        P1 CRITICAL
-                      </span>
+            {inProgressJobs.length === 0 ? (
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                ไม่มีงานซ่อมที่ค้างอยู่
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {inProgressJobs.map(wo => (
+                  <div
+                    key={wo.id}
+                    className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center justify-between">
                       <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        wo.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-900' :
+                        wo.status === 'WAITING_PART' ? 'bg-orange-100 text-orange-900' :
+                        'bg-indigo-100 text-indigo-900'
+                      }`}>
+                        {wo.status}
+                      </span>
                     </div>
-                    <h4 className="text-lg font-black text-stone-900 mt-1">
-                      {wo.machine_code} - {wo.machine_name}
-                    </h4>
-                    <div className="text-xs text-red-700 font-bold flex items-center gap-1 mt-0.5">
-                      <AlertOctagon className="w-3.5 h-3.5" />
-                      <span>{wo.symptom_category}: {wo.symptom_description || wo.production_impact}</span>
+
+                    <div>
+                      <h4 className="text-sm font-bold text-stone-900">{wo.machine_code} - {wo.machine_name}</h4>
+                      <p className="text-xs text-stone-600 mt-1 line-clamp-2">{wo.symptom_description || wo.symptom_category}</p>
                     </div>
-                  </div>
 
-                  <div className="text-right">
-                    <span className="text-[10px] text-stone-400 block font-medium">แจ้งเมื่อ:</span>
-                    <span className="font-mono text-xs font-bold text-stone-700">
-                      {new Date(wo.reported_at).toLocaleTimeString('th-TH')} น.
-                    </span>
-                  </div>
-                </div>
-
-                {/* Photo/Video Attachments with Download & Share */}
-                {((wo.photo_before_urls && wo.photo_before_urls.length > 0) || (wo.photo_after_urls && wo.photo_after_urls.length > 0)) && (
-                  <div className="space-y-2 py-1">
+                    {/* Attachments preview */}
                     {wo.photo_before_urls && wo.photo_before_urls.length > 0 && (
-                      <MediaAttachmentViewer
-                        urls={wo.photo_before_urls}
-                        title="ภาพถ่าย/วิดีโออาการที่แจ้ง"
-                        woNumber={wo.wo_number}
-                      />
+                      <div className="pt-1">
+                        <MediaAttachmentViewer
+                          urls={wo.photo_before_urls}
+                          title="ภาพถ่าย/วิดีโออาการ"
+                          woNumber={wo.wo_number}
+                        />
+                      </div>
                     )}
-                    {wo.photo_after_urls && wo.photo_after_urls.length > 0 && (
-                      <MediaAttachmentViewer
-                        urls={wo.photo_after_urls}
-                        title="ภาพถ่ายหลังการซ่อมเสร็จ"
-                        woNumber={wo.wo_number}
-                      />
-                    )}
-                  </div>
-                )}
 
-                {/* Status and Timer */}
-                <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <span className="text-stone-500">สถานะงาน:</span>
-                    <span className="font-bold px-2 py-0.5 rounded bg-stone-900 text-white">
-                      {wo.status}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1.5 text-stone-700 font-semibold">
-                    <Clock className="w-3.5 h-3.5 text-red-600 animate-spin" />
-                    <span>Downtime: {wo.total_downtime_minutes} นาที</span>
-                  </div>
-                </div>
-
-                {/* Big Action Buttons */}
-                <div className="grid grid-cols-2 gap-2">
-                  {wo.status === 'NEW' && (
-                    <Button
-                      onClick={() => handleAcceptJob(wo)}
-                      className="col-span-2 h-12 bg-red-600 hover:bg-red-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-red-900/20"
-                    >
-                      ACCEPT JOB (รับงานด่วน)
-                    </Button>
-                  )}
-
-                  {wo.status === 'ACKNOWLEDGED' && (
-                    <Button
-                      onClick={() => handleStartRepair(wo)}
-                      className="col-span-2 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"
-                    >
-                      <Play className="w-4 h-4 fill-white" />
-                      START REPAIR (เริ่มซ่อม & จับเวลา)
-                    </Button>
-                  )}
-
-                  {['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(wo.status) && (
-                    <>
+                    <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
                       <Button
                         onClick={() => setPartModalWO(wo)}
-                        className="h-11 bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                        size="sm"
+                        variant="outline"
+                        className="flex-1 text-xs rounded-xl h-9 border-stone-300"
                       >
-                        <Package className="w-4 h-4" />
                         + ใช้อะไหล่
                       </Button>
-
-                      <Button
-                        onClick={() => handlePauseWaitingPart(wo)}
-                        variant="outline"
-                        className="h-11 border-stone-300 text-stone-700 font-bold text-xs rounded-xl hover:bg-stone-100 flex items-center justify-center gap-1.5"
-                      >
-                        <Pause className="w-4 h-4" />
-                        รออะไหล่
-                      </Button>
-
-                      <Button
-                        onClick={() => setCompleteModalData({ wo, targetStatus: 'TEST_RUN' })}
-                        className="h-11 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl flex items-center justify-center gap-1.5"
-                      >
-                        <CheckSquare className="w-4 h-4" />
-                        TEST RUN
-                      </Button>
-
                       <Button
                         onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
-                        className="h-11 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md flex items-center justify-center gap-1.5"
+                        size="sm"
+                        className="flex-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9"
                       >
-                        <CheckCircle2 className="w-4 h-4" />
-                        ซ่อมเสร็จ (COMPLETE)
+                        ปิดงานซ่อม
                       </Button>
-                    </>
-                  )}
-                </div>
-
-                {/* Quick Link to DCC E-form & Machine 360 */}
-                <div className="flex justify-between items-center text-[11px] pt-2 border-t border-stone-100">
-                  <Link
-                    href={`/maintenance/work-orders/${wo.wo_number}/eform`}
-                    target="_blank"
-                    className="text-stone-800 hover:text-stone-950 font-bold hover:underline inline-flex items-center gap-1 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200"
-                  >
-                    <span>📄 E-form (DCC)</span>
-                  </Link>
-                  <Link
-                    href={`/maintenance/machines/${wo.machine_code}`}
-                    className="text-[#8B7355] font-bold hover:underline inline-flex items-center gap-1"
-                  >
-                    ดูประวัติเครื่อง 360°
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                </div>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
+
+          {/* 3. NEW & ASSIGNED JOBS */}
+          <div className="space-y-3">
+            <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-600" />
+              งานใหม่รอดำเนินการ (New & Assigned) ({newPendingJobs.length})
+            </h3>
+
+            {newPendingJobs.length === 0 ? (
+              <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                ไม่มีงานรอรับใหม่ในขณะนี้
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {newPendingJobs.map(wo => (
+                  <div
+                    key={wo.id}
+                    className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700">
+                          {wo.priority}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-stone-900 mt-1">{wo.machine_code} - {wo.machine_name}</h4>
+                      <div className="text-xs text-stone-600 font-medium mt-0.5">{wo.symptom_category}</div>
+                      <div className="text-[11px] text-stone-400 mt-1">ผู้แจ้ง: {wo.requester_name}</div>
+                    </div>
+
+                    <Button
+                      onClick={() => handleAcceptJob(wo)}
+                      className="w-full bg-[#2A2521] hover:bg-stone-800 text-white font-bold text-xs rounded-xl h-10"
+                    >
+                      ACCEPT (รับงานนี้)
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 4. JOBS WAITING PRODUCTION VERIFY */}
+          {workOrders.filter(w => w.status === 'COMPLETED' || w.status === 'TEST_RUN').length > 0 && (
+            <div className="space-y-3 bg-amber-50/60 p-5 rounded-3xl border border-amber-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-black text-amber-900 flex items-center gap-2">
+                  <CheckSquare className="w-5 h-5 text-amber-700" />
+                  งานรอฝ่ายผลิตทดสอบ & ยืนยันเครื่องพร้อมใช้งาน (Production Sign-Off)
+                </h3>
+                <span className="text-xs text-amber-700 font-semibold">คลิกเพื่อยืนยันผล</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {workOrders.filter(w => w.status === 'COMPLETED' || w.status === 'TEST_RUN').map(wo => (
+                  <div key={wo.id} className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between">
+                    <div>
+                      <div className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</div>
+                      <div className="font-bold text-stone-900 text-sm">{wo.machine_code} - {wo.machine_name}</div>
+                      <div className="text-xs text-stone-500">สถานะ: <b className="text-indigo-700">{wo.status}</b></div>
+                    </div>
+
+                    <Button
+                      onClick={() => setVerifyModalWO(wo)}
+                      size="sm"
+                      className="bg-[#D4AF37] hover:bg-amber-600 text-stone-900 font-extrabold text-xs rounded-xl h-10 px-4"
+                    >
+                      VERIFY PASS / FAIL
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* 2. MY IN-PROGRESS & WAITING JOBS */}
-      <div className="space-y-3">
-        <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight flex items-center gap-2">
-          <Wrench className="w-5 h-5 text-[#D4AF37]" />
-          งานที่กำลังดำเนินการ (In Progress & Waiting) ({inProgressJobs.length})
-        </h3>
+      {/* GROUP 2: PREVENTIVE MAINTENANCE SECTION */}
+      {activeGroupTab === 'pm_plan' && (
+        <div className="space-y-5">
+          {/* Header Banner */}
+          <div className="bg-gradient-to-r from-cyan-900 via-cyan-800 to-teal-900 p-5 rounded-3xl text-white shadow-xl border border-cyan-500/30 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="p-2 rounded-xl bg-white/10 text-cyan-300">
+                  <Calendar className="w-5 h-5" />
+                </span>
+                <h3 className="text-lg sm:text-xl font-black tracking-tight">
+                  แผนงานบำรุงรักษาเชิงป้องกัน (PM Plan) ประจำเดือนนี้
+                </h3>
+              </div>
+              <p className="text-xs text-cyan-100/80">
+                ระบบดึงรอบเครื่องจักรที่ต้องเข้าทำ PM ในเดือนปัจจุบัน (กันยายน 2026 - SEP) เพื่อให้ช่างเปิด E-Form ตรวจเช็คหน้างาน
+              </p>
+            </div>
 
-        {inProgressJobs.length === 0 ? (
-          <div className="bg-white p-8 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
-            ไม่มีงานที่กำลังซ่อมค้างอยู่
+            <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-2xl border border-white/10 shrink-0">
+              <div className="text-center">
+                <span className="text-[10px] text-cyan-200 block uppercase font-bold">แผนเดือนนี้</span>
+                <span className="text-xl font-black text-white font-mono">{currentMonthPMCount}</span>
+              </div>
+              <div className="h-7 w-[1px] bg-white/20"></div>
+              <div className="text-center">
+                <span className="text-[10px] text-cyan-200 block uppercase font-bold">ที่เลือกแสดง</span>
+                <span className="text-xl font-black text-amber-300 font-mono">{filteredPMPlans.length}</span>
+              </div>
+            </div>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {inProgressJobs.map(wo => (
-              <div
-                key={wo.id}
-                className="bg-white border border-stone-200 hover:border-[#D4AF37] rounded-3xl p-5 shadow-sm space-y-3.5 transition-all flex flex-col justify-between"
+
+          {/* Filter Bar */}
+          <div className="bg-white p-4 rounded-3xl border border-stone-200 shadow-sm grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+            {/* Search */}
+            <div>
+              <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                ค้นหารหัส / ชื่อเครื่อง / แผน
+              </label>
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  placeholder="เช่น AFILL, AHU, MX..."
+                  value={pmSearchQuery}
+                  onChange={e => setPmSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-stone-200 bg-stone-50 text-xs focus:bg-white focus:outline-none focus:border-cyan-600"
+                />
+              </div>
+            </div>
+
+            {/* Month Filter */}
+            <div>
+              <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                งวดเดือนปฏิบัติการ
+              </label>
+              <select
+                value={pmMonthFilter}
+                onChange={e => setPmMonthFilter(e.target.value as any)}
+                className="w-full p-2 rounded-xl border border-stone-200 bg-stone-50 text-xs font-semibold text-stone-800 focus:bg-white focus:outline-none focus:border-cyan-600"
               >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      wo.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-900' :
-                      wo.status === 'WAITING_PART' ? 'bg-orange-100 text-orange-900' :
-                      'bg-indigo-100 text-indigo-900'
-                    }`}>
-                      {wo.status}
-                    </span>
-                  </div>
+                <option value="SEP">📍 กันยายน (SEP - เดือนปัจจุบัน)</option>
+                <option value="ALL">📅 ทั้งปี 2026 (ทุกเครื่องที่มีแผน PM)</option>
+              </select>
+            </div>
 
-                  <h4 className="text-base font-bold text-stone-900 mt-1">{wo.machine_code} - {wo.machine_name}</h4>
-                  <div className="text-xs text-stone-600 mt-0.5 font-medium">{wo.symptom_category}: {wo.symptom_description || 'ไม่มีรายละเอียด'}</div>
+            {/* Dept Filter */}
+            <div>
+              <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                แผนก (Department)
+              </label>
+              <select
+                value={pmDeptFilter}
+                onChange={e => setPmDeptFilter(e.target.value)}
+                className="w-full p-2 rounded-xl border border-stone-200 bg-stone-50 text-xs font-medium text-stone-800 focus:bg-white focus:outline-none focus:border-cyan-600"
+              >
+                {pmDepartments.map(d => (
+                  <option key={d} value={d}>
+                    {d === 'ALL' ? '🏢 ทุกแผนก (All Depts)' : `แผนก ${d}`}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-                  {wo.parts && wo.parts.length > 0 && (
-                    <div className="mt-2.5 p-2 bg-stone-50 rounded-xl text-[11px] text-stone-600 space-y-0.5 border border-stone-200">
-                      <span className="font-bold text-stone-700">อะไหล่ที่ใช้:</span>
-                      {wo.parts.map((p: any) => (
-                        <div key={p.id} className="flex justify-between">
-                          <span>• {p.part_name}</span>
-                          <span className="font-semibold">{p.quantity} {p.unit}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+            {/* Frequency Filter */}
+            <div>
+              <label className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block mb-1">
+                รอบความถี่ PM
+              </label>
+              <select
+                value={pmFreqFilter}
+                onChange={e => setPmFreqFilter(e.target.value)}
+                className="w-full p-2 rounded-xl border border-stone-200 bg-stone-50 text-xs font-medium text-stone-800 focus:bg-white focus:outline-none focus:border-cyan-600"
+              >
+                <option value="ALL">🔄 ทุกรอบความถี่</option>
+                <option value="PM1">PM1 = ทุก 1 เดือน</option>
+                <option value="PM2">PM2 = ทุก 2 เดือน</option>
+                <option value="PM3">PM3 = ทุก 3 เดือน</option>
+                <option value="PM4">PM4 = ทุก 4 เดือน</option>
+                <option value="PM6">PM6 = ทุก 6 เดือน</option>
+                <option value="PM12">PM12 = ทุก 12 เดือน</option>
+              </select>
+            </div>
+          </div>
 
-                <div className="space-y-2 pt-2 border-t border-stone-100">
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      onClick={() => setPartModalWO(wo)}
-                      size="sm"
-                      className="bg-amber-500 hover:bg-amber-600 text-stone-900 font-bold text-xs rounded-xl"
-                    >
-                      <Package className="w-3.5 h-3.5 mr-1" />
-                      + อะไหล่
-                    </Button>
+          {/* PM Plans Grid */}
+          {filteredPMPlans.length === 0 ? (
+            <div className="bg-white p-12 rounded-3xl border border-stone-200 text-center text-stone-400 space-y-2">
+              <Calendar className="w-10 h-10 text-stone-300 mx-auto mb-1" />
+              <div className="font-bold text-stone-700 text-sm">ไม่พบรายการงาน PM ตามเงื่อนไขที่เลือก</div>
+              <p className="text-xs text-stone-400">ลองเปลี่ยนตัวกรองเดือน แผนก หรือรอบความถี่</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredPMPlans.map(plan => {
+                const machine = (plan as any).machine
+                const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
+                const checklistCount = Array.isArray(plan.checklist_template) ? plan.checklist_template.length : 0
 
-                    <Button
-                      onClick={() => setCompleteModalData({ wo, targetStatus: 'TEST_RUN' })}
-                      size="sm"
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl"
-                    >
-                      TEST RUN
-                    </Button>
-                  </div>
-
-                  <Button
-                    onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
-                    size="sm"
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl h-10 shadow-sm"
+                return (
+                  <div
+                    key={plan.id}
+                    className="bg-white border-2 border-stone-200 hover:border-cyan-600 rounded-3xl p-5 shadow-sm hover:shadow-md transition space-y-4 flex flex-col justify-between"
                   >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
-                    บันทึกซ่อมเสร็จ (COMPLETE)
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+                    <div className="space-y-3">
+                      {/* Top Badges */}
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-mono text-xs font-bold text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-full border border-cyan-200">
+                          {plan.plan_code}
+                        </span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${freq.color}`}>
+                          {freq.full}
+                        </span>
+                      </div>
 
-      {/* 3. NEW & PENDING JOBS */}
-      <div className="space-y-3">
-        <h3 className="text-base sm:text-lg font-black text-stone-900 tracking-tight flex items-center gap-2">
-          <Clock className="w-5 h-5 text-stone-500" />
-          งานรอรับใหม่ (New & Pending) ({newPendingJobs.length})
-        </h3>
+                      {/* Machine Title */}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-base font-black text-stone-900">{plan.machine_code}</span>
+                          {machine?.criticality && (
+                            <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
+                              machine.criticality === 'A' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              Grade {machine.criticality}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-sm font-bold text-stone-800 line-clamp-1 mt-0.5">
+                          {plan.machine_name}
+                        </h4>
+                        <div className="text-xs text-stone-500 mt-0.5">
+                          {machine?.department_code || 'ฝ่ายผลิต'} • {machine?.production_area || '-'}
+                        </div>
+                      </div>
 
-        {newPendingJobs.length === 0 ? (
-          <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
-            ไม่มีงานรอรับใหม่ในขณะนี้
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {newPendingJobs.map(wo => (
-              <div
-                key={wo.id}
-                className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between"
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700">
-                      {wo.priority}
-                    </span>
+                      {/* Checklist & Due Date info */}
+                      <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 space-y-1.5 text-xs text-stone-600">
+                        <div className="flex justify-between items-center">
+                          <span className="text-stone-400">วันครบกำหนด:</span>
+                          <span className="font-semibold font-mono text-stone-800">
+                            {plan.next_due_date ? new Date(plan.next_due_date).toLocaleDateString('th-TH') : 'กันยายน 2026'}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-stone-400">มาตรฐานตรวจเช็ค:</span>
+                          <span className="font-semibold text-cyan-800 flex items-center gap-1">
+                            <FileCheck className="w-3.5 h-3.5" />
+                            {checklistCount} รายการ ({plan.estimated_minutes || 60} นาที)
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="pt-2 border-t border-stone-100 space-y-2">
+                      <Button
+                        onClick={() => setSelectedPlanForExecute(plan)}
+                        className="w-full bg-cyan-700 hover:bg-cyan-800 text-white font-black text-xs rounded-2xl h-11 shadow-sm flex items-center justify-center gap-2"
+                      >
+                        <span>🚀</span>
+                        <span>เริ่มตรวจเช็ค PM (E-Form)</span>
+                      </Button>
+
+                      <div className="flex items-center justify-between text-xs px-1">
+                        <Link
+                          href={`/maintenance/machines/${plan.machine_code}`}
+                          className="text-stone-500 hover:text-stone-900 font-medium inline-flex items-center gap-1"
+                        >
+                          <span>ดูสเปก & ประวัติ 360°</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                        <span className="text-[11px] text-stone-400">
+                          {plan.last_completed_at ? 'เคยทำแล้ว' : 'ยังไม่เคยทำในงวดนี้'}
+                        </span>
+                      </div>
+                    </div>
                   </div>
-
-                  <h4 className="text-sm font-bold text-stone-900 mt-1">{wo.machine_code} - {wo.machine_name}</h4>
-                  <div className="text-xs text-stone-600 font-medium mt-0.5">{wo.symptom_category}</div>
-                  <div className="text-[11px] text-stone-400 mt-1">ผู้แจ้ง: {wo.requester_name}</div>
-                </div>
-
-                <Button
-                  onClick={() => handleAcceptJob(wo)}
-                  className="w-full bg-[#2A2521] hover:bg-stone-800 text-white font-bold text-xs rounded-xl h-10"
-                >
-                  ACCEPT (รับงานนี้)
-                </Button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* 4. JOBS WAITING PRODUCTION VERIFY */}
-      {workOrders.filter(w => w.status === 'COMPLETED' || w.status === 'TEST_RUN').length > 0 && (
-        <div className="space-y-3 bg-amber-50/60 p-5 rounded-3xl border border-amber-200">
-          <div className="flex items-center justify-between">
-            <h3 className="text-base font-black text-amber-900 flex items-center gap-2">
-              <CheckSquare className="w-5 h-5 text-amber-700" />
-              งานรอฝ่ายผลิตทดสอบ & ยืนยันเครื่องพร้อมใช้งาน (Production Sign-Off)
-            </h3>
-            <span className="text-xs text-amber-700 font-semibold">คลิกเพื่อยืนยันผล</span>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {workOrders.filter(w => w.status === 'COMPLETED' || w.status === 'TEST_RUN').map(wo => (
-              <div key={wo.id} className="bg-white p-4 rounded-2xl border border-amber-200 shadow-sm flex items-center justify-between">
-                <div>
-                  <div className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</div>
-                  <div className="font-bold text-stone-900 text-sm">{wo.machine_code} - {wo.machine_name}</div>
-                  <div className="text-xs text-stone-500">สถานะ: <b className="text-indigo-700">{wo.status}</b></div>
-                </div>
-
-                <Button
-                  onClick={() => setVerifyModalWO(wo)}
-                  size="sm"
-                  className="bg-[#D4AF37] hover:bg-amber-600 text-stone-900 font-extrabold text-xs rounded-xl h-10 px-4"
-                >
-                  VERIFY PASS / FAIL
-                </Button>
-              </div>
-            ))}
-          </div>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -598,6 +890,17 @@ export default function TechnicianCockpitPage() {
           workOrderId={verifyModalWO.id}
           machineCode={verifyModalWO.machine_code}
           machineName={verifyModalWO.machine_name}
+          onSuccess={loadJobs}
+        />
+      )}
+
+      {/* Execute PM Checksheet Modal (E-Form) */}
+      {selectedPlanForExecute && (
+        <ExecutePMChecksheetModal
+          isOpen={!!selectedPlanForExecute}
+          onClose={() => setSelectedPlanForExecute(null)}
+          plan={selectedPlanForExecute}
+          technicianName={technicianName}
           onSuccess={loadJobs}
         />
       )}
