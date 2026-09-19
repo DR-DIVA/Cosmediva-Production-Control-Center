@@ -25,28 +25,76 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
   const pathname = usePathname()
 
   const navItems = [
-    { label: 'ภาพรวมระบบ', href: '/maintenance', icon: Cpu },
-    { label: 'โหมดช่างซ่อม', href: '/maintenance/technician', icon: HardHat, badge: 'Tech' },
-    { label: 'บอร์ดงานซ่อม', href: '/maintenance/work-orders', icon: KanbanSquare },
-    { label: 'แผน PM 2026', href: '/maintenance/pm', icon: Calendar, badge: 'PM' },
-    { label: 'ทะเบียนเครื่องจักร', href: '/maintenance/machines', icon: Wrench },
-    { label: 'พิมพ์ QR หน้าเครื่อง', href: '/maintenance/qr-print', icon: QrCode, badge: 'QR' },
-    { label: 'คลังอะไหล่', href: '/maintenance/spare-parts', icon: Package },
-    { label: 'แดชบอร์ด KPI', href: '/maintenance/dashboard', icon: BarChart3 },
-    { label: 'ค้นหาประวัติ', href: '/maintenance/search', icon: Search },
+    { 
+      label: 'ภาพรวมระบบ', 
+      href: '/maintenance', 
+      icon: Cpu,
+      color: 'bg-blue-100 text-blue-700 border-blue-200' 
+    },
+    { 
+      label: 'โหมดช่างซ่อม', 
+      href: '/maintenance/technician', 
+      icon: HardHat, 
+      badge: 'Tech',
+      color: 'bg-amber-100 text-amber-800 border-amber-200' 
+    },
+    { 
+      label: 'บอร์ดงานซ่อม', 
+      href: '/maintenance/work-orders', 
+      icon: KanbanSquare,
+      color: 'bg-purple-100 text-purple-700 border-purple-200' 
+    },
+    { 
+      label: 'แผน PM 2026', 
+      href: '/maintenance/pm', 
+      icon: Calendar, 
+      badge: 'PM',
+      color: 'bg-cyan-100 text-cyan-800 border-cyan-200' 
+    },
+    { 
+      label: 'ทะเบียนเครื่องจักร', 
+      href: '/maintenance/machines', 
+      icon: Wrench,
+      color: 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+    },
+    { 
+      label: 'พิมพ์ QR หน้าเครื่อง', 
+      href: '/maintenance/qr-print', 
+      icon: QrCode, 
+      badge: 'QR',
+      color: 'bg-rose-100 text-rose-800 border-rose-200' 
+    },
+    { 
+      label: 'คลังอะไหล่', 
+      href: '/maintenance/spare-parts', 
+      icon: Package,
+      color: 'bg-orange-100 text-orange-800 border-orange-200' 
+    },
+    { 
+      label: 'แดชบอร์ด KPI', 
+      href: '/maintenance/dashboard', 
+      icon: BarChart3,
+      color: 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+    },
+    { 
+      label: 'ค้นหาประวัติ', 
+      href: '/maintenance/search', 
+      icon: Search,
+      color: 'bg-teal-100 text-teal-800 border-teal-200' 
+    },
   ]
 
   return (
     <div className="space-y-4">
       {/* Top Banner */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-5 md:p-6 rounded-2xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-5 md:p-6 rounded-3xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]">
             <span className="inline-block w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse"></span>
             CosmeFlow OS • CMMS Industrial Module
           </div>
           <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight text-white flex items-center gap-3 mt-1">
-            <span className="p-2 bg-[#D4AF37]/20 border border-[#D4AF37]/50 rounded-xl text-[#D4AF37]">
+            <span className="p-2.5 bg-[#D4AF37]/20 border border-[#D4AF37]/50 rounded-2xl text-[#D4AF37]">
               <Wrench className="w-6 h-6 md:w-7 md:h-7" />
             </span>
             CosmeFlow Maintenance
@@ -62,14 +110,14 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
         <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
           <Link
             href="/maintenance/report"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-red-900/30 border border-red-400/30 transition-all transform active:scale-95 text-sm"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-red-900/30 border border-red-400/30 transition-all transform active:scale-95 text-sm"
           >
             <AlertOctagon className="w-5 h-5 animate-pulse" />
             🚨 แจ้งเครื่องเสียด่วน
           </Link>
           <Link
             href="/maintenance/technician"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-4 py-2.5 rounded-xl shadow-md transition-all text-sm active:scale-95"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-4 py-2.5 rounded-2xl shadow-md transition-all text-sm active:scale-95"
           >
             <HardHat className="w-4 h-4" />
             โหมดช่างซ่อม
@@ -77,33 +125,50 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs (Responsive Wrap - Never clips or overflows) */}
-      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-stone-100/90 rounded-2xl border border-stone-200/80 shadow-2xs">
-        {navItems.map(item => {
-          const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
-          const Icon = item.icon
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 ${
-                isActive
-                  ? 'bg-[#2A2521] text-[#D4AF37] shadow-xs border border-[#2A2521]'
-                  : 'bg-white hover:bg-stone-200/80 text-stone-700 hover:text-stone-950 border border-stone-200/70 shadow-2xs'
-              }`}
-            >
-              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#D4AF37]' : 'text-stone-500'}`} />
-              <span>{item.label}</span>
-              {item.badge && (
-                <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono ${
-                  isActive ? 'bg-[#D4AF37] text-stone-950' : 'bg-stone-100 text-stone-700 border border-stone-300'
+      {/* Prominent Icon Navigation Deck (Large, Clear, Tactile & Responsive) */}
+      <div className="bg-white p-2.5 sm:p-3 rounded-3xl border border-stone-200 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+          {navItems.map(item => {
+            const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 ${
+                  isActive
+                    ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
+                    : 'bg-stone-50/80 hover:bg-stone-100 text-stone-800 border border-stone-200 hover:border-stone-300 shadow-2xs hover:shadow-xs'
+                }`}
+              >
+                {/* Large Icon Image Container */}
+                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+                  isActive
+                    ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
+                    : `${item.color}`
                 }`}>
-                  {item.badge}
-                </span>
-              )}
-            </Link>
-          )
-        })}
+                  <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+                </div>
+
+                {/* Text Label */}
+                <div className="flex items-center gap-1.5">
+                  <span className={`text-xs sm:text-sm font-extrabold ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono ${
+                      isActive 
+                        ? 'bg-[#D4AF37] text-stone-950' 
+                        : 'bg-stone-200 text-stone-700 border border-stone-300'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </div>
   )
