@@ -21,7 +21,9 @@ import {
   ShieldAlert,
   HelpCircle,
   Clock,
-  ChevronDown
+  ChevronDown,
+  Download,
+  Share2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -190,6 +192,60 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           <Clock className="w-4 h-4 text-red-600 shrink-0" />
           <span>ระบบเริ่มจับเวลา Downtime และแจ้งเตือนทีมช่างแล้ว</span>
         </div>
+
+        {/* Photo attached preview & Share to LINE / Download */}
+        {photoPreview && (
+          <div className="space-y-2 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs text-left">
+            <span className="font-bold text-stone-700 block">รูปภาพ/วิดีโอที่แนบส่งทีมช่าง:</span>
+            <div className="relative rounded-xl overflow-hidden border border-stone-300 max-h-44 bg-black flex items-center justify-center">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photoPreview} alt="Attached symptom" className="max-h-44 object-contain" />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const a = document.createElement('a')
+                  a.href = photoPreview
+                  a.download = `symptom-${submittedWO.wo_number}.jpg`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  toast.success('ดาวน์โหลดรูปภาพลงมือถือเรียบร้อยแล้ว')
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>โหลดเก็บไว้</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  const shareText = `🚨 แจ้งเครื่องเสียด่วน (CosmeFlow Maintenance)\nเลขที่: ${submittedWO.wo_number}\nเครื่องจักร: ${submittedWO.machine_code} - ${submittedWO.machine_name}\nระดับ: ${submittedWO.priority}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ช่างกำลังเข้าตรวจสอบ`
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: 'แจ้งซ่อมเครื่องจักร CosmeFlow',
+                        text: shareText
+                      })
+                      toast.success('เปิดเมนูแชร์ส่งต่อเรียบร้อยแล้ว')
+                    } catch (err: any) {
+                      if (err.name !== 'AbortError') console.error(err)
+                    }
+                  } else {
+                    navigator.clipboard.writeText(shareText)
+                    toast.success('คัดลอกข้อความแจ้งซ่อมแล้ว นำไปวางใน LINE ได้เลยค่ะ')
+                  }
+                }}
+                className="flex-1 py-2 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+                <span>ส่งต่อเข้า LINE</span>
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-2 pt-2">
           <Button
@@ -361,8 +417,8 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           {/* Photo Button */}
           <label className="flex-1 h-12 rounded-2xl border-2 border-dashed border-stone-300 hover:border-[#D4AF37] hover:bg-amber-50/50 flex items-center justify-center gap-2 text-xs font-bold text-stone-600 cursor-pointer transition-colors">
             <Camera className="w-4 h-4 text-[#D4AF37]" />
-            <span>{photoPreview ? 'เปลี่ยนรูปภาพ' : 'ถ่ายรูป / แนบรูป'}</span>
-            <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+            <span>{photoPreview ? 'เปลี่ยนรูปภาพ / วิดีโอ' : 'ถ่ายรูป / วิดีโอ / แนบไฟล์'}</span>
+            <input type="file" accept="image/*,video/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
           </label>
 
           {/* Voice Input Button */}
@@ -381,15 +437,60 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
         </div>
 
         {photoPreview && (
-          <div className="relative rounded-2xl overflow-hidden border border-stone-300 max-h-48 w-full bg-black flex items-center justify-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={photoPreview} alt="Preview" className="max-h-48 object-contain" />
+          <div className="relative rounded-2xl overflow-hidden border border-stone-300 max-h-52 w-full bg-black flex items-center justify-center group">
+            {photoPreview.startsWith('data:video') ? (
+              <video src={photoPreview} controls className="max-h-52 object-contain" />
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={photoPreview} alt="Preview" className="max-h-52 object-contain" />
+            )}
+
+            {/* Quick Action Overlay on Preview */}
+            <div className="absolute top-2 left-2 flex items-center gap-1.5 bg-black/60 p-1 rounded-xl backdrop-blur-xs">
+              <button
+                type="button"
+                title="ดาวน์โหลดลงเครื่อง"
+                onClick={() => {
+                  const a = document.createElement('a')
+                  a.href = photoPreview
+                  a.download = `preview-${Date.now()}.jpg`
+                  document.body.appendChild(a)
+                  a.click()
+                  document.body.removeChild(a)
+                  toast.success('ดาวน์โหลดลงมือถือแล้ว')
+                }}
+                className="p-1.5 rounded-lg bg-white/90 hover:bg-white text-stone-900 transition"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+
+              <button
+                type="button"
+                title="ส่งต่อ / แชร์"
+                onClick={async () => {
+                  if (navigator.share) {
+                    try {
+                      await navigator.share({
+                        title: 'ภาพอาการหน้างาน CosmeFlow',
+                        text: 'ภาพอาการเครื่องจักรหน้างาน CosmeFlow Maintenance'
+                      })
+                    } catch (e) {}
+                  } else {
+                    toast.info('สามารถดาวน์โหลดแล้วส่งต่อได้เลยค่ะ')
+                  }
+                }}
+                className="p-1.5 rounded-lg bg-[#D4AF37] hover:bg-amber-400 text-stone-900 transition"
+              >
+                <Share2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
             <button
               type="button"
               onClick={() => setPhotoPreview(null)}
-              className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded-lg"
+              className="absolute top-2 right-2 bg-black/75 hover:bg-black text-white text-xs px-2.5 py-1.5 rounded-xl border border-white/20 transition"
             >
-              ลบรูป
+              ลบไฟล์
             </button>
           </div>
         )}

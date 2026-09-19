@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MachinePMSection from '@/components/maintenance/MachinePMSection'
+import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
 
 export const dynamic = 'force-dynamic'
 
@@ -312,6 +313,26 @@ export default async function Machine360Page({ params }: Props) {
                           📦 {p.part_name} ({p.quantity} {p.unit})
                         </span>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Media Attachments with Download & Share */}
+                  {((job.photo_before_urls && job.photo_before_urls.length > 0) || (job.photo_after_urls && job.photo_after_urls.length > 0)) && (
+                    <div className="pt-2 border-t border-stone-200/60 space-y-2">
+                      {job.photo_before_urls && job.photo_before_urls.length > 0 && (
+                        <MediaAttachmentViewer
+                          urls={job.photo_before_urls}
+                          title="รูปภาพ/วิดีโออาการที่แจ้ง"
+                          woNumber={job.wo_number}
+                        />
+                      )}
+                      {job.photo_after_urls && job.photo_after_urls.length > 0 && (
+                        <MediaAttachmentViewer
+                          urls={job.photo_after_urls}
+                          title="รูปภาพหลังซ่อมเสร็จ"
+                          woNumber={job.wo_number}
+                        />
+                      )}
                     </div>
                   )}
                 </div>

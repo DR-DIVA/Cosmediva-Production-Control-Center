@@ -31,6 +31,7 @@ import {
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
+import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
 
 export default function TechnicianCockpitPage() {
   const [workOrders, setWorkOrders] = useState<MaintenanceWorkOrder[]>([])
@@ -291,6 +292,26 @@ export default function TechnicianCockpitPage() {
                     </span>
                   </div>
                 </div>
+
+                {/* Photo/Video Attachments with Download & Share */}
+                {((wo.photo_before_urls && wo.photo_before_urls.length > 0) || (wo.photo_after_urls && wo.photo_after_urls.length > 0)) && (
+                  <div className="space-y-2 py-1">
+                    {wo.photo_before_urls && wo.photo_before_urls.length > 0 && (
+                      <MediaAttachmentViewer
+                        urls={wo.photo_before_urls}
+                        title="ภาพถ่าย/วิดีโออาการที่แจ้ง"
+                        woNumber={wo.wo_number}
+                      />
+                    )}
+                    {wo.photo_after_urls && wo.photo_after_urls.length > 0 && (
+                      <MediaAttachmentViewer
+                        urls={wo.photo_after_urls}
+                        title="ภาพถ่ายหลังการซ่อมเสร็จ"
+                        woNumber={wo.wo_number}
+                      />
+                    )}
+                  </div>
+                )}
 
                 {/* Status and Timer */}
                 <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 flex items-center justify-between text-xs">
