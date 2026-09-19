@@ -4,10 +4,11 @@ import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Pencil, Trash2, ShieldAlert } from 'lucide-react'
+import { Pencil, FileCheck, ShieldAlert, AlertOctagon } from 'lucide-react'
 import { toast } from 'sonner'
-import { updateMachine, deleteMachine } from '@/app/actions/maintenance'
+import { updateMachine } from '@/app/actions/maintenance'
 import { MaintenanceMachine } from '@/types/maintenance'
+import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
 
 interface EditMachineModalProps {
   machine: MaintenanceMachine | null
@@ -61,7 +62,7 @@ export default function EditMachineModal({
   const [serialNumber, setSerialNumber] = useState('')
   const [instruction, setInstruction] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
 
   // Populate fields when machine changes
   useEffect(() => {
@@ -118,28 +119,6 @@ export default function EditMachineModal({
       toast.error(err.message || 'ไม่สามารถบันทึกการแก้ไขได้')
     } finally {
       setIsSubmitting(false)
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!confirm(`ยืนยันการลบเครื่องจักร ${machine.machine_code} (${machine.machine_name}) ออกจากระบบหรือไม่?`)) {
-      return
-    }
-
-    setIsDeleting(true)
-    try {
-      const res = await deleteMachine(machine.id)
-      if (res.success) {
-        toast.success(`ลบเครื่องจักร ${machine.machine_code} เรียบร้อยแล้ว`)
-        onSuccess?.()
-        onClose()
-      } else {
-        toast.error(res.error || 'เกิดข้อผิดพลาดในการลบ')
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'ไม่สามารถลบเครื่องจักรได้')
-    } finally {
-      setIsDeleting(false)
     }
   }
 
@@ -333,19 +312,18 @@ export default function EditMachineModal({
           </div>
 
           {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-3 border-t border-stone-200">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-stone-200">
             <Button
               type="button"
               variant="outline"
-              onClick={handleDelete}
-              disabled={isDeleting || isSubmitting}
-              className="text-xs h-10 border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 gap-1 rounded-xl"
+              onClick={() => setIsRequestModalOpen(true)}
+              className="text-xs h-10 border-red-300 text-red-700 bg-red-50/70 hover:bg-red-100 hover:text-red-900 gap-1.5 rounded-xl font-bold w-full sm:w-auto"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              <span>{isDeleting ? 'กำลังลบ...' : 'ลบเครื่องจักร'}</span>
+              <FileCheck className="w-4 h-4 text-red-600" />
+              <span>ยื่นคำร้องขอยกเลิกใช้ / ปลดระวาง (MT-PF-002)</span>
             </Button>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
               <Button
                 type="button"
                 variant="outline"
@@ -365,6 +343,18 @@ export default function EditMachineModal({
             </div>
           </div>
         </form>
+
+        {/* Machine Action Request Modal (DCC MT-PF-002) */}
+        <MachineActionRequestModal
+          isOpen={isRequestModalOpen}
+          onClose={() => setIsRequestModalOpen(false)}
+          initialMachine={machine}
+          initialType="DECOMMISSION"
+          onSuccess={() => {
+            onClose()
+            onSuccess?.()
+          }}
+        />
       </DialogContent>
     </Dialog>
   )

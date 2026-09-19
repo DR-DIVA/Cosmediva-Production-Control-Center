@@ -15,16 +15,19 @@ import {
   Clock,
   Printer,
   Plus,
-  Pencil
+  Pencil,
+  FileCheck
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
-import { MaintenanceMachine } from '@/types/maintenance'
+import { MaintenanceMachine, MachineRequestType } from '@/types/maintenance'
 import { getMachines } from '@/app/actions/maintenance'
 import MachineQRBadge from '@/components/maintenance/MachineQRBadge'
 import AddMachineModal from '@/components/maintenance/AddMachineModal'
 import EditMachineModal from '@/components/maintenance/EditMachineModal'
+import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
+import MachineRequestsListModal from '@/components/maintenance/MachineRequestsListModal'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 
 export default function MachinesMasterPage() {
@@ -37,6 +40,8 @@ export default function MachinesMasterPage() {
   const [qrMachine, setQrMachine] = useState<MaintenanceMachine | null>(null)
   const [editingMachine, setEditingMachine] = useState<MaintenanceMachine | null>(null)
   const [isAddMachineOpen, setIsAddMachineOpen] = useState(false)
+  const [isRequestsListOpen, setIsRequestsListOpen] = useState(false)
+  const [isActionRequestOpen, setIsActionRequestOpen] = useState(false)
 
   const fetchMachines = async () => {
     setIsLoading(true)
@@ -158,11 +163,22 @@ export default function MachinesMasterPage() {
 
           <Button
             type="button"
-            onClick={() => setIsAddMachineOpen(true)}
+            onClick={() => setIsRequestsListOpen(true)}
+            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-white hover:bg-stone-100 text-stone-800 border border-stone-200 shadow-sm flex items-center gap-1.5 transition"
+            title="ดูคำร้องขอดำเนินการเกี่ยวกับเครื่องจักร (MT-PF-002)"
+          >
+            <FileCheck className="w-3.5 h-3.5 text-blue-600" />
+            <span>คำขอดำเนินการ (MT-PF-002)</span>
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => setIsActionRequestOpen(true)}
             className="h-10 px-3.5 rounded-xl text-xs font-extrabold bg-[#D4AF37] hover:bg-amber-600 text-stone-950 shadow-sm flex items-center gap-1.5"
+            title="ยื่นคำขอขึ้นทะเบียนเครื่องจักรใหม่ (MT-PF-002)"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>+ เพิ่มเครื่องจักรใหม่</span>
+            <span>+ ขอขึ้นทะเบียนเครื่องใหม่</span>
           </Button>
         </div>
       </div>
@@ -278,15 +294,26 @@ export default function MachinesMasterPage() {
         })}
       </div>
 
-      {/* Floating Action Button for Registering New Machine */}
-      <button
-        onClick={() => setIsAddMachineOpen(true)}
-        className="fixed bottom-6 right-6 z-40 bg-[#D4AF37] hover:bg-[#b89528] text-stone-950 font-black px-4 py-3 rounded-2xl shadow-2xl border-2 border-white flex items-center gap-2 transition transform active:scale-95 text-xs sm:text-sm hover:shadow-amber-500/20"
-        title="ขึ้นทะเบียนเครื่องจักรใหม่"
-      >
-        <Plus className="w-5 h-5 stroke-[2.5]" />
-        <span>+ เพิ่มเครื่องจักรใหม่</span>
-      </button>
+      {/* Floating Action Buttons for MT-PF-002 Governance */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col sm:flex-row items-end sm:items-center gap-2">
+        <button
+          onClick={() => setIsRequestsListOpen(true)}
+          className="bg-white hover:bg-stone-50 text-stone-800 font-bold px-3.5 py-2.5 rounded-2xl shadow-xl border border-stone-200 flex items-center gap-2 transition text-xs"
+          title="ดูรายการคำร้อง MT-PF-002 ทั้งหมด"
+        >
+          <FileCheck className="w-4 h-4 text-blue-600" />
+          <span>คำขอดำเนินการ (MT-PF-002)</span>
+        </button>
+
+        <button
+          onClick={() => setIsActionRequestOpen(true)}
+          className="bg-[#D4AF37] hover:bg-[#b89528] text-stone-950 font-black px-4 py-3 rounded-2xl shadow-2xl border-2 border-white flex items-center gap-2 transition transform active:scale-95 text-xs sm:text-sm hover:shadow-amber-500/20"
+          title="ยื่นขอขึ้นทะเบียนเครื่องจักรใหม่ (MT-PF-002)"
+        >
+          <Plus className="w-5 h-5 stroke-[2.5]" />
+          <span>+ ยื่นขอเพิ่มเครื่องใหม่ (MT-PF-002)</span>
+        </button>
+      </div>
 
       {/* QR Badge Modal */}
       {qrMachine && (
@@ -303,7 +330,7 @@ export default function MachinesMasterPage() {
         </Dialog>
       )}
 
-      {/* Add Machine Modal */}
+      {/* Add Machine Modal (Direct admin fallback) */}
       <AddMachineModal
         isOpen={isAddMachineOpen}
         onClose={() => setIsAddMachineOpen(false)}
@@ -315,6 +342,21 @@ export default function MachinesMasterPage() {
         machine={editingMachine}
         isOpen={!!editingMachine}
         onClose={() => setEditingMachine(null)}
+        onSuccess={fetchMachines}
+      />
+
+      {/* Machine Requests List Modal (MT-PF-002 Review / Approval) */}
+      <MachineRequestsListModal
+        isOpen={isRequestsListOpen}
+        onClose={() => setIsRequestsListOpen(false)}
+        onSuccess={fetchMachines}
+      />
+
+      {/* Machine Action Request Modal (MT-PF-002 New Machine Request) */}
+      <MachineActionRequestModal
+        isOpen={isActionRequestOpen}
+        onClose={() => setIsActionRequestOpen(false)}
+        initialType="NEW_MACHINE"
         onSuccess={fetchMachines}
       />
     </div>

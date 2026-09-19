@@ -9,7 +9,10 @@ import {
   MaintenancePMPlan,
   MaintenancePMAdjustmentLog,
   PriorityLevel,
-  WorkOrderStatus 
+  WorkOrderStatus,
+  MaintenanceMachineRequest,
+  MachineRequestType,
+  MachineRequestStatus
 } from '@/types/maintenance'
 
 /**
@@ -1338,5 +1341,346 @@ export async function getWorkOrderDCCDetails(idOrWoNumber: string) {
 
   return { success: true, data }
 }
+
+/**
+ * Generate sequential Machine Request number: MR-YYYY-XXXX
+ */
+async function generateMachineRequestNumber(supabase: any): Promise<string> {
+  const currentYear = new Date().getFullYear()
+  const prefix = `MR-${currentYear}-`
+
+  const { data } = await supabase
+    .from('maintenance_machine_requests')
+    .select('request_number')
+    .like('request_number', `${prefix}%`)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  let nextSeq = 1
+  if (data && data.length > 0) {
+    const lastNumber = data[0].request_number
+    const match = lastNumber.match(/MR-\d{4}-(\d+)/)
+    if (match && match[1]) {
+      nextSeq = parseInt(match[1], 10) + 1
+    }
+  }
+
+  return `${prefix}${nextSeq.toString().padStart(4, '0')}`
+}
+
+/**
+ * 1. Create a new Machine Request (MT-PF-002)
+ * Supports 4 request types:
+ * - NEW_MACHINE: ขอเพิ่มเครื่องจักรใหม่
+ * - DECOMMISSION: ขอยกเลิกใช้ / ปลดระวาง
+ * - RELOCATE: ขอโอนย้ายสังกัด / แผนก / พื้นที่
+ * - OTHER: ขอกรณีอื่นๆ (ดัดแปลง / สเปกพิเศษ)
+ */
+export async function createMachineRequest(payload: {
+  request_type: MachineRequestType
+  machine_id?: string | null
+  machine_code: string
+  machine_name: string
+  current_department?: string | null
+  current_location?: string | null
+  target_department?: string | null
+  target_location?: string | null
+  proposed_machine_data?: any
+  reason: string
+  requested_by_name: string
+  requested_by_dept?: string | null
+}) {
+  const supabase = createAdminClient()
+
+  if (!payload.reason || payload.reason.trim().length < 5) {
+    return { success: false, error: 'กรุณาระบุเหตุผลในการขอดำเนินการเกี่ยวกับเครื่องจักรอย่างน้อย 5 ตัวอักษร' }
+  }
+
+  const reqNumber = await generateMachineRequestNumber(supabase)
+
+  const insertData = {
+    request_number: reqNumber,
+    request_type: payload.request_type,
+    machine_id: payload.machine_id || null,
+    machine_code: payload.machine_code.trim().toUpperCase(),
+    machine_name: payload.machine_name.trim(),
+    current_department: payload.current_department || null,
+    current_location: payload.current_location || null,
+    target_department: payload.target_department || null,
+    target_location: payload.target_location || null,
+    proposed_machine_data: payload.proposed_machine_data || null,
+    reason: payload.reason.trim(),
+    status: 'PENDING',
+    requested_by_name: payload.requested_by_name.trim(),
+    requested_by_dept: payload.requested_by_dept || 'ฝ่ายผลิต (Production)',
+    execution_status: 'PENDING',
+    dcc_doc_code: 'MT-PF-002'
+  }
+
+  const { data, error } = await supabase
+    .from('maintenance_machine_requests')
+    .insert(insertData)
+    .select()
+    .single()
+
+  if (error) {
+    console.error('Error creating machine request:', error)
+    return { success: false, error: error.message }
+  }
+
+  // Audit log
+  await supabase.from('maintenance_audit_logs').insert({
+    entity_name: 'maintenance_machine_requests',
+    entity_id: data.id,
+    action: `SUBMIT_REQUEST_${payload.request_type}`,
+    new_data: insertData,
+    performed_by_name: payload.requested_by_name
+  })
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  revalidatePath('/dcc')
+
+  return { 
+    success: true, 
+    data: data as MaintenanceMachineRequest,
+    message: `ยื่นคำร้อง ${reqNumber} สำเร็จแล้ว รอการอนุมัติตามขั้นตอน DCC`
+  }
+}
+
+/**
+ * Get all machine requests with optional filters
+ */
+export async function getMachineRequests(filters?: {
+  status?: string
+  type?: string
+  search?: string
+}) {
+  const supabase = createAdminClient()
+  let query = supabase
+    .from('maintenance_machine_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (filters?.status && filters.status !== 'ALL') {
+    query = query.eq('status', filters.status)
+  }
+  if (filters?.type && filters.type !== 'ALL') {
+    query = query.eq('request_type', filters.type)
+  }
+  if (filters?.search) {
+    const s = `%${filters.search}%`
+    query = query.or(`request_number.ilike.${s},machine_code.ilike.${s},machine_name.ilike.${s},requested_by_name.ilike.${s}`)
+  }
+
+  const { data, error } = await query
+  if (error) {
+    console.error('Error fetching machine requests:', error)
+    return { success: false, error: error.message, data: [] }
+  }
+
+  return { success: true, data: (data || []) as MaintenanceMachineRequest[] }
+}
+
+/**
+ * Approve a Machine Request and automatically execute the action
+ */
+export async function approveMachineRequest(
+  requestId: string,
+  approverName: string = 'Plant Director (PDT)',
+  approverComment: string = 'อนุมัติการดำเนินการตามมาตรฐาน DCC'
+) {
+  const supabase = createAdminClient()
+
+  const { data: request, error: fetchErr } = await supabase
+    .from('maintenance_machine_requests')
+    .select('*')
+    .eq('id', requestId)
+    .single()
+
+  if (fetchErr || !request) {
+    return { success: false, error: 'ไม่พบคำร้องที่ระบุ' }
+  }
+
+  if (request.status !== 'PENDING') {
+    return { success: false, error: `คำร้องนี้อยู่ในสถานะ ${request.status} แล้ว ไม่สามารถอนุมัติซ้ำได้` }
+  }
+
+  // Execute the change in maintenance_machines based on request type
+  let executionSuccess = true
+  let executionError: string | null = null
+
+  try {
+    if (request.request_type === 'NEW_MACHINE') {
+      const pData = request.proposed_machine_data || {}
+      const { error: insErr } = await supabase
+        .from('maintenance_machines')
+        .insert({
+          machine_code: request.machine_code,
+          machine_name: request.machine_name,
+          category: pData.category || 'General Machinery',
+          department_name: request.target_department || pData.department_name || 'ฝ่ายผลิต (Production)',
+          production_area: request.target_location || pData.production_area || '',
+          criticality: pData.criticality || 'B',
+          status: 'Running',
+          manufacturer: pData.manufacturer || '',
+          model: pData.model || '',
+          serial_number: pData.serial_number || '',
+          hourly_downtime_cost: pData.hourly_downtime_cost || 5000,
+          maintenance_instruction: pData.maintenance_instruction || ''
+        })
+      if (insErr) {
+        executionSuccess = false
+        executionError = insErr.message
+      }
+    } else if (request.request_type === 'DECOMMISSION') {
+      // Decommission & Soft-delete machine
+      if (request.machine_id) {
+        const { error: updErr } = await supabase
+          .from('maintenance_machines')
+          .update({
+            status: 'Decommissioned',
+            is_deleted: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', request.machine_id)
+        if (updErr) {
+          executionSuccess = false
+          executionError = updErr.message
+        }
+      } else {
+        const { error: updErr } = await supabase
+          .from('maintenance_machines')
+          .update({
+            status: 'Decommissioned',
+            is_deleted: true,
+            updated_at: new Date().toISOString()
+          })
+          .eq('machine_code', request.machine_code)
+        if (updErr) {
+          executionSuccess = false
+          executionError = updErr.message
+        }
+      }
+    } else if (request.request_type === 'RELOCATE') {
+      // Relocate machine to target department and area
+      const updatePayload: any = { updated_at: new Date().toISOString() }
+      if (request.target_department) updatePayload.department_name = request.target_department
+      if (request.target_location) updatePayload.production_area = request.target_location
+
+      const q = request.machine_id 
+        ? supabase.from('maintenance_machines').update(updatePayload).eq('id', request.machine_id)
+        : supabase.from('maintenance_machines').update(updatePayload).eq('machine_code', request.machine_code)
+
+      const { error: relErr } = await q
+      if (relErr) {
+        executionSuccess = false
+        executionError = relErr.message
+      }
+    } else if (request.request_type === 'OTHER') {
+      // Apply proposed data if available
+      if (request.proposed_machine_data && (request.machine_id || request.machine_code)) {
+        const q = request.machine_id 
+          ? supabase.from('maintenance_machines').update(request.proposed_machine_data).eq('id', request.machine_id)
+          : supabase.from('maintenance_machines').update(request.proposed_machine_data).eq('machine_code', request.machine_code)
+        await q
+      }
+    }
+  } catch (err: any) {
+    executionSuccess = false
+    executionError = err.message
+  }
+
+  if (!executionSuccess) {
+    return { success: false, error: `ไม่สามารถปรับปรุงเครื่องจักรจริงได้: ${executionError}` }
+  }
+
+  // Update request status to APPROVED
+  const now = new Date().toISOString()
+  const { data: updatedReq, error: reqErr } = await supabase
+    .from('maintenance_machine_requests')
+    .update({
+      status: 'APPROVED',
+      approved_by_name: approverName,
+      approved_at: now,
+      approver_comment: approverComment,
+      execution_status: 'COMPLETED',
+      updated_at: now
+    })
+    .eq('id', requestId)
+    .select()
+    .single()
+
+  if (reqErr) {
+    return { success: false, error: reqErr.message }
+  }
+
+  // Audit log
+  await supabase.from('maintenance_audit_logs').insert({
+    entity_name: 'maintenance_machine_requests',
+    entity_id: requestId,
+    action: `APPROVE_REQUEST_${request.request_type}`,
+    old_data: request,
+    new_data: updatedReq,
+    performed_by_name: approverName
+  })
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  revalidatePath('/maintenance/qr-print')
+  revalidatePath('/dcc')
+
+  return { success: true, data: updatedReq, message: `อนุมัติคำร้อง ${request.request_number} และดำเนินการเรียบร้อยแล้ว` }
+}
+
+/**
+ * Reject a Machine Request
+ */
+export async function rejectMachineRequest(
+  requestId: string,
+  rejectorName: string,
+  rejectionReason: string
+) {
+  const supabase = createAdminClient()
+
+  if (!rejectionReason || rejectionReason.trim().length < 3) {
+    return { success: false, error: 'กรุณาระบุเหตุผลที่ไม่อนุมัติ' }
+  }
+
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('maintenance_machine_requests')
+    .update({
+      status: 'REJECTED',
+      rejection_reason: rejectionReason.trim(),
+      approved_by_name: rejectorName,
+      approved_at: now,
+      execution_status: 'FAILED',
+      updated_at: now
+    })
+    .eq('id', requestId)
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  // Audit log
+  await supabase.from('maintenance_audit_logs').insert({
+    entity_name: 'maintenance_machine_requests',
+    entity_id: requestId,
+    action: 'REJECT_REQUEST',
+    new_data: data,
+    performed_by_name: rejectorName
+  })
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  revalidatePath('/dcc')
+
+  return { success: true, data, message: `ปฏิเสธคำร้องเรียบร้อยแล้ว` }
+}
+
 
 

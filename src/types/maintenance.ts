@@ -275,3 +275,41 @@ export interface MaintenanceNotification {
   is_read: boolean
   created_at: string
 }
+
+export type MachineRequestType = 
+  | 'NEW_MACHINE'   // 1. ขอเพิ่มเครื่องจักรใหม่
+  | 'DECOMMISSION'  // 2. ขอยกเลิกใช้ / ปลดระวาง
+  | 'RELOCATE'      // 3. ขอโอนย้ายสังกัด / แผนก / พื้นที่
+  | 'OTHER'         // 4. ขอกรณีอื่นๆ (ดัดแปลง / เปลี่ยนสเปก)
+
+export type MachineRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED'
+
+export interface MaintenanceMachineRequest {
+  id: string
+  request_number: string
+  request_type: MachineRequestType
+  machine_id?: string | null
+  machine_code: string
+  machine_name: string
+  current_department?: string | null
+  current_location?: string | null
+  target_department?: string | null
+  target_location?: string | null
+  proposed_machine_data?: any
+  reason: string
+  status: MachineRequestStatus
+  requested_by_name: string
+  requested_by_dept?: string | null
+  requested_at: string
+  reviewed_by_name?: string | null
+  reviewed_at?: string | null
+  approved_by_name?: string | null
+  approved_at?: string | null
+  approver_comment?: string | null
+  rejection_reason?: string | null
+  execution_status?: 'PENDING' | 'COMPLETED' | 'FAILED' | null
+  dcc_doc_code: string
+  created_at: string
+  updated_at: string
+}
+
