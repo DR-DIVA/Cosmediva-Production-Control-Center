@@ -1265,6 +1265,11 @@ export function RollingMasterRadar({
     if (!horizonStartStr || !horizonEndStr) return
     if (!silent) setLoading(true)
 
+    // Safety timeout: ensure loading state never gets stuck indefinitely
+    const safetyTimeout = !silent ? setTimeout(() => {
+      setLoading(false)
+    }, 7000) : null
+
     try {
       const [
         { data: etaData },
@@ -1322,13 +1327,14 @@ export function RollingMasterRadar({
           .or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%,note.ilike.%[NC]%')
           .order('updated_at', { ascending: false }),
 
-        // 6. All production logs for tracking Bulk Staging Stock & Packing consumption
+        // 6. Production logs for tracking Bulk Staging Stock & Packing consumption (Scoped to active lots)
         supabase.from('production_logs')
           .select(`
             id, status, qc_status, activity_date, end_date, tank_start, tank_end, tank_details, total_tanks,
             processes (process_name),
-            production_lots (id, lot_no, planned_quantity, total_tanks, current_status, products:sku_id (sku, product_name))
+            production_lots!inner (id, lot_no, planned_quantity, total_tanks, current_status, products:sku_id (sku, product_name))
           `)
+          .neq('production_lots.current_status', 'DONE')
           .order('activity_date', { ascending: true })
       ])
 
@@ -1354,6 +1360,7 @@ export function RollingMasterRadar({
     } catch (err) {
       console.error('Error fetching rolling radar data:', err)
     } finally {
+      if (safetyTimeout) clearTimeout(safetyTimeout)
       if (!silent) setLoading(false)
     }
   }
@@ -2372,7 +2379,7 @@ export function RollingMasterRadar({
               <Truck className="w-4 h-4 text-amber-500 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-amber-300' : 'text-amber-700'}`}>คลัง RM/PM (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-amber-100' : 'text-amber-900'}`}>{summaryCounts.totalEta} รายการ</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-amber-100' : 'text-amber-900'}`}>{loading ? '...' : `${summaryCounts.totalEta} รายการ`}</div>
               </div>
             </div>
           </div>
@@ -2384,7 +2391,7 @@ export function RollingMasterRadar({
               <Scale className="w-4 h-4 text-indigo-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-indigo-300' : 'text-indigo-700'}`}>เตรียม/ชั่งสาร (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-indigo-100' : 'text-indigo-900'}`}>{summaryCounts.totalWeighing} รอบงาน</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-indigo-100' : 'text-indigo-900'}`}>{loading ? '...' : `${summaryCounts.totalWeighing} รอบงาน`}</div>
               </div>
             </div>
           </div>
@@ -2396,7 +2403,7 @@ export function RollingMasterRadar({
               <Beaker className="w-4 h-4 text-blue-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-blue-300' : 'text-blue-700'}`}>งานผสม Bulk (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-blue-100' : 'text-blue-900'}`}>{summaryCounts.totalMixingTanks} ถัง ({summaryCounts.totalMixing} รอบ)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-blue-100' : 'text-blue-900'}`}>{loading ? '...' : `${summaryCounts.totalMixingTanks} ถัง (${summaryCounts.totalMixing} รอบ)`}</div>
               </div>
             </div>
           </div>
@@ -2408,7 +2415,7 @@ export function RollingMasterRadar({
               <ShieldCheck className="w-4 h-4 text-purple-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-purple-300' : 'text-purple-700'}`}>ตรวจ QC (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{summaryCounts.totalQc} รายการ</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-purple-100' : 'text-purple-900'}`}>{loading ? '...' : `${summaryCounts.totalQc} รายการ`}</div>
               </div>
             </div>
           </div>
@@ -2451,11 +2458,13 @@ export function RollingMasterRadar({
                     ? (isNight ? 'text-purple-200 font-black' : 'text-purple-900 font-black')
                     : (isNight ? 'text-emerald-200' : 'text-emerald-800')
                 }`}>
-                  {summaryCounts.totalPendingQa > 0 
-                    ? `รอ QA: ${summaryCounts.totalPendingQa}${summaryCounts.totalFirstBatch > 0 ? ` • 🔬 1st: ${summaryCounts.totalFirstBatch}` : ''}` 
-                    : summaryCounts.totalFirstBatch > 0
-                    ? `🔬 1st Batch: ${summaryCounts.totalFirstBatch} รอบ`
-                    : '✅ ปกติ (0 เคส)'}
+                  {loading ? '...' : (
+                    summaryCounts.totalPendingQa > 0 
+                      ? `รอ QA: ${summaryCounts.totalPendingQa}${summaryCounts.totalFirstBatch > 0 ? ` • 🔬 1st: ${summaryCounts.totalFirstBatch}` : ''}` 
+                      : summaryCounts.totalFirstBatch > 0
+                      ? `🔬 1st Batch: ${summaryCounts.totalFirstBatch} รอบ`
+                      : '✅ ปกติ (0 เคส)'
+                  )}
                 </div>
               </div>
             </div>
@@ -2468,7 +2477,7 @@ export function RollingMasterRadar({
               <Boxes className="w-4 h-4 text-cyan-500 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-cyan-300' : 'text-cyan-700'}`}>คลัง Bulk (สต็อกพร้อมบรรจุ)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-cyan-100' : 'text-cyan-900'}`}>{summaryCounts.totalBulkStockTanks} ถัง ({summaryCounts.totalBulkStockLots} ล็อต)</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-cyan-100' : 'text-cyan-900'}`}>{loading ? '...' : `${summaryCounts.totalBulkStockTanks} ถัง (${summaryCounts.totalBulkStockLots} ล็อต)`}</div>
               </div>
             </div>
           </div>
@@ -2480,7 +2489,7 @@ export function RollingMasterRadar({
               <Package className="w-4 h-4 text-emerald-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-emerald-300' : 'text-emerald-700'}`}>งานบรรจุ (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{summaryCounts.totalPacking} รอบงาน</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-emerald-100' : 'text-emerald-900'}`}>{loading ? '...' : `${summaryCounts.totalPacking} รอบงาน`}</div>
               </div>
             </div>
           </div>
@@ -2492,7 +2501,7 @@ export function RollingMasterRadar({
               <PackageOpen className="w-4 h-4 text-teal-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-teal-300' : 'text-teal-700'}`}>งานลงลัง/POF (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-teal-100' : 'text-teal-900'}`}>{summaryCounts.totalPof} รอบงาน</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-teal-100' : 'text-teal-900'}`}>{loading ? '...' : `${summaryCounts.totalPof} รอบงาน`}</div>
               </div>
             </div>
           </div>
@@ -2504,7 +2513,7 @@ export function RollingMasterRadar({
               <Gift className="w-4 h-4 text-rose-400 shrink-0" />
               <div className="min-w-0">
                 <div className={`text-[10px] font-medium truncate ${isNight ? 'text-rose-300' : 'text-rose-700'}`}>คลัง FG & ส่งมอบ (21 วัน)</div>
-                <div className={`text-sm font-black truncate ${isNight ? 'text-rose-100' : 'text-rose-900'}`}>{summaryCounts.totalFgDue} ล็อต</div>
+                <div className={`text-sm font-black truncate ${isNight ? 'text-rose-100' : 'text-rose-900'}`}>{loading ? '...' : `${summaryCounts.totalFgDue} ล็อต`}</div>
               </div>
             </div>
           </div>
@@ -2513,9 +2522,14 @@ export function RollingMasterRadar({
 
       <CardContent className="p-4 md:p-6">
         {loading ? (
-          <div className={`p-12 text-center ${isNight ? 'text-slate-400' : 'text-slate-400'}`}>
-            <Compass className="w-8 h-8 mx-auto mb-3 animate-spin text-[#D4AF37]" />
-            กำลังจัดทำเรดาร์แผนงาน 21 วัน (ย้อนหลัง 7 วัน + ล่วงหน้า 14 วัน)...
+          <div className={`p-10 text-center rounded-2xl border my-4 transition-colors ${
+            isNight ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-[#FAF8F5] border-[#D4AF37]/30 text-[#4A4238]'
+          }`}>
+            <Compass className="w-10 h-10 mx-auto mb-3 animate-spin text-[#D4AF37]" />
+            <div className="font-bold text-sm text-[#D4AF37]">กำลังเชื่อมต่อและประมวลผลเรดาร์แผนงาน 21 วัน...</div>
+            <div className="text-xs text-slate-400 mt-1.5 max-w-lg mx-auto">
+              ระบบกำลังเชื่อมโยงข้อมูลทั้ง 9 สายงานการผลิต (RM/PM, ชั่ง, ผสม, QC, QA, Bulk, บรรจุ, POF, FG) เพื่อแสดงผลภาพรวมโรงงาน
+            </div>
           </div>
         ) : (
           <>
