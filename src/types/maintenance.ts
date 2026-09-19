@@ -313,3 +313,22 @@ export interface MaintenanceMachineRequest {
   updated_at: string
 }
 
+export interface MachineAuditChange {
+  field: string
+  label: string
+  old_value: any
+  new_value: any
+}
+
+export interface MaintenanceMachineAuditLog {
+  id: string
+  machine_id: string
+  machine_code: string
+  machine_name: string
+  edited_by_name: string
+  edit_reason: string
+  changes_summary: MachineAuditChange[]
+  created_at: string
+}
+
+

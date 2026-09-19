@@ -12,7 +12,8 @@ import {
   WorkOrderStatus,
   MaintenanceMachineRequest,
   MachineRequestType,
-  MachineRequestStatus
+  MachineRequestStatus,
+  MaintenanceMachineAuditLog
 } from '@/types/maintenance'
 
 /**
@@ -156,8 +157,30 @@ export async function updateMachine(id: string, payload: {
   serial_number?: string
   hourly_downtime_cost?: number
   maintenance_instruction?: string
+  // Mandatory GMP Audit Trail fields
+  edited_by_name: string
+  edit_reason: string
 }) {
   const supabase = createAdminClient()
+
+  if (!payload.edit_reason || payload.edit_reason.trim().length < 5) {
+    return { success: false, error: 'กรุณาระบุเหตุผลความจำเป็นในการแก้ไขข้อมูลอย่างน้อย 5 ตัวอักษร เพื่อการสอบกลับ (Audit Trail)' }
+  }
+
+  if (!payload.edited_by_name || !payload.edited_by_name.trim()) {
+    return { success: false, error: 'กรุณาระบุชื่อผู้แก้ไขข้อมูล เพื่อการสอบกลับ (Audit Trail)' }
+  }
+
+  // 1. Fetch current machine before update
+  const { data: currentMachine, error: fetchErr } = await supabase
+    .from('maintenance_machines')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (fetchErr || !currentMachine) {
+    return { success: false, error: 'ไม่พบข้อมูลเครื่องจักรที่ต้องการแก้ไข' }
+  }
 
   const updateData: any = {
     machine_name: payload.machine_name.trim(),
@@ -194,6 +217,43 @@ export async function updateMachine(id: string, payload: {
     updateData.machine_code = code
   }
 
+  // 2. Compute diff for Audit Trail
+  const FIELD_LABELS: Record<string, string> = {
+    machine_code: 'รหัสเครื่องจักร',
+    machine_name: 'ชื่อเครื่องจักร',
+    category: 'หมวดหมู่',
+    department_name: 'แผนกสังกัด',
+    production_area: 'พื้นที่ / ห้องผลิต',
+    criticality: 'ระดับวิกฤตภาพ (Criticality)',
+    status: 'สถานะการทำงาน',
+    manufacturer: 'ยี่ห้อ / ผู้ผลิต',
+    model: 'รุ่น',
+    serial_number: 'หมายเลขซีเรียล (S/N)',
+    hourly_downtime_cost: 'ต้นทุน Downtime (บาท/ชม.)',
+    maintenance_instruction: 'คำแนะนำการบำรุงรักษา'
+  }
+
+  const changes: { field: string; label: string; old_value: any; new_value: any }[] = []
+  for (const [key, label] of Object.entries(FIELD_LABELS)) {
+    if (key in updateData) {
+      const oldVal = currentMachine[key] ?? ''
+      const newVal = updateData[key] ?? ''
+      if (String(oldVal).trim() !== String(newVal).trim()) {
+        changes.push({
+          field: key,
+          label,
+          old_value: oldVal,
+          new_value: newVal
+        })
+      }
+    }
+  }
+
+  if (changes.length === 0) {
+    return { success: false, error: 'ไม่มีข้อมูลใดเปลี่ยนแปลง ไม่จำเป็นต้องบันทึก' }
+  }
+
+  // 3. Update machine
   const { data, error } = await supabase
     .from('maintenance_machines')
     .update(updateData)
@@ -205,11 +265,44 @@ export async function updateMachine(id: string, payload: {
     return { success: false, error: error.message }
   }
 
+  // 4. Record Audit Log for Traceability
+  const nowIso = new Date().toISOString()
+  await supabase
+    .from('maintenance_machine_audit_logs')
+    .insert({
+      machine_id: id,
+      machine_code: data.machine_code,
+      machine_name: data.machine_name,
+      edited_by_name: payload.edited_by_name.trim(),
+      edit_reason: payload.edit_reason.trim(),
+      changes_summary: changes,
+      created_at: nowIso
+    })
+
   revalidatePath('/maintenance')
   revalidatePath('/maintenance/machines')
+  revalidatePath(`/maintenance/machines/${data.machine_code}`)
   revalidatePath('/maintenance/qr-print')
-  return { success: true, data }
+  return { success: true, data, changesCount: changes.length }
 }
+
+/**
+ * Get audit logs for a specific machine for traceability
+ */
+export async function getMachineAuditLogs(machineId: string) {
+  const supabase = createAdminClient()
+  const { data, error } = await supabase
+    .from('maintenance_machine_audit_logs')
+    .select('*')
+    .eq('machine_id', machineId)
+    .order('created_at', { ascending: false })
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+  return { success: true, data: data as MaintenanceMachineAuditLog[] }
+}
+
 
 /**
  * Soft delete a machine from Machine Master
@@ -319,6 +412,13 @@ export async function getMachine360(machineCode: string) {
     pmAdjustmentLogs = logs || []
   }
 
+  // 6. Fetch Machine Modification Audit Logs (Traceability)
+  const { data: auditLogs } = await supabase
+    .from('maintenance_machine_audit_logs')
+    .select('*')
+    .eq('machine_id', machine.id)
+    .order('created_at', { ascending: false })
+
   return {
     success: true,
     data: {
@@ -328,6 +428,7 @@ export async function getMachine360(machineCode: string) {
       partsConsumed: partsConsumed || [],
       pmPlan: pmPlan as MaintenancePMPlan | null,
       pmAdjustmentLogs: pmAdjustmentLogs,
+      machineAuditLogs: (auditLogs || []) as MaintenanceMachineAuditLog[],
       metrics: {
         totalBreakdowns,
         totalDowntimeMinutes: totalDowntimeMin,

@@ -18,7 +18,9 @@ import {
   ChevronLeft,
   DollarSign,
   Activity,
-  History
+  History,
+  User,
+  ArrowRight
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import MachinePMSection from '@/components/maintenance/MachinePMSection'
@@ -45,7 +47,7 @@ export default async function Machine360Page({ params }: Props) {
     )
   }
 
-  const { machine, activeWorkOrders, historyWorkOrders, partsConsumed, pmPlan, pmAdjustmentLogs, metrics } = res.data
+  const { machine, activeWorkOrders, historyWorkOrders, partsConsumed, pmPlan, pmAdjustmentLogs, machineAuditLogs, metrics } = res.data
 
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
@@ -384,6 +386,89 @@ export default async function Machine360Page({ params }: Props) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+      </div>
+
+      {/* MACHINE AUDIT TRAIL / MODIFICATION HISTORY */}
+      <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-amber-600" />
+            <div>
+              <h2 className="text-base font-black text-stone-900">
+                ประวัติการแก้ไขข้อมูลเครื่องจักรเพื่อการสอบกลับ (Machine Change History & Audit Trail)
+              </h2>
+              <p className="text-xs text-stone-500">
+                บันทึกตามมาตรฐาน GMP / ISO 22716 ระบุผู้แก้ไข, เวลาที่บันทึก (Timestamp) และเหตุผลความจำเป็นทุกครั้ง
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-stone-600 bg-stone-100 px-3 py-1 rounded-full border border-stone-200">
+            ทั้งหมด {(machineAuditLogs || []).length} รายการ
+          </span>
+        </div>
+
+        {(!machineAuditLogs || machineAuditLogs.length === 0) ? (
+          <div className="text-center py-8 text-xs text-stone-400 bg-stone-50 rounded-2xl border border-dashed border-stone-200">
+            ยังไม่มีประวัติการแก้ไขข้อมูลสำหรับเครื่องจักรนี้
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {machineAuditLogs.map((log: any) => (
+              <div key={log.id} className="bg-stone-50 p-4 rounded-2xl border border-stone-200 space-y-2.5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-b border-stone-200 pb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 rounded-lg bg-blue-100 text-blue-800">
+                      <User className="w-3.5 h-3.5" />
+                    </span>
+                    <span className="text-xs font-bold text-stone-900">{log.edited_by_name}</span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] text-stone-500 font-mono">
+                    <Clock className="w-3 h-3 text-stone-400" />
+                    <span>
+                      {new Date(log.created_at).toLocaleString('th-TH', {
+                        day: 'numeric',
+                        month: 'short',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Reason */}
+                <div className="text-xs bg-white p-2.5 rounded-xl border border-stone-200">
+                  <span className="font-bold text-amber-900 block mb-0.5">เหตุผลความจำเป็นในการแก้ไข:</span>
+                  <p className="text-stone-700 italic">"{log.edit_reason}"</p>
+                </div>
+
+                {/* Changed Fields */}
+                {log.changes_summary && log.changes_summary.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-stone-400 block">
+                      ข้อมูลที่มีการปรับปรุง ({log.changes_summary.length} จุด):
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-1.5">
+                      {log.changes_summary.map((change: any, idx: number) => (
+                        <div key={idx} className="flex items-center gap-1.5 text-xs bg-white px-2.5 py-1.5 rounded-lg border border-stone-150">
+                          <span className="font-semibold text-stone-700">{change.label}:</span>
+                          <span className="line-through text-red-500 bg-red-50 px-1 py-0.2 rounded text-[11px]">
+                            {change.old_value !== '' && change.old_value !== null && change.old_value !== undefined ? String(change.old_value) : '(ว่าง)'}
+                          </span>
+                          <ArrowRight className="w-3 h-3 text-stone-400 shrink-0" />
+                          <span className="text-emerald-700 font-bold bg-emerald-50 px-1 py-0.2 rounded text-[11px]">
+                            {change.new_value !== '' && change.new_value !== null && change.new_value !== undefined ? String(change.new_value) : '(ว่าง)'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
