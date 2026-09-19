@@ -163,20 +163,28 @@ export default async function Machine360Page({ params }: Props) {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-stone-50 p-4 rounded-2xl border border-stone-200">
               <div>
+                <span className="text-stone-400 block">ผู้จำหน่าย (Supplier):</span>
+                <span className="font-semibold text-stone-800">{machine.supplier && machine.supplier !== 'N/A' ? machine.supplier : '-'}</span>
+              </div>
+              <div>
+                <span className="text-stone-400 block">เลขทรัพย์สิน (Asset ID):</span>
+                <span className="font-mono font-semibold text-blue-700">{machine.asset_id || '-'}</span>
+              </div>
+              <div>
                 <span className="text-stone-400 block">ผู้ผลิต / แบรนด์:</span>
-                <span className="font-semibold text-stone-800">{machine.manufacturer}</span>
+                <span className="font-semibold text-stone-800">{machine.manufacturer && machine.manufacturer !== 'N/A' ? machine.manufacturer : '-'}</span>
               </div>
               <div>
                 <span className="text-stone-400 block">รุ่น (Model):</span>
-                <span className="font-semibold text-stone-800">{machine.model}</span>
+                <span className="font-semibold text-stone-800">{machine.model && machine.model !== 'N/A' ? machine.model : '-'}</span>
               </div>
               <div>
                 <span className="text-stone-400 block">หมายเลขเครื่อง (Serial No.):</span>
-                <span className="font-mono font-semibold text-stone-800">{machine.serial_number || '-'}</span>
+                <span className="font-mono font-semibold text-stone-800">{machine.serial_number && machine.serial_number !== 'N/A' ? machine.serial_number : '-'}</span>
               </div>
               <div>
                 <span className="text-stone-400 block">ราคาจัดซื้อ (Purchase Cost):</span>
-                <span className="font-semibold text-stone-800">฿{Number(machine.purchase_cost).toLocaleString()}</span>
+                <span className="font-semibold text-stone-800">฿{Number(machine.purchase_cost || 0).toLocaleString()}</span>
               </div>
               <div>
                 <span className="text-stone-400 block">ต้นทุน Downtime:</span>
@@ -204,6 +212,10 @@ export default async function Machine360Page({ params }: Props) {
             productionArea={machine.production_area}
             criticality={machine.criticality}
             roomName={machine.room_name}
+            assetId={machine.asset_id}
+            supplier={machine.supplier}
+            serialNumber={machine.serial_number}
+            model={machine.model}
           />
         </div>
       </div>

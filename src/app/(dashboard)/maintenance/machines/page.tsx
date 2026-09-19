@@ -74,9 +74,11 @@ export default function MachinesMasterPage() {
         <div class="badge-card">
           <div class="header">CosmeFlow Maintenance • Asset QR</div>
           <div class="title">${m.machine_code}</div>
+          ${m.asset_id ? `<div style="font-size:12px;font-weight:bold;color:#2563eb;margin-bottom:4px;">เลขทรัพย์สิน: ${m.asset_id}</div>` : ''}
           <div class="subtitle">${m.machine_name}<br/><b>${m.production_area || m.department_name || ''}</b></div>
+          ${m.supplier && m.supplier !== 'N/A' ? `<div style="font-size:11px;color:#666;margin-bottom:6px;">ผู้จำหน่าย: <b>${m.supplier}</b></div>` : ''}
           <img class="qr-img" src="${qrImageUrl}" alt="QR" />
-          <div class="emergency">🚨 สแกนแจ้งเครื่องเสีย (≤ 60 วินาที)</div>
+          <div class="emergency">🚨 สแกนแจ้งซ่อม / เบิกอะไหล่ (≤ 60 วินาที)</div>
           <div class="footer">สแกนดูประวัติเครื่องจักร & Maintenance 360°</div>
         </div>
       `
@@ -236,14 +238,28 @@ export default function MachinesMasterPage() {
                 </div>
 
                 {/* Specs snapshot */}
-                <div className="mt-3 p-2.5 bg-stone-50 rounded-2xl text-[11px] text-stone-600 space-y-1 border border-stone-150">
-                  <div className="flex justify-between">
-                    <span className="text-stone-400">ยี่ห้อ / รุ่น:</span>
-                    <span className="font-medium text-stone-800">{m.manufacturer} {m.model}</span>
+                <div className="mt-3 p-2.5 bg-stone-50 rounded-2xl text-[11px] text-stone-600 space-y-1.5 border border-stone-200">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-stone-400 shrink-0">ผู้จำหน่าย:</span>
+                    <span className="font-medium text-stone-800 text-right truncate max-w-[170px]" title={m.supplier || '-'}>
+                      {m.supplier && m.supplier !== 'N/A' ? m.supplier : '-'}
+                    </span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-stone-400 shrink-0">ยี่ห้อ / รุ่น:</span>
+                    <span className="font-medium text-stone-800 text-right truncate max-w-[170px]" title={([m.manufacturer, m.model].filter(x => x && x !== 'N/A').join(' ') || '-')}>
+                      {[m.manufacturer, m.model].filter(x => x && x !== 'N/A').join(' ') || '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center gap-2">
+                    <span className="text-stone-400 shrink-0">หมายเลข / ทรัพย์สิน:</span>
+                    <span className="font-mono text-stone-700 text-right truncate max-w-[170px]" title={(m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '') || m.asset_id || '-'}>
+                      {(m.serial_number && m.serial_number !== 'N/A' ? m.serial_number : '') || m.asset_id || '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1 border-t border-stone-200/60">
                     <span className="text-stone-400">ต้นทุน Downtime:</span>
-                    <span className="font-semibold text-[#8B7355]">฿{Number(m.hourly_downtime_cost).toLocaleString()} / ชม.</span>
+                    <span className="font-bold text-[#8B7355]">฿{Number(m.hourly_downtime_cost).toLocaleString()} / ชม.</span>
                   </div>
                 </div>
               </div>
@@ -325,6 +341,10 @@ export default function MachinesMasterPage() {
               productionArea={qrMachine.production_area}
               criticality={qrMachine.criticality}
               roomName={qrMachine.room_name}
+              assetId={qrMachine.asset_id}
+              supplier={qrMachine.supplier}
+              serialNumber={qrMachine.serial_number}
+              model={qrMachine.model}
             />
           </DialogContent>
         </Dialog>

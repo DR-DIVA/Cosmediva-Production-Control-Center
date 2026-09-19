@@ -11,6 +11,10 @@ interface MachineQRBadgeProps {
   productionArea?: string | null
   criticality?: string
   roomName?: string | null
+  assetId?: string | null
+  supplier?: string | null
+  serialNumber?: string | null
+  model?: string | null
 }
 
 export default function MachineQRBadge({
@@ -18,7 +22,11 @@ export default function MachineQRBadge({
   machineName,
   productionArea,
   criticality = 'A',
-  roomName
+  roomName,
+  assetId,
+  supplier,
+  serialNumber,
+  model
 }: MachineQRBadgeProps) {
   const badgeRef = useRef<HTMLDivElement>(null)
 
@@ -43,20 +51,24 @@ export default function MachineQRBadge({
               .badge-card { border: 3px solid #000; border-radius: 16px; padding: 24px; text-align: center; width: 340px; }
               .header { font-size: 14px; font-weight: bold; letter-spacing: 1px; color: #555; text-transform: uppercase; margin-bottom: 4px; }
               .title { font-size: 28px; font-weight: 900; margin: 6px 0; }
-              .subtitle { font-size: 14px; color: #333; margin-bottom: 16px; line-height: 1.3; }
-              .qr-img { width: 220px; height: 220px; margin: 0 auto; display: block; }
-              .footer { margin-top: 16px; font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 8px; border-radius: 8px; }
-              .emergency { color: #dc2626; font-size: 15px; font-weight: bold; margin-top: 12px; }
+              .asset-id { font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 6px; }
+              .subtitle { font-size: 14px; color: #333; margin-bottom: 12px; line-height: 1.3; }
+              .meta { font-size: 12px; color: #666; margin-bottom: 12px; }
+              .qr-img { width: 200px; height: 200px; margin: 0 auto; display: block; }
+              .footer { margin-top: 14px; font-size: 13px; font-weight: bold; background: #f0f0f0; padding: 8px; border-radius: 8px; }
+              .emergency { color: #dc2626; font-size: 14px; font-weight: bold; margin-top: 10px; }
             </style>
           </head>
           <body>
             <div class="badge-card">
               <div class="header">CosmeFlow Maintenance • Asset QR</div>
               <div class="title">${machineCode}</div>
+              ${assetId ? `<div class="asset-id">เลขทรัพย์สิน: ${assetId}</div>` : ''}
               <div class="subtitle">${machineName}<br/><b>${productionArea || ''}</b></div>
+              ${supplier && supplier !== 'N/A' ? `<div class="meta">ผู้จำหน่าย: ${supplier}</div>` : ''}
               <img class="qr-img" src="${qrImageUrl}" alt="QR" />
-              <div class="emergency">🚨 สแกนเพื่อแจ้งเครื่องเสียด่วน (≤ 60 วินาที)</div>
-              <div class="footer">สแกนเปิดประวัติเครื่องจักร & Maintenance 360°</div>
+              <div class="emergency">🚨 สแกนแจ้งซ่อม / เบิกอะไหล่ (≤ 60 วินาที)</div>
+              <div class="footer">สแกนดูประวัติเครื่องจักร & Maintenance 360°</div>
             </div>
             <script>
               window.onload = function() { window.print(); window.close(); }
@@ -82,9 +94,20 @@ export default function MachineQRBadge({
             Grade {criticality}
           </span>
         </div>
-        <p className="text-xs text-stone-600 font-medium line-clamp-2 px-2 mb-3">
+        {assetId && (
+          <div className="text-xs font-mono font-bold text-blue-700 mb-1">
+            เลขทรัพย์สิน: {assetId}
+          </div>
+        )}
+        <p className="text-xs text-stone-600 font-medium line-clamp-2 px-2 mb-2">
           {machineName}
         </p>
+
+        {supplier && supplier !== 'N/A' && (
+          <div className="text-[11px] text-stone-500 mb-2">
+            ผู้จำหน่าย: <span className="font-semibold text-stone-700">{supplier}</span>
+          </div>
+        )}
 
         {/* QR Code Container */}
         <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 shadow-inner mb-3">

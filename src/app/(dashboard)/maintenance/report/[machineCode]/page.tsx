@@ -2,7 +2,7 @@ import React from 'react'
 import { getMachines, getMachine360 } from '@/app/actions/maintenance'
 import FastReportForm from '@/components/maintenance/FastReportForm'
 import Link from 'next/link'
-import { ChevronLeft, QrCode } from 'lucide-react'
+import { ChevronLeft, QrCode, Package, History } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,12 +36,78 @@ export default async function MachineDirectReportPage({ params }: Props) {
         </span>
       </div>
 
+      {/* Machine Quick Specs Banner */}
+      {initialMachine && (
+        <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-100 pb-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-xl font-black text-stone-900">{initialMachine.machine_code}</span>
+                {initialMachine.asset_id && (
+                  <span className="text-xs font-mono font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md border border-blue-200">
+                    เลขทรัพย์สิน: {initialMachine.asset_id}
+                  </span>
+                )}
+                <span className={`px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                  initialMachine.criticality === 'A' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  Grade {initialMachine.criticality}
+                </span>
+              </div>
+              <h2 className="text-sm sm:text-base font-bold text-stone-800 mt-1">{initialMachine.machine_name}</h2>
+              <div className="text-xs text-stone-500 mt-0.5">
+                {initialMachine.department_name} • {initialMachine.production_area}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Link
+                href={`/maintenance/spare-parts?search=${initialMachine.machine_code}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-xl transition"
+              >
+                <Package className="w-3.5 h-3.5 text-amber-600" />
+                <span>เบิกอะไหล่สิ้นเปลือง</span>
+              </Link>
+
+              <Link
+                href={`/maintenance/machines/${initialMachine.machine_code}`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl transition"
+              >
+                <History className="w-3.5 h-3.5 text-stone-600" />
+                <span>ประวัติ & รอบ PM</span>
+              </Link>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-stone-600">
+            <div>
+              <span className="text-stone-400 block text-[11px]">ผู้จำหน่าย (Supplier):</span>
+              <span className="font-medium text-stone-800">{initialMachine.supplier && initialMachine.supplier !== 'N/A' ? initialMachine.supplier : '-'}</span>
+            </div>
+            <div>
+              <span className="text-stone-400 block text-[11px]">ยี่ห้อ / รุ่น:</span>
+              <span className="font-medium text-stone-800">
+                {[initialMachine.manufacturer, initialMachine.model].filter(x => x && x !== 'N/A').join(' ') || '-'}
+              </span>
+            </div>
+            <div>
+              <span className="text-stone-400 block text-[11px]">หมายเลขเครื่อง:</span>
+              <span className="font-mono text-stone-800">{initialMachine.serial_number && initialMachine.serial_number !== 'N/A' ? initialMachine.serial_number : '-'}</span>
+            </div>
+            <div>
+              <span className="text-stone-400 block text-[11px]">สถานะปัจจุบัน:</span>
+              <span className="font-bold text-stone-800">{initialMachine.status}</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="text-center space-y-1">
         <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-          🚨 แจ้งเครื่องเสีย: {machineCode}
+          🚨 บันทึกแจ้งซ่อมเครื่องจักร: {machineCode}
         </h1>
         <p className="text-xs sm:text-sm text-stone-500 font-medium">
-          {initialMachine?.machine_name || 'ระบบบันทึกงานซ่อมอัตโนมัติ'}
+          ระบบส่งแจ้งเตือนเข้าช่างซ่อมบำรุงทันที และออกใบสั่งซ่อม (Work Order) อัตโนมัติ
         </p>
       </div>
 

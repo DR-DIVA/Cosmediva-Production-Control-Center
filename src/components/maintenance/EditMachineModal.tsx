@@ -70,6 +70,8 @@ export default function EditMachineModal({
   const [manufacturer, setManufacturer] = useState('')
   const [model, setModel] = useState('')
   const [serialNumber, setSerialNumber] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [assetId, setAssetId] = useState('')
   const [instruction, setInstruction] = useState('')
 
   // Mandatory GMP Audit Trail State
@@ -106,6 +108,8 @@ export default function EditMachineModal({
       setManufacturer(machine.manufacturer || '')
       setModel(machine.model || '')
       setSerialNumber(machine.serial_number || '')
+      setSupplier(machine.supplier || '')
+      setAssetId(machine.asset_id || '')
       setInstruction(machine.maintenance_instruction || '')
       setEditReason('')
       setActiveTab('form')
@@ -172,6 +176,8 @@ export default function EditMachineModal({
         manufacturer: manufacturer.trim(),
         model: model.trim(),
         serial_number: serialNumber.trim(),
+        supplier: supplier.trim(),
+        asset_id: assetId.trim(),
         maintenance_instruction: instruction.trim(),
         // Mandatory Audit Fields
         edited_by_name: editedByName.trim(),
@@ -383,6 +389,27 @@ export default function EditMachineModal({
                     value={serialNumber}
                     onChange={e => setSerialNumber(e.target.value)}
                     placeholder="เช่น SN-2024-9988"
+                    className="h-9 text-xs font-mono rounded-xl bg-white border-stone-300"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[11px] font-medium text-stone-600 block mb-1">ผู้จำหน่าย (Supplier)</label>
+                  <Input
+                    value={supplier}
+                    onChange={e => setSupplier(e.target.value)}
+                    placeholder="เช่น อุดมทรัพย์, PNP SCALE"
+                    className="h-9 text-xs rounded-xl bg-white border-stone-300"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-stone-600 block mb-1">เลขทรัพย์สิน (Asset ID)</label>
+                  <Input
+                    value={assetId}
+                    onChange={e => setAssetId(e.target.value)}
+                    placeholder="เช่น AST-MIX-001"
                     className="h-9 text-xs font-mono rounded-xl bg-white border-stone-300"
                   />
                 </div>

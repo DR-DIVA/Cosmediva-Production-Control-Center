@@ -155,6 +155,8 @@ export async function updateMachine(id: string, payload: {
   manufacturer?: string
   model?: string
   serial_number?: string
+  supplier?: string
+  asset_id?: string
   hourly_downtime_cost?: number
   maintenance_instruction?: string
   // Mandatory GMP Audit Trail fields
@@ -192,6 +194,8 @@ export async function updateMachine(id: string, payload: {
     manufacturer: payload.manufacturer || '',
     model: payload.model || '',
     serial_number: payload.serial_number || '',
+    supplier: payload.supplier ?? currentMachine.supplier,
+    asset_id: payload.asset_id ?? currentMachine.asset_id,
     hourly_downtime_cost: payload.hourly_downtime_cost ?? 0,
     maintenance_instruction: payload.maintenance_instruction || '',
     updated_at: new Date().toISOString()
