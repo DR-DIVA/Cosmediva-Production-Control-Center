@@ -77,8 +77,8 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-stone-200">
+      {/* Navigation Sub-Tabs (Responsive Wrap - Never clips or overflows) */}
+      <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-stone-100/90 rounded-2xl border border-stone-200/80 shadow-2xs">
         {navItems.map(item => {
           const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
           const Icon = item.icon
@@ -86,16 +86,18 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
             <Link
               key={item.href}
               href={item.href}
-              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs md:text-sm font-semibold whitespace-nowrap transition-all ${
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 isActive
-                  ? 'bg-[#4A4238] text-white shadow-sm border border-[#4A4238]'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100'
+                  ? 'bg-[#2A2521] text-[#D4AF37] shadow-xs border border-[#2A2521]'
+                  : 'bg-white hover:bg-stone-200/80 text-stone-700 hover:text-stone-950 border border-stone-200/70 shadow-2xs'
               }`}
             >
-              <Icon className={`w-4 h-4 ${isActive ? 'text-[#D4AF37]' : 'text-stone-400'}`} />
-              {item.label}
+              <Icon className={`w-3.5 h-3.5 ${isActive ? 'text-[#D4AF37]' : 'text-stone-500'}`} />
+              <span>{item.label}</span>
               {item.badge && (
-                <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-amber-100 text-amber-900">
+                <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono ${
+                  isActive ? 'bg-[#D4AF37] text-stone-950' : 'bg-stone-100 text-stone-700 border border-stone-300'
+                }`}>
                   {item.badge}
                 </span>
               )}
