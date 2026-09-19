@@ -150,8 +150,8 @@ export default function CostingDashboardPage() {
                       <TableRow key={c.id} className="hover:bg-slate-50">
                         <TableCell className="font-semibold">{c.lot?.lot_no}</TableCell>
                         <TableCell>
-                          <div className="text-sm font-medium">{c.lot?.products?.sku}</div>
-                          <div className="text-xs text-slate-500 truncate max-w-[150px]">{c.lot?.products?.name}</div>
+                          <div className="text-sm font-medium">{c.lot?.product?.sku || c.lot?.products?.sku || '-'}</div>
+                          <div className="text-xs text-slate-500 truncate max-w-[150px]">{c.lot?.product?.product_name || c.lot?.product?.name || c.lot?.products?.name || '-'}</div>
                         </TableCell>
                         <TableCell className="text-right">{c.total_produced_qty}</TableCell>
                         <TableCell className="text-right text-blue-700 font-medium">

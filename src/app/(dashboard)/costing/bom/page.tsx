@@ -86,7 +86,7 @@ export default function BOMConfigurationPage() {
   }
 
   const filteredProducts = products.filter(p => 
-    p.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (p.product_name || p.name)?.toLowerCase().includes(searchTerm.toLowerCase()) || 
     p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
@@ -142,7 +142,7 @@ export default function BOMConfigurationPage() {
                   return (
                     <div key={product.id} className="grid grid-cols-6 gap-4 p-4 items-center">
                       <div className="col-span-2">
-                        <div className="font-medium">{product.name}</div>
+                        <div className="font-medium">{product.product_name || product.name}</div>
                         <div className="text-sm text-muted-foreground">{product.sku}</div>
                       </div>
                       <div>

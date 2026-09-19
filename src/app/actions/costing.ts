@@ -14,7 +14,7 @@ export async function getProductBOMs() {
       *,
       product:products (
         id,
-        name,
+        product_name,
         sku
       )
     `)
@@ -65,7 +65,7 @@ export async function getLaborRates() {
       *,
       process:processes (
         id,
-        name
+        process_name
       )
     `)
 
@@ -108,7 +108,7 @@ export async function getOverheadRates() {
       *,
       process:processes (
         id,
-        name
+        process_name
       )
     `)
 
@@ -152,9 +152,10 @@ export async function getLotCostings() {
       lot:production_lots (
         id,
         lot_no,
-        status,
-        product:products (
-          name,
+        current_status,
+        product:sku_id (
+          id,
+          product_name,
           sku
         )
       )
@@ -172,7 +173,6 @@ export async function getLotCostings() {
 
 // --- LOT COSTING & PROFITABILITY ---
 
-
 export async function calculateLotCost(lot_id: string) {
   const adminClient = createAdminClient()
   
@@ -180,7 +180,7 @@ export async function calculateLotCost(lot_id: string) {
     // 1. Get Lot info
     const { data: lotData, error: lotError } = await adminClient
       .from('production_lots')
-      .select('id, sku_id, total_quantity, status')
+      .select('id, sku_id, planned_quantity, order_quantity, current_status')
       .eq('id', lot_id)
       .single()
       
@@ -196,7 +196,7 @@ export async function calculateLotCost(lot_id: string) {
     const total_cost_per_piece = bomData?.total_cost_per_piece || 0
     const selling_price = bomData?.selling_price || 0
     
-    const produced_qty = lotData.total_quantity || 0
+    const produced_qty = lotData.order_quantity || lotData.planned_quantity || 0
     const actual_material_cost = produced_qty * total_cost_per_piece
     const revenue = produced_qty * selling_price
     
@@ -211,34 +211,25 @@ export async function calculateLotCost(lot_id: string) {
     const { data: logs } = await adminClient
       .from('production_logs')
       .select('*')
-      .eq('lot_id', lot_id)
+      .eq('production_lot_id', lot_id)
       
     let actual_labor_cost = 0
     let actual_overhead_cost = 0
     
     if (logs && logs.length > 0) {
-      const taskTimes: Record<string, { start: Date | null, end: Date | null, process_id: string }> = {}
-      
       logs.forEach((log: any) => {
-        if (!taskTimes[log.task_id]) {
-          taskTimes[log.task_id] = { start: null, end: null, process_id: log.process_id }
-        }
-        if (log.action === 'IN_PROGRESS' || log.action === 'SOAKING') {
-          if (!taskTimes[log.task_id].start) taskTimes[log.task_id].start = new Date(log.created_at)
-        }
-        if (log.action === 'COMPLETED') {
-          taskTimes[log.task_id].end = new Date(log.created_at)
-        }
-      })
-      
-      Object.values(taskTimes).forEach(task => {
-        if (task.start && task.end) {
-          const hours = (task.end.getTime() - task.start.getTime()) / (1000 * 60 * 60)
-          const lRate = laborRateMap.get(task.process_id) || 0
-          const oRate = ohRateMap.get(task.process_id) || 0
-          
-          actual_labor_cost += hours * lRate
-          actual_overhead_cost += hours * oRate
+        if (log.start_time && log.end_time) {
+          const start = new Date(log.start_time).getTime()
+          const end = new Date(log.end_time).getTime()
+          if (end > start) {
+            const hours = (end - start) / (1000 * 60 * 60)
+            const people = log.people_count && log.people_count > 0 ? Number(log.people_count) : 1
+            const lRate = Number(laborRateMap.get(log.process_id)) || 0
+            const oRate = Number(ohRateMap.get(log.process_id)) || 0
+            
+            actual_labor_cost += hours * people * lRate
+            actual_overhead_cost += hours * oRate
+          }
         }
       })
     }
@@ -253,7 +244,7 @@ export async function calculateLotCost(lot_id: string) {
     if (defects) {
       defects.forEach((d: any) => {
         const costPerUnit = d.cost_per_unit || 0
-        defect_cost += d.quantity * costPerUnit
+        defect_cost += Number(d.quantity) * Number(costPerUnit)
       })
     }
     

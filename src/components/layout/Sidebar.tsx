@@ -159,12 +159,12 @@ const routes = [
     icon: Calculator,
     href: '/costing',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'manager', 'planner'],
+    allowedRoles: ['admin', 'manager', 'planner', 'acc'],
     subRoutes: [
-      { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'manager', 'planner'] },
-      { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'manager', 'planner'] },
-      { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'manager', 'planner'] },
-      { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'manager', 'planner'] },
+      { label: 'ภาพรวม (Dashboard)', href: '/costing', allowedRoles: ['admin', 'manager', 'planner', 'acc'] },
+      { label: 'ผูกสูตรต้นทุน (BOM)', href: '/costing/bom', allowedRoles: ['admin', 'manager', 'planner', 'acc'] },
+      { label: 'ตั้งค่าต้นทุนมาตรฐาน (Setup)', href: '/costing/setup', allowedRoles: ['admin', 'manager', 'planner', 'acc'] },
+      { label: 'บันทึกของเสีย (Defects)', href: '/costing/defects', allowedRoles: ['admin', 'manager', 'planner', 'acc'] },
     ]
   },
   {
@@ -315,7 +315,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
     if (userRole.startsWith('custom:')) {
       return hasAccessToRoute(route.href, userRole);
     }
-    return !route.allowedRoles || route.allowedRoles.includes(userRole);
+    return (!route.allowedRoles || route.allowedRoles.includes(userRole)) || hasAccessToRoute(route.href, userRole);
   }).map(route => {
     // Also filter subRoutes if they exist
     if (route.subRoutes) {
@@ -327,7 +327,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
           if (userRole.startsWith('custom:')) {
             return hasAccessToRoute(sub.href, userRole);
           }
-          return !sub.allowedRoles || sub.allowedRoles.includes(userRole);
+          return (!sub.allowedRoles || sub.allowedRoles.includes(userRole)) || hasAccessToRoute(sub.href, userRole);
         })
       }
     }
@@ -364,6 +364,15 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                   open={pathname.startsWith(route.href)}
                 >
                   <summary
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement
+                      // If clicking the chevron arrow button, let the details tag toggle without navigating
+                      if (target.closest('.accordion-chevron-toggle')) {
+                        return
+                      }
+                      handleLinkClick()
+                      router.push(route.href)
+                    }}
                     className={cn(
                       "flex p-3 w-full justify-between items-center cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition list-none",
                       pathname.startsWith(route.href) ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-cosme-gold/10" : "text-zinc-400",
@@ -381,7 +390,12 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                       )}
                     </div>
                     {!isCollapsed && (
-                      <div className="shrink-0 ml-2">
+                      <div 
+                        className="shrink-0 ml-2 p-1 rounded hover:bg-white/10 accordion-chevron-toggle"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                      >
                         <ChevronRight className="w-4 h-4 group-open:hidden" />
                         <ChevronDown className="w-4 h-4 hidden group-open:block" />
                       </div>
@@ -391,19 +405,24 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                   {/* Render SubRoutes (handled natively by details tag) */}
                   {!isCollapsed && (
                     <div className="mt-1 ml-6 space-y-1 border-l-2 border-slate-700 pl-2">
-                      {route.subRoutes.map((subRoute) => (
-                        <Link
-                          key={subRoute.href}
-                          href={subRoute.href}
-                          onClick={handleLinkClick}
-                          className={cn(
-                            "text-sm group flex p-2 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition truncate",
-                            pathname === subRoute.href ? "text-white bg-slate-800 font-semibold border border-slate-700" : "text-zinc-500"
-                          )}
-                        >
-                          <span className="truncate">{subRoute.label}</span>
-                        </Link>
-                      ))}
+                      {route.subRoutes.map((subRoute) => {
+                        const isSubActive = subRoute.href.includes('?')
+                          ? (pathname === subRoute.href.split('?')[0])
+                          : (pathname === subRoute.href)
+                        return (
+                          <Link
+                            key={subRoute.href}
+                            href={subRoute.href}
+                            onClick={handleLinkClick}
+                            className={cn(
+                              "text-sm group flex p-2 w-full justify-start font-medium cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition truncate",
+                              isSubActive ? "text-white bg-slate-800 font-semibold border border-slate-700" : "text-zinc-500"
+                            )}
+                          >
+                            <span className="truncate">{subRoute.label}</span>
+                          </Link>
+                        )
+                      })}
                     </div>
                   )}
                 </details>

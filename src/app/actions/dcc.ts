@@ -378,20 +378,12 @@ const SEED_DAR_REQUESTS: DCCDarRequest[] = [
 export async function getDCCSummaryStats() {
   const supabase = getSupabase()
 
-  // 1. Count Maintenance Executed Records
-  const { count: maintWoCount } = await supabase
-    .from('maintenance_work_orders')
-    .select('*', { count: 'exact', head: true })
-
-  // 2. Count Production Lots
-  const { count: prodLotCount } = await supabase
-    .from('production_lots')
-    .select('*', { count: 'exact', head: true })
-
-  // 3. Count Machines
-  const { count: machineCount } = await supabase
-    .from('maintenance_machines')
-    .select('*', { count: 'exact', head: true })
+  // Run all counts in parallel
+  const [{ count: maintWoCount }, { count: prodLotCount }, { count: machineCount }] = await Promise.all([
+    supabase.from('maintenance_work_orders').select('*', { count: 'exact', head: true }),
+    supabase.from('production_lots').select('*', { count: 'exact', head: true }),
+    supabase.from('maintenance_machines').select('*', { count: 'exact', head: true })
+  ])
 
   return {
     totalControlledDocs: SEED_MASTER_TEMPLATES.filter(t => t.status === 'EFFECTIVE').length,
@@ -417,15 +409,22 @@ export async function getDCCExecutedRecords(filters?: {
   const supabase = getSupabase()
   const records: DCCExecutedRecord[] = []
 
-  // 1. Pull Real Maintenance Work Orders (MT-PF-001D)
+  // Run maintenance work orders and production lots queries in parallel
   try {
-    let woQuery = supabase
-      .from('maintenance_work_orders')
-      .select('id, wo_number, machine_code, machine_name, status, reported_at, closed_at, requester_name, assigned_technician_name, verified_by_name')
-      .order('reported_at', { ascending: false })
-      .limit(50)
+    const [woRes, lotRes] = await Promise.all([
+      supabase
+        .from('maintenance_work_orders')
+        .select('id, wo_number, machine_code, machine_name, status, reported_at, closed_at, requester_name, assigned_technician_name, verified_by_name')
+        .order('reported_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('production_lots')
+        .select('id, lot_no, current_status, order_quantity, planned_quantity, created_at, products:sku_id(sku, product_name)')
+        .order('created_at', { ascending: false })
+        .limit(50)
+    ])
 
-    const { data: woData } = await woQuery
+    const woData = woRes.data
     if (woData && woData.length > 0) {
       woData.forEach(wo => {
         records.push({
@@ -450,20 +449,11 @@ export async function getDCCExecutedRecords(filters?: {
         })
       })
     }
-  } catch (err) {
-    console.warn('Error fetching maintenance records for DCC:', err)
-  }
 
-  // 2. Pull Real Production Lots (BMR PD-FM-001)
-  try {
-    const { data: lotData } = await supabase
-      .from('production_lots')
-      .select('id, lot_no, product_name, sku, status, order_qty, planned_start, planned_end, created_at')
-      .order('created_at', { ascending: false })
-      .limit(50)
-
+    const lotData = lotRes.data
     if (lotData && lotData.length > 0) {
-      lotData.forEach(lot => {
+      lotData.forEach((lot: any) => {
+        const prod = Array.isArray(lot.products) ? lot.products[0] : lot.products
         records.push({
           id: `lot-${lot.id}`,
           recordNumber: `BMR-${lot.lot_no}`,
@@ -472,7 +462,7 @@ export async function getDCCExecutedRecords(filters?: {
           departmentCode: 'PD-MX',
           streamCode: 'OPM',
           revisionNo: '02',
-          status: lot.status === 'COMPLETED' ? 'CLOSED' : 'APPROVED',
+          status: lot.current_status === 'COMPLETED' || lot.current_status === 'DONE' ? 'CLOSED' : 'APPROVED',
           executedDate: (lot.created_at || new Date().toISOString()).slice(0, 16).replace('T', ' '),
           operatorName: 'หัวหน้ากะผสม',
           verifiedByName: 'QA Inspector',
@@ -480,15 +470,15 @@ export async function getDCCExecutedRecords(filters?: {
           lotNo: lot.lot_no,
           viewEFormUrl: `/my-tasks/mixing`,
           meta: {
-            productName: lot.product_name,
-            sku: lot.sku,
-            qty: lot.order_qty
+            productName: prod?.product_name || 'ผลิตภัณฑ์ผสมตามรุ่น',
+            sku: prod?.sku || '-',
+            qty: lot.order_quantity || lot.planned_quantity || 0
           }
         })
       })
     }
   } catch (err) {
-    console.warn('Error fetching production lots for DCC:', err)
+    console.warn('Error fetching DCC executed records:', err)
   }
 
   // 3. Add Representative GMP Records for Other Key Departments (QC, QA, MMRM, MMFG, HR, PU)
@@ -646,38 +636,43 @@ export async function getDCCBatchTraceability(queryKey: string) {
     return { success: false, error: 'กรุณาระบุ Lot No. หรือรหัสเครื่องจักร', data: null }
   }
 
-  // 1. Search in Production Lots
-  const { data: lots } = await supabase
-    .from('production_lots')
-    .select('*')
-    .ilike('lot_no', `%${cleanKey}%`)
-    .limit(5)
+  // Search lots, machines, and work orders in parallel
+  const [lotsRes, machinesRes, woRes] = await Promise.all([
+    supabase
+      .from('production_lots')
+      .select('*, products:sku_id(sku, product_name)')
+      .ilike('lot_no', `%${cleanKey}%`)
+      .limit(5),
+    supabase
+      .from('maintenance_machines')
+      .select('*')
+      .or(`machine_code.ilike.%${cleanKey}%,machine_name.ilike.%${cleanKey}%`)
+      .limit(5),
+    supabase
+      .from('maintenance_work_orders')
+      .select('*')
+      .or(`machine_code.ilike.%${cleanKey}%,wo_number.ilike.%${cleanKey}%`)
+      .limit(10)
+  ])
 
-  // 2. Search in Maintenance Machines
-  const { data: machines } = await supabase
-    .from('maintenance_machines')
-    .select('*')
-    .or(`machine_code.ilike.%${cleanKey}%,machine_name.ilike.%${cleanKey}%`)
-    .limit(5)
+  const lots = lotsRes.data || []
+  const machines = machinesRes.data || []
+  const workOrders = woRes.data || []
 
-  // 3. Search in Maintenance Work Orders
-  const { data: workOrders } = await supabase
-    .from('maintenance_work_orders')
-    .select('*')
-    .or(`machine_code.ilike.%${cleanKey}%,wo_number.ilike.%${cleanKey}%`)
-    .limit(10)
+  const firstLot = lots[0]
+  const firstProd = firstLot ? (Array.isArray(firstLot.products) ? firstLot.products[0] : firstLot.products) : null
 
   // Mock linked traceability dossier for demonstration & auditor verification
   const dossier = {
     searchedKey: cleanKey,
-    matchedLots: lots || [],
-    matchedMachines: machines || [],
-    matchedWorkOrders: workOrders || [],
+    matchedLots: lots,
+    matchedMachines: machines,
+    matchedWorkOrders: workOrders,
     genealogy: {
-      lotNumber: lots && lots.length > 0 ? lots[0].lot_no : cleanKey.toUpperCase(),
-      productName: lots && lots.length > 0 ? lots[0].product_name : 'Advanced Skin Radiance Serum 50ml',
-      sku: lots && lots.length > 0 ? lots[0].sku : 'SKU-SERUM-001',
-      batchSize: lots && lots.length > 0 ? `${lots[0].order_qty} pcs` : '5,000 pcs',
+      lotNumber: firstLot ? firstLot.lot_no : cleanKey.toUpperCase(),
+      productName: firstProd?.product_name || 'Advanced Skin Radiance Serum 50ml',
+      sku: firstProd?.sku || 'SKU-SERUM-001',
+      batchSize: firstLot ? `${firstLot.order_quantity || firstLot.planned_quantity || 5000} pcs` : '5,000 pcs',
       productionDate: '2026-03-08',
       mixingTank: 'TANK-MIX-02 (ความจุ 500L)',
       fillerMachine: 'AFILL-PK-001 (เครื่องบรรจุขวดอัตโนมัติ)',

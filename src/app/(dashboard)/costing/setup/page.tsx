@@ -124,7 +124,7 @@ export default function StandardCostSetupPage() {
               <div className="space-y-4">
                 {processes.map((process) => (
                   <div key={`labor-${process.id}`} className="flex items-center justify-between">
-                    <span className="font-medium">{process.name}</span>
+                    <span className="font-medium">{process.process_name || process.name}</span>
                     <div className="flex items-center space-x-2">
                       <Input 
                         type="number" 
@@ -158,7 +158,7 @@ export default function StandardCostSetupPage() {
               <div className="space-y-4">
                 {processes.map((process) => (
                   <div key={`overhead-${process.id}`} className="flex items-center justify-between">
-                    <span className="font-medium">{process.name}</span>
+                    <span className="font-medium">{process.process_name || process.name}</span>
                     <div className="flex items-center space-x-2">
                       <Input 
                         type="number" 
