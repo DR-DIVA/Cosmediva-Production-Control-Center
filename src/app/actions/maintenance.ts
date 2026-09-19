@@ -137,6 +137,98 @@ export async function createMachine(payload: {
 }
 
 /**
+ * Update an existing machine in Machine Master
+ */
+export async function updateMachine(id: string, payload: {
+  machine_code?: string
+  machine_name: string
+  category: string
+  department_name?: string
+  production_area?: string
+  line?: string
+  criticality?: 'A' | 'B' | 'C'
+  status?: 'Running' | 'Breakdown' | 'Under Repair' | 'Standby' | 'Decommissioned'
+  manufacturer?: string
+  model?: string
+  serial_number?: string
+  hourly_downtime_cost?: number
+  maintenance_instruction?: string
+}) {
+  const supabase = createAdminClient()
+
+  const updateData: any = {
+    machine_name: payload.machine_name.trim(),
+    category: payload.category || 'Other',
+    department_name: payload.department_name || '',
+    production_area: payload.production_area || '',
+    line: payload.line || '',
+    criticality: payload.criticality || 'B',
+    manufacturer: payload.manufacturer || '',
+    model: payload.model || '',
+    serial_number: payload.serial_number || '',
+    hourly_downtime_cost: payload.hourly_downtime_cost ?? 0,
+    maintenance_instruction: payload.maintenance_instruction || '',
+    updated_at: new Date().toISOString()
+  }
+
+  if (payload.status) {
+    updateData.status = payload.status
+  }
+
+  if (payload.machine_code) {
+    const code = payload.machine_code.trim().toUpperCase()
+    // Check if new code conflicts with another machine
+    const { data: conflict } = await supabase
+      .from('maintenance_machines')
+      .select('id')
+      .eq('machine_code', code)
+      .neq('id', id)
+      .maybeSingle()
+
+    if (conflict) {
+      return { success: false, error: `รหัสเครื่องจักร ${code} ซ้ำกับเครื่องอื่นในระบบ` }
+    }
+    updateData.machine_code = code
+  }
+
+  const { data, error } = await supabase
+    .from('maintenance_machines')
+    .update(updateData)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  revalidatePath('/maintenance/qr-print')
+  return { success: true, data }
+}
+
+/**
+ * Soft delete a machine from Machine Master
+ */
+export async function deleteMachine(id: string) {
+  const supabase = createAdminClient()
+  const { error } = await supabase
+    .from('maintenance_machines')
+    .update({ is_deleted: true, updated_at: new Date().toISOString() })
+    .eq('id', id)
+
+  if (error) {
+    return { success: false, error: error.message }
+  }
+
+  revalidatePath('/maintenance')
+  revalidatePath('/maintenance/machines')
+  revalidatePath('/maintenance/qr-print')
+  return { success: true }
+}
+
+/**
  * Get complete Machine 360° Profile
  */
 export async function getMachine360(machineCode: string) {
