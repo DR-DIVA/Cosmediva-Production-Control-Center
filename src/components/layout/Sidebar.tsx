@@ -361,7 +361,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
               {route.subRoutes ? (
                 <details 
                   className="group"
-                  open={pathname.startsWith(route.href)}
+                  open={pathname.startsWith(route.href.split('?')[0]) || (route.href.startsWith('/my-tasks') && pathname.startsWith('/my-tasks'))}
                 >
                   <summary
                     onClick={(e) => {
@@ -371,11 +371,12 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                         return
                       }
                       handleLinkClick()
-                      router.push(route.href)
+                      const dest = route.href === '/my-tasks' ? '/my-tasks/overview' : route.href
+                      router.push(dest)
                     }}
                     className={cn(
                       "flex p-3 w-full justify-between items-center cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition list-none",
-                      pathname.startsWith(route.href) ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-cosme-gold/10" : "text-zinc-400",
+                      pathname.startsWith(route.href.split('?')[0]) || (route.href.startsWith('/my-tasks') && pathname.startsWith('/my-tasks')) ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-cosme-gold/10" : "text-zinc-400",
                       isCollapsed ? "justify-center px-0" : ""
                     )}
                     title={isCollapsed ? route.label : undefined}

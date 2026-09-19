@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import DCCRecordVault from '@/components/dcc/DCCRecordVault'
 import DCCMasterVault from '@/components/dcc/DCCMasterVault'
@@ -24,25 +23,23 @@ export default function DCCTabsView({
   initialTab = 'records',
   initialSearch = ''
 }: DCCTabsViewProps) {
-  const searchParams = useSearchParams()
-  const router = useRouter()
-  
-  const urlTab = searchParams.get('tab')
-  const [activeTab, setActiveTab] = useState(urlTab || initialTab || 'records')
+  const [activeTab, setActiveTab] = useState(initialTab || 'records')
 
-  // Sync state if URL query param changes from external navigation (e.g. sidebar click)
+  // Sync state if initialTab prop changes
   useEffect(() => {
-    if (urlTab && urlTab !== activeTab) {
-      setActiveTab(urlTab)
+    if (initialTab && initialTab !== activeTab) {
+      setActiveTab(initialTab)
     }
-  }, [urlTab])
+  }, [initialTab])
 
   const handleTabChange = (val: string) => {
     setActiveTab(val)
     // Update browser URL without triggering a slow full-page server re-render
-    const url = new URL(window.location.href)
-    url.searchParams.set('tab', val)
-    window.history.replaceState(null, '', url.toString())
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', val)
+      window.history.replaceState(null, '', url.toString())
+    }
   }
 
   return (
