@@ -58,6 +58,18 @@ export const APP_MODULES: AppModuleItem[] = [
     href: '/issues',
   },
   {
+    id: 'dcc',
+    label: 'CosmeFlow DCC',
+    shortLabel: 'ศูนย์เอกสาร & คุณภาพ (DCC)',
+    href: '/dcc',
+    subModules: [
+      { id: 'dcc_records', label: 'คลังบันทึกคุณภาพจริง (Executed Records)', href: '/dcc?tab=records' },
+      { id: 'dcc_master', label: 'คลังต้นฉบับ & DP (Master Vault)', href: '/dcc?tab=master' },
+      { id: 'dcc_trace', label: 'สืบย้อนกลับ 360° (Traceability)', href: '/dcc?tab=trace' },
+      { id: 'dcc_dar', label: 'ขอจัดทำ/แก้ไข DP/WI (E-DAR Flow)', href: '/dcc?tab=dar' },
+    ]
+  },
+  {
     id: 'fg',
     label: 'CosmeFlow FG Warehouse',
     shortLabel: 'คลังสินค้าสำเร็จรูป (FG)',
@@ -109,7 +121,7 @@ export const APP_MODULES: AppModuleItem[] = [
 
 export const ALL_MODULE_IDS = [
   'dashboard', 'planner', 'incoming-rm', 'production_overview', 'production_weighing', 
-  'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 
+  'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 'dcc',
   'fg', 'purchase', 'maintenance', 'people', 'costing', 'improve', 'master-data', 'sales-pipeline'
 ]
 
@@ -366,6 +378,10 @@ export function getRouteAccessLevel(href: string, userRole?: string | null): Acc
   }
   else if (href === '/qc-queue') key = 'qc'
   else if (href === '/issues') key = 'issues'
+  else if (href.startsWith('/dcc')) {
+    if (['admin', 'qa', 'dcc'].includes(userRole || '')) return 'EDIT'
+    return 'VIEW'
+  }
   else if (href === '/my-tasks/fg') key = 'fg'
   else if (href === '/purchase') key = 'purchase'
   else if (href === '/maintenance') key = 'maintenance'

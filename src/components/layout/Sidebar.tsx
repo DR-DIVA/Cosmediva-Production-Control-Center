@@ -22,7 +22,8 @@ import {
   Users,
   KeyRound,
   TrendingUp,
-  Briefcase
+  Briefcase,
+  FolderArchive
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
@@ -95,6 +96,20 @@ const routes = [
     href: '/issues',
     color: 'text-[#D4AF37]',
     allowedRoles: ['admin', 'qa', 'qc']
+  },
+  {
+    label: 'CosmeFlow DCC',
+    subtitle: 'ศูนย์กลางเอกสารและบันทึกคุณภาพดิจิทัล',
+    icon: FolderArchive,
+    href: '/dcc',
+    color: 'text-[#D4AF37]',
+    allowedRoles: ['admin', 'qa', 'qc', 'planner', 'maintenance', 'production', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'purchase', 'acc', 'rd', 'ra', 'sm', 'mkt'],
+    subRoutes: [
+      { label: '🗄️ คลังบันทึกจริง (Records Vault)', href: '/dcc?tab=records', allowedRoles: ['admin', 'qa', 'qc', 'planner', 'maintenance', 'production', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'purchase', 'acc', 'rd', 'ra', 'sm', 'mkt'] },
+      { label: '📁 คลังต้นฉบับ & DP (Master Vault)', href: '/dcc?tab=master', allowedRoles: ['admin', 'qa', 'qc', 'planner', 'maintenance', 'production', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'purchase', 'acc', 'rd', 'ra', 'sm', 'mkt'] },
+      { label: '🔗 ตรวจสอบย้อนกลับ 360° (Traceability)', href: '/dcc?tab=trace', allowedRoles: ['admin', 'qa', 'qc', 'planner', 'maintenance', 'production', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'purchase', 'acc', 'rd', 'ra', 'sm', 'mkt'] },
+      { label: '📝 ขอจัดทำ/แก้ไข DP (E-DAR Flow)', href: '/dcc?tab=dar', allowedRoles: ['admin', 'qa', 'qc', 'planner', 'maintenance', 'production', 'production_mx', 'production_pk', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'purchase', 'acc', 'rd', 'ra', 'sm', 'mkt'] },
+    ]
   },
   {
     label: 'CosmeFlow FG Warehouse',
