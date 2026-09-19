@@ -15,20 +15,20 @@ export default async function PMPage() {
   const logs = logsRes.data || []
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+    <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6 text-stone-900 font-sans">
       <MaintenanceHeader />
 
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Page Title */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <main className="space-y-6">
+        {/* Page Title Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-5 rounded-2xl border border-stone-200 shadow-xs">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">🗓️</span>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+              <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-stone-950">
                 แผนซ่อมบำรุงเชิงป้องกัน 2026 (PM 2026)
               </h1>
             </div>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-xs sm:text-sm text-stone-500 mt-1">
               ระบบผูกแผนบำรุงรักษาประจำปีและเดือนเข้ากับเครื่องจักร 279 เครื่อง พร้อมระบบปรับเปลี่ยนความถี่แบบตรวจสอบได้ (Audited Frequency Adjustment)
             </p>
           </div>

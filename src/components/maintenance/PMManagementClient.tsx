@@ -88,77 +88,77 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 text-stone-900 font-sans">
       {/* Top Header & Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-slate-400 font-medium">แผน PM ทั้งหมด</span>
+        <div className="bg-white border border-stone-200 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-stone-500 font-bold">แผน PM ทั้งหมด</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-white font-mono">{metrics.total}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-stone-900 font-mono">{metrics.total}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-cyan-400 font-medium">รายเดือน (PM1)</span>
+        <div className="bg-white border border-cyan-200/80 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-cyan-700 font-bold">รายเดือน (PM1)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-cyan-300 font-mono">{metrics.pm1}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-cyan-600 font-mono">{metrics.pm1}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-blue-400 font-medium">ทุก 2 เดือน (PM2)</span>
+        <div className="bg-white border border-blue-200/80 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-blue-700 font-bold">ทุก 2 เดือน (PM2)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-blue-300 font-mono">{metrics.pm2}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-blue-600 font-mono">{metrics.pm2}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-indigo-400 font-medium">รายไตรมาส (PM3)</span>
+        <div className="bg-white border border-indigo-200/80 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-indigo-700 font-bold">รายไตรมาส (PM3)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-indigo-300 font-mono">{metrics.pm3}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-indigo-600 font-mono">{metrics.pm3}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-purple-400 font-medium">ทุก 4 เดือน (PM4)</span>
+        <div className="bg-white border border-purple-200/80 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-purple-700 font-bold">ทุก 4 เดือน (PM4)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-purple-300 font-mono">{metrics.pm4}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-purple-600 font-mono">{metrics.pm4}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-slate-800 p-3.5 rounded-2xl">
-          <span className="text-[11px] uppercase tracking-wider text-emerald-400 font-medium">รายครึ่งปี (PM6)</span>
+        <div className="bg-white border border-emerald-200/80 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-emerald-700 font-bold">รายครึ่งปี (PM6)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-emerald-300 font-mono">{metrics.pm6}</span>
-            <span className="text-xs text-slate-500">เครื่อง</span>
+            <span className="text-2xl font-black text-emerald-600 font-mono">{metrics.pm6}</span>
+            <span className="text-xs text-stone-400 font-medium">เครื่อง</span>
           </div>
         </div>
 
-        <div className="bg-slate-900/80 border border-amber-900/30 p-3.5 rounded-2xl bg-amber-950/10">
-          <span className="text-[11px] uppercase tracking-wider text-amber-400 font-medium">ประวัติปรับรอบ (Audit)</span>
+        <div className="bg-amber-50/80 border border-amber-200 p-3.5 rounded-2xl shadow-2xs">
+          <span className="text-[11px] uppercase tracking-wider text-amber-800 font-bold">ประวัติปรับรอบ (AUDIT)</span>
           <div className="mt-1 flex items-baseline gap-1.5">
-            <span className="text-2xl font-bold text-amber-300 font-mono">{metrics.totalAdjustments}</span>
-            <span className="text-xs text-amber-500/80">ครั้ง</span>
+            <span className="text-2xl font-black text-amber-700 font-mono">{metrics.totalAdjustments}</span>
+            <span className="text-xs text-amber-600">ครั้ง</span>
           </div>
         </div>
       </div>
 
       {/* Tabs & Search Filter Controls */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 shadow-xl space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-3 border-b border-slate-800">
+      <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs space-y-4">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-stone-100">
           {/* Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-xl border border-slate-800 text-sm">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-stone-100 rounded-xl border border-stone-200/60 text-xs sm:text-sm">
             <button
               onClick={() => setActiveTab('list')}
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
                 activeTab === 'list'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
               }`}
             >
               <span>📋</span>
@@ -167,10 +167,10 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
             <button
               onClick={() => setActiveTab('matrix')}
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
                 activeTab === 'matrix'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
               }`}
             >
               <span>📅</span>
@@ -179,10 +179,10 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
             <button
               onClick={() => setActiveTab('logs')}
-              className={`px-3.5 py-1.5 rounded-lg font-medium transition flex items-center gap-2 ${
+              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 ${
                 activeTab === 'logs'
-                  ? 'bg-cyan-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
               }`}
             >
               <span>📜</span>
@@ -191,8 +191,8 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
           </div>
 
           {/* Quick Notice */}
-          <div className="text-xs text-slate-400 flex items-center gap-1.5 bg-slate-800/60 px-3 py-1.5 rounded-lg border border-slate-750">
-            <span className="text-amber-400 font-bold">⚠️ บันทึกตรวจสอบ:</span>
+          <div className="text-xs text-stone-600 flex items-center gap-1.5 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200">
+            <span className="text-amber-700 font-bold">⚠️ บันทึกตรวจสอบ:</span>
             <span>ระบบกำหนดให้ระบุเหตุผลทุกครั้งที่ปรับแก้ความถี่รอบ PM</span>
           </div>
         </div>
@@ -201,7 +201,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
           {/* Search Box */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
               ค้นหารหัส / ชื่อเครื่องจักร / แผน
             </label>
             <input
@@ -209,19 +209,19 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
               placeholder="ค้นหา เช่น AFILL, MX-04, AHU, รถยก..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500"
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:outline-none focus:bg-white focus:border-[#D4AF37]"
             />
           </div>
 
           {/* Dept Filter */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
               แผนก (Department)
             </label>
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-[#D4AF37] font-medium"
             >
               {departments.map((d) => (
                 <option key={d} value={d}>
@@ -233,13 +233,13 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
           {/* Frequency Filter */}
           <div>
-            <label className="block text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">
+            <label className="block text-[11px] font-bold text-stone-500 uppercase tracking-wider mb-1">
               รอบความถี่ (Frequency)
             </label>
             <select
               value={selectedFreq}
               onChange={(e) => setSelectedFreq(e.target.value)}
-              className="w-full bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-500"
+              className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-[#D4AF37] font-medium"
             >
               <option value="ALL">🔄 ทุกรอบความถี่</option>
               <option value="PM1">รายเดือน (PM1)</option>
@@ -255,11 +255,11 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
       {/* TAB 1: LIST VIEW */}
       {activeTab === 'list' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+        <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse text-sm">
+            <table className="w-full text-left border-collapse text-xs text-stone-700">
               <thead>
-                <tr className="bg-slate-950/70 border-b border-slate-800 text-xs font-semibold uppercase text-slate-400 tracking-wider">
+                <tr className="bg-stone-50 border-b border-stone-200 text-[11px] font-bold uppercase text-stone-600 tracking-wider">
                   <th className="p-3.5 pl-5">รหัสแผน / เครื่องจักร</th>
                   <th className="p-3.5">ชื่อเครื่องจักร</th>
                   <th className="p-3.5">แผนก / สถานที่</th>
@@ -269,10 +269,10 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   <th className="p-3.5 pr-5 text-right">การจัดการ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60">
+              <tbody className="divide-y divide-stone-100">
                 {filteredPlans.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-8 text-center text-slate-500">
+                    <td colSpan={7} className="p-8 text-center text-stone-400 font-medium">
                       ไม่พบข้อมูลแผน PM ตามเงื่อนไขที่เลือก
                     </td>
                   </tr>
@@ -280,53 +280,53 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   filteredPlans.map((plan) => {
                     const machine = (plan as any).machine
                     return (
-                      <tr key={plan.id} className="hover:bg-slate-850/50 transition">
+                      <tr key={plan.id} className="hover:bg-stone-50/80 transition">
                         <td className="p-3.5 pl-5">
                           <div className="flex flex-col">
-                            <span className="font-mono text-xs text-cyan-400 font-semibold">{plan.plan_code}</span>
+                            <span className="font-mono text-xs text-cyan-700 font-bold">{plan.plan_code}</span>
                             <Link
                               href={machine?.id ? `/maintenance/machines/${machine.id}` : '#'}
-                              className="font-bold text-white hover:text-cyan-300 transition mt-0.5 inline-flex items-center gap-1"
+                              className="font-bold text-stone-900 hover:text-cyan-700 transition mt-0.5 inline-flex items-center gap-1 font-mono"
                             >
                               <span>{plan.machine_code}</span>
-                              <span className="text-xs text-slate-500">↗</span>
+                              <span className="text-[10px] text-stone-400">↗</span>
                             </Link>
                           </div>
                         </td>
 
                         <td className="p-3.5">
-                          <span className="font-medium text-slate-200 line-clamp-1">{plan.machine_name}</span>
-                          <span className="text-xs text-slate-400">{machine?.category || 'General Machinery'}</span>
+                          <span className="font-bold text-stone-900 line-clamp-1">{plan.machine_name}</span>
+                          <span className="text-[11px] text-stone-500">{machine?.category || 'General Machinery'}</span>
                         </td>
 
                         <td className="p-3.5">
-                          <div className="flex flex-col text-xs">
-                            <span className="font-semibold text-slate-300">{machine?.department_code || 'PD'}</span>
-                            <span className="text-slate-400 line-clamp-1">{machine?.production_area || 'Factory'}</span>
+                          <div className="flex flex-col text-[11px]">
+                            <span className="font-bold text-stone-800">{machine?.department_code || 'PD'}</span>
+                            <span className="text-stone-500 line-clamp-1">{machine?.production_area || 'Factory'}</span>
                           </div>
                         </td>
 
                         <td className="p-3.5">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium font-mono ${
+                            <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold font-mono ${
                               plan.frequency_type === 'Monthly'
-                                ? 'bg-cyan-950 border border-cyan-700 text-cyan-300'
+                                ? 'bg-cyan-50 border border-cyan-300 text-cyan-800'
                                 : plan.frequency_type === 'Every 2 Months'
-                                ? 'bg-blue-950 border border-blue-700 text-blue-300'
+                                ? 'bg-blue-50 border border-blue-300 text-blue-800'
                                 : plan.frequency_type === 'Quarterly'
-                                ? 'bg-indigo-950 border border-indigo-700 text-indigo-300'
+                                ? 'bg-indigo-50 border border-indigo-300 text-indigo-800'
                                 : plan.frequency_type === 'Every 4 Months'
-                                ? 'bg-purple-950 border border-purple-700 text-purple-300'
+                                ? 'bg-purple-50 border border-purple-300 text-purple-800'
                                 : plan.frequency_type === 'BiAnnually'
-                                ? 'bg-emerald-950 border border-emerald-700 text-emerald-300'
-                                : 'bg-amber-950 border border-amber-700 text-amber-300'
+                                ? 'bg-emerald-50 border border-emerald-300 text-emerald-800'
+                                : 'bg-amber-50 border border-amber-300 text-amber-800'
                             }`}>
                               {plan.frequency_type} ({plan.frequency_interval} ด.)
                             </span>
                             {plan.adjustment_count && plan.adjustment_count > 0 ? (
                               <span
                                 title={`ปรับรอบแล้ว ${plan.adjustment_count} ครั้ง พร้อมบันทึกเหตุผล`}
-                                className="px-1.5 py-0.5 rounded text-[10px] bg-amber-900/40 text-amber-300 border border-amber-800"
+                                className="px-1.5 py-0.5 rounded text-[10px] bg-amber-100 text-amber-900 border border-amber-300 font-bold"
                               >
                                 🔄 ปรับ {plan.adjustment_count}x
                               </span>
@@ -335,13 +335,13 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         </td>
 
                         <td className="p-3.5">
-                          <span className="font-mono text-xs text-slate-300">
+                          <span className="font-mono text-xs font-semibold text-stone-700">
                             {plan.next_due_date || 'ตามรอบปี'}
                           </span>
                         </td>
 
                         <td className="p-3.5">
-                          <span className="text-xs text-slate-400">
+                          <span className="text-xs text-stone-600">
                             {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} รายการตรวจเช็ค` : 'ตามมาตรฐาน'}
                           </span>
                         </td>
@@ -349,7 +349,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         <td className="p-3.5 pr-5 text-right">
                           <button
                             onClick={() => handleOpenAdjustModal(plan)}
-                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-cyan-600 text-cyan-300 hover:text-white border border-slate-700 hover:border-cyan-500 transition shadow-sm inline-flex items-center gap-1.5"
+                            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 hover:border-stone-900 transition shadow-2xs inline-flex items-center gap-1.5"
                           >
                             <span>⚙️</span>
                             <span>ปรับความถี่</span>
@@ -367,19 +367,19 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
       {/* TAB 2: YEARLY MATRIX VIEW */}
       {activeTab === 'matrix' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-4 bg-slate-950/60 border-b border-slate-800 flex items-center justify-between">
-            <div className="text-xs text-slate-400">
-              ตารางแสดงกำหนดการบำรุงรักษาประจำปี 2026 (12 เดือน) | เดือนปัจจุบัน: <span className="text-cyan-400 font-bold underline">{CURRENT_MONTH} (กันยายน)</span>
+        <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 bg-stone-50 border-b border-stone-200 flex items-center justify-between">
+            <div className="text-xs text-stone-600 font-medium">
+              ตารางแสดงกำหนดการบำรุงรักษาประจำปี 2026 (12 เดือน) | เดือนปัจจุบัน: <span className="text-[#8B7355] font-black underline">{CURRENT_MONTH} (กันยายน)</span>
             </div>
-            <div className="flex items-center gap-3 text-xs">
+            <div className="flex items-center gap-3 text-xs font-medium">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-cyan-500"></span>
-                <span className="text-slate-300">มีแผน PM</span>
+                <span className="w-2.5 h-2.5 rounded-sm bg-cyan-600"></span>
+                <span className="text-stone-700">มีแผน PM</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-slate-800 border border-slate-700"></span>
-                <span className="text-slate-400">ไม่มีรอบ</span>
+                <span className="w-2.5 h-2.5 rounded-sm bg-stone-200 border border-stone-300"></span>
+                <span className="text-stone-400">ไม่มีรอบ</span>
               </span>
             </div>
           </div>
@@ -387,7 +387,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-950/80 border-b border-slate-800 font-semibold uppercase text-slate-400 tracking-wider">
+                <tr className="bg-stone-100 border-b border-stone-200 font-bold uppercase text-stone-600 tracking-wider text-[11px]">
                   <th className="p-3 pl-5 min-w-[150px]">รหัสเครื่องจักร</th>
                   <th className="p-3 min-w-[200px]">ชื่อเครื่องจักร</th>
                   <th className="p-3 min-w-[80px]">รอบ</th>
@@ -395,7 +395,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                     <th
                       key={m}
                       className={`p-3 text-center min-w-[50px] ${
-                        m === CURRENT_MONTH ? 'bg-cyan-950/60 text-cyan-300 font-bold border-x border-cyan-800/40' : ''
+                        m === CURRENT_MONTH ? 'bg-amber-100/70 text-amber-950 font-black border-x border-amber-300' : ''
                       }`}
                     >
                       {m}
@@ -404,10 +404,9 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   <th className="p-3 pr-5 text-right min-w-[100px]">จัดการ</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-800/60 font-mono">
+              <tbody className="divide-y divide-stone-100 font-mono">
                 {filteredPlans.slice(0, 100).map((plan) => {
                   const scheduleMonths: string[] = (plan as any).schedule_months || []
-                  // If not explicitly set, calculate based on interval
                   const hasMonth = (m: string) => {
                     if (scheduleMonths.length > 0) return scheduleMonths.includes(m)
                     if (plan.frequency_type === 'Monthly') return true
@@ -420,17 +419,17 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                   }
 
                   return (
-                    <tr key={plan.id} className="hover:bg-slate-850/50 transition">
-                      <td className="p-3 pl-5 font-bold text-white font-sans">
-                        <Link href={`/maintenance/machines/${(plan as any).machine?.id || ''}`} className="hover:text-cyan-300">
+                    <tr key={plan.id} className="hover:bg-stone-50 transition">
+                      <td className="p-3 pl-5 font-bold text-stone-900 font-sans">
+                        <Link href={`/maintenance/machines/${(plan as any).machine?.id || ''}`} className="hover:text-cyan-700">
                           {plan.machine_code}
                         </Link>
                       </td>
-                      <td className="p-3 font-sans text-slate-300 truncate max-w-[220px]">
+                      <td className="p-3 font-sans text-stone-700 truncate max-w-[220px]">
                         {plan.machine_name}
                       </td>
                       <td className="p-3 font-sans text-xs">
-                        <span className="text-cyan-300">{plan.frequency_type.substring(0, 4)}</span>
+                        <span className="text-cyan-700 font-bold">{plan.frequency_type.substring(0, 4)}</span>
                       </td>
 
                       {MONTHS.map((m) => {
@@ -439,14 +438,14 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         return (
                           <td
                             key={m}
-                            className={`p-2 text-center ${isCurrent ? 'bg-cyan-950/20 border-x border-cyan-800/30' : ''}`}
+                            className={`p-2 text-center ${isCurrent ? 'bg-amber-50/50 border-x border-amber-200' : ''}`}
                           >
                             {isScheduled ? (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-600/30 text-cyan-300 border border-cyan-600/50">
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-900 border border-cyan-300">
                                 PM
                               </span>
                             ) : (
-                              <span className="text-slate-700">-</span>
+                              <span className="text-stone-300">-</span>
                             )}
                           </td>
                         )
@@ -455,7 +454,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                       <td className="p-3 pr-5 text-right font-sans">
                         <button
                           onClick={() => handleOpenAdjustModal(plan)}
-                          className="px-2.5 py-1 rounded-lg text-xs bg-slate-800 hover:bg-cyan-600 text-slate-300 hover:text-white border border-slate-700 transition"
+                          className="px-2.5 py-1 rounded-lg text-xs bg-stone-100 hover:bg-stone-900 text-stone-800 hover:text-[#D4AF37] border border-stone-200 font-bold transition"
                         >
                           ปรับ
                         </button>
@@ -467,7 +466,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
             </table>
           </div>
           {filteredPlans.length > 100 && (
-            <div className="p-3 text-center text-xs text-slate-400 bg-slate-950/40 border-t border-slate-800">
+            <div className="p-3 text-center text-xs text-stone-500 bg-stone-50 border-t border-stone-200">
               แสดง 100 รายการแรกจากทั้งหมด {filteredPlans.length} รายการ (ใช้ช่องค้นหาด้านบนเพื่อกรองเฉพาะเครื่องที่ต้องการ)
             </div>
           )}
@@ -476,61 +475,61 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
       {/* TAB 3: AUDIT HISTORY LOGS */}
       {activeTab === 'logs' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
-          <div className="p-4 bg-slate-950/70 border-b border-slate-800">
-            <h4 className="font-bold text-white text-base flex items-center gap-2">
+        <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
+          <div className="p-4 bg-stone-50 border-b border-stone-200">
+            <h4 className="font-black text-stone-900 text-base flex items-center gap-2">
               <span>📜</span>
               <span>บันทึกประวัติการปรับความถี่รอบ PM พร้อมเหตุผล (Audit Trail)</span>
             </h4>
-            <p className="text-xs text-slate-400 mt-1">
+            <p className="text-xs text-stone-500 mt-1">
               ประวัติความโปร่งใส ทุกครั้งที่มีการเปลี่ยนรอบตรวจเช็ค เพื่อเป็นหลักฐานทางวิศวกรรมและการตรวจสอบคุณภาพ (Audit Proof)
             </p>
           </div>
 
-          <div className="divide-y divide-slate-800">
+          <div className="divide-y divide-stone-100">
             {logs.length === 0 ? (
-              <div className="p-8 text-center text-slate-500">
+              <div className="p-8 text-center text-stone-400">
                 ยังไม่มีประวัติการปรับเปลี่ยนความถี่รอบ PM
               </div>
             ) : (
               logs.map((log) => (
-                <div key={log.id} className="p-4 hover:bg-slate-850/40 transition flex flex-col md:flex-row md:items-start justify-between gap-4">
+                <div key={log.id} className="p-4 hover:bg-stone-50 transition flex flex-col md:flex-row md:items-start justify-between gap-4">
                   <div className="space-y-2 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-white font-mono bg-slate-800 px-2 py-0.5 rounded text-xs">
+                      <span className="font-bold text-stone-900 font-mono bg-stone-100 border border-stone-300 px-2 py-0.5 rounded text-xs">
                         {log.machine_code}
                       </span>
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-stone-500">
                         ปรับรอบจาก:
                       </span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                      <span className="text-xs px-2 py-0.5 rounded bg-stone-100 text-stone-700 font-mono border border-stone-200">
                         {log.old_frequency_type || 'มาตรฐาน'}
                       </span>
-                      <span className="text-cyan-400 font-bold">➔</span>
-                      <span className="text-xs px-2 py-0.5 rounded bg-cyan-950 border border-cyan-700 text-cyan-300 font-semibold font-mono">
+                      <span className="text-cyan-700 font-bold">➔</span>
+                      <span className="text-xs px-2 py-0.5 rounded bg-cyan-50 border border-cyan-300 text-cyan-800 font-bold font-mono">
                         {log.new_frequency_type}
                       </span>
                     </div>
 
                     {/* Prominent Mandatory Reason */}
-                    <div className="bg-slate-950/80 p-3 rounded-xl border border-slate-800 text-sm">
-                      <div className="text-[11px] font-bold text-amber-400 flex items-center gap-1 mb-1">
+                    <div className="bg-amber-50/70 p-3 rounded-xl border border-amber-200/80 text-xs">
+                      <div className="text-[11px] font-bold text-amber-900 flex items-center gap-1 mb-1">
                         <span>📝</span> เหตุผลในการปรับเปลี่ยน:
                       </div>
-                      <p className="text-slate-200 leading-relaxed font-sans">
+                      <p className="text-stone-800 leading-relaxed font-sans font-medium">
                         {log.reason}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-4 text-xs text-slate-400">
-                      <span>👤 ผู้ปรับเปลี่ยน: <span className="text-slate-300 font-medium">{log.adjusted_by_name}</span></span>
+                    <div className="flex items-center gap-4 text-xs text-stone-500">
+                      <span>👤 ผู้ปรับเปลี่ยน: <span className="text-stone-800 font-bold">{log.adjusted_by_name}</span></span>
                       {log.new_due_date && (
-                        <span>📅 กำหนดการใหม่: <span className="text-white font-mono">{log.new_due_date}</span></span>
+                        <span>📅 กำหนดการใหม่: <span className="text-stone-800 font-mono font-bold">{log.new_due_date}</span></span>
                       )}
                     </div>
                   </div>
 
-                  <div className="text-right text-xs text-slate-400 font-mono whitespace-nowrap">
+                  <div className="text-right text-xs text-stone-400 font-mono whitespace-nowrap">
                     {new Date(log.created_at).toLocaleString('th-TH', {
                       year: 'numeric',
                       month: 'short',
