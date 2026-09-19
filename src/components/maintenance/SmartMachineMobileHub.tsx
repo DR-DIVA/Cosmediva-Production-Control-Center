@@ -276,6 +276,32 @@ export default function SmartMachineMobileHub({
                 <span className="text-stone-400 block text-[11px]">ต้นทุน Downtime:</span>
                 <span className="font-bold text-[#8B7355]">฿{Number(machine.hourly_downtime_cost || 0).toLocaleString()} / ชม.</span>
               </div>
+
+              {machine.is_subcontract_pm && (
+                <div className="p-3 bg-purple-50 rounded-xl border border-purple-200 sm:col-span-2">
+                  <span className="text-purple-700 block text-[11px] font-bold">🏢 การดูแล PM (Subcontract):</span>
+                  <div className="text-xs font-bold text-purple-950 mt-0.5">
+                    {machine.subcontractor_name || 'จ้าง Subcontract ดูแล'} {machine.subcontractor_contact ? `(${machine.subcontractor_contact})` : ''}
+                  </div>
+                  {machine.subcontract_scope && (
+                    <div className="text-[11px] text-purple-800 mt-0.5">{machine.subcontract_scope}</div>
+                  )}
+                </div>
+              )}
+
+              {machine.requires_calibration && (
+                <div className="p-3 bg-cyan-50 rounded-xl border border-cyan-200 sm:col-span-2">
+                  <span className="text-cyan-700 block text-[11px] font-bold">🎯 การสอบเทียบ (Calibration - CAL):</span>
+                  <div className="text-xs font-bold text-cyan-950 mt-0.5">
+                    รอบ: {machine.calibration_frequency || 'ตามรอบ'} • กำหนดถัดไป: <b className="text-rose-700 font-mono">{machine.next_calibration_date || '-'}</b>
+                  </div>
+                  {(machine.calibration_lab || machine.calibration_cert_no) && (
+                    <div className="text-[11px] text-cyan-800 mt-0.5">
+                      {machine.calibration_lab} {machine.calibration_cert_no ? `(Cert: ${machine.calibration_cert_no})` : ''}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="pt-2 flex justify-end">

@@ -35,6 +35,7 @@ export default function MachinesMasterPage() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [criticalityFilter, setCriticalityFilter] = useState('all')
+  const [specialFilter, setSpecialFilter] = useState<'all' | 'subcontract' | 'calibration'>('all')
   const [search, setSearch] = useState('')
   const [isLoading, setIsLoading] = useState(true)
   const [qrMachine, setQrMachine] = useState<MaintenanceMachine | null>(null)
@@ -185,9 +186,69 @@ export default function MachinesMasterPage() {
         </div>
       </div>
 
+      {/* Special Category Filter Pills: All vs Subcontract PM vs Calibration */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => setSpecialFilter('all')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            specialFilter === 'all'
+              ? 'bg-stone-900 text-white shadow-xs'
+              : 'bg-white text-stone-600 hover:bg-stone-100 border border-stone-200'
+          }`}
+        >
+          <span>เครื่องจักรทั้งหมด</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+            specialFilter === 'all' ? 'bg-stone-700 text-white' : 'bg-stone-150 text-stone-700'
+          }`}>
+            {machines.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSpecialFilter('subcontract')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            specialFilter === 'subcontract'
+              ? 'bg-purple-700 text-white shadow-xs'
+              : 'bg-white text-purple-800 hover:bg-purple-50 border border-purple-200'
+          }`}
+        >
+          <span>🏢 จ้าง Subcontract PM</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+            specialFilter === 'subcontract' ? 'bg-purple-900 text-white' : 'bg-purple-100 text-purple-900'
+          }`}>
+            {machines.filter(m => m.is_subcontract_pm).length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setSpecialFilter('calibration')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+            specialFilter === 'calibration'
+              ? 'bg-cyan-700 text-white shadow-xs'
+              : 'bg-white text-cyan-800 hover:bg-cyan-50 border border-cyan-200'
+          }`}
+        >
+          <span>🎯 เครื่องที่ต้องสอบเทียบ (CAL)</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+            specialFilter === 'calibration' ? 'bg-cyan-900 text-white' : 'bg-cyan-100 text-cyan-900'
+          }`}>
+            {machines.filter(m => m.requires_calibration).length}
+          </span>
+        </button>
+      </div>
+
       {/* Machine Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {machines.map(m => {
+        {machines
+          .filter(m => {
+            if (specialFilter === 'subcontract') return m.is_subcontract_pm
+            if (specialFilter === 'calibration') return m.requires_calibration
+            return true
+          })
+          .map(m => {
           const isBreakdown = m.status === 'Breakdown' || m.status === 'Under Repair'
           const pmFreq = m.pm_frequency_type ? getPmFrequencyInfo(m.pm_frequency_type, m.pm_frequency_interval) : null
 
@@ -217,6 +278,16 @@ export default function MachinesMasterPage() {
                     {pmFreq && (
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-bold border ${pmFreq.color}`} title={pmFreq.full}>
                         {pmFreq.code}
+                      </span>
+                    )}
+                    {m.is_subcontract_pm && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-purple-100 text-purple-800 border border-purple-200" title={`ผู้รับเหมา: ${m.subcontractor_name || 'จ้าง Subcontract'}`}>
+                        🏢 Subcontract
+                      </span>
+                    )}
+                    {m.requires_calibration && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-cyan-100 text-cyan-800 border border-cyan-200" title={`CAL: ${m.calibration_frequency || ''}${m.next_calibration_date ? ` • ครบ ${m.next_calibration_date}` : ''}`}>
+                        🎯 CAL {m.next_calibration_date ? `(${m.next_calibration_date.slice(5)})` : ''}
                       </span>
                     )}
                   </div>
@@ -273,6 +344,22 @@ export default function MachinesMasterPage() {
                       <span className="text-stone-400 shrink-0">รอบความถี่ PM:</span>
                       <span className="font-medium text-cyan-800 text-right truncate max-w-[170px]">
                         {pmFreq.full}
+                      </span>
+                    </div>
+                  )}
+                  {m.is_subcontract_pm && (
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-purple-700 font-bold shrink-0">การดูแล PM:</span>
+                      <span className="font-bold text-purple-900 text-right truncate max-w-[170px]" title={m.subcontractor_name || 'จ้าง Subcontract'}>
+                        🏢 {m.subcontractor_name || 'Subcontract'}
+                      </span>
+                    </div>
+                  )}
+                  {m.requires_calibration && (
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-cyan-700 font-bold shrink-0">สอบเทียบ (CAL):</span>
+                      <span className="font-bold text-cyan-900 text-right truncate max-w-[170px]" title={`${m.calibration_frequency || ''} ${m.next_calibration_date ? `กำหนดถัดไป: ${m.next_calibration_date}` : ''}`}>
+                        🎯 {m.next_calibration_date ? `ครบ ${m.next_calibration_date}` : (m.calibration_frequency || 'ต้องสอบเทียบ')}
                       </span>
                     </div>
                   )}

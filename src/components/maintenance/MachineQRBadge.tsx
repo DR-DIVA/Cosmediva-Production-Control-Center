@@ -16,6 +16,10 @@ interface MachineQRBadgeProps {
   serialNumber?: string | null
   model?: string | null
   pmFrequency?: string | null
+  isSubcontractPm?: boolean
+  subcontractorName?: string | null
+  requiresCalibration?: boolean
+  nextCalibrationDate?: string | null
 }
 
 export default function MachineQRBadge({
@@ -28,7 +32,11 @@ export default function MachineQRBadge({
   supplier,
   serialNumber,
   model,
-  pmFrequency
+  pmFrequency,
+  isSubcontractPm,
+  subcontractorName,
+  requiresCalibration,
+  nextCalibrationDate
 }: MachineQRBadgeProps) {
   const badgeRef = useRef<HTMLDivElement>(null)
 
@@ -55,6 +63,8 @@ export default function MachineQRBadge({
               .title { font-size: 28px; font-weight: 900; margin: 4px 0; }
               .asset-id { font-size: 13px; font-weight: bold; color: #2563eb; margin-bottom: 4px; }
               .pm-freq { font-size: 12px; font-weight: bold; color: #0284c7; background: #f0f9ff; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; border: 1px solid #bae6fd; }
+              .subcontract-tag { font-size: 11px; font-weight: bold; color: #7e22ce; background: #faf5ff; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; border: 1px solid #e9d5ff; }
+              .cal-tag { font-size: 11px; font-weight: bold; color: #0e7490; background: #ecfeff; padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 6px; border: 1px solid #a5f3fc; }
               .subtitle { font-size: 13px; color: #333; margin-bottom: 10px; line-height: 1.3; }
               .meta { font-size: 11px; color: #666; margin-bottom: 10px; }
               .qr-img { width: 190px; height: 190px; margin: 0 auto; display: block; }
@@ -68,6 +78,8 @@ export default function MachineQRBadge({
               <div class="title">${machineCode}</div>
               ${assetId ? `<div class="asset-id">เลขทรัพย์สิน: ${assetId}</div>` : ''}
               ${pmFrequency ? `<div class="pm-freq">รอบความถี่ PM: ${pmFrequency}</div>` : ''}
+              ${isSubcontractPm ? `<div class="subcontract-tag">🏢 Subcontract: ${subcontractorName || 'จ้างภายนอก'}</div>` : ''}
+              ${requiresCalibration ? `<div class="cal-tag">🎯 ต้องสอบเทียบ (CAL)${nextCalibrationDate ? ` • ครบ ${nextCalibrationDate}` : ''}</div>` : ''}
               <div class="subtitle">${machineName}<br/><b>${productionArea || ''}</b></div>
               ${supplier && supplier !== 'N/A' ? `<div class="meta">ผู้จำหน่าย: ${supplier}</div>` : ''}
               <img class="qr-img" src="${qrImageUrl}" alt="QR" />
@@ -75,7 +87,7 @@ export default function MachineQRBadge({
               <div class="footer">สแกนดูประวัติเครื่องจักร & Maintenance 360°</div>
             </div>
             <script>
-              window.onload = function() { window.print(); window.close(); }
+              window.onload = function() { window.print(); }
             </script>
           </body>
         </html>
@@ -85,8 +97,12 @@ export default function MachineQRBadge({
   }
 
   return (
-    <div className="bg-white border-2 border-[#D4AF37]/50 rounded-2xl p-5 shadow-lg flex flex-col items-center text-center max-w-sm w-full mx-auto">
-      <div ref={badgeRef} className="w-full flex flex-col items-center">
+    <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-4">
+      {/* Visual Badge Preview */}
+      <div 
+        ref={badgeRef}
+        className="bg-white rounded-2xl p-5 border-2 border-dashed border-stone-300 flex flex-col items-center text-center shadow-xs"
+      >
         <div className="text-[11px] font-bold text-[#8B7355] tracking-widest uppercase mb-1">
           CosmeFlow Smart Asset QR
         </div>
@@ -106,6 +122,16 @@ export default function MachineQRBadge({
         {pmFrequency && (
           <div className="text-xs font-mono font-bold text-cyan-700 bg-cyan-50 px-2.5 py-0.5 rounded-md border border-cyan-200 mb-1">
             รอบ PM: {pmFrequency}
+          </div>
+        )}
+        {isSubcontractPm && (
+          <div className="text-xs font-bold text-purple-700 bg-purple-50 px-2.5 py-0.5 rounded-md border border-purple-200 mb-1">
+            🏢 Subcontract: {subcontractorName || 'จ้างภายนอก'}
+          </div>
+        )}
+        {requiresCalibration && (
+          <div className="text-xs font-bold text-cyan-800 bg-cyan-50 px-2.5 py-0.5 rounded-md border border-cyan-200 mb-1">
+            🎯 ต้องสอบเทียบ (CAL){nextCalibrationDate ? ` • ครบ ${nextCalibrationDate}` : ''}
           </div>
         )}
         <p className="text-xs text-stone-600 font-medium line-clamp-2 px-2 mb-2">

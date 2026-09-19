@@ -93,12 +93,26 @@ export async function getMachines(filters?: {
 
   const enrichedMachines = (data || []).map(m => {
     const p = planMap.get(m.id) || planMap.get(m.machine_code)
+    const spec = (m.specification || {}) as Record<string, any>
+    const sub = spec.subcontract || {}
+    const cal = spec.calibration || {}
+
     return {
       ...m,
       pm_plan: p || null,
       pm_frequency_type: p?.frequency_type || null,
       pm_frequency_interval: p?.frequency_interval || null,
-      pm_next_due_date: p?.next_due_date || null
+      pm_next_due_date: p?.next_due_date || null,
+      is_subcontract_pm: Boolean(sub.is_subcontract_pm ?? m.is_subcontract_pm ?? false),
+      subcontractor_name: sub.subcontractor_name ?? m.subcontractor_name ?? null,
+      subcontractor_contact: sub.subcontractor_contact ?? m.subcontractor_contact ?? null,
+      subcontract_scope: sub.subcontract_scope ?? m.subcontract_scope ?? null,
+      requires_calibration: Boolean(cal.requires_calibration ?? m.requires_calibration ?? false),
+      calibration_frequency: cal.calibration_frequency ?? m.calibration_frequency ?? null,
+      last_calibration_date: cal.last_calibration_date ?? m.last_calibration_date ?? null,
+      next_calibration_date: cal.next_calibration_date ?? m.next_calibration_date ?? null,
+      calibration_lab: cal.calibration_lab ?? m.calibration_lab ?? null,
+      calibration_cert_no: cal.calibration_cert_no ?? m.calibration_cert_no ?? null
     }
   })
 
@@ -119,8 +133,22 @@ export async function createMachine(payload: {
   manufacturer?: string
   model?: string
   serial_number?: string
+  supplier?: string
+  asset_id?: string
   hourly_downtime_cost?: number
   maintenance_instruction?: string
+  // Subcontract PM fields
+  is_subcontract_pm?: boolean
+  subcontractor_name?: string
+  subcontractor_contact?: string
+  subcontract_scope?: string
+  // Calibration (CAL) fields
+  requires_calibration?: boolean
+  calibration_frequency?: string
+  last_calibration_date?: string
+  next_calibration_date?: string
+  calibration_lab?: string
+  calibration_cert_no?: string
 }) {
   const supabase = createAdminClient()
 
@@ -133,6 +161,23 @@ export async function createMachine(payload: {
 
   if (existing) {
     return { success: false, error: `รหัสเครื่องจักร ${code} มีอยู่ในระบบแล้ว` }
+  }
+
+  const specData = {
+    subcontract: {
+      is_subcontract_pm: Boolean(payload.is_subcontract_pm),
+      subcontractor_name: payload.subcontractor_name?.trim() || '',
+      subcontractor_contact: payload.subcontractor_contact?.trim() || '',
+      subcontract_scope: payload.subcontract_scope?.trim() || ''
+    },
+    calibration: {
+      requires_calibration: Boolean(payload.requires_calibration),
+      calibration_frequency: payload.calibration_frequency?.trim() || '',
+      last_calibration_date: payload.last_calibration_date || null,
+      next_calibration_date: payload.next_calibration_date || null,
+      calibration_lab: payload.calibration_lab?.trim() || '',
+      calibration_cert_no: payload.calibration_cert_no?.trim() || ''
+    }
   }
 
   const { data, error } = await supabase
@@ -149,8 +194,11 @@ export async function createMachine(payload: {
       manufacturer: payload.manufacturer || '',
       model: payload.model || '',
       serial_number: payload.serial_number || '',
+      supplier: payload.supplier || '',
+      asset_id: payload.asset_id || '',
       hourly_downtime_cost: payload.hourly_downtime_cost || 5000,
-      maintenance_instruction: payload.maintenance_instruction || ''
+      maintenance_instruction: payload.maintenance_instruction || '',
+      specification: specData
     })
     .select()
     .single()
@@ -183,6 +231,18 @@ export async function updateMachine(id: string, payload: {
   asset_id?: string
   hourly_downtime_cost?: number
   maintenance_instruction?: string
+  // Subcontract PM fields
+  is_subcontract_pm?: boolean
+  subcontractor_name?: string
+  subcontractor_contact?: string
+  subcontract_scope?: string
+  // Calibration (CAL) fields
+  requires_calibration?: boolean
+  calibration_frequency?: string
+  last_calibration_date?: string
+  next_calibration_date?: string
+  calibration_lab?: string
+  calibration_cert_no?: string
   // Mandatory GMP Audit Trail fields
   edited_by_name: string
   edit_reason: string
@@ -208,6 +268,32 @@ export async function updateMachine(id: string, payload: {
     return { success: false, error: 'ไม่พบข้อมูลเครื่องจักรที่ต้องการแก้ไข' }
   }
 
+  const currentSpec = (currentMachine.specification || {}) as Record<string, any>
+  const currentSub = currentSpec.subcontract || {}
+  const currentCal = currentSpec.calibration || {}
+
+  const newSub = {
+    is_subcontract_pm: payload.is_subcontract_pm !== undefined ? payload.is_subcontract_pm : Boolean(currentSub.is_subcontract_pm ?? false),
+    subcontractor_name: payload.subcontractor_name !== undefined ? payload.subcontractor_name.trim() : (currentSub.subcontractor_name || ''),
+    subcontractor_contact: payload.subcontractor_contact !== undefined ? payload.subcontractor_contact.trim() : (currentSub.subcontractor_contact || ''),
+    subcontract_scope: payload.subcontract_scope !== undefined ? payload.subcontract_scope.trim() : (currentSub.subcontract_scope || '')
+  }
+
+  const newCal = {
+    requires_calibration: payload.requires_calibration !== undefined ? payload.requires_calibration : Boolean(currentCal.requires_calibration ?? false),
+    calibration_frequency: payload.calibration_frequency !== undefined ? payload.calibration_frequency.trim() : (currentCal.calibration_frequency || ''),
+    last_calibration_date: payload.last_calibration_date !== undefined ? (payload.last_calibration_date || null) : (currentCal.last_calibration_date || null),
+    next_calibration_date: payload.next_calibration_date !== undefined ? (payload.next_calibration_date || null) : (currentCal.next_calibration_date || null),
+    calibration_lab: payload.calibration_lab !== undefined ? payload.calibration_lab.trim() : (currentCal.calibration_lab || ''),
+    calibration_cert_no: payload.calibration_cert_no !== undefined ? payload.calibration_cert_no.trim() : (currentCal.calibration_cert_no || '')
+  }
+
+  const updatedSpecification = {
+    ...currentSpec,
+    subcontract: newSub,
+    calibration: newCal
+  }
+
   const updateData: any = {
     machine_name: payload.machine_name.trim(),
     category: payload.category || 'Other',
@@ -218,10 +304,11 @@ export async function updateMachine(id: string, payload: {
     manufacturer: payload.manufacturer || '',
     model: payload.model || '',
     serial_number: payload.serial_number || '',
-    supplier: payload.supplier ?? currentMachine.supplier,
-    asset_id: payload.asset_id ?? currentMachine.asset_id,
+    supplier: payload.supplier !== undefined ? payload.supplier : currentMachine.supplier,
+    asset_id: payload.asset_id !== undefined ? payload.asset_id : currentMachine.asset_id,
     hourly_downtime_cost: payload.hourly_downtime_cost ?? 0,
     maintenance_instruction: payload.maintenance_instruction || '',
+    specification: updatedSpecification,
     updated_at: new Date().toISOString()
   }
 
@@ -257,6 +344,8 @@ export async function updateMachine(id: string, payload: {
     manufacturer: 'ยี่ห้อ / ผู้ผลิต',
     model: 'รุ่น',
     serial_number: 'หมายเลขซีเรียล (S/N)',
+    supplier: 'ผู้จำหน่าย (Supplier)',
+    asset_id: 'เลขทะเบียนทรัพย์สิน (Asset ID)',
     hourly_downtime_cost: 'ต้นทุน Downtime (บาท/ชม.)',
     maintenance_instruction: 'คำแนะนำการบำรุงรักษา'
   }
@@ -275,6 +364,90 @@ export async function updateMachine(id: string, payload: {
         })
       }
     }
+  }
+
+  // Check subcontract differences
+  if (Boolean(currentSub.is_subcontract_pm) !== Boolean(newSub.is_subcontract_pm)) {
+    changes.push({
+      field: 'is_subcontract_pm',
+      label: 'การจ้าง PM ภายนอก (Subcontract)',
+      old_value: currentSub.is_subcontract_pm ? 'จ้าง Subcontract' : 'MT ภายในดูแล',
+      new_value: newSub.is_subcontract_pm ? 'จ้าง Subcontract' : 'MT ภายในดูแล'
+    })
+  }
+  if ((currentSub.subcontractor_name || '') !== (newSub.subcontractor_name || '')) {
+    changes.push({
+      field: 'subcontractor_name',
+      label: 'ผู้รับเหมา Subcontract',
+      old_value: currentSub.subcontractor_name || '-',
+      new_value: newSub.subcontractor_name || '-'
+    })
+  }
+  if ((currentSub.subcontractor_contact || '') !== (newSub.subcontractor_contact || '')) {
+    changes.push({
+      field: 'subcontractor_contact',
+      label: 'เบอร์ติดต่อ / สัญญา Subcontract',
+      old_value: currentSub.subcontractor_contact || '-',
+      new_value: newSub.subcontractor_contact || '-'
+    })
+  }
+  if ((currentSub.subcontract_scope || '') !== (newSub.subcontract_scope || '')) {
+    changes.push({
+      field: 'subcontract_scope',
+      label: 'ขอบเขตงาน Subcontract',
+      old_value: currentSub.subcontract_scope || '-',
+      new_value: newSub.subcontract_scope || '-'
+    })
+  }
+
+  // Check calibration differences
+  if (Boolean(currentCal.requires_calibration) !== Boolean(newCal.requires_calibration)) {
+    changes.push({
+      field: 'requires_calibration',
+      label: 'ต้องสอบเทียบเครื่องมือวัด (CAL)',
+      old_value: currentCal.requires_calibration ? 'ต้องสอบเทียบ (CAL)' : 'ไม่ต้องสอบเทียบ',
+      new_value: newCal.requires_calibration ? 'ต้องสอบเทียบ (CAL)' : 'ไม่ต้องสอบเทียบ'
+    })
+  }
+  if ((currentCal.calibration_frequency || '') !== (newCal.calibration_frequency || '')) {
+    changes.push({
+      field: 'calibration_frequency',
+      label: 'ความถี่การสอบเทียบ (CAL)',
+      old_value: currentCal.calibration_frequency || '-',
+      new_value: newCal.calibration_frequency || '-'
+    })
+  }
+  if ((currentCal.last_calibration_date || '') !== (newCal.last_calibration_date || '')) {
+    changes.push({
+      field: 'last_calibration_date',
+      label: 'วันที่สอบเทียบล่าสุด (Last CAL)',
+      old_value: currentCal.last_calibration_date || '-',
+      new_value: newCal.last_calibration_date || '-'
+    })
+  }
+  if ((currentCal.next_calibration_date || '') !== (newCal.next_calibration_date || '')) {
+    changes.push({
+      field: 'next_calibration_date',
+      label: 'กำหนดสอบเทียบครั้งถัดไป (Next CAL)',
+      old_value: currentCal.next_calibration_date || '-',
+      new_value: newCal.next_calibration_date || '-'
+    })
+  }
+  if ((currentCal.calibration_lab || '') !== (newCal.calibration_lab || '')) {
+    changes.push({
+      field: 'calibration_lab',
+      label: 'สถาบัน / ผู้ให้บริการสอบเทียบ',
+      old_value: currentCal.calibration_lab || '-',
+      new_value: newCal.calibration_lab || '-'
+    })
+  }
+  if ((currentCal.calibration_cert_no || '') !== (newCal.calibration_cert_no || '')) {
+    changes.push({
+      field: 'calibration_cert_no',
+      label: 'เลขที่ใบรับรองการสอบเทียบ (CAL Cert)',
+      old_value: currentCal.calibration_cert_no || '-',
+      new_value: newCal.calibration_cert_no || '-'
+    })
   }
 
   if (changes.length === 0) {
@@ -456,10 +629,28 @@ export async function getMachine360(identifier: string) {
     .eq('machine_id', machine.id)
     .order('created_at', { ascending: false })
 
+  // Enrich machine with subcontract and calibration fields
+  const spec = (machine.specification || {}) as Record<string, any>
+  const sub = spec.subcontract || {}
+  const cal = spec.calibration || {}
+  const enrichedMachine: MaintenanceMachine = {
+    ...machine,
+    is_subcontract_pm: Boolean(sub.is_subcontract_pm ?? machine.is_subcontract_pm ?? false),
+    subcontractor_name: sub.subcontractor_name ?? machine.subcontractor_name ?? null,
+    subcontractor_contact: sub.subcontractor_contact ?? machine.subcontractor_contact ?? null,
+    subcontract_scope: sub.subcontract_scope ?? machine.subcontract_scope ?? null,
+    requires_calibration: Boolean(cal.requires_calibration ?? machine.requires_calibration ?? false),
+    calibration_frequency: cal.calibration_frequency ?? machine.calibration_frequency ?? null,
+    last_calibration_date: cal.last_calibration_date ?? machine.last_calibration_date ?? null,
+    next_calibration_date: cal.next_calibration_date ?? machine.next_calibration_date ?? null,
+    calibration_lab: cal.calibration_lab ?? machine.calibration_lab ?? null,
+    calibration_cert_no: cal.calibration_cert_no ?? machine.calibration_cert_no ?? null
+  }
+
   return {
     success: true,
     data: {
-      machine: machine as MaintenanceMachine,
+      machine: enrichedMachine,
       activeWorkOrders: activeWOs || [],
       historyWorkOrders: completedJobs,
       partsConsumed: partsConsumed || [],

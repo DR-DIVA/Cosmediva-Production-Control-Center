@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Wrench, Building, Cpu, Layers } from 'lucide-react'
+import { Plus, Wrench, Building, Cpu, Layers, Building2, Target, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { createMachine } from '@/app/actions/maintenance'
 
@@ -26,7 +26,25 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
   const [hourlyCost, setHourlyCost] = useState('5000')
   const [manufacturer, setManufacturer] = useState('')
   const [model, setModel] = useState('')
+  const [serialNumber, setSerialNumber] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [assetId, setAssetId] = useState('')
   const [instruction, setInstruction] = useState('')
+
+  // Subcontract PM State
+  const [isSubcontractPm, setIsSubcontractPm] = useState(false)
+  const [subcontractorName, setSubcontractorName] = useState('')
+  const [subcontractorContact, setSubcontractorContact] = useState('')
+  const [subcontractScope, setSubcontractScope] = useState('')
+
+  // Calibration (CAL) State
+  const [requiresCalibration, setRequiresCalibration] = useState(false)
+  const [calibrationFrequency, setCalibrationFrequency] = useState('ทุก 1 ปี (Annual)')
+  const [lastCalibrationDate, setLastCalibrationDate] = useState('')
+  const [nextCalibrationDate, setNextCalibrationDate] = useState('')
+  const [calibrationLab, setCalibrationLab] = useState('')
+  const [calibrationCertNo, setCalibrationCertNo] = useState('')
+
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -48,7 +66,22 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
         hourly_downtime_cost: parseFloat(hourlyCost) || 5000,
         manufacturer,
         model,
-        maintenance_instruction: instruction
+        serial_number: serialNumber,
+        supplier,
+        asset_id: assetId,
+        maintenance_instruction: instruction,
+        // Subcontract PM
+        is_subcontract_pm: isSubcontractPm,
+        subcontractor_name: subcontractorName,
+        subcontractor_contact: subcontractorContact,
+        subcontract_scope: subcontractScope,
+        // Calibration
+        requires_calibration: requiresCalibration,
+        calibration_frequency: calibrationFrequency,
+        last_calibration_date: lastCalibrationDate || undefined,
+        next_calibration_date: nextCalibrationDate || undefined,
+        calibration_lab: calibrationLab,
+        calibration_cert_no: calibrationCertNo
       })
 
       if (res.success) {
@@ -198,6 +231,39 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
             </div>
           </div>
 
+          {/* Supplier, Asset ID & Serial Number */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">ผู้จำหน่าย (Supplier)</label>
+              <Input
+                value={supplier}
+                onChange={e => setSupplier(e.target.value)}
+                placeholder="เช่น อุดมทรัพย์, PNP SCALE"
+                className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">เลขทรัพย์สิน (Asset ID)</label>
+              <Input
+                value={assetId}
+                onChange={e => setAssetId(e.target.value)}
+                placeholder="เช่น AST-MIX-005"
+                className="h-10 text-xs font-mono rounded-xl bg-stone-50 border-stone-200"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-bold text-stone-700 block mb-1">Serial Number</label>
+              <Input
+                value={serialNumber}
+                onChange={e => setSerialNumber(e.target.value)}
+                placeholder="เช่น SN-2025-001"
+                className="h-10 text-xs font-mono rounded-xl bg-stone-50 border-stone-200"
+              />
+            </div>
+          </div>
+
           {/* Maintenance Instruction */}
           <div>
             <label className="text-xs font-bold text-stone-700 block mb-1">คำแนะนำการบำรุงรักษาพิเศษ</label>
@@ -207,6 +273,172 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
               placeholder="เช่น อัดจารบี Food Grade ทุก 2 สัปดาห์"
               className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200"
             />
+          </div>
+
+          {/* SUBCONTRACT / OUTSOURCE PM SECTION */}
+          <div className="p-4 bg-purple-50/60 rounded-2xl border border-purple-200/80 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center text-purple-800 font-bold shrink-0">
+                  <Building2 className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-stone-900">การบำรุงรักษาโดยผู้รับเหมาภายนอก (Subcontract PM)</h4>
+                  <p className="text-[11px] text-stone-500">สำหรับเครื่องจักรที่ไม่มี PM โดยฝ่าย MT เองเนื่องจากจ้างซัพพลายเออร์/ผู้รับเหมาภายนอก</p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-xl border border-purple-200 shadow-xs shrink-0">
+                <input
+                  type="checkbox"
+                  checked={isSubcontractPm}
+                  onChange={e => setIsSubcontractPm(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-stone-300 focus:ring-purple-500"
+                />
+                <span className="text-xs font-bold text-purple-900">
+                  {isSubcontractPm ? '🏢 จ้าง Subcontract ดูแล' : '🔧 ฝ่าย MT ภายในดูแลเอง'}
+                </span>
+              </label>
+            </div>
+
+            {isSubcontractPm && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-purple-100">
+                <div>
+                  <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                    ชื่อผู้รับเหมา / ซัพพลายเออร์ที่ดูแล *
+                  </label>
+                  <Input
+                    value={subcontractorName}
+                    onChange={e => setSubcontractorName(e.target.value)}
+                    placeholder="เช่น บจก. พีเอ็นพี แมชชีนเนอรี่"
+                    className="h-9 text-xs rounded-xl bg-white border-purple-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                    เบอร์ติดต่อ / สัญญาบริการ
+                  </label>
+                  <Input
+                    value={subcontractorContact}
+                    onChange={e => setSubcontractorContact(e.target.value)}
+                    placeholder="เช่น 02-123-4567"
+                    className="h-9 text-xs rounded-xl bg-white border-purple-200"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                    ขอบเขตงานบริการ
+                  </label>
+                  <Input
+                    value={subcontractScope}
+                    onChange={e => setSubcontractScope(e.target.value)}
+                    placeholder="เช่น PM ทุก 6 เดือน พร้อมเปลี่ยนอะไหล่"
+                    className="h-9 text-xs rounded-xl bg-white border-purple-200"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* CALIBRATION (CAL) SECTION */}
+          <div className="p-4 bg-cyan-50/60 rounded-2xl border border-cyan-200/80 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center text-cyan-800 font-bold shrink-0">
+                  <Target className="w-4 h-4" />
+                </div>
+                <div>
+                  <h4 className="text-xs font-bold text-stone-900">การสอบเทียบเครื่องมือวัดและอุปกรณ์ (Calibration - CAL)</h4>
+                  <p className="text-[11px] text-stone-500">สำหรับเครื่องชั่ง, เกจวัดแรงดัน, เซ็นเซอร์อุณหภูมิ/ความชื้น, ตู้อบ</p>
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer select-none bg-white px-3 py-1.5 rounded-xl border border-cyan-200 shadow-xs shrink-0">
+                <input
+                  type="checkbox"
+                  checked={requiresCalibration}
+                  onChange={e => setRequiresCalibration(e.target.checked)}
+                  className="w-4 h-4 text-cyan-600 rounded border-stone-300 focus:ring-cyan-500"
+                />
+                <span className="text-xs font-bold text-cyan-900">
+                  {requiresCalibration ? '🎯 เครื่องนี้ต้องสอบเทียบ (CAL)' : 'ไม่ต้องสอบเทียบ'}
+                </span>
+              </label>
+            </div>
+
+            {requiresCalibration && (
+              <div className="space-y-3 pt-2 border-t border-cyan-100">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                      ความถี่การสอบเทียบ (CAL)
+                    </label>
+                    <select
+                      value={calibrationFrequency}
+                      onChange={e => setCalibrationFrequency(e.target.value)}
+                      className="w-full h-9 px-3 text-xs rounded-xl bg-white border border-cyan-200 font-medium text-stone-800"
+                    >
+                      <option value="ทุก 3 เดือน (Quarterly)">ทุก 3 เดือน (Quarterly)</option>
+                      <option value="ทุก 6 เดือน (Semi-Annual)">ทุก 6 เดือน (Semi-Annual)</option>
+                      <option value="ทุก 1 ปี (Annual)">ทุก 1 ปี (Annual)</option>
+                      <option value="ทุก 2 ปี (Bi-Annual)">ทุก 2 ปี (Bi-Annual)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
+                      <CalendarDays className="w-3.5 h-3.5 text-cyan-700" />
+                      <span>วันที่สอบเทียบล่าสุด</span>
+                    </label>
+                    <Input
+                      type="date"
+                      value={lastCalibrationDate}
+                      onChange={e => setLastCalibrationDate(e.target.value)}
+                      className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
+                      <CalendarDays className="w-3.5 h-3.5 text-rose-600" />
+                      <span>กำหนดสอบเทียบครั้งถัดไป</span>
+                    </label>
+                    <Input
+                      type="date"
+                      value={nextCalibrationDate}
+                      onChange={e => setNextCalibrationDate(e.target.value)}
+                      className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono font-bold text-rose-700"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                      สถาบัน / ผู้ให้บริการสอบเทียบ
+                    </label>
+                    <Input
+                      value={calibrationLab}
+                      onChange={e => setCalibrationLab(e.target.value)}
+                      placeholder="เช่น สถาบันมาตรวิทยาแห่งชาติ (NIMT)"
+                      className="h-9 text-xs rounded-xl bg-white border-cyan-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-medium text-stone-700 block mb-1">
+                      เลขที่ใบรับรองการสอบเทียบ
+                    </label>
+                    <Input
+                      value={calibrationCertNo}
+                      onChange={e => setCalibrationCertNo(e.target.value)}
+                      placeholder="เช่น CAL-2025-0819"
+                      className="h-9 text-xs font-mono rounded-xl bg-white border-cyan-200"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Footer Buttons */}

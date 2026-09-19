@@ -107,110 +107,206 @@ export default async function Machine360Page({ params }: Props) {
         {/* Left 2 Cols: 360 Header & Specs */}
         <div className="lg:col-span-2 bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-stone-100">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-2xl font-black text-stone-900">{machine.machine_code}</span>
-                <span className={`px-2.5 py-0.5 rounded-md text-xs font-black ${
-                  machine.criticality === 'A' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-mono text-2xl font-black text-stone-900">{machine.machine_code}</span>
+                  <span className={`px-2.5 py-0.5 rounded-md text-xs font-black ${
+                    machine.criticality === 'A' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    Criticality Grade {machine.criticality}
+                  </span>
+                  {machine.is_subcontract_pm && (
+                    <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-purple-100 text-purple-800 border border-purple-200">
+                      🏢 จ้าง Subcontract ดูแล
+                    </span>
+                  )}
+                  {machine.requires_calibration && (
+                    <span className="px-2.5 py-0.5 rounded-md text-xs font-bold bg-cyan-100 text-cyan-800 border border-cyan-200">
+                      🎯 เครื่องต้องสอบเทียบ (CAL)
+                    </span>
+                  )}
+                </div>
+                <h1 className="text-lg sm:text-xl font-black text-stone-800 mt-1">{machine.machine_name}</h1>
+                <div className="text-xs text-stone-500 mt-0.5">
+                  {machine.department_name} • {machine.production_area} • {machine.line}
+                </div>
+              </div>
+
+              <div className="text-left sm:text-right">
+                <span className={`inline-block px-3 py-1 rounded-full text-xs font-black ${
+                  machine.status === 'Running' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                  machine.status === 'Breakdown' ? 'bg-red-600 text-white animate-pulse' :
+                  machine.status === 'Under Repair' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
+                  'bg-stone-100 text-stone-700'
                 }`}>
-                  Criticality Grade {machine.criticality}
+                  {machine.status}
                 </span>
-              </div>
-              <h1 className="text-lg sm:text-xl font-black text-stone-800 mt-1">{machine.machine_name}</h1>
-              <div className="text-xs text-stone-500 mt-0.5">
-                {machine.department_name} • {machine.production_area} • {machine.line}
+                <div className="text-[11px] text-stone-400 mt-1">
+                  {machine.is_subcontract_pm ? `ผู้ดูแล: ${machine.subcontractor_name || 'Subcontractor'}` : `ช่างรับผิดชอบ: ${machine.responsible_technician_name || '-'}`}
+                </div>
               </div>
             </div>
 
-            <div className="text-left sm:text-right">
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-black ${
-                machine.status === 'Running' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                machine.status === 'Breakdown' ? 'bg-red-600 text-white animate-pulse' :
-                machine.status === 'Under Repair' ? 'bg-amber-100 text-amber-900 border border-amber-300' :
-                'bg-stone-100 text-stone-700'
+            {/* Key Reliability Metrics */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
+                <div className="text-xs text-stone-400 font-medium">MTBF (ชม. ระหว่างเสีย)</div>
+                <div className="text-xl font-black text-stone-900 mt-0.5">{metrics.mtbfHours} ชม.</div>
+              </div>
+
+              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
+                <div className="text-xs text-stone-400 font-medium">MTTR (เวลาซ่อมเฉลี่ย)</div>
+                <div className="text-xl font-black text-stone-900 mt-0.5">{metrics.mttrMinutes} นาที</div>
+              </div>
+
+              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
+                <div className="text-xs text-stone-400 font-medium">จำนวนครั้งที่เสีย</div>
+                <div className="text-xl font-black text-stone-900 mt-0.5">{metrics.totalBreakdowns} ครั้ง</div>
+              </div>
+
+              <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
+                <div className="text-xs text-stone-400 font-medium">Downtime รวม</div>
+                <div className="text-xl font-black text-stone-900 mt-0.5">{metrics.totalDowntimeHours} ชม.</div>
+              </div>
+            </div>
+
+            {/* Technical Specs & Details */}
+            <div className="space-y-3 pt-2">
+              <h3 className="text-sm font-black text-stone-900 flex items-center gap-1.5">
+                <Cpu className="w-4 h-4 text-[#8B7355]" />
+                <span>ข้อมูลทางเทคนิคและสินทรัพย์ (Technical Specifications)</span>
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-stone-50 p-4 rounded-2xl border border-stone-200">
+                <div>
+                  <span className="text-stone-400 block">ผู้จำหน่าย (Supplier):</span>
+                  <span className="font-semibold text-stone-800">{machine.supplier && machine.supplier !== 'N/A' ? machine.supplier : '-'}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">เลขทรัพย์สิน (Asset ID):</span>
+                  <span className="font-mono font-semibold text-blue-700">{machine.asset_id || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">ผู้ผลิต / แบรนด์:</span>
+                  <span className="font-semibold text-stone-800">{machine.manufacturer && machine.manufacturer !== 'N/A' ? machine.manufacturer : '-'}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">รุ่น (Model):</span>
+                  <span className="font-semibold text-stone-800">{machine.model && machine.model !== 'N/A' ? machine.model : '-'}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">หมายเลขเครื่อง (Serial No.):</span>
+                  <span className="font-mono font-semibold text-stone-800">{machine.serial_number && machine.serial_number !== 'N/A' ? machine.serial_number : '-'}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">ราคาจัดซื้อ (Purchase Cost):</span>
+                  <span className="font-semibold text-stone-800">฿{Number(machine.purchase_cost || 0).toLocaleString()}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">ต้นทุน Downtime:</span>
+                  <span className="font-bold text-[#8B7355]">฿{Number(machine.hourly_downtime_cost).toLocaleString()} / ชั่วโมง</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block">วันที่ติดตั้ง:</span>
+                  <span className="font-semibold text-stone-800">{machine.installation_date || '-'}</span>
+                </div>
+              </div>
+
+              {/* Subcontract PM Details Card */}
+              <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
+                machine.is_subcontract_pm
+                  ? 'bg-purple-50/70 border-purple-200 text-purple-950'
+                  : 'bg-stone-50 border-stone-200 text-stone-700'
               }`}>
-                {machine.status}
-              </span>
-              <div className="text-[11px] text-stone-400 mt-1">ช่างรับผิดชอบ: {machine.responsible_technician_name || '-'}</div>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1.5">
+                    🏢 การบำรุงรักษาเชิงป้องกัน (PM Responsibility):
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    machine.is_subcontract_pm ? 'bg-purple-200 text-purple-900' : 'bg-emerald-100 text-emerald-800'
+                  }`}>
+                    {machine.is_subcontract_pm ? 'จ้าง Subcontract ภายนอก' : 'ช่าง MT ภายในดูแลเอง'}
+                  </span>
+                </div>
+
+                {machine.is_subcontract_pm ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-purple-200/60">
+                    <div>
+                      <span className="text-purple-600 block text-[11px]">ผู้รับเหมา / บริษัทดูแล:</span>
+                      <span className="font-bold text-stone-900">{machine.subcontractor_name || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-purple-600 block text-[11px]">เบอร์ติดต่อ / สัญญาบริการ:</span>
+                      <span className="font-medium text-stone-800">{machine.subcontractor_contact || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-purple-600 block text-[11px]">ขอบเขตงานบริการ:</span>
+                      <span className="font-medium text-stone-800">{machine.subcontract_scope || '-'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-stone-500">
+                    เครื่องจักรนี้ได้รับการบำรุงรักษาตามรอบ PM โดยทีมช่างซ่อมบำรุงและวิศวกรรมของโรงงาน (In-House Maintenance Team)
+                  </div>
+                )}
+              </div>
+
+              {/* Calibration (CAL) Details Card */}
+              <div className={`p-4 rounded-2xl border text-xs space-y-2 ${
+                machine.requires_calibration
+                  ? 'bg-cyan-50/70 border-cyan-200 text-cyan-950'
+                  : 'bg-stone-50 border-stone-200 text-stone-700'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold flex items-center gap-1.5">
+                    🎯 การสอบเทียบเครื่องมือวัดและอุปกรณ์ (Calibration - CAL):
+                  </span>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                    machine.requires_calibration ? 'bg-cyan-200 text-cyan-900' : 'bg-stone-200 text-stone-700'
+                  }`}>
+                    {machine.requires_calibration ? 'ต้องสอบเทียบ (CAL Required)' : 'ไม่ต้องสอบเทียบ'}
+                  </span>
+                </div>
+
+                {machine.requires_calibration ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1 border-t border-cyan-200/60">
+                    <div>
+                      <span className="text-cyan-700 block text-[11px]">ความถี่การสอบเทียบ:</span>
+                      <span className="font-bold text-stone-900">{machine.calibration_frequency || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-cyan-700 block text-[11px]">วันที่สอบเทียบล่าสุด:</span>
+                      <span className="font-mono font-medium text-stone-800">{machine.last_calibration_date || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-rose-700 block text-[11px] font-bold">กำหนดสอบเทียบครั้งถัดไป:</span>
+                      <span className="font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200 inline-block">
+                        {machine.next_calibration_date || '-'}
+                      </span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-cyan-700 block text-[11px]">สถาบัน / ผู้ให้บริการสอบเทียบ:</span>
+                      <span className="font-medium text-stone-800">{machine.calibration_lab || '-'}</span>
+                    </div>
+                    <div>
+                      <span className="text-cyan-700 block text-[11px]">เลขที่ใบรับรอง (Cert No.):</span>
+                      <span className="font-mono font-bold text-stone-900">{machine.calibration_cert_no || '-'}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-stone-500">
+                    เครื่องจักรนี้เป็นอุปกรณ์ทั่วไป ไม่อยู่ในข่ายเครื่องมือวัดที่ต้องสอบเทียบตามมาตรฐาน GMP
+                  </div>
+                )}
+              </div>
+
+              {machine.maintenance_instruction && (
+                <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-xs text-amber-900">
+                  <b>คำแนะนำการบำรุงรักษา:</b> {machine.maintenance_instruction}
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Key Reliability Metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
-              <span className="text-[11px] text-stone-500 font-medium block">Breakdowns</span>
-              <span className="text-xl font-black text-stone-900">{metrics.totalBreakdowns}</span>
-              <span className="text-[10px] text-stone-400 block">ครั้ง</span>
-            </div>
-
-            <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
-              <span className="text-[11px] text-stone-500 font-medium block">Total Downtime</span>
-              <span className="text-xl font-black text-red-600">{metrics.totalDowntimeHours}</span>
-              <span className="text-[10px] text-stone-400 block">ชั่วโมง</span>
-            </div>
-
-            <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
-              <span className="text-[11px] text-stone-500 font-medium block">MTTR (เฉลี่ย)</span>
-              <span className="text-xl font-black text-amber-600">{metrics.mttrMinutes}</span>
-              <span className="text-[10px] text-stone-400 block">นาที/งาน</span>
-            </div>
-
-            <div className="bg-stone-50 p-3.5 rounded-2xl border border-stone-200 text-center">
-              <span className="text-[11px] text-stone-500 font-medium block">MTBF</span>
-              <span className="text-xl font-black text-emerald-600">{metrics.mtbfHours}</span>
-              <span className="text-[10px] text-stone-400 block">ชั่วโมงเดินเครื่อง</span>
-            </div>
-          </div>
-
-          {/* Technical Specifications */}
-          <div className="space-y-2 pt-2">
-            <h3 className="text-xs font-bold text-stone-700 uppercase tracking-wider flex items-center gap-1.5">
-              <Cpu className="w-3.5 h-3.5 text-[#D4AF37]" />
-              ข้อมูลทางเทคนิค & สเปกเครื่องจักร:
-            </h3>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs bg-stone-50 p-4 rounded-2xl border border-stone-200">
-              <div>
-                <span className="text-stone-400 block">ผู้จำหน่าย (Supplier):</span>
-                <span className="font-semibold text-stone-800">{machine.supplier && machine.supplier !== 'N/A' ? machine.supplier : '-'}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">เลขทรัพย์สิน (Asset ID):</span>
-                <span className="font-mono font-semibold text-blue-700">{machine.asset_id || '-'}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">ผู้ผลิต / แบรนด์:</span>
-                <span className="font-semibold text-stone-800">{machine.manufacturer && machine.manufacturer !== 'N/A' ? machine.manufacturer : '-'}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">รุ่น (Model):</span>
-                <span className="font-semibold text-stone-800">{machine.model && machine.model !== 'N/A' ? machine.model : '-'}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">หมายเลขเครื่อง (Serial No.):</span>
-                <span className="font-mono font-semibold text-stone-800">{machine.serial_number && machine.serial_number !== 'N/A' ? machine.serial_number : '-'}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">ราคาจัดซื้อ (Purchase Cost):</span>
-                <span className="font-semibold text-stone-800">฿{Number(machine.purchase_cost || 0).toLocaleString()}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">ต้นทุน Downtime:</span>
-                <span className="font-bold text-[#8B7355]">฿{Number(machine.hourly_downtime_cost).toLocaleString()} / ชั่วโมง</span>
-              </div>
-              <div>
-                <span className="text-stone-400 block">วันที่ติดตั้ง:</span>
-                <span className="font-semibold text-stone-800">{machine.installation_date || '-'}</span>
-              </div>
-            </div>
-
-            {machine.maintenance_instruction && (
-              <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/60 text-xs text-amber-900">
-                <b>คำแนะนำการบำรุงรักษา:</b> {machine.maintenance_instruction}
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Right 1 Col: Printable QR Badge */}
         <div>
@@ -225,6 +321,10 @@ export default async function Machine360Page({ params }: Props) {
             serialNumber={machine.serial_number}
             model={machine.model}
             pmFrequency={pmPlan ? getPmFrequencyInfo(pmPlan.frequency_type, pmPlan.frequency_interval).full : undefined}
+            isSubcontractPm={machine.is_subcontract_pm}
+            subcontractorName={machine.subcontractor_name}
+            requiresCalibration={machine.requires_calibration}
+            nextCalibrationDate={machine.next_calibration_date}
           />
         </div>
       </div>

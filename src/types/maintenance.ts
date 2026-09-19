@@ -104,6 +104,18 @@ export interface MaintenanceMachine {
   pm_frequency_type?: string | null
   pm_frequency_interval?: number | null
   pm_next_due_date?: string | null
+  // Subcontract / Outsource PM fields
+  is_subcontract_pm?: boolean
+  subcontractor_name?: string | null
+  subcontractor_contact?: string | null
+  subcontract_scope?: string | null
+  // Calibration (CAL) fields
+  requires_calibration?: boolean
+  calibration_frequency?: string | null
+  last_calibration_date?: string | null
+  next_calibration_date?: string | null
+  calibration_lab?: string | null
+  calibration_cert_no?: string | null
 }
 
 export interface MaintenanceSparePart {
