@@ -165,7 +165,7 @@ export default function MachineActionRequestModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-2xl w-full p-0 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto font-sans">
+      <DialogContent className="max-w-4xl sm:max-w-4xl w-[95vw] p-0 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto font-sans">
         
         {/* DCC Standard Header */}
         <div className="bg-stone-900 text-white p-5 rounded-t-3xl border-b border-stone-800">

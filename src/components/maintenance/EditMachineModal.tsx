@@ -194,7 +194,7 @@ export default function EditMachineModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-2xl w-full p-6 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto font-sans">
+      <DialogContent className="max-w-4xl sm:max-w-4xl w-[95vw] p-6 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto font-sans">
         <DialogHeader className="text-left space-y-1">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">

@@ -70,7 +70,7 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-lg w-full p-6 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl sm:max-w-3xl w-[92vw] p-6 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto">
         <DialogHeader className="text-left space-y-1">
           <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center text-amber-800 border border-amber-300">
             <Wrench className="w-5 h-5" />
