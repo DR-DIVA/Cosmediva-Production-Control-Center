@@ -51,21 +51,18 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       label: 'สำหรับช่างซ่อม', 
       href: '/maintenance/technician', 
       icon: HardHat, 
-      badge: 'My Tasks',
       color: 'bg-amber-100 text-amber-800 border-amber-200' 
     },
     { 
       label: 'ศูนย์ควบคุมงาน', 
       href: '/maintenance/work-orders', 
       icon: KanbanSquare,
-      badge: 'Kanban',
       color: 'bg-purple-100 text-purple-700 border-purple-200' 
     },
     { 
       label: 'แผน PM 2026', 
       href: '/maintenance/pm', 
       icon: Calendar, 
-      badge: 'PM',
       color: 'bg-cyan-100 text-cyan-800 border-cyan-200' 
     },
     { 
@@ -78,7 +75,6 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       label: 'พิมพ์ QR หน้าเครื่อง', 
       href: '/maintenance/qr-print', 
       icon: QrCode, 
-      badge: 'QR',
       color: 'bg-rose-100 text-rose-800 border-rose-200' 
     },
   ]
@@ -137,14 +133,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-red-300 bg-red-600 text-white shadow-xs transition-transform group-hover:scale-105">
               <AlertOctagon className="w-4.5 h-4.5 sm:w-5 sm:h-5 animate-pulse stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs sm:text-sm font-extrabold text-rose-950 truncate">
-                แจ้งเครื่องเสียด่วน
-              </span>
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-rose-200 text-red-900 border border-rose-300 shrink-0">
-                🚨 ด่วน
-              </span>
-            </div>
+            <span className="text-xs sm:text-sm font-extrabold text-rose-950 truncate">
+              แจ้งเครื่องเสียด่วน
+            </span>
           </Link>
 
           {/* 2. แจ้งซ่อมทั่วไป */}
@@ -156,14 +147,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-blue-300 bg-blue-600 text-white shadow-xs transition-transform group-hover:scale-105">
               <Wrench className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs sm:text-sm font-extrabold text-blue-950 truncate">
-                แจ้งซ่อมทั่วไป
-              </span>
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-blue-200 text-blue-900 border border-blue-300 shrink-0">
-                🛠️ ทั่วไป
-              </span>
-            </div>
+            <span className="text-xs sm:text-sm font-extrabold text-blue-950 truncate">
+              แจ้งซ่อมทั่วไป
+            </span>
           </Link>
 
           {/* 3. แจ้งซ่อมบริการ */}
@@ -175,14 +161,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-purple-300 bg-purple-600 text-white shadow-xs transition-transform group-hover:scale-105">
               <Zap className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs sm:text-sm font-extrabold text-purple-950 truncate">
-                แจ้งซ่อมบริการ
-              </span>
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-purple-200 text-purple-900 border border-purple-300 shrink-0">
-                💡 บริการ
-              </span>
-            </div>
+            <span className="text-xs sm:text-sm font-extrabold text-purple-950 truncate">
+              แจ้งซ่อมบริการ
+            </span>
           </Link>
 
           {/* 4. สำหรับช่างซ่อม */}
@@ -194,14 +175,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-[#D4AF37] text-[#2A2521] shadow-xs transition-transform group-hover:scale-105">
               <HardHat className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-xs sm:text-sm font-extrabold text-amber-950 truncate">
-                สำหรับช่างซ่อม 📱
-              </span>
-              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
-                My Tasks
-              </span>
-            </div>
+            <span className="text-xs sm:text-sm font-extrabold text-amber-950 truncate">
+              สำหรับช่างซ่อม
+            </span>
           </Link>
         </div>
       </div>
@@ -232,21 +208,10 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                   <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
-                {/* Text Label & Badge */}
-                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                  <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
-                    {item.label}
-                  </span>
-                  {item.badge && (
-                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono shrink-0 ${
-                      isActive 
-                        ? 'bg-[#D4AF37] text-stone-950' 
-                        : 'bg-stone-200 text-stone-700 border border-stone-300'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
+                {/* Text Label */}
+                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -276,21 +241,10 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                   <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
-                {/* Text Label & Badge */}
-                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-                  <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
-                    {item.label}
-                  </span>
-                  {item.badge && (
-                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono shrink-0 ${
-                      isActive 
-                        ? 'bg-[#D4AF37] text-stone-950' 
-                        : 'bg-stone-200 text-stone-700 border border-stone-300'
-                    }`}>
-                      {item.badge}
-                    </span>
-                  )}
-                </div>
+                {/* Text Label */}
+                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                  {item.label}
+                </span>
               </Link>
             )
           })}
@@ -305,14 +259,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-emerald-400 bg-[#06C755] text-white shadow-xs transition-transform group-hover:scale-105">
               <MessageSquare className="w-4 h-4 fill-white stroke-none" />
             </div>
-            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-              <span className="text-xs font-extrabold text-emerald-950 truncate">
-                ตั้งค่า LINE
-              </span>
-              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-emerald-200 text-emerald-900 border border-emerald-300 shrink-0">
-                LINE Bot
-              </span>
-            </div>
+            <span className="text-xs font-extrabold text-emerald-950 truncate">
+              ตั้งค่า LINE
+            </span>
           </button>
 
           {/* Quick QR Scanner Modal Trigger */}
@@ -328,14 +277,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-amber-500 text-white shadow-xs transition-transform group-hover:scale-105">
               <QrCode className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
-              <span className="text-xs font-extrabold text-amber-950 truncate">
-                สแกน QR หน้าเครื่อง
-              </span>
-              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
-                Scan
-              </span>
-            </div>
+            <span className="text-xs font-extrabold text-amber-950 truncate">
+              สแกน QR หน้าเครื่อง
+            </span>
           </button>
         </div>
       </div>
