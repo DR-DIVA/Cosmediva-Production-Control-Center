@@ -18,15 +18,19 @@ import {
   Zap
 } from 'lucide-react'
 import LineSettingsModal from '@/components/maintenance/LineSettingsModal'
+import MachineQRScannerModal from '@/components/maintenance/MachineQRScannerModal'
+import { MaintenanceMachine } from '@/types/maintenance'
 
 interface MaintenanceHeaderProps {
   onOpenReport?: () => void
   onOpenQR?: () => void
+  machines?: MaintenanceMachine[]
 }
 
-export default function MaintenanceHeader({ onOpenReport, onOpenQR }: MaintenanceHeaderProps) {
+export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [] }: MaintenanceHeaderProps) {
   const pathname = usePathname()
   const [isLineOpen, setIsLineOpen] = useState(false)
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false)
 
   const navItems = [
     { 
@@ -213,6 +217,29 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
               </span>
             </div>
           </button>
+
+          {/* Quick QR Scanner Modal Trigger */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onOpenQR) onOpenQR()
+              else setIsQRScannerOpen(true)
+            }}
+            className="group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer"
+            title="สแกน QR Code หน้าเครื่อง เพื่อแจ้งซ่อมหรือดูประวัติ 360°"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-amber-500 text-white shadow-xs transition-transform group-hover:scale-105">
+              <QrCode className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs sm:text-sm font-extrabold text-amber-950">
+                สแกน QR หน้าเครื่อง
+              </span>
+              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300">
+                Scan
+              </span>
+            </div>
+          </button>
         </div>
       </div>
 
@@ -220,6 +247,13 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
       <LineSettingsModal
         isOpen={isLineOpen}
         onClose={() => setIsLineOpen(false)}
+      />
+
+      {/* Machine QR Scanner Modal */}
+      <MachineQRScannerModal
+        isOpen={isQRScannerOpen}
+        onClose={() => setIsQRScannerOpen(false)}
+        machines={machines}
       />
     </div>
   )

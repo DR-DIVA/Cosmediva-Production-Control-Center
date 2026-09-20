@@ -18,7 +18,6 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { getMaintenanceKPIs, getWorkOrders, getMachines } from '@/app/actions/maintenance'
-import MaintenanceHubClient from '@/components/maintenance/MaintenanceHubClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,10 +50,7 @@ export default async function MaintenanceHubPage() {
 
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
-      <MaintenanceHeader />
-
-      {/* Hero Quick Launch Cards */}
-      <MaintenanceHubClient machines={machines} />
+      <MaintenanceHeader machines={machines} />
 
       {/* Real-time KPI Metric Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
