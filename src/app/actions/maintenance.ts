@@ -1074,6 +1074,7 @@ export async function transitionWorkOrderStatus(payload: {
 
   if (payload.to_status === 'CLOSED') {
     updateFields.closed_at = nowIso
+    updateFields.supervisor_name = payload.changed_by_name || 'ปิยะราช รามมา'
     if (!wo.verified_at) updateFields.verified_at = nowIso
     
     await supabase

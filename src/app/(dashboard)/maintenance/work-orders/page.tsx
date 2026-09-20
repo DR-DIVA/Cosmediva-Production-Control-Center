@@ -27,7 +27,9 @@ import {
   ArrowRight,
   Timer,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ShieldCheck,
+  FileText
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -432,6 +434,29 @@ export default function WorkOrdersKanbanPage() {
     }
   }
 
+  const handleCloseWorkOrder = async (wo: MaintenanceWorkOrder) => {
+    try {
+      const res = await transitionWorkOrderStatus({
+        work_order_id: wo.id,
+        to_status: 'CLOSED',
+        changed_by_name: 'ปิยะราช รามมา',
+        notes: 'หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช รามมา) ตรวจสอบความสมบูรณ์และปิดงานซ่อม'
+      })
+
+      if (res.success) {
+        toast.success(`ปิดงาน ${wo.wo_number} สำเร็จ ย้ายไปคอลัมน์ "ปิดงาน (Closed)" แล้ว`)
+        if (detailWO?.id === wo.id) {
+          refreshDetailWO(wo.id)
+        }
+        fetchWOs()
+      } else {
+        toast.error(res.error || 'เกิดข้อผิดพลาดในการปิดงาน')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'ไม่สามารถปิดงานได้')
+    }
+  }
+
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
@@ -724,6 +749,22 @@ export default function WorkOrdersKanbanPage() {
                               className="w-full h-7 text-[10px] font-bold bg-[#D4AF37] hover:bg-amber-600 text-stone-900 rounded-lg mt-1"
                             >
                               Verify เครื่อง
+                            </Button>
+                          )}
+
+                          {/* Quick Close button for Verified status */}
+                          {wo.status === 'VERIFIED' && (
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleCloseWorkOrder(wo)
+                              }}
+                              size="sm"
+                              className="w-full h-7 text-[10px] font-bold bg-stone-900 hover:bg-stone-800 text-white rounded-lg mt-1 flex items-center justify-center gap-1 shadow-2xs"
+                              title="หัวหน้าฝ่ายซ่อมบำรุงปิดงานสมบูรณ์"
+                            >
+                              <ShieldCheck className="w-3.5 h-3.5 text-[#D4AF37]" />
+                              ปิดงาน (Close)
                             </Button>
                           )}
                         </div>
@@ -1060,6 +1101,62 @@ export default function WorkOrdersKanbanPage() {
                 >
                   ผู้แจ้งตรวจรับงาน (Verify)
                 </Button>
+              </div>
+            )}
+
+            {/* VERIFIED ACTIONS -> READY TO CLOSE */}
+            {detailWO.status === 'VERIFIED' && (
+              <div className="bg-emerald-50/80 p-4 rounded-2xl border border-emerald-300 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                    <div>
+                      <span className="text-xs font-black text-emerald-950 block">
+                        ฝ่ายผลิตตรวจรับมอบงานแล้ว (Verified Passed)
+                      </span>
+                      <span className="text-[11px] text-emerald-700">
+                        ผู้ตรวจรับ: <b className="text-emerald-900">{detailWO.verified_by_name || detailWO.requester_name}</b> • พร้อมให้หัวหน้าฝ่ายซ่อมบำรุงปิดงานสมบูรณ์
+                      </span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2.5 py-1 rounded-full font-bold font-mono">
+                    READY TO CLOSE
+                  </span>
+                </div>
+
+                <div className="pt-1 flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => handleCloseWorkOrder(detailWO)}
+                    className="w-full h-10 bg-stone-900 hover:bg-stone-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
+                    หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช รามมา) กดปิดงานสมบูรณ์ (CLOSE WORK ORDER)
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* CLOSED STATUS BANNER */}
+            {detailWO.status === 'CLOSED' && (
+              <div className="bg-stone-100 p-3.5 rounded-2xl border border-stone-300 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0" />
+                  <div>
+                    <span className="font-bold text-stone-900 block">งานซ่อมนี้ปิดสมบูรณ์แล้ว (Closed & Archived)</span>
+                    <span className="text-[11px] text-stone-600">
+                      หัวหน้าช่างผู้ปิดงาน: <b className="text-stone-800">{detailWO.supervisor_name || 'ปิยะราช รามมา'}</b> • บันทึกเข้าประวัติเครื่องจักร DCC เรียบร้อย
+                    </span>
+                  </div>
+                </div>
+                <Link
+                  href={`/maintenance/work-orders/${detailWO.wo_number}/eform`}
+                  target="_blank"
+                  className="px-3 py-1.5 rounded-xl bg-stone-900 hover:bg-stone-800 text-[#D4AF37] font-bold text-[11px] flex items-center gap-1 shadow-2xs"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  พิมพ์ใบแจ้งซ่อม A4
+                </Link>
               </div>
             )}
 
