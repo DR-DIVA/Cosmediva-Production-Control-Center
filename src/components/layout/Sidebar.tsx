@@ -126,8 +126,7 @@ const routes = [
     subtitle: 'แจ้งไว • ซ่อมไว • รู้ประวัติ • ลด Downtime',
     icon: Settings,
     href: '/maintenance',
-    color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa']
+    color: 'text-[#D4AF37]'
   },
   {
     label: 'CosmeFlow People',

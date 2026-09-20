@@ -147,6 +147,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       purchase: 'VIEW',
       costing: 'EDIT',
       improve: 'EDIT',
+      maintenance: 'VIEW',
       'master-data': 'VIEW'
     }
   },
@@ -164,6 +165,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       qc: 'VIEW',
       issues: 'VIEW',
       improve: 'VIEW',
+      maintenance: 'VIEW',
       'master-data': 'VIEW'
     }
   },
@@ -176,6 +178,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       improve: 'EDIT',
       purchase: 'VIEW',
       fg: 'VIEW',
+      maintenance: 'VIEW',
       'master-data': 'VIEW'
     }
   },
@@ -191,7 +194,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_pof: 'EDIT',
       qc: 'VIEW',
       issues: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   },
   production_mx: {
@@ -203,7 +207,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_weighing: 'EDIT',
       production_mixing: 'EDIT',
       issues: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   },
   production_pk: {
@@ -214,7 +219,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_packing: 'EDIT',
       production_pof: 'EDIT',
       issues: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   },
   qc: {
@@ -229,7 +235,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_pof: 'VIEW',
       qc: 'EDIT',
       issues: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   },
   qa: {
@@ -244,7 +251,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       production_pof: 'VIEW',
       qc: 'EDIT',
       issues: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   },
   warehouse_mmrm_bu: {
@@ -252,7 +260,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
     perms: {
       dashboard: 'VIEW',
       'incoming-rm': 'EDIT',
-      production_weighing: 'VIEW'
+      production_weighing: 'VIEW',
+      maintenance: 'VIEW'
     }
   },
   warehouse_mmpm_fg: {
@@ -261,7 +270,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       dashboard: 'VIEW',
       'incoming-rm': 'EDIT',
       fg: 'EDIT',
-      improve: 'VIEW'
+      improve: 'VIEW',
+      maintenance: 'VIEW'
     }
   },
   purchase: {
@@ -270,7 +280,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
       dashboard: 'VIEW',
       'incoming-rm': 'VIEW',
       purchase: 'EDIT',
-      improve: 'VIEW'
+      improve: 'VIEW',
+      maintenance: 'VIEW'
     }
   },
   maintenance: {
@@ -286,7 +297,8 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
     perms: {
       dashboard: 'VIEW',
       people: 'EDIT',
-      improve: 'EDIT'
+      improve: 'EDIT',
+      maintenance: 'VIEW'
     }
   }
 }
@@ -295,7 +307,7 @@ export const ROLE_TEMPLATES: Record<string, { label: string; perms: Record<strin
  * Parse role string into module permissions map
  */
 export function parseRolePermissions(roleString?: string | null): Record<string, 'VIEW' | 'EDIT'> {
-  if (!roleString) return {}
+  if (!roleString) return { maintenance: 'VIEW' }
   if (roleString === 'admin') {
     return ALL_MODULE_IDS.reduce((acc, m) => ({ ...acc, [m]: 'EDIT' }), {})
   }
@@ -324,6 +336,11 @@ export function parseRolePermissions(roleString?: string | null): Record<string,
       if (!perms['production_pof']) perms['production_pof'] = lvl
     }
 
+    // Ensure all users have at least VIEW permission on maintenance
+    if (!perms['maintenance']) {
+      perms['maintenance'] = 'VIEW'
+    }
+
     return perms
   }
 
@@ -331,7 +348,7 @@ export function parseRolePermissions(roleString?: string | null): Record<string,
     return { ...ROLE_TEMPLATES[roleString].perms }
   }
 
-  return {}
+  return { maintenance: 'VIEW' }
 }
 
 /**
@@ -384,7 +401,10 @@ export function getRouteAccessLevel(href: string, userRole?: string | null): Acc
   }
   else if (href === '/my-tasks/fg') key = 'fg'
   else if (href === '/purchase') key = 'purchase'
-  else if (href === '/maintenance') key = 'maintenance'
+  else if (href === '/maintenance' || href.startsWith('/maintenance')) {
+    if (['admin', 'maintenance'].includes(userRole || '')) return 'EDIT'
+    return perms['maintenance'] || 'VIEW'
+  }
   else if (href === '/people') key = 'people'
   else if (href.startsWith('/costing')) key = 'costing'
   else if (href.startsWith('/improve')) key = 'improve'
