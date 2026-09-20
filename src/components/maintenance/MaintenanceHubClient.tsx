@@ -78,6 +78,35 @@ export default function MaintenanceHubClient({ machines }: Props) {
         </Link>
       </div>
 
+      {/* End-to-End Workflow Infographic Banner */}
+      <Link
+        href="/maintenance/workflow"
+        className="group relative p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] text-white shadow-md hover:shadow-xl hover:scale-[1.008] transition-all border border-[#D4AF37]/50 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+      >
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-[#D4AF37]/20 flex items-center justify-center text-[#D4AF37] shrink-0 border border-[#D4AF37]/40">
+            <span className="text-2xl">🧭</span>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
+                แผนภาพวงจรการแจ้งซ่อมบำรุงโรงงาน (End-to-End Workflow)
+              </h3>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-[#D4AF37] text-stone-950">
+                คู่มือภาพกราฟิก
+              </span>
+            </div>
+            <p className="text-xs text-stone-300 mt-0.5">
+              ดูขั้นตอนการไหลของงานแบบบูรณาการ 6 ขั้นตอน: ผู้แจ้งซ่อม ➔ น้อง MTEX LINE AI ➔ ทีมช่าง Mobile Cockpit ➔ ตรวจรับมอบ ➔ ปิดงาน DCC
+            </p>
+          </div>
+        </div>
+        <div className="inline-flex items-center gap-1 text-xs font-black text-[#D4AF37] bg-[#D4AF37]/10 px-4 py-2.5 rounded-xl border border-[#D4AF37]/30 shrink-0 group-hover:bg-[#D4AF37] group-hover:text-stone-950 transition">
+          <span>ดูผังและบันทึกภาพ</span>
+          <ArrowRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform" />
+        </div>
+      </Link>
+
       {/* 4 Operations & Cockpit Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 

@@ -129,6 +129,14 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             <span className="text-amber-300 font-semibold">“แจ้งไว • ซ่อมไว • รู้ประวัติ • ลด Downtime”</span>
             <span className="text-slate-400">|</span>
             <span className="text-slate-300">ระบบบริหารงานซ่อมบำรุงโรงงานเครื่องสำอาง</span>
+            <span className="text-slate-400">|</span>
+            <Link 
+              href="/maintenance/workflow" 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-400 hover:text-amber-300 underline underline-offset-4 decoration-amber-400/50 hover:decoration-amber-300 transition"
+              title="ดูผังภาพรวมการไหลของงานแจ้งซ่อมบำรุง (End-to-End Workflow)"
+            >
+              <span>🧭 ผังขั้นตอนการแจ้งซ่อม (Workflow)</span>
+            </Link>
           </div>
         </div>
 
