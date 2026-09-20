@@ -167,32 +167,57 @@ export function buildBreakdownFlexMessage(params: {
   requesterName: string
   reportedAt?: string
   appBaseUrl?: string
+  repairType?: 'EMERGENCY' | 'GENERAL' | 'SERVICE'
 }) {
   const baseUrl = params.appBaseUrl || getAppBaseUrl()
   const techUrl = `${baseUrl}/maintenance/technician`
   const machineUrl = `${baseUrl}/maintenance/machines/${params.machineCode}`
   const eformUrl = params.workOrderId ? `${baseUrl}/maintenance/work-orders/${params.workOrderId}/eform` : techUrl
 
-  const isCritical = params.priority === 'P1_CRITICAL' || params.productionImpact === 'Production stopped'
-  const isService = params.symptomCategory.includes('บริการ') || params.symptomCategory.includes('หลอดไฟ') || params.symptomCategory.includes('แอร์') || params.symptomCategory.includes('ประปา')
+  // 3-Case Category Classification: EMERGENCY (Red), GENERAL (Blue), SERVICE (Purple)
+  const isService = 
+    params.repairType === 'SERVICE' ||
+    params.machineCode === 'FACILITY' ||
+    params.productionImpact === 'Facility no impact' ||
+    params.symptomDescription?.includes('แจ้งซ่อมบริการ') ||
+    params.symptomCategory.includes('บริการ') ||
+    params.symptomCategory.includes('หลอดไฟ') ||
+    params.symptomCategory.includes('แอร์') ||
+    params.symptomCategory.includes('ประปา')
 
+  const isEmergency = !isService && (
+    params.repairType === 'EMERGENCY' ||
+    params.symptomDescription?.includes('แจ้งซ่อมด่วน') ||
+    (!params.symptomDescription?.includes('แจ้งซ่อมทั่วไป') && (
+      params.priority === 'P1_CRITICAL' || 
+      params.productionImpact === 'Production stopped'
+    ))
+  )
+
+  const isGeneral = !isService && !isEmergency
+
+  // 1. 🚨 แจ้งซ่อมด่วน -> สีแดง (#DC2626)
+  // 2. 🛠️ แจ้งซ่อมทั่วไป -> สีน้ำเงิน (#2563EB)
+  // 3. 💡 แจ้งซ่อมบริการ -> สีม่วง (#7C3AED)
   const headerBgColor = 
-    isCritical ? '#B91C1C' : 
-    isService ? '#6B21A8' : 
-    params.priority === 'P2_HIGH' ? '#EA580C' : 
+    isEmergency ? '#DC2626' : 
+    isService ? '#7C3AED' : 
     '#2563EB'
 
   const headerTitle = 
-    isCritical ? '🚨 แจ้งซ่อมด่วน (ฉุกเฉิน)' :
+    isEmergency ? '🚨 แจ้งซ่อมด่วน (ฉุกเฉิน)' :
     isService ? '💡 แจ้งซ่อมบริการ & อาคาร' :
-    params.priority === 'P2_HIGH' ? '⚠️ แจ้งซ่อมด่วน' :
     '🛠️ แจ้งซ่อมทั่วไป'
 
   const urgencyLabel = 
-    isCritical ? '🚨 กระทบการผลิต: หยุดการผลิตทันที (Critical)' :
-    isService ? '💡 งานบริการสิ่งอำนวยความสะดวก & อาคารสถานที่' :
-    params.priority === 'P2_HIGH' ? '⚠️ มีความเสี่ยงต่อการผลิต (High Priority)' :
-    '🛠️ ไม่กระทบการผลิต (ซ่อมบำรุงตามรอบ)'
+    isEmergency ? '🛑 กระทบการผลิต (เครื่องหยุด / สายชะงัก)' :
+    isService ? '🏢 งานบริการอาคาร & สิ่งอำนวยความสะดวก' :
+    '🟢 ไม่กระทบการผลิต (เครื่องยังเดินต่อได้)'
+
+  const urgencyColor = 
+    isEmergency ? '#FEE2E2' : 
+    isService ? '#F3E8FF' : 
+    '#DBEAFE'
 
   const timeStr = params.reportedAt
     ? new Date(params.reportedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
@@ -249,7 +274,7 @@ export function buildBreakdownFlexMessage(params: {
         {
           type: 'text',
           text: urgencyLabel,
-          color: '#FEF08A',
+          color: urgencyColor,
           size: 'xs',
           weight: 'bold',
           margin: 'xs'

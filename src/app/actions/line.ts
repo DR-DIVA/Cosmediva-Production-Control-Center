@@ -149,6 +149,24 @@ export async function dispatchWorkOrderLineAlert(params: {
     }
 
     if (eventType === 'NEW_REPORT') {
+      const isService = 
+        workOrder.machine_code === 'FACILITY' ||
+        workOrder.production_impact === 'Facility no impact' ||
+        workOrder.symptom_description?.includes('แจ้งซ่อมบริการ') ||
+        workOrder.symptom_category.includes('บริการ')
+
+      const isEmergency = !isService && (
+        workOrder.is_emergency_breakdown ||
+        workOrder.symptom_description?.includes('แจ้งซ่อมด่วน') ||
+        (!workOrder.symptom_description?.includes('แจ้งซ่อมทั่วไป') && (
+          workOrder.priority === 'P1_CRITICAL' || 
+          workOrder.production_impact === 'Production stopped'
+        ))
+      )
+
+      const repairType = isEmergency ? 'EMERGENCY' : isService ? 'SERVICE' : 'GENERAL'
+      const altPrefix = isEmergency ? '🚨 [ซ่อมด่วน]' : isService ? '💡 [ซ่อมบริการ]' : '🛠️ [ซ่อมทั่วไป]'
+
       const flex = buildBreakdownFlexMessage({
         woNumber: workOrder.wo_number,
         workOrderId: workOrder.id,
@@ -163,12 +181,13 @@ export async function dispatchWorkOrderLineAlert(params: {
         priority: workOrder.priority,
         requesterName: workOrder.requester_name,
         reportedAt: workOrder.reported_at,
-        appBaseUrl: getAppBaseUrl()
+        appBaseUrl: getAppBaseUrl(),
+        repairType
       })
 
       await pushLineFlexMessage({
         channelKey: 'maintenance',
-        altText: `🚨 แจ้งซ่อมเครื่อง ${resolvedMachine.machine_code}: ${workOrder.symptom_category}`,
+        altText: `${altPrefix} ${resolvedMachine.machine_code}: ${workOrder.symptom_category}`,
         flexContents: flex
       })
     } else if (eventType === 'STATUS_CHANGED') {
