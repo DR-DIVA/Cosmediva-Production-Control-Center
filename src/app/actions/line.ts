@@ -200,7 +200,8 @@ export async function dispatchWorkOrderLineAlert(params: {
         toStatus: workOrder.status,
         changedByName: changedByName || 'ช่างซ่อมบำรุง',
         notes: notes,
-        appBaseUrl: getAppBaseUrl()
+        appBaseUrl: getAppBaseUrl(),
+        changedAt: workOrder.updated_at || new Date().toISOString()
       })
 
       await pushLineFlexMessage({
@@ -216,7 +217,7 @@ export async function dispatchWorkOrderLineAlert(params: {
         technicianName: changedByName || workOrder.assigned_technician_name || 'ฝ่ายซ่อมบำรุง',
         correctiveAction: workOrder.corrective_action || notes,
         rootCause: workOrder.root_cause,
-        closedAt: workOrder.repair_completed_at,
+        closedAt: workOrder.repair_completed_at || workOrder.updated_at || new Date().toISOString(),
         appBaseUrl: getAppBaseUrl()
       })
 

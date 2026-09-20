@@ -27,6 +27,27 @@ export function getAppBaseUrl(): string {
 }
 
 /**
+ * Bangkok Timezone (UTC+7) formatting helper for LINE Notifications
+ */
+export const BANGKOK_TZ = 'Asia/Bangkok'
+
+export function formatThaiDateTime(dateInput?: string | Date | null): { dateStr: string; timeStr: string } {
+  const d = dateInput ? new Date(dateInput) : new Date()
+  const dateStr = d.toLocaleDateString('th-TH', {
+    timeZone: BANGKOK_TZ,
+    day: 'numeric',
+    month: 'short',
+    year: '2-digit'
+  })
+  const timeStr = d.toLocaleTimeString('th-TH', {
+    timeZone: BANGKOK_TZ,
+    hour: '2-digit',
+    minute: '2-digit'
+  }) + ' น.'
+  return { dateStr, timeStr }
+}
+
+/**
  * Fetch Channel Config from Supabase (or fallback to environment variables)
  */
 export async function getLineChannelConfig(channelKey: string = 'maintenance'): Promise<LineChannelConfig | null> {
@@ -219,15 +240,7 @@ export function buildBreakdownFlexMessage(params: {
     isService ? '#F3E8FF' : 
     '#DBEAFE'
 
-  const timeStr = params.reportedAt
-    ? new Date(params.reportedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-    : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
-
-  const dateStr = new Date().toLocaleDateString('th-TH', {
-    day: 'numeric',
-    month: 'short',
-    year: '2-digit'
-  })
+  const { dateStr, timeStr } = formatThaiDateTime(params.reportedAt)
 
   const impactLabel = 
     params.productionImpact === 'Production stopped' ? '🛑 หยุดการผลิตทั้งหมด (Production Stopped)' :
@@ -426,14 +439,19 @@ export function buildWorkOrderStatusFlexMessage(params: {
   changedByName: string
   notes?: string
   appBaseUrl?: string
+  changedAt?: string
 }) {
   const baseUrl = params.appBaseUrl || getAppBaseUrl()
   const techUrl = `${baseUrl}/maintenance/technician`
+  const { dateStr, timeStr } = formatThaiDateTime(params.changedAt)
 
   const statusLabel = 
     params.toStatus === 'IN_PROGRESS' ? 'กำลังดำเนินการซ่อม (In Progress)' :
     params.toStatus === 'ASSIGNED' ? 'ช่างรับมอบหมายงานแล้ว (Assigned)' :
     params.toStatus === 'PENDING_PARTS' ? 'รอเบิกอะไหล่ (Pending Parts)' :
+    params.toStatus === 'ACKNOWLEDGED' ? 'ช่างรับเรื่องแล้ว (Acknowledged)' :
+    params.toStatus === 'COMPLETED' ? 'ซ่อมเสร็จสิ้น (Completed)' :
+    params.toStatus === 'VERIFIED' ? 'ผู้แจ้งซ่อมตรวจรับแล้ว (Verified)' :
     params.toStatus
 
   return {
@@ -485,7 +503,7 @@ export function buildWorkOrderStatusFlexMessage(params: {
             },
             {
               type: 'text',
-              text: `ผู้ดำเนินการ: ${params.changedByName}`,
+              text: `ผู้ดำเนินการ: ${params.changedByName} (${dateStr} ${timeStr})`,
               color: '#475569',
               size: 'xs',
               margin: 'xs'
@@ -536,6 +554,7 @@ export function buildWorkOrderClosedFlexMessage(params: {
 }) {
   const baseUrl = params.appBaseUrl || getAppBaseUrl()
   const historyUrl = `${baseUrl}/maintenance/machines/${params.machineCode}`
+  const { dateStr, timeStr } = formatThaiDateTime(params.closedAt)
 
   return {
     type: 'bubble',
@@ -586,7 +605,7 @@ export function buildWorkOrderClosedFlexMessage(params: {
           contents: [
             {
               type: 'text',
-              text: `ช่างผู้ซ่อม: ${params.technicianName}`,
+              text: `ช่างผู้ซ่อม: ${params.technicianName} (${dateStr} ${timeStr})`,
               weight: 'bold',
               color: '#047857',
               size: 'xs'
@@ -635,7 +654,7 @@ export function buildWorkOrderClosedFlexMessage(params: {
  * 🧪 Flex Message Generator: Test Push Notification
  */
 export function buildTestFlexMessage(channelKey: string, channelName: string) {
-  const timeStr = new Date().toLocaleString('th-TH')
+  const { dateStr, timeStr } = formatThaiDateTime()
   return {
     type: 'bubble',
     size: 'kilo',
@@ -686,7 +705,7 @@ export function buildTestFlexMessage(channelKey: string, channelName: string) {
         },
         {
           type: 'text',
-          text: `เวลาทดสอบ: ${timeStr}`,
+          text: `เวลาทดสอบ: ${dateStr} ${timeStr}`,
           size: 'xxs',
           color: '#94A3B8'
         }

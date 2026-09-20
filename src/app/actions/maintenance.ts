@@ -1094,7 +1094,7 @@ export async function transitionWorkOrderStatus(payload: {
     })
 
   // Dispatch LINE notification in background
-  if (['ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CLOSED'].includes(payload.to_status)) {
+  if (['ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'ACKNOWLEDGED', 'COMPLETED', 'CLOSED', 'VERIFIED'].includes(payload.to_status)) {
     dispatchWorkOrderLineAlert({
       eventType: (payload.to_status === 'COMPLETED' || payload.to_status === 'CLOSED') ? 'CLOSED' : 'STATUS_CHANGED',
       workOrder: updatedWO,
