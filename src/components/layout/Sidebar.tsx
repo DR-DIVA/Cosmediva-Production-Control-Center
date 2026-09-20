@@ -127,21 +127,7 @@ const routes = [
     icon: Settings,
     href: '/maintenance',
     color: 'text-[#D4AF37]',
-    allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'],
-    subRoutes: [
-      { label: 'ภาพรวมระบบ', href: '/maintenance', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🚨 แจ้งเครื่องเสียด่วน', href: '/maintenance/report?type=EMERGENCY', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🛠️ แจ้งซ่อมทั่วไป', href: '/maintenance/report?type=GENERAL', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '💡 แจ้งซ่อมบริการ', href: '/maintenance/report?type=SERVICE', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🔧 โหมดช่างซ่อม', href: '/maintenance/technician', allowedRoles: ['admin', 'maintenance'] },
-      { label: '📋 บอร์ดงานซ่อม', href: '/maintenance/work-orders', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🗓️ แผน PM 2026', href: '/maintenance/pm', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🏭 ทะเบียนเครื่องจักร', href: '/maintenance/machines', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🖨️ พิมพ์สติกเกอร์ QR', href: '/maintenance/qr-print', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '📦 คลังอะไหล่', href: '/maintenance/spare-parts', allowedRoles: ['admin', 'maintenance', 'planner', 'warehouse_mmrm_bu', 'purchase'] },
-      { label: '📊 แดชบอร์ด & KPI', href: '/maintenance/dashboard', allowedRoles: ['admin', 'maintenance', 'planner'] },
-      { label: '🔍 ค้นหาประวัติ', href: '/maintenance/search', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-    ]
+    allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa']
   },
   {
     label: 'CosmeFlow People',
@@ -431,7 +417,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                   onClick={handleLinkClick}
                   className={cn(
                     "group relative flex p-3 w-full justify-start cursor-pointer hover:text-white hover:bg-[#D4AF37]/10 hover:text-[#D4AF37] rounded-lg transition",
-                    pathname === route.href ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-[#D4AF37]/10" : "text-zinc-400",
+                    (pathname === route.href || (route.href !== '/' && route.href !== '/dashboard' && pathname.startsWith(route.href + '/'))) ? "text-[#D4AF37] bg-[#D4AF37]/10 border border-[#D4AF37]/30 shadow-sm shadow-[#D4AF37]/10" : "text-zinc-400",
                     isCollapsed ? "justify-center px-0" : ""
                   )}
                   title={isCollapsed ? route.label : undefined}
