@@ -877,7 +877,8 @@ export async function getWorkOrders(filters?: {
     .from('maintenance_work_orders')
     .select(`
       *,
-      parts:maintenance_wo_parts(*)
+      parts:maintenance_wo_parts(*),
+      status_logs:maintenance_wo_status_logs(*)
     `)
     .eq('is_deleted', false)
     .order('reported_at', { ascending: false })

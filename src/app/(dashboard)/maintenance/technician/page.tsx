@@ -22,9 +22,13 @@ import {
   FileCheck,
   Search,
   Filter,
-  Check
+  Check,
+  ShoppingCart,
+  Timer,
+  RotateCcw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo, formatWorkOrderStatus } from '@/types/maintenance'
@@ -39,6 +43,25 @@ import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
 import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
+
+/**
+ * Format live elapsed duration in Thai
+ */
+function formatElapsedDuration(diffMs: number): string {
+  if (diffMs <= 0) return '0 วินาที'
+  const totalSeconds = Math.floor(diffMs / 1000)
+  const days = Math.floor(totalSeconds / 86400)
+  const hours = Math.floor((totalSeconds % 86400) / 3600)
+  const minutes = Math.floor((totalSeconds % 3600) / 60)
+  const seconds = totalSeconds % 60
+
+  const parts = []
+  if (days > 0) parts.push(`${days} วัน`)
+  if (hours > 0) parts.push(`${hours} ชม.`)
+  if (minutes > 0 || (days === 0 && hours === 0)) parts.push(`${minutes} นาที`)
+  parts.push(`${seconds} วิ`)
+  return parts.join(' ')
+}
 
 export default function TechnicianCockpitPage() {
   const [workOrders, setWorkOrders] = useState<MaintenanceWorkOrder[]>([])
@@ -62,8 +85,21 @@ export default function TechnicianCockpitPage() {
     targetStatus: 'TEST_RUN' | 'COMPLETED'
   } | null>(null)
   const [verifyModalWO, setVerifyModalWO] = useState<MaintenanceWorkOrder | null>(null)
+  const [waitingPartModalWO, setWaitingPartModalWO] = useState<MaintenanceWorkOrder | null>(null)
+  const [prNumber, setPrNumber] = useState('')
+  const [prReason, setPrReason] = useState('')
   const [aiInsight, setAiInsight] = useState<any>(null)
   const [selectedWOForAI, setSelectedWOForAI] = useState<MaintenanceWorkOrder | null>(null)
+
+  // Live timer ticking every second
+  const [currentTime, setCurrentTime] = useState<number>(Date.now())
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now())
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
 
   const loadJobs = async () => {
     setIsLoading(true)
@@ -138,15 +174,61 @@ export default function TechnicianCockpitPage() {
 
   // Action: Pause / Waiting Part
   const handlePauseWaitingPart = async (wo: MaintenanceWorkOrder) => {
+    setWaitingPartModalWO(wo)
+    setPrNumber('')
+    setPrReason('')
+  }
+
+  const handleConfirmWaitingPart = async () => {
+    if (!waitingPartModalWO) return
+    const noteText = prNumber.trim() 
+      ? `รออะไหล่: เปิด PR เลขที่ ${prNumber.trim()} (${prReason.trim() || 'รอจัดซื้อจัดส่ง'})`
+      : `รออะไหล่: ${prReason.trim() || 'ไม่มีอะไหล่ในสต็อก ต้องเปิด PR ขอซื้อ'}`
+
     const res = await transitionWorkOrderStatus({
-      work_order_id: wo.id,
+      work_order_id: waitingPartModalWO.id,
       to_status: 'WAITING_PART',
       changed_by_name: technicianName,
-      notes: 'หยุดพักงานชั่วคราว รอเบิกหรือสั่งซื้ออะไหล่'
+      notes: noteText
     })
 
     if (res.success) {
-      toast.info(`ปรับสถานะเป็น WAITING PART สำหรับ ${wo.wo_number}`)
+      toast.warning(`ย้าย ${waitingPartModalWO.wo_number} ไปสถานะ "รออะไหล่" เรียบร้อย`)
+      setWaitingPartModalWO(null)
+      setPrNumber('')
+      setPrReason('')
+      loadJobs()
+    } else {
+      toast.error(res.error || 'เกิดข้อผิดพลาด')
+    }
+  }
+
+  const handleResumeRepair = async (wo: MaintenanceWorkOrder) => {
+    const res = await transitionWorkOrderStatus({
+      work_order_id: wo.id,
+      to_status: 'IN_PROGRESS',
+      changed_by_name: technicianName,
+      notes: `${technicianName} ได้รับอะไหล่แล้ว เริ่มดำเนินการซ่อมต่อ`
+    })
+
+    if (res.success) {
+      toast.success(`เริ่มงานซ่อม ${wo.wo_number} ต่อแล้ว! ระบบจับเวลาต่อ`)
+      loadJobs()
+    } else {
+      toast.error(res.error || 'เกิดข้อผิดพลาด')
+    }
+  }
+
+  const handleFailTestRun = async (wo: MaintenanceWorkOrder) => {
+    const res = await transitionWorkOrderStatus({
+      work_order_id: wo.id,
+      to_status: 'IN_PROGRESS',
+      changed_by_name: technicianName,
+      notes: `${technicianName}: ทดสอบเครื่องไม่ผ่าน นำกลับมาแก้ไขต่อ`
+    })
+
+    if (res.success) {
+      toast.info(`ส่ง ${wo.wo_number} กลับไปตรวจซ่อมต่อ`)
       loadJobs()
     } else {
       toast.error(res.error || 'เกิดข้อผิดพลาด')
@@ -686,22 +768,122 @@ export default function TechnicianCockpitPage() {
                         )}
                       </div>
 
-                      <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
-                        <Button
-                          onClick={() => setPartModalWO(wo)}
-                          size="sm"
-                          variant="outline"
-                          className="flex-1 text-xs rounded-xl h-9 border-stone-300"
-                        >
-                          + ใช้อะไหล่
-                        </Button>
-                        <Button
-                          onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
-                          size="sm"
-                          className="flex-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9"
-                        >
-                          ปิดงานซ่อม
-                        </Button>
+                      {/* Live Repair Timer or Downtime */}
+                      {wo.status === 'IN_PROGRESS' ? (
+                        <div className="bg-amber-50 rounded-2xl p-2.5 border border-amber-300 space-y-1">
+                          <div className="flex items-center justify-between text-xs font-bold text-amber-950">
+                            <span className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                              เวลาซ่อมสด:
+                            </span>
+                            <span className="font-mono text-emerald-800 font-black">
+                              {wo.repair_started_at ? formatElapsedDuration(currentTime - new Date(wo.repair_started_at).getTime()) : '0 วินาที'}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-stone-500 pt-0.5 border-t border-amber-200/60">
+                            <span>รวม Downtime:</span>
+                            <span className="font-mono font-bold text-red-600">
+                              {formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())}
+                            </span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="bg-stone-50 rounded-2xl p-2 border border-stone-200 flex items-center justify-between text-xs">
+                          <span className="text-stone-500 flex items-center gap-1">
+                            <Clock className="w-3.5 h-3.5 text-stone-400" />
+                            Downtime รวม:
+                          </span>
+                          <span className="font-mono font-bold text-red-600">
+                            {wo.total_downtime_minutes > 0 ? `${wo.total_downtime_minutes} นาที` : formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="pt-2 border-t border-stone-100 space-y-2">
+                        {wo.status === 'IN_PROGRESS' && (
+                          <>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                onClick={() => setPartModalWO(wo)}
+                                size="sm"
+                                className="text-xs font-bold bg-amber-500 hover:bg-amber-600 text-stone-950 rounded-xl h-9 flex items-center justify-center gap-1"
+                              >
+                                <Package className="w-3.5 h-3.5" />
+                                + ใช้อะไหล่
+                              </Button>
+                              <Button
+                                onClick={() => handlePauseWaitingPart(wo)}
+                                size="sm"
+                                variant="outline"
+                                className="text-xs font-bold border-orange-300 text-orange-800 hover:bg-orange-50 rounded-xl h-9 flex items-center justify-center gap-1"
+                              >
+                                <ShoppingCart className="w-3.5 h-3.5 text-orange-600" />
+                                รออะไหล่ / PR
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                              <Button
+                                onClick={() => setCompleteModalData({ wo, targetStatus: 'TEST_RUN' })}
+                                size="sm"
+                                className="text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl h-9 flex items-center justify-center gap-1"
+                              >
+                                <Play className="w-3.5 h-3.5" />
+                                TEST RUN
+                              </Button>
+                              <Button
+                                onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
+                                size="sm"
+                                className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 flex items-center justify-center gap-1"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                ปิดงานซ่อม
+                              </Button>
+                            </div>
+                          </>
+                        )}
+
+                        {wo.status === 'WAITING_PART' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              onClick={() => setPartModalWO(wo)}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs font-bold border-orange-300 text-orange-900 hover:bg-orange-50 rounded-xl h-9 flex items-center justify-center gap-1"
+                            >
+                              <Package className="w-3.5 h-3.5" />
+                              + ตัดใช้อะไหล่
+                            </Button>
+                            <Button
+                              onClick={() => handleResumeRepair(wo)}
+                              size="sm"
+                              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 flex items-center justify-center gap-1 shadow-xs"
+                            >
+                              <Play className="w-3.5 h-3.5 fill-white" />
+                              ได้อะไหล่แล้ว ซ่อมต่อ ▶️
+                            </Button>
+                          </div>
+                        )}
+
+                        {wo.status === 'TEST_RUN' && (
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button
+                              onClick={() => handleFailTestRun(wo)}
+                              size="sm"
+                              variant="outline"
+                              className="text-xs font-bold border-rose-300 text-rose-800 hover:bg-rose-50 rounded-xl h-9"
+                            >
+                              ↩️ ไม่ผ่าน ซ่อมต่อ
+                            </Button>
+                            <Button
+                              onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
+                              size="sm"
+                              className="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9 flex items-center justify-center gap-1"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              ผ่าน / ปิดงานซ่อม
+                            </Button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1028,6 +1210,64 @@ export default function TechnicianCockpitPage() {
           machineName={verifyModalWO.machine_name}
           onSuccess={loadJobs}
         />
+      )}
+
+      {/* Waiting Part PR Prompt Modal */}
+      {waitingPartModalWO && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-[60] animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-orange-100 text-orange-700 flex items-center justify-center">
+                <ShoppingCart className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-stone-900">ย้ายไปขั้นตอน "รออะไหล่"</h3>
+                <span className="text-xs text-stone-500 font-mono">{waitingPartModalWO.wo_number} - {waitingPartModalWO.machine_code}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="font-bold text-stone-700">เลขที่ใบขอซื้อ (PR Number) (ถ้ามี):</label>
+                <Input
+                  value={prNumber}
+                  onChange={e => setPrNumber(e.target.value)}
+                  placeholder="เช่น PR-6909-0012"
+                  className="rounded-xl text-xs font-mono"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-bold text-stone-700">รายการอะไหล่หรือเหตุผลที่ต้องรอสั่งซื้อ:</label>
+                <textarea
+                  value={prReason}
+                  onChange={e => setPrReason(e.target.value)}
+                  rows={3}
+                  placeholder="ระบุชื่ออะไหล่ สเปก หรือเหตุผล เช่น สายพานไทม์มิ่งขาด ไม่มีสต็อกสำรอง..."
+                  className="w-full p-2.5 rounded-xl border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-stone-100">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setWaitingPartModalWO(null)}
+                className="flex-1 text-xs rounded-xl"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleConfirmWaitingPart}
+                className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs rounded-xl shadow-xs"
+              >
+                ยืนยันย้ายไป "รออะไหล่"
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Execute PM Checksheet Modal (E-Form) */}
