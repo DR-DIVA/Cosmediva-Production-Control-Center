@@ -123,10 +123,17 @@ function getWorkflowTimeline(wo: MaintenanceWorkOrder): WorkflowStep[] {
     gapLabel: null
   })
 
-  // Status logs sorted by created_at ascending
-  const logs = [...(wo.status_logs || [])].sort(
-    (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-  )
+  // Status logs sorted by created_at ascending, filtering out redundant NEW log (which is already Step 1)
+  // and deduplicating consecutive identical to_status
+  const rawLogs = [...(wo.status_logs || [])]
+    .filter(log => log.to_status !== 'NEW')
+    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+
+  // Deduplicate consecutive identical status logs
+  const logs = rawLogs.filter((log, idx) => {
+    if (idx === 0) return true
+    return log.to_status !== rawLogs[idx - 1].to_status
+  })
 
   let prevTime = new Date(wo.reported_at).getTime()
 

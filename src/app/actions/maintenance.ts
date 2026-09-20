@@ -966,6 +966,11 @@ export async function transitionWorkOrderStatus(payload: {
     return { success: false, error: 'ไม่พบใบแจ้งซ่อม' }
   }
 
+  // Prevent duplicate status transitions to the same status (e.g. clicking Accept multiple times)
+  if (wo.status === payload.to_status && !payload.assigned_technician_name) {
+    return { success: true, data: wo }
+  }
+
   const updateFields: Record<string, any> = {
     status: payload.to_status,
     updated_at: nowIso
