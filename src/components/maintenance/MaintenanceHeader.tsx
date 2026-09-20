@@ -95,8 +95,8 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
   return (
     <div className="space-y-4">
       {/* Top Banner */}
-      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-5 md:p-6 rounded-3xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
-        <div>
+      <div className="flex flex-col 2xl:flex-row justify-between items-start 2xl:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-4 sm:p-5 md:p-6 rounded-3xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]">
             <span className="inline-block w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse"></span>
             CosmeFlow OS • CMMS Industrial Module
@@ -115,7 +115,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
         </div>
 
         {/* Global Action Buttons: 4 in 1 line on wide screens, 2x2 grid when narrower */}
-        <div className="grid grid-cols-2 2xl:grid-cols-4 gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
+        <div className="grid grid-cols-2 lg:grid-cols-4 2xl:flex 2xl:items-center gap-2 sm:gap-2.5 w-full 2xl:w-auto">
           {/* 1. แจ้งเครื่องเสียด่วน */}
           <Link
             href="/maintenance/report?type=EMERGENCY"

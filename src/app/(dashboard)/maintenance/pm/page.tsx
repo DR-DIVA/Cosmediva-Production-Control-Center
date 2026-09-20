@@ -15,7 +15,7 @@ export default async function PMPage() {
   const logs = logsRes.data || []
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6 text-stone-900 font-sans">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0 text-stone-900 font-sans">
       <MaintenanceHeader />
 
       <main className="space-y-6">

@@ -20,7 +20,7 @@ export default async function FastReportPage(props: PageProps) {
   const initialType = ((resolvedSearchParams as any)?.type || '').toUpperCase() as any
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-5xl w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <div className="flex items-center justify-between">
         <Link
           href="/maintenance"

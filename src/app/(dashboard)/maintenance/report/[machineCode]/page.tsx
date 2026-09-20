@@ -37,7 +37,7 @@ export default async function MachineDirectReportPage({ params }: Props) {
   }
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-5xl w-full mx-auto space-y-6 text-stone-900 font-sans">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0 text-stone-900 font-sans">
       <div className="flex items-center justify-between">
         <Link
           href={`/maintenance/machines/${machineCode}`}

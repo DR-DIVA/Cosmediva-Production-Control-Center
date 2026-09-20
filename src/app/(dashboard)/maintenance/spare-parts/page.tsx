@@ -83,7 +83,7 @@ export default function SparePartsPage() {
   }
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
 
       {/* Summary KPI Cards */}

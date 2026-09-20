@@ -50,7 +50,7 @@ export default async function MaintenanceHubPage() {
   const activeBreakdowns = allWOs.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status))
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-7xl w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader machines={machines} />
 
       {/* Real-time KPI Metric Row */}

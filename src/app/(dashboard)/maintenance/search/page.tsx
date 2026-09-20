@@ -38,7 +38,7 @@ export default function MaintenanceSearchPage() {
   const quickQueries = ['MX-04', 'Bearing', 'FL-01', 'Sensor', 'Wear & Tear', 'Solenoid', 'CP-01']
 
   return (
-    <div className="p-3 sm:p-5 md:p-6 max-w-5xl w-full mx-auto space-y-6">
+    <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
 
       {/* Search Box */}
