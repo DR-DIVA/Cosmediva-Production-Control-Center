@@ -32,7 +32,8 @@ interface NavItem {
   href: string
   icon: any
   badge?: string
-  color: string
+  frameClass: string
+  iconClass: string
 }
 
 export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [] }: MaintenanceHeaderProps) {
@@ -45,37 +46,43 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       label: 'ภาพรวมระบบ', 
       href: '/maintenance', 
       icon: Cpu,
-      color: 'bg-blue-100 text-blue-700 border-blue-200' 
+      frameClass: 'bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-300 hover:border-blue-400',
+      iconClass: 'border border-blue-400 bg-blue-600 text-white' 
     },
     { 
       label: 'สำหรับช่างซ่อม', 
       href: '/maintenance/technician', 
       icon: HardHat, 
-      color: 'bg-amber-100 text-amber-800 border-amber-200' 
+      frameClass: 'bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400',
+      iconClass: 'border border-amber-400 bg-amber-500 text-white' 
     },
     { 
       label: 'ศูนย์ควบคุมงาน', 
       href: '/maintenance/work-orders', 
       icon: KanbanSquare,
-      color: 'bg-purple-100 text-purple-700 border-purple-200' 
+      frameClass: 'bg-purple-50 hover:bg-purple-100 text-purple-950 border border-purple-300 hover:border-purple-400',
+      iconClass: 'border border-purple-400 bg-purple-600 text-white' 
     },
     { 
       label: 'แผน PM 2026', 
       href: '/maintenance/pm', 
       icon: Calendar, 
-      color: 'bg-cyan-100 text-cyan-800 border-cyan-200' 
+      frameClass: 'bg-cyan-50 hover:bg-cyan-100 text-cyan-950 border border-cyan-300 hover:border-cyan-400',
+      iconClass: 'border border-cyan-400 bg-cyan-600 text-white' 
     },
     { 
       label: 'ทะเบียนเครื่องจักร', 
       href: '/maintenance/machines', 
       icon: Wrench,
-      color: 'bg-emerald-100 text-emerald-800 border-emerald-200' 
+      frameClass: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400',
+      iconClass: 'border border-emerald-400 bg-emerald-600 text-white' 
     },
     { 
       label: 'พิมพ์ QR หน้าเครื่อง', 
       href: '/maintenance/qr-print', 
       icon: QrCode, 
-      color: 'bg-rose-100 text-rose-800 border-rose-200' 
+      frameClass: 'bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-300 hover:border-rose-400',
+      iconClass: 'border border-rose-400 bg-rose-600 text-white' 
     },
   ]
 
@@ -84,19 +91,22 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       label: 'คลังอะไหล่', 
       href: '/maintenance/spare-parts', 
       icon: Package,
-      color: 'bg-orange-100 text-orange-800 border-orange-200' 
+      frameClass: 'bg-orange-50 hover:bg-orange-100 text-orange-950 border border-orange-300 hover:border-orange-400',
+      iconClass: 'border border-orange-400 bg-orange-500 text-white' 
     },
     { 
       label: 'แดชบอร์ด KPI', 
       href: '/maintenance/dashboard', 
       icon: BarChart3,
-      color: 'bg-indigo-100 text-indigo-700 border-indigo-200' 
+      frameClass: 'bg-indigo-50 hover:bg-indigo-100 text-indigo-950 border border-indigo-300 hover:border-indigo-400',
+      iconClass: 'border border-indigo-400 bg-indigo-600 text-white' 
     },
     { 
       label: 'ค้นหาประวัติ', 
       href: '/maintenance/search', 
       icon: Search,
-      color: 'bg-teal-100 text-teal-800 border-teal-200' 
+      frameClass: 'bg-teal-50 hover:bg-teal-100 text-teal-950 border border-teal-300 hover:border-teal-400',
+      iconClass: 'border border-teal-400 bg-teal-600 text-white' 
     },
   ]
 
@@ -196,20 +206,20 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                 className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
                   isActive
                     ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
-                    : 'bg-stone-50/80 hover:bg-stone-100 text-stone-800 border border-stone-200 hover:border-stone-300 shadow-2xs hover:shadow-xs'
+                    : `${item.frameClass} shadow-2xs hover:shadow-xs`
                 }`}
               >
                 {/* Large Icon Container */}
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                   isActive
                     ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
-                    : `${item.color}`
+                    : `${item.iconClass} shadow-xs`
                 }`}>
                   <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
                 {/* Text Label */}
-                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-inherit'}`}>
                   {item.label}
                 </span>
               </Link>
@@ -229,20 +239,20 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                 className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
                   isActive
                     ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
-                    : 'bg-stone-50/80 hover:bg-stone-100 text-stone-800 border border-stone-200 hover:border-stone-300 shadow-2xs hover:shadow-xs'
+                    : `${item.frameClass} shadow-2xs hover:shadow-xs`
                 }`}
               >
                 {/* Large Icon Container */}
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                   isActive
                     ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
-                    : `${item.color}`
+                    : `${item.iconClass} shadow-xs`
                 }`}>
                   <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
                 {/* Text Label */}
-                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-inherit'}`}>
                   {item.label}
                 </span>
               </Link>
