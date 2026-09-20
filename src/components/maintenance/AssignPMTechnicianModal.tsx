@@ -42,13 +42,13 @@ export default function AssignPMTechnicianModal({
   const todayStr = new Date().toISOString().split('T')[0]
 
   const [selectedTech, setSelectedTech] = useState(
-    (plan as any).machine?.responsible_technician_name || 'ช่างสมหมาย เก่งการช่าง'
+    (plan as any).machine?.responsible_technician_name || 'ช่างยะ ปิยะราช รามมา'
   )
   const [customTech, setCustomTech] = useState('')
   const [targetDate, setTargetDate] = useState(plan.next_due_date || todayStr)
   const [priority, setPriority] = useState('P3_NORMAL')
   const [notes, setNotes] = useState('')
-  const [assignedByName, setAssignedByName] = useState('หัวหน้าฝ่ายซ่อมบำรุง')
+  const [assignedByName, setAssignedByName] = useState('ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {

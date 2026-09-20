@@ -317,7 +317,7 @@ export default function QuickSparePartRequisition({
               </label>
               <Input
                 type="text"
-                placeholder="ระบุชื่อผู้เบิก เช่น ช่างสมหมาย, สมศักดิ์ ผลิต 1"
+                placeholder="ระบุชื่อผู้เบิก เช่น ช่างยะ, ช่างคิม, สมศักดิ์ ผลิต 1"
                 value={requesterName}
                 onChange={e => setRequesterName(e.target.value)}
                 className="text-xs"

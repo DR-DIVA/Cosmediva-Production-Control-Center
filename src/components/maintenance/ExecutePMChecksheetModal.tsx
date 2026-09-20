@@ -44,7 +44,7 @@ export default function ExecutePMChecksheetModal({
   const checklistItems = Array.isArray(plan.checklist_template) ? plan.checklist_template : []
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
 
-  const [execTechName, setExecTechName] = useState(technicianName || 'ช่างสมหมาย เก่งการช่าง')
+  const [execTechName, setExecTechName] = useState(technicianName || 'ช่างยะ ปิยะราช รามมา')
   const [isEditingTech, setIsEditingTech] = useState(false)
 
   // Results state for each checklist item

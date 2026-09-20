@@ -69,7 +69,7 @@ export default function TechnicianCockpitPage() {
   const [pmPlans, setPmPlans] = useState<MaintenancePMPlan[]>([])
   const [activeGroupTab, setActiveGroupTab] = useState<'breakdown' | 'pm_plan'>('breakdown')
   const [breakdownFilter, setBreakdownFilter] = useState<'ALL' | 'READY' | 'IN_PROGRESS' | 'NEW'>('ALL')
-  const [technicianName, setTechnicianName] = useState('ช่างสมหมาย เก่งการช่าง')
+  const [technicianName, setTechnicianName] = useState('ช่างยะ ปิยะราช รามมา')
   const [isCustomTech, setIsCustomTech] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
 
