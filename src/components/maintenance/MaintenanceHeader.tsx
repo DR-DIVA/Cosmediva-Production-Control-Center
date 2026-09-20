@@ -14,7 +14,8 @@ import {
   HardHat,
   Calendar,
   QrCode,
-  MessageSquare
+  MessageSquare,
+  Zap
 } from 'lucide-react'
 import LineSettingsModal from '@/components/maintenance/LineSettingsModal'
 
@@ -110,20 +111,41 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
         </div>
 
         {/* Global Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full lg:w-auto">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
+          {/* 1. แจ้งเครื่องเสียด่วน */}
           <Link
-            href="/maintenance/report"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-4 py-2.5 rounded-2xl shadow-lg shadow-red-900/30 border border-red-400/30 transition-all transform active:scale-95 text-sm"
+            href="/maintenance/report?type=EMERGENCY"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-red-900/30 border border-red-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
           >
-            <AlertOctagon className="w-5 h-5 animate-pulse" />
-            🚨 แจ้งเครื่องเสียด่วน
+            <AlertOctagon className="w-4 h-4 animate-pulse shrink-0" />
+            <span>🚨 แจ้งเครื่องเสียด่วน</span>
           </Link>
+
+          {/* 2. แจ้งซ่อมทั่วไป */}
+          <Link
+            href="/maintenance/report?type=GENERAL"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-blue-900/30 border border-blue-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
+          >
+            <Wrench className="w-4 h-4 shrink-0" />
+            <span>🛠️ แจ้งซ่อมทั่วไป</span>
+          </Link>
+
+          {/* 3. แจ้งซ่อมบริการ */}
+          <Link
+            href="/maintenance/report?type=SERVICE"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-purple-900/30 border border-purple-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
+          >
+            <Zap className="w-4 h-4 shrink-0" />
+            <span>💡 แจ้งซ่อมบริการ</span>
+          </Link>
+
+          {/* โหมดช่างซ่อม */}
           <Link
             href="/maintenance/technician"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-4 py-2.5 rounded-2xl shadow-md transition-all text-sm active:scale-95"
+            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-3.5 py-2.5 rounded-2xl shadow-md transition-all text-xs sm:text-sm active:scale-95"
           >
-            <HardHat className="w-4 h-4" />
-            โหมดช่างซ่อม
+            <HardHat className="w-4 h-4 shrink-0" />
+            <span>โหมดช่างซ่อม</span>
           </Link>
 
           {/* LINE Notification Settings Button */}

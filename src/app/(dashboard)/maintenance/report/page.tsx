@@ -7,9 +7,17 @@ import { ChevronLeft } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
-export default async function FastReportPage() {
-  const machinesRes = await getMachines()
+interface PageProps {
+  searchParams?: Promise<{ type?: string }>
+}
+
+export default async function FastReportPage(props: PageProps) {
+  const [machinesRes, resolvedSearchParams] = await Promise.all([
+    getMachines(),
+    props.searchParams ? props.searchParams : Promise.resolve({})
+  ])
   const machines = machinesRes.data || []
+  const initialType = ((resolvedSearchParams as any)?.type || '').toUpperCase() as any
 
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-5xl w-full mx-auto space-y-6">
@@ -35,7 +43,7 @@ export default async function FastReportPage() {
         </p>
       </div>
 
-      <FastReportForm machines={machines} />
+      <FastReportForm machines={machines} initialType={initialType} />
     </div>
   )
 }

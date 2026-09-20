@@ -130,7 +130,9 @@ const routes = [
     allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'],
     subRoutes: [
       { label: 'ภาพรวมระบบ', href: '/maintenance', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
-      { label: '🚨 แจ้งเครื่องเสียด่วน', href: '/maintenance/report', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🚨 แจ้งเครื่องเสียด่วน', href: '/maintenance/report?type=EMERGENCY', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '🛠️ แจ้งซ่อมทั่วไป', href: '/maintenance/report?type=GENERAL', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
+      { label: '💡 แจ้งซ่อมบริการ', href: '/maintenance/report?type=SERVICE', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
       { label: '🔧 โหมดช่างซ่อม', href: '/maintenance/technician', allowedRoles: ['admin', 'maintenance'] },
       { label: '📋 บอร์ดงานซ่อม', href: '/maintenance/work-orders', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },
       { label: '🗓️ แผน PM 2026', href: '/maintenance/pm', allowedRoles: ['admin', 'maintenance', 'planner', 'production', 'production_mx', 'production_pk', 'qc', 'qa'] },

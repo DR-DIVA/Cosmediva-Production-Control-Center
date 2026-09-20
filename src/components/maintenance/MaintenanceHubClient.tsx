@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
-import { AlertOctagon, QrCode, HardHat, KanbanSquare, ArrowRight } from 'lucide-react'
+import { AlertOctagon, QrCode, HardHat, KanbanSquare, ArrowRight, Wrench, Zap } from 'lucide-react'
 import MachineQRScannerModal from './MachineQRScannerModal'
 import { MaintenanceMachine } from '@/types/maintenance'
 
@@ -14,27 +14,72 @@ export default function MaintenanceHubClient({ machines }: Props) {
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false)
 
   return (
-    <>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        {/* Card 1: Emergency / Fast Report */}
+    <div className="space-y-4">
+      {/* 3 Dedicated Fast Report Cards (Red / Blue / Purple) */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+        {/* Card 1: แจ้งเครื่องเสียด่วน */}
         <Link
-          href="/maintenance/report"
-          className="group relative p-5 rounded-3xl bg-gradient-to-br from-red-600 to-rose-700 text-white shadow-xl shadow-red-900/20 hover:shadow-2xl hover:scale-[1.02] transition-all border border-red-500 flex flex-col justify-between"
+          href="/maintenance/report?type=EMERGENCY"
+          className="group relative p-5 rounded-3xl bg-gradient-to-br from-red-600 via-rose-600 to-red-700 text-white shadow-lg shadow-red-900/20 hover:shadow-xl hover:scale-[1.02] transition-all border-2 border-red-400/60 flex flex-col justify-between"
         >
           <div>
-            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-3 shadow-inner">
+            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-3 shadow-inner">
               <AlertOctagon className="w-6 h-6 animate-pulse" />
             </div>
-            <h3 className="text-lg font-black tracking-tight">🚨 แจ้งเครื่องเสียด่วน</h3>
-            <p className="text-xs text-red-100 mt-1">
-              แจ้งปัญหาหน้างานใน 30–60 วินาที • มีปุ่ม BREAKDOWN NOW สำหรับงานวิกฤต
+            <h3 className="text-base sm:text-lg font-black tracking-tight">🚨 แจ้งเครื่องเสียด่วน</h3>
+            <p className="text-xs text-red-100 mt-1 font-medium leading-relaxed">
+              กระทบสายการผลิต • หยุดชะงัก (P1 Critical Breakdown)
             </p>
           </div>
           <div className="flex items-center text-xs font-bold text-white/90 pt-4 group-hover:translate-x-1 transition-transform">
-            <span>กดเพื่อแจ้งซ่อมทันที</span>
+            <span>แจ้งซ่อมด่วนทันที</span>
             <ArrowRight className="w-4 h-4 ml-1" />
           </div>
         </Link>
+
+        {/* Card 2: แจ้งซ่อมทั่วไป */}
+        <Link
+          href="/maintenance/report?type=GENERAL"
+          className="group relative p-5 rounded-3xl bg-gradient-to-br from-blue-600 via-indigo-600 to-blue-700 text-white shadow-lg shadow-blue-900/20 hover:shadow-xl hover:scale-[1.02] transition-all border-2 border-blue-400/60 flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-3 shadow-inner">
+              <Wrench className="w-6 h-6" />
+            </div>
+            <h3 className="text-base sm:text-lg font-black tracking-tight">🛠️ แจ้งซ่อมทั่วไป</h3>
+            <p className="text-xs text-blue-100 mt-1 font-medium leading-relaxed">
+              ไม่กระทบการผลิต • เครื่องยังเดินต่อได้ (P3 Normal)
+            </p>
+          </div>
+          <div className="flex items-center text-xs font-bold text-white/90 pt-4 group-hover:translate-x-1 transition-transform">
+            <span>แจ้งซ่อมตามรอบ</span>
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </div>
+        </Link>
+
+        {/* Card 3: แจ้งซ่อมบริการ */}
+        <Link
+          href="/maintenance/report?type=SERVICE"
+          className="group relative p-5 rounded-3xl bg-gradient-to-br from-purple-600 via-fuchsia-600 to-purple-700 text-white shadow-lg shadow-purple-900/20 hover:shadow-xl hover:scale-[1.02] transition-all border-2 border-purple-400/60 flex flex-col justify-between"
+        >
+          <div>
+            <div className="w-11 h-11 rounded-2xl bg-white/20 flex items-center justify-center text-white mb-3 shadow-inner">
+              <Zap className="w-6 h-6" />
+            </div>
+            <h3 className="text-base sm:text-lg font-black tracking-tight">💡 แจ้งซ่อมบริการ</h3>
+            <p className="text-xs text-purple-100 mt-1 font-medium leading-relaxed">
+              งานบริการอาคาร • เปลี่ยนหลอดไฟ แอร์ ประปา สุขาภิบาล
+            </p>
+          </div>
+          <div className="flex items-center text-xs font-bold text-white/90 pt-4 group-hover:translate-x-1 transition-transform">
+            <span>แจ้งงานบริการอาคาร</span>
+            <ArrowRight className="w-4 h-4 ml-1" />
+          </div>
+        </Link>
+      </div>
+
+      {/* 4 Operations & Cockpit Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
         {/* Card 2: Scan QR */}
         <button
@@ -130,6 +175,6 @@ export default function MaintenanceHubClient({ machines }: Props) {
         onClose={() => setIsQRScannerOpen(false)}
         machines={machines}
       />
-    </>
+    </div>
   )
 }

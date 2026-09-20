@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -38,6 +38,7 @@ import { createRepairRequest } from '@/app/actions/maintenance'
 interface FastReportFormProps {
   initialMachine?: MaintenanceMachine | null
   machines: MaintenanceMachine[]
+  initialType?: RepairTypeCategory
 }
 
 const SYMPTOMS: { label: SymptomCategory; icon: any; color: string }[] = [
@@ -69,32 +70,62 @@ const FACILITY_SYMPTOMS: { label: string; icon: any; color: string }[] = [
 export type RepairTypeCategory = 'EMERGENCY' | 'GENERAL' | 'SERVICE'
 
 const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] = [
+  { label: 'Facility no impact', text: '🟢 ไม่กระทบการผลิต (แจ้งซ่อมบริการ)', badgeColor: 'bg-emerald-600 text-white' },
   { label: 'Production stopped', text: '🛑 Production หยุดทั้งหมด (สายการผลิตชะงัก)', badgeColor: 'bg-red-600 text-white' },
   { label: 'Machine stopped', text: '⏸️ เครื่องจักรหยุด (แต่แผนกอื่นยังเดินได้)', badgeColor: 'bg-orange-600 text-white' },
   { label: 'Intermittent stops', text: '🔄 เครื่องยังเดินต่อได้ (แต่หยุดบ่อยเพราะไม่ปกติ)', badgeColor: 'bg-amber-500 text-stone-950' },
-  { label: 'Facility no impact', text: '🟢 ไม่กระทบการผลิต (แจ้งซ่อมบริการ)', badgeColor: 'bg-emerald-600 text-white' },
   { label: 'Quality risk', text: '⚠️ เสี่ยงกระทบคุณภาพสินค้า / ต้องซ่อมด่วน', badgeColor: 'bg-amber-500 text-white' },
   { label: 'Safety risk', text: '🚨 อันตรายต่อความปลอดภัยของผู้ปฏิบัติงาน', badgeColor: 'bg-rose-600 text-white' },
   { label: 'Production can continue', text: '🟢 เครื่องยังเดินต่อได้ (ซ่อมตามรอบ/มีนัดหมาย)', badgeColor: 'bg-emerald-600 text-white' }
 ]
 
-export default function FastReportForm({ initialMachine, machines }: FastReportFormProps) {
+export default function FastReportForm({ initialMachine, machines, initialType }: FastReportFormProps) {
   const router = useRouter()
+  const defaultType: RepairTypeCategory = initialType || 'EMERGENCY'
+
   const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || machines[0] || null)
   const [machineSearchQuery, setMachineSearchQuery] = useState('')
   const [isSearchingMachine, setIsSearchingMachine] = useState(false)
-  const [repairType, setRepairType] = useState<RepairTypeCategory>('EMERGENCY')
+  const [repairType, setRepairType] = useState<RepairTypeCategory>(defaultType)
   const [facilityLocation, setFacilityLocation] = useState('')
-  const [symptom, setSymptom] = useState<SymptomCategory>('เครื่องหยุดกลางงาน')
+  const [symptom, setSymptom] = useState<SymptomCategory>(
+    defaultType === 'SERVICE' ? ('💡 เปลี่ยนหลอดไฟ / แสงสว่าง' as any) : defaultType === 'GENERAL' ? 'เสียงผิดปกติ' : 'เครื่องหยุดกลางงาน'
+  )
   const [customSymptom, setCustomSymptom] = useState('')
-  const [impact, setImpact] = useState<ProductionImpact>('Production stopped')
-  const [isEmergency, setIsEmergency] = useState(true)
+  const [impact, setImpact] = useState<ProductionImpact>(
+    defaultType === 'SERVICE' ? 'Facility no impact' : defaultType === 'GENERAL' ? 'Production can continue' : 'Production stopped'
+  )
+  const [isEmergency, setIsEmergency] = useState(defaultType === 'EMERGENCY')
   const [description, setDescription] = useState('')
   const [requesterName, setRequesterName] = useState('พนักงานหน้างาน (Operator)')
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
+
+  // Listen to URL query params (e.g. ?type=EMERGENCY | GENERAL | SERVICE)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search)
+      const t = (params.get('type') || '').toUpperCase() as RepairTypeCategory
+      if (t === 'SERVICE') {
+        setRepairType('SERVICE')
+        setIsEmergency(false)
+        setImpact('Facility no impact')
+        setSymptom('💡 เปลี่ยนหลอดไฟ / แสงสว่าง' as any)
+      } else if (t === 'GENERAL') {
+        setRepairType('GENERAL')
+        setIsEmergency(false)
+        setImpact('Production can continue')
+        setSymptom('เสียงผิดปกติ')
+      } else if (t === 'EMERGENCY') {
+        setRepairType('EMERGENCY')
+        setIsEmergency(true)
+        setImpact('Production stopped')
+        setSymptom('เครื่องหยุดกลางงาน')
+      }
+    }
+  }, [])
 
   // Live Machine Search Filter
   const filteredMachines = useMemo(() => {
