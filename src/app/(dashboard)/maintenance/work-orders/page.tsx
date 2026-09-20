@@ -25,7 +25,9 @@ import {
   Check,
   ChevronRight,
   ArrowRight,
-  Timer
+  Timer,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -253,6 +255,22 @@ export default function WorkOrdersKanbanPage() {
   const [detailWO, setDetailWO] = useState<MaintenanceWorkOrder | null>(null)
   const [assignTechName, setAssignTechName] = useState('')
   const [isCustomTech, setIsCustomTech] = useState(false)
+  
+  // Collapsible time control (Default is collapsed to keep cards clean and prevent pressure for technicians)
+  const [showAllTimes, setShowAllTimes] = useState(false)
+  const [expandedTimeCardIds, setExpandedTimeCardIds] = useState<Set<string>>(new Set())
+
+  const toggleCardTime = (woId: string) => {
+    setExpandedTimeCardIds(prev => {
+      const next = new Set(prev)
+      if (next.has(woId)) {
+        next.delete(woId)
+      } else {
+        next.add(woId)
+      }
+      return next
+    })
+  }
 
   // Live timer ticking every second
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
@@ -455,6 +473,28 @@ export default function WorkOrdersKanbanPage() {
             <option value="P4_LOW">P4 LOW</option>
           </select>
 
+          {/* Board-level time visibility toggle button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (showAllTimes) {
+                setShowAllTimes(false)
+                setExpandedTimeCardIds(new Set())
+              } else {
+                setShowAllTimes(true)
+              }
+            }}
+            className={`h-10 px-3 rounded-xl text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer ${
+              showAllTimes 
+                ? 'bg-amber-100 border-amber-300 text-amber-900 shadow-xs' 
+                : 'bg-stone-50 hover:bg-stone-100 border-stone-200 text-stone-600'
+            }`}
+            title={showAllTimes ? 'คลิกเพื่อย่อ/ซ่อนเวลาบนการ์ดทั้งหมด (ช่างสบายตา)' : 'คลิกเพื่อกางดูเวลาบนการ์ดทุกใบ'}
+          >
+            <Timer className={`w-3.5 h-3.5 ${showAllTimes ? 'text-amber-800' : 'text-stone-500'}`} />
+            <span>{showAllTimes ? 'ซ่อนเวลา (สบายตา)' : 'กางดูเวลาทุกใบ'}</span>
+          </button>
+
           <Button
             onClick={fetchWOs}
             variant="outline"
@@ -508,115 +548,157 @@ export default function WorkOrdersKanbanPage() {
                       ไม่มีงานในขั้นตอนนี้
                     </div>
                   ) : (
-                    colJobs.map(wo => {
-                      const isCritical = wo.priority === 'P1_CRITICAL'
+                      colJobs.map(wo => {
+                        const isCritical = wo.priority === 'P1_CRITICAL'
+                        const isTimeExpanded = showAllTimes || expandedTimeCardIds.has(wo.id)
 
-                      return (
-                        <div
-                          key={wo.id}
-                          onClick={() => {
-                            setDetailWO(wo)
-                            const currentTech = wo.assigned_technician_name || ''
-                            setAssignTechName(currentTech)
-                            setIsCustomTech(
-                              !!currentTech && 
-                              !FACTORY_TECHNICIANS.some(t => t.startsWith(currentTech))
-                            )
-                          }}
-                          className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${
-                            isCritical
-                              ? 'border-red-500 ring-2 ring-red-500/20'
-                              : 'border-stone-200 hover:border-[#D4AF37]'
-                          }`}
-                        >
-                          {/* Priority badge & WO Number */}
-                          <div className="flex items-center justify-between">
-                            <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
-                              isCritical ? 'bg-red-600 text-white animate-pulse' :
-                              wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' :
-                              'bg-stone-100 text-stone-600'
-                            }`}>
-                              {wo.priority}
-                            </span>
-                            <span className="font-mono text-[10px] text-stone-400 font-bold">{wo.wo_number}</span>
-                          </div>
-
-                          {/* Machine & Symptom */}
-                          <div>
-                            <div className="text-xs font-black text-stone-900 line-clamp-1">{wo.machine_code}</div>
-                            <div className="text-[11px] text-stone-600 font-medium line-clamp-1">{wo.symptom_category}</div>
-                          </div>
-
-                          {/* Live Timer or Downtime Badge */}
-                          {wo.status === 'IN_PROGRESS' ? (
-                            <div className="bg-amber-50 rounded-xl p-2 border border-amber-300 space-y-1">
-                              <div className="flex items-center justify-between text-amber-950 font-bold text-[11px]">
-                                <span className="flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
-                                  กำลังซ่อม:
-                                </span>
-                                <span className="font-mono font-extrabold text-emerald-700">
-                                  {wo.repair_started_at ? formatElapsedDuration(currentTime - new Date(wo.repair_started_at).getTime()) : 'เพิ่งเริ่ม'}
-                                </span>
-                              </div>
-                              <div className="flex items-center justify-between text-[10px] text-stone-500 pt-0.5 border-t border-amber-200/60">
-                                <span>Downtime สะสม:</span>
-                                <span className="font-mono font-bold text-red-600">
-                                  {formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())}
-                                </span>
-                              </div>
+                        return (
+                          <div
+                            key={wo.id}
+                            onClick={() => {
+                              setDetailWO(wo)
+                              const currentTech = wo.assigned_technician_name || ''
+                              setAssignTechName(currentTech)
+                              setIsCustomTech(
+                                !!currentTech && 
+                                !FACTORY_TECHNICIANS.some(t => t.startsWith(currentTech))
+                              )
+                            }}
+                            className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${
+                              isCritical
+                                ? 'border-red-500 ring-2 ring-red-500/20'
+                                : 'border-stone-200 hover:border-[#D4AF37]'
+                            }`}
+                          >
+                            {/* Priority badge & WO Number */}
+                            <div className="flex items-center justify-between">
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                isCritical ? 'bg-red-600 text-white animate-pulse' :
+                                wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' :
+                                'bg-stone-100 text-stone-600'
+                              }`}>
+                                {wo.priority}
+                              </span>
+                              <span className="font-mono text-[10px] text-stone-400 font-bold">{wo.wo_number}</span>
                             </div>
-                          ) : (
-                            <div className="text-[10px] bg-stone-50 p-1.5 rounded-lg border border-stone-200 flex items-center justify-between">
-                              <span className="text-stone-500 flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-red-500" />
-                                {wo.total_downtime_minutes > 0 ? `${wo.total_downtime_minutes} นาที` : (
-                                  ['CLOSED', 'VERIFIED'].includes(wo.status) ? 'เสร็จสิ้น' :
-                                  formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())
-                                )}
-                              </span>
-                              <span className="text-stone-700 font-bold">
-                                ฿{Number(wo.total_part_cost || 0).toLocaleString()}
-                              </span>
-                            </div>
-                          )}
 
-                          {/* Mini Flow Milestones & Time Gaps on Card */}
-                          <div className="pt-1.5 border-t border-stone-100 flex flex-wrap items-center gap-1 text-[9px] text-stone-500">
-                            <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono font-bold">
-                              1.แจ้ง: {new Date(wo.reported_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            {wo.acknowledged_at && (
-                              <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-mono font-bold">
-                                2.รับ: {new Date(wo.acknowledged_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                                {wo.reported_at && (
-                                  <span className="text-amber-950 font-black ml-0.5">
-                                    (+{Math.max(0, Math.round((new Date(wo.acknowledged_at).getTime() - new Date(wo.reported_at).getTime()) / 60000))}น.)
-                                  </span>
+                            {/* Machine & Symptom */}
+                            <div>
+                              <div className="text-xs font-black text-stone-900 line-clamp-1">{wo.machine_code}</div>
+                              <div className="text-[11px] text-stone-600 font-medium line-clamp-1">{wo.symptom_category}</div>
+                            </div>
+
+                            {/* Compact Status Bar & Time Toggle Header */}
+                            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-stone-100">
+                              {wo.status === 'IN_PROGRESS' ? (
+                                <span className="flex items-center gap-1 font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                  กำลังซ่อม
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-stone-500 font-medium">
+                                  {wo.total_downtime_minutes > 0 ? `Downtime: ${wo.total_downtime_minutes} นาที` : (
+                                    ['CLOSED', 'VERIFIED'].includes(wo.status) ? 'ซ่อมเสร็จสิ้น' :
+                                    `แจ้ง ${new Date(wo.reported_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.`
+                                  )}
+                                </span>
+                              )}
+
+                              {/* Collapsible toggle button */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  toggleCardTime(wo.id)
+                                }}
+                                className={`flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md transition cursor-pointer ${
+                                  isTimeExpanded 
+                                    ? 'bg-amber-100 text-amber-900' 
+                                    : 'text-stone-400 hover:text-amber-800 hover:bg-stone-100'
+                                }`}
+                                title={isTimeExpanded ? 'คลิกเพื่อย่อเก็บเวลา' : 'คลิกเพื่อกางดูเวลาและไทม์ไลน์'}
+                              >
+                                <Clock className="w-2.5 h-2.5" />
+                                <span>{isTimeExpanded ? 'ซ่อนเวลา' : 'ดูเวลา'}</span>
+                                {isTimeExpanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
+                              </button>
+                            </div>
+
+                            {/* Expandable Section: Live Timer & Mini Flow Milestones */}
+                            {isTimeExpanded && (
+                              <div className="space-y-2 pt-1 border-t border-amber-100 animate-in fade-in slide-in-from-top-1 duration-150">
+                                {/* Live Timer or Downtime Badge */}
+                                {wo.status === 'IN_PROGRESS' ? (
+                                  <div className="bg-amber-50 rounded-xl p-2 border border-amber-300 space-y-1">
+                                    <div className="flex items-center justify-between text-amber-950 font-bold text-[11px]">
+                                      <span className="flex items-center gap-1.5">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping inline-block" />
+                                        กำลังซ่อม:
+                                      </span>
+                                      <span className="font-mono font-extrabold text-emerald-700">
+                                        {wo.repair_started_at ? formatElapsedDuration(currentTime - new Date(wo.repair_started_at).getTime()) : 'เพิ่งเริ่ม'}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] text-stone-500 pt-0.5 border-t border-amber-200/60">
+                                      <span>Downtime สะสม:</span>
+                                      <span className="font-mono font-bold text-red-600">
+                                        {formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())}
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] bg-stone-50 p-1.5 rounded-lg border border-stone-200 flex items-center justify-between">
+                                    <span className="text-stone-500 flex items-center gap-1">
+                                      <Clock className="w-3 h-3 text-red-500" />
+                                      {wo.total_downtime_minutes > 0 ? `${wo.total_downtime_minutes} นาที` : (
+                                        ['CLOSED', 'VERIFIED'].includes(wo.status) ? 'เสร็จสิ้น' :
+                                        formatElapsedDuration(currentTime - new Date(wo.reported_at).getTime())
+                                      )}
+                                    </span>
+                                    <span className="text-stone-700 font-bold">
+                                      ฿{Number(wo.total_part_cost || 0).toLocaleString()}
+                                    </span>
+                                  </div>
                                 )}
-                              </span>
-                            )}
-                            {wo.repair_started_at && (
-                              <span className="bg-yellow-50 text-yellow-800 px-1.5 py-0.5 rounded font-mono font-bold">
-                                3.ซ่อม: {new Date(wo.repair_started_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                                {wo.acknowledged_at && (
-                                  <span className="text-yellow-950 font-black ml-0.5">
-                                    (+{Math.max(0, Math.round((new Date(wo.repair_started_at).getTime() - new Date(wo.acknowledged_at).getTime()) / 60000))}น.)
+
+                                {/* Mini Flow Milestones & Time Gaps on Card */}
+                                <div className="flex flex-wrap items-center gap-1 text-[9px] text-stone-500">
+                                  <span className="bg-rose-50 text-rose-700 px-1.5 py-0.5 rounded font-mono font-bold">
+                                    1.แจ้ง: {new Date(wo.reported_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                                   </span>
-                                )}
-                              </span>
+                                  {wo.acknowledged_at && (
+                                    <span className="bg-amber-50 text-amber-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                      2.รับ: {new Date(wo.acknowledged_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                      {wo.reported_at && (
+                                        <span className="text-amber-950 font-black ml-0.5">
+                                          (+{Math.max(0, Math.round((new Date(wo.acknowledged_at).getTime() - new Date(wo.reported_at).getTime()) / 60000))}น.)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {wo.repair_started_at && (
+                                    <span className="bg-yellow-50 text-yellow-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                      3.ซ่อม: {new Date(wo.repair_started_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                      {wo.acknowledged_at && (
+                                        <span className="text-yellow-950 font-black ml-0.5">
+                                          (+{Math.max(0, Math.round((new Date(wo.repair_started_at).getTime() - new Date(wo.acknowledged_at).getTime()) / 60000))}น.)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {wo.repair_completed_at && (
+                                    <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                      4.เสร็จ: {new Date(wo.repair_completed_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                      {wo.repair_started_at && (
+                                        <span className="text-emerald-950 font-black ml-0.5">
+                                          (+{Math.max(0, Math.round((new Date(wo.repair_completed_at).getTime() - new Date(wo.repair_started_at).getTime()) / 60000))}น.)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             )}
-                            {wo.repair_completed_at && (
-                              <span className="bg-emerald-50 text-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold">
-                                4.เสร็จ: {new Date(wo.repair_completed_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
-                                {wo.repair_started_at && (
-                                  <span className="text-emerald-950 font-black ml-0.5">
-                                    (+{Math.max(0, Math.round((new Date(wo.repair_completed_at).getTime() - new Date(wo.repair_started_at).getTime()) / 60000))}น.)
-                                  </span>
-                                )}
-                              </span>
-                            )}
-                          </div>
 
                           {/* Technician */}
                           <div className="flex items-center justify-between text-[10px] text-stone-400 pt-1 border-t border-stone-100">
