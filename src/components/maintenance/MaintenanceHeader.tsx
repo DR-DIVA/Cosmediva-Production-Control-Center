@@ -119,37 +119,77 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
           {/* 1. แจ้งเครื่องเสียด่วน */}
           <Link
             href="/maintenance/report?type=EMERGENCY"
-            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-red-900/30 border border-red-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
+            className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-300 hover:border-rose-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
+            title="แจ้งซ่อมด่วนฉุกเฉิน (กระทบการผลิต / เครื่องหยุด)"
           >
-            <AlertOctagon className="w-4 h-4 animate-pulse shrink-0" />
-            <span>🚨 แจ้งเครื่องเสียด่วน</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-red-300 bg-red-600 text-white shadow-xs transition-transform group-hover:scale-105">
+              <AlertOctagon className="w-4.5 h-4.5 sm:w-5 sm:h-5 animate-pulse stroke-[2.2]" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs sm:text-sm font-extrabold text-rose-950 truncate">
+                แจ้งเครื่องเสียด่วน
+              </span>
+              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-rose-200 text-red-900 border border-rose-300 shrink-0">
+                🚨 ด่วน
+              </span>
+            </div>
           </Link>
 
           {/* 2. แจ้งซ่อมทั่วไป */}
           <Link
             href="/maintenance/report?type=GENERAL"
-            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-blue-900/30 border border-blue-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
+            className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-blue-50 hover:bg-blue-100 text-blue-950 border border-blue-300 hover:border-blue-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
+            title="แจ้งซ่อมทั่วไป (ไม่กระทบการผลิต)"
           >
-            <Wrench className="w-4 h-4 shrink-0" />
-            <span>🛠️ แจ้งซ่อมทั่วไป</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-blue-300 bg-blue-600 text-white shadow-xs transition-transform group-hover:scale-105">
+              <Wrench className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs sm:text-sm font-extrabold text-blue-950 truncate">
+                แจ้งซ่อมทั่วไป
+              </span>
+              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-blue-200 text-blue-900 border border-blue-300 shrink-0">
+                🛠️ ทั่วไป
+              </span>
+            </div>
           </Link>
 
           {/* 3. แจ้งซ่อมบริการ */}
           <Link
             href="/maintenance/report?type=SERVICE"
-            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-purple-900/30 border border-purple-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
+            className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-purple-50 hover:bg-purple-100 text-purple-950 border border-purple-300 hover:border-purple-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
+            title="แจ้งซ่อมบริการ & อาคารสถานที่ (ไม่กระทบการผลิต)"
           >
-            <Zap className="w-4 h-4 shrink-0" />
-            <span>💡 แจ้งซ่อมบริการ</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-purple-300 bg-purple-600 text-white shadow-xs transition-transform group-hover:scale-105">
+              <Zap className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs sm:text-sm font-extrabold text-purple-950 truncate">
+                แจ้งซ่อมบริการ
+              </span>
+              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-purple-200 text-purple-900 border border-purple-300 shrink-0">
+                💡 บริการ
+              </span>
+            </div>
           </Link>
 
           {/* 4. โหมดช่างซ่อม */}
           <Link
             href="/maintenance/technician"
-            className="w-full inline-flex items-center justify-center gap-1.5 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-3 py-2.5 rounded-2xl shadow-md transition-all text-xs sm:text-sm active:scale-95 whitespace-nowrap"
+            className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
+            title="โหมดช่างซ่อม (รับงาน / บันทึกผล / คืนเครื่อง)"
           >
-            <HardHat className="w-4 h-4 shrink-0" />
-            <span>🔧 โหมดช่างซ่อม</span>
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-[#D4AF37] text-[#2A2521] shadow-xs transition-transform group-hover:scale-105">
+              <HardHat className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+            </div>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-xs sm:text-sm font-extrabold text-amber-950 truncate">
+                โหมดช่างซ่อม
+              </span>
+              <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
+                Tech
+              </span>
+            </div>
           </Link>
         </div>
       </div>
