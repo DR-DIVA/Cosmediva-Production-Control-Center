@@ -40,16 +40,17 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       color: 'bg-blue-100 text-blue-700 border-blue-200' 
     },
     { 
-      label: 'โหมดช่างซ่อม', 
+      label: 'ช่างหน้างาน (My Tasks)', 
       href: '/maintenance/technician', 
       icon: HardHat, 
-      badge: 'Tech',
+      badge: 'ช่าง',
       color: 'bg-amber-100 text-amber-800 border-amber-200' 
     },
     { 
-      label: 'บอร์ดงานซ่อม', 
+      label: 'ศูนย์ควบคุมงาน (Kanban)', 
       href: '/maintenance/work-orders', 
       icon: KanbanSquare,
+      badge: 'หัวหน้า',
       color: 'bg-purple-100 text-purple-700 border-purple-200' 
     },
     { 
@@ -173,21 +174,21 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             </div>
           </Link>
 
-          {/* 4. โหมดช่างซ่อม */}
+          {/* 4. ช่างหน้างาน */}
           <Link
             href="/maintenance/technician"
             className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
-            title="โหมดช่างซ่อม (รับงาน / บันทึกผล / คืนเครื่อง)"
+            title="สำหรับช่างประจำกะลงมือซ่อม (รับงาน / บันทึกผล / คืนเครื่อง)"
           >
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-[#D4AF37] text-[#2A2521] shadow-xs transition-transform group-hover:scale-105">
               <HardHat className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xs sm:text-sm font-extrabold text-amber-950 truncate">
-                โหมดช่างซ่อม
+                ช่างหน้างาน 📱
               </span>
               <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
-                Tech
+                My Tasks
               </span>
             </div>
           </Link>

@@ -235,13 +235,47 @@ export default function TechnicianCockpitPage() {
     }
   }
 
-  // Filter groups for Breakdowns
-  const criticalJobs = workOrders.filter(w => w.priority === 'P1_CRITICAL' && !['CLOSED', 'VERIFIED'].includes(w.status))
-  const readyToRepairJobs = workOrders.filter(w => ['ACKNOWLEDGED', 'ASSIGNED'].includes(w.status) && w.priority !== 'P1_CRITICAL')
-  const inProgressJobs = workOrders.filter(w => ['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(w.status) && w.priority !== 'P1_CRITICAL')
-  const newRequests = workOrders.filter(w => w.status === 'NEW' && w.priority !== 'P1_CRITICAL')
-  const recentlyCompleted = workOrders.filter(w => ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(w.status)).slice(0, 5)
-  const activeBreakdownCount = workOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
+  // Scope: Focused My Tasks vs All Factory Tasks
+  const [viewScope, setViewScope] = useState<'MY_TASKS' | 'ALL'>('MY_TASKS')
+
+  // Scoped Work Orders based on logged-in / active technician
+  const scopedWorkOrders = useMemo(() => {
+    if (viewScope === 'ALL') return workOrders
+    const normTech = technicianName.trim().toLowerCase()
+    return workOrders.filter(w => {
+      // 1. P1 Critical is ALWAYS shown to everyone on duty
+      if (w.priority === 'P1_CRITICAL') return true
+      // 2. Assigned to this technician
+      if (w.assigned_technician_name && (
+        w.assigned_technician_name.toLowerCase().includes(normTech) ||
+        normTech.includes(w.assigned_technician_name.toLowerCase())
+      )) return true
+      // 3. Unassigned or New jobs waiting for pickup
+      if (!w.assigned_technician_name || w.status === 'NEW') return true
+      return false
+    })
+  }, [workOrders, viewScope, technicianName])
+
+  // Count specifically assigned to this technician
+  const myDirectAssignedCount = useMemo(() => {
+    const normTech = technicianName.trim().toLowerCase()
+    return workOrders.filter(w => 
+      !['CLOSED', 'VERIFIED'].includes(w.status) &&
+      w.assigned_technician_name && (
+        w.assigned_technician_name.toLowerCase().includes(normTech) ||
+        normTech.includes(w.assigned_technician_name.toLowerCase())
+      )
+    ).length
+  }, [workOrders, technicianName])
+
+  // Filter groups for Breakdowns using scopedWorkOrders
+  const criticalJobs = scopedWorkOrders.filter(w => w.priority === 'P1_CRITICAL' && !['CLOSED', 'VERIFIED'].includes(w.status))
+  const readyToRepairJobs = scopedWorkOrders.filter(w => ['ACKNOWLEDGED', 'ASSIGNED'].includes(w.status) && w.priority !== 'P1_CRITICAL')
+  const inProgressJobs = scopedWorkOrders.filter(w => ['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(w.status) && w.priority !== 'P1_CRITICAL')
+  const newRequests = scopedWorkOrders.filter(w => w.status === 'NEW' && w.priority !== 'P1_CRITICAL')
+  const recentlyCompleted = scopedWorkOrders.filter(w => ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(w.status)).slice(0, 5)
+  const activeBreakdownCount = scopedWorkOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
+  const totalFactoryBreakdownCount = workOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
 
   // Filter groups for PM Plans
   const currentMonthPMCount = pmPlans.filter(p => p.schedule_months?.includes('SEP') || p.frequency_type === 'Monthly').length
@@ -288,27 +322,30 @@ export default function TechnicianCockpitPage() {
     <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
 
-      {/* Technician Cockpit Header */}
+      {/* Technician Cockpit Header (Focused Execution View) */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-4 sm:p-5 rounded-3xl border border-stone-200 shadow-sm gap-3">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold text-lg">
-            🔧
+          <div className="w-12 h-12 rounded-2xl bg-amber-100 border border-amber-300 flex items-center justify-center text-amber-800 font-bold text-xl shrink-0">
+            📱
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-stone-900">Technician Mobile Cockpit</h2>
-              <span className="px-2 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-full">
-                พร้อมปฏิบัติงาน (Active)
+              <h2 className="text-lg font-black text-stone-900">ช่างซ่อมหน้างาน (Technician Mobile Cockpit)</h2>
+              <span className="px-2.5 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
+                สำหรับลงมือซ่อมจริง
               </span>
             </div>
-            <div className="text-xs text-stone-500 flex items-center gap-2 mt-0.5">
-              <span>ช่างประจำกะ:</span>
+            <div className="text-xs text-stone-500 flex flex-wrap items-center gap-2 mt-1">
+              <span className="font-bold text-stone-700">ช่างประจำกะ:</span>
               <input
                 type="text"
                 value={technicianName}
                 onChange={e => setTechnicianName(e.target.value)}
-                className="font-bold text-stone-800 bg-stone-100 px-2 py-0.5 rounded-lg border-none text-xs w-48"
+                className="font-bold text-stone-800 bg-stone-100 hover:bg-stone-200/80 px-2.5 py-1 rounded-xl border border-stone-200 text-xs w-48 transition focus:outline-none focus:ring-2 focus:ring-amber-500/20"
               />
+              <span className="text-[11px] text-stone-400">
+                (ระบบจะโฟกัสงานของ <span className="font-semibold text-stone-700">{technicianName.split(' ')[0]}</span> ให้อัตโนมัติ)
+              </span>
             </div>
           </div>
         </div>
@@ -318,7 +355,7 @@ export default function TechnicianCockpitPage() {
             onClick={loadJobs}
             variant="outline"
             size="sm"
-            className="text-xs border-stone-200 rounded-xl"
+            className="text-xs border-stone-200 rounded-xl h-10"
           >
             <RefreshCw className={`w-3.5 h-3.5 mr-1.5 ${isLoading ? 'animate-spin' : ''}`} />
             รีเฟรชงาน
@@ -326,9 +363,10 @@ export default function TechnicianCockpitPage() {
 
           <Link
             href="/maintenance/work-orders"
-            className="inline-flex items-center text-xs font-bold bg-stone-900 text-white hover:bg-stone-800 px-3.5 py-2 rounded-xl"
+            className="inline-flex items-center text-xs font-bold bg-stone-100 hover:bg-stone-200 text-stone-700 px-3.5 py-2.5 rounded-xl border border-stone-200 transition"
+            title="สำหรับหัวหน้างานดูภาพรวม 9 คอลัมน์ทั้งโรงงาน"
           >
-            เปิดบอร์ด Kanban เต็ม
+            <span>📊 ศูนย์ควบคุม (Kanban Hub)</span>
             <ArrowRight className="w-3.5 h-3.5 ml-1" />
           </Link>
         </div>
@@ -370,6 +408,46 @@ export default function TechnicianCockpitPage() {
           </span>
         </button>
       </div>
+
+      {/* Scope Selector: My Tasks vs All Factory Tasks */}
+      {activeGroupTab === 'breakdown' && (
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-white p-2.5 px-3.5 rounded-2xl border border-stone-200 text-xs gap-2 shadow-2xs">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider pl-1">ขอบเขตงาน:</span>
+            <button
+              onClick={() => setViewScope('MY_TASKS')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewScope === 'MY_TASKS'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              <span>🎯 งานของฉัน & งานด่วน</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-stone-950 font-black text-[10px]">
+                {myDirectAssignedCount} ที่รับผิดชอบ
+              </span>
+            </button>
+            <button
+              onClick={() => setViewScope('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                viewScope === 'ALL'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-100 border border-stone-200'
+              }`}
+            >
+              <span>🌐 ดูงานทั้งหมดในโรงงาน</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-stone-200 text-stone-800 text-[10px]">
+                {totalFactoryBreakdownCount}
+              </span>
+            </button>
+          </div>
+          <span className="text-[11px] text-stone-500 pr-1">
+            {viewScope === 'MY_TASKS' 
+              ? `โฟกัสเฉพาะงานที่มอบหมายให้ ${technicianName.split(' ')[0]} + งานฉุกเฉิน P1` 
+              : 'แสดงงานทุกใบของฝ่ายช่างทั้งหมดในโรงงาน'}
+          </span>
+        </div>
+      )}
 
       {/* GROUP 1: BREAKDOWN WORK ORDERS */}
       {activeGroupTab === 'breakdown' && (

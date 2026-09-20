@@ -413,13 +413,18 @@ export default function WorkOrdersKanbanPage() {
       {/* Control Toolbar */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-4 rounded-2xl border border-stone-200 shadow-sm">
         <div className="flex items-center gap-3 w-full md:w-auto">
-          <div className="w-10 h-10 rounded-xl bg-stone-900 text-[#D4AF37] flex items-center justify-center font-bold">
+          <div className="w-10 h-10 rounded-xl bg-purple-900 text-purple-200 flex items-center justify-center font-bold">
             <KanbanSquare className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-lg font-black text-stone-900">Work Order Command Center</h2>
-            <div className="text-xs text-stone-500">
-              กระดานติดตามสถานะงานซ่อมบำรุง 9 ขั้นตอน Real-Time
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-black text-stone-900">ศูนย์ควบคุมงานซ่อม (Kanban Hub)</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
+                สำหรับหัวหน้างาน & ฝ่ายผลิต
+              </span>
+            </div>
+            <div className="text-xs text-stone-500 mt-0.5">
+              หอบังคับการติดตาม Pipeline 9 ขั้นตอน Real-Time และกระจายงานให้ช่าง
             </div>
           </div>
         </div>
@@ -457,6 +462,14 @@ export default function WorkOrdersKanbanPage() {
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
           </Button>
+
+          <Link
+            href="/maintenance/technician"
+            className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs transition-colors"
+            title="สำหรับช่างประจำกะลงมือซ่อมจริง & จับเวลา"
+          >
+            <span>📱 ช่างหน้างาน (My Tasks)</span>
+          </Link>
 
           <Link
             href="/maintenance/report"
