@@ -396,8 +396,8 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
         <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
           ประเภทการแจ้งซ่อม (เลือก 1 กรณี):
         </label>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {/* Case 1: แจ้งซ่อมด่วน */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* Case 1: แจ้งซ่อมด่วน (สีแดง) */}
           <button
             type="button"
             onClick={() => {
@@ -407,22 +407,28 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
               setSymptom('เครื่องหยุดกลางงาน')
               setCustomSymptom('')
             }}
-            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative cursor-pointer ${
               repairType === 'EMERGENCY'
-                ? 'bg-red-50/80 border-red-500 ring-2 ring-red-400 text-red-950 shadow-sm'
-                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+                ? 'bg-red-600 border-red-700 text-white ring-4 ring-red-200 shadow-md shadow-red-600/20 scale-[1.02]'
+                : 'bg-red-50/80 border-red-300 hover:bg-red-100 hover:border-red-400 text-red-950'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-black text-xs sm:text-sm text-red-700">🚨 แจ้งซ่อมด่วน</span>
-              {repairType === 'EMERGENCY' && <CheckCircle2 className="w-4 h-4 text-red-600" />}
+              <span className={`font-black text-sm ${repairType === 'EMERGENCY' ? 'text-white' : 'text-red-700'}`}>
+                🚨 แจ้งซ่อมด่วน
+              </span>
+              {repairType === 'EMERGENCY' ? (
+                <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+              ) : (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-red-300 shrink-0" />
+              )}
             </div>
-            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+            <div className={`text-[11px] mt-1.5 font-medium leading-tight ${repairType === 'EMERGENCY' ? 'text-red-100' : 'text-red-900/80'}`}>
               กระทบกับการผลิต (เครื่องหยุด / สายชะงัก)
             </div>
           </button>
 
-          {/* Case 2: แจ้งซ่อมทั่วไป */}
+          {/* Case 2: แจ้งซ่อมทั่วไป (สีน้ำเงิน) */}
           <button
             type="button"
             onClick={() => {
@@ -432,22 +438,28 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
               setSymptom('เสียงผิดปกติ')
               setCustomSymptom('')
             }}
-            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative cursor-pointer ${
               repairType === 'GENERAL'
-                ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-400 text-blue-950 shadow-sm'
-                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+                ? 'bg-blue-600 border-blue-700 text-white ring-4 ring-blue-200 shadow-md shadow-blue-600/20 scale-[1.02]'
+                : 'bg-blue-50/80 border-blue-300 hover:bg-blue-100 hover:border-blue-400 text-blue-950'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-black text-xs sm:text-sm text-blue-700">🛠️ แจ้งซ่อมทั่วไป</span>
-              {repairType === 'GENERAL' && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+              <span className={`font-black text-sm ${repairType === 'GENERAL' ? 'text-white' : 'text-blue-700'}`}>
+                🛠️ แจ้งซ่อมทั่วไป
+              </span>
+              {repairType === 'GENERAL' ? (
+                <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+              ) : (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-blue-300 shrink-0" />
+              )}
             </div>
-            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+            <div className={`text-[11px] mt-1.5 font-medium leading-tight ${repairType === 'GENERAL' ? 'text-blue-100' : 'text-blue-900/80'}`}>
               ไม่กระทบกับการผลิต (เครื่องยังเดินต่อได้)
             </div>
           </button>
 
-          {/* Case 3: แจ้งซ่อมบริการ */}
+          {/* Case 3: แจ้งซ่อมบริการ (สีม่วง) */}
           <button
             type="button"
             onClick={() => {
@@ -457,17 +469,23 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
               setSymptom('💡 เปลี่ยนหลอดไฟ / แสงสว่าง' as any)
               setCustomSymptom('')
             }}
-            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+            className={`p-4 rounded-2xl border-2 text-left transition-all relative cursor-pointer ${
               repairType === 'SERVICE'
-                ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-400 text-purple-950 shadow-sm'
-                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+                ? 'bg-purple-600 border-purple-700 text-white ring-4 ring-purple-200 shadow-md shadow-purple-600/20 scale-[1.02]'
+                : 'bg-purple-50/80 border-purple-300 hover:bg-purple-100 hover:border-purple-400 text-purple-950'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="font-black text-xs sm:text-sm text-purple-700">💡 แจ้งซ่อมบริการ</span>
-              {repairType === 'SERVICE' && <CheckCircle2 className="w-4 h-4 text-purple-600" />}
+              <span className={`font-black text-sm ${repairType === 'SERVICE' ? 'text-white' : 'text-purple-700'}`}>
+                💡 แจ้งซ่อมบริการ
+              </span>
+              {repairType === 'SERVICE' ? (
+                <CheckCircle2 className="w-4 h-4 text-white shrink-0" />
+              ) : (
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-purple-300 shrink-0" />
+              )}
             </div>
-            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+            <div className={`text-[11px] mt-1.5 font-medium leading-tight ${repairType === 'SERVICE' ? 'text-purple-100' : 'text-purple-900/80'}`}>
               งานบริการอาคาร (เปลี่ยนหลอดไฟ, แอร์, ประปา)
             </div>
           </button>
@@ -892,14 +910,26 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
       <Button
         type="submit"
         disabled={isSubmitting}
-        className="w-full h-14 rounded-2xl text-base font-extrabold bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-xl shadow-red-900/30 flex items-center justify-center gap-2 transition-all transform active:scale-98"
+        className={`w-full h-14 rounded-2xl text-base font-extrabold text-white shadow-xl flex items-center justify-center gap-2 transition-all transform active:scale-98 cursor-pointer ${
+          repairType === 'EMERGENCY'
+            ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-900/30'
+            : repairType === 'GENERAL'
+            ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/30'
+            : 'bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 shadow-purple-900/30'
+        }`}
       >
         {isSubmitting ? (
           <span>กำลังส่งข้อมูล...</span>
         ) : (
           <>
             <Send className="w-5 h-5" />
-            <span>ยืนยันการแจ้งซ่อมทันที (SUBMIT TICKET)</span>
+            <span>
+              {repairType === 'SERVICE'
+                ? 'ยืนยันแจ้งซ่อมบริการ (SUBMIT SERVICE)'
+                : repairType === 'GENERAL'
+                ? 'ยืนยันแจ้งซ่อมทั่วไป (SUBMIT TICKET)'
+                : 'ยืนยันแจ้งซ่อมด่วนทันที (BREAKDOWN NOW)'}
+            </span>
           </>
         )}
       </Button>
