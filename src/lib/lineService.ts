@@ -428,8 +428,158 @@ export function buildBreakdownFlexMessage(params: {
   }
 }
 
+interface StatusVisualConfig {
+  headerBg: string
+  headerTitle: string
+  subText: string
+  icon: string
+  badgeBg: string
+  badgeText: string
+  label: string
+  stepIndex: number // 1 to 5
+  stepLabel: string
+}
+
+export function getStatusVisualConfig(status: string): StatusVisualConfig {
+  switch (status) {
+    case 'NEW':
+      return {
+        headerBg: '#DC2626', // Red
+        headerTitle: '🚨 แจ้งซ่อมใหม่ (New)',
+        subText: 'รอช่างซ่อมรับเรื่องเข้าระบบ',
+        icon: '🚨',
+        badgeBg: '#FEF2F2',
+        badgeText: '#B91C1C',
+        label: 'แจ้งซ่อมใหม่ (New)',
+        stepIndex: 1,
+        stepLabel: 'ขั้นที่ 1/5: แจ้งซ่อม'
+      }
+    case 'ACKNOWLEDGED':
+      return {
+        headerBg: '#D97706', // Amber
+        headerTitle: '🔔 ช่างรับเรื่องแล้ว (Acknowledged)',
+        subText: 'ช่างรับงานเข้าระบบแล้ว กำลังเตรียมพร้อมลงหน้างาน',
+        icon: '🔔',
+        badgeBg: '#FFFBEB',
+        badgeText: '#B45309',
+        label: 'ช่างรับเรื่องแล้ว (Acknowledged)',
+        stepIndex: 2,
+        stepLabel: 'ขั้นที่ 2/5: รับเรื่อง'
+      }
+    case 'ASSIGNED':
+      return {
+        headerBg: '#0284C7', // Sky Blue
+        headerTitle: '👷 มอบหมายช่างแล้ว (Assigned)',
+        subText: 'กำหนดช่างผู้รับผิดชอบงานซ่อมเรียบร้อย',
+        icon: '👷',
+        badgeBg: '#F0F9FF',
+        badgeText: '#0369A1',
+        label: 'ช่างรับมอบหมายงานแล้ว (Assigned)',
+        stepIndex: 2,
+        stepLabel: 'ขั้นที่ 2/5: มอบหมายช่าง'
+      }
+    case 'IN_PROGRESS':
+      return {
+        headerBg: '#EA580C', // Safety Orange
+        headerTitle: '⚡ กำลังดำเนินการซ่อม (In Progress)',
+        subText: 'ช่างเริ่มลงมือซ่อมหน้างาน & กำลังจับเวลา Downtime',
+        icon: '⚡',
+        badgeBg: '#FFF7ED',
+        badgeText: '#C2410C',
+        label: 'กำลังดำเนินการซ่อม (In Progress)',
+        stepIndex: 3,
+        stepLabel: 'ขั้นที่ 3/5: กำลังซ่อม'
+      }
+    case 'WAITING_PART':
+    case 'PENDING_PARTS':
+      return {
+        headerBg: '#E11D48', // Rose Crimson
+        headerTitle: '📦 พักการซ่อม: รออะไหล่ (Waiting Part)',
+        subText: 'พักการซ่อมชั่วคราว รอเบิกอะไหล่หรือเปิด PR ขอซื้อ',
+        icon: '📦',
+        badgeBg: '#FFF1F2',
+        badgeText: '#BE123C',
+        label: 'อยู่ระหว่างรออะไหล่ (Waiting Part)',
+        stepIndex: 3,
+        stepLabel: 'ขั้นที่ 3/5: พักรออะไหล่'
+      }
+    case 'WAITING_EXTERNAL':
+      return {
+        headerBg: '#9333EA', // Purple
+        headerTitle: '🏢 รอช่างภายนอก (Waiting Outsource)',
+        subText: 'ประสานงานผู้เชี่ยวชาญหรือซัพพลายเออร์ภายนอก',
+        icon: '🏢',
+        badgeBg: '#FAF5FF',
+        badgeText: '#7E22CE',
+        label: 'รอช่างภายนอก (Waiting Outsource)',
+        stepIndex: 3,
+        stepLabel: 'ขั้นที่ 3/5: รอช่างภายนอก'
+      }
+    case 'TEST_RUN':
+      return {
+        headerBg: '#6366F1', // Indigo
+        headerTitle: '▶️ ขอทดสอบเดินเครื่อง (Test Run)',
+        subText: 'ซ่อมเบื้องต้นเสร็จ ส่งต่อฝ่ายผลิตทดลองรันเครื่อง',
+        icon: '▶️',
+        badgeBg: '#EEF2FF',
+        badgeText: '#4338CA',
+        label: 'อยู่ระหว่างทดสอบเดินเครื่อง (Test Run)',
+        stepIndex: 3,
+        stepLabel: 'ขั้นที่ 3/5: ทดสอบเดินเครื่อง'
+      }
+    case 'COMPLETED':
+      return {
+        headerBg: '#059669', // Emerald Green
+        headerTitle: '✨ ซ่อมเสร็จสิ้นแล้ว (Completed)',
+        subText: 'ช่างซ่อมเสร็จสิ้นสมบูรณ์ รอผู้แจ้งซ่อมตรวจรับมอบงาน',
+        icon: '✨',
+        badgeBg: '#ECFDF5',
+        badgeText: '#047857',
+        label: 'ช่างซ่อมเสร็จสิ้น (Completed)',
+        stepIndex: 4,
+        stepLabel: 'ขั้นที่ 4/5: รอตรวจรับ'
+      }
+    case 'VERIFIED':
+      return {
+        headerBg: '#0D9488', // Teal
+        headerTitle: '✅ ผู้แจ้งตรวจรับแล้ว (Verified)',
+        subText: 'ฝ่ายผลิตทดสอบเครื่องผ่าน 100% พร้อมให้หัวหน้าช่างปิดงาน',
+        icon: '✅',
+        badgeBg: '#F0FDFA',
+        badgeText: '#0F766E',
+        label: 'ผู้แจ้งซ่อมตรวจรับแล้ว (Verified)',
+        stepIndex: 4,
+        stepLabel: 'ขั้นที่ 4/5: ตรวจรับผ่านแล้ว'
+      }
+    case 'CLOSED':
+      return {
+        headerBg: '#1C1917', // Stone Black
+        headerTitle: '🛡️ ปิดงานซ่อมสมบูรณ์ (Closed)',
+        subText: 'หัวหน้าฝ่ายซ่อมบำรุงปิดงานและบันทึกประวัติ DCC เรียบร้อย',
+        icon: '🛡️',
+        badgeBg: '#F5F5F4',
+        badgeText: '#292524',
+        label: 'ปิดงานสมบูรณ์ (Closed)',
+        stepIndex: 5,
+        stepLabel: 'ขั้นที่ 5/5: ปิดงานสมบูรณ์'
+      }
+    default:
+      return {
+        headerBg: '#2563EB',
+        headerTitle: '🔧 อัปเดตสถานะงานซ่อม',
+        subText: 'มีความคืบหน้าของงานซ่อมบำรุง',
+        icon: '🔧',
+        badgeBg: '#EFF6FF',
+        badgeText: '#1D4ED8',
+        label: status,
+        stepIndex: 2,
+        stepLabel: status
+      }
+  }
+}
+
 /**
- * ⚙️ Flex Message Generator: Work Order Status Transition (Assigned / In-Progress)
+ * ⚙️ Flex Message Generator: Work Order Status Transition with Visual Control & Progress Timeline
  */
 export function buildWorkOrderStatusFlexMessage(params: {
   woNumber: string
@@ -444,15 +594,53 @@ export function buildWorkOrderStatusFlexMessage(params: {
   const baseUrl = params.appBaseUrl || getAppBaseUrl()
   const techUrl = `${baseUrl}/maintenance/technician`
   const { dateStr, timeStr } = formatThaiDateTime(params.changedAt)
+  const config = getStatusVisualConfig(params.toStatus)
 
-  const statusLabel = 
-    params.toStatus === 'IN_PROGRESS' ? 'กำลังดำเนินการซ่อม (In Progress)' :
-    params.toStatus === 'ASSIGNED' ? 'ช่างรับมอบหมายงานแล้ว (Assigned)' :
-    params.toStatus === 'PENDING_PARTS' ? 'รอเบิกอะไหล่ (Pending Parts)' :
-    params.toStatus === 'ACKNOWLEDGED' ? 'ช่างรับเรื่องแล้ว (Acknowledged)' :
-    params.toStatus === 'COMPLETED' ? 'ซ่อมเสร็จสิ้น (Completed)' :
-    params.toStatus === 'VERIFIED' ? 'ผู้แจ้งซ่อมตรวจรับแล้ว (Verified)' :
-    params.toStatus
+  // 5 Steps Workflow: แจ้ง -> รับงาน -> ซ่อม -> ตรวจรับ -> ปิดงาน
+  const workflowSteps = [
+    { num: 1, label: 'แจ้ง' },
+    { num: 2, label: 'รับงาน' },
+    { num: 3, label: 'ซ่อม' },
+    { num: 4, label: 'ตรวจรับ' },
+    { num: 5, label: 'ปิดงาน' }
+  ]
+
+  const stepperContents: any[] = []
+  workflowSteps.forEach((step, idx) => {
+    const isPassed = step.num < config.stepIndex
+    const isCurrent = step.num === config.stepIndex
+
+    stepperContents.push({
+      type: 'box',
+      layout: 'vertical',
+      backgroundColor: isCurrent ? config.headerBg : isPassed ? '#E2E8F0' : '#F8FAFC',
+      cornerRadius: 'sm',
+      paddingAll: '4px',
+      alignItems: 'center',
+      flex: 3,
+      contents: [
+        {
+          type: 'text',
+          text: (isPassed ? '✓ ' : isCurrent ? '● ' : '○ ') + step.label,
+          size: 'xxs',
+          color: isCurrent ? '#FFFFFF' : isPassed ? '#1E293B' : '#94A3B8',
+          weight: isCurrent ? 'bold' : 'regular',
+          align: 'center'
+        }
+      ]
+    })
+
+    if (idx < workflowSteps.length - 1) {
+      stepperContents.push({
+        type: 'text',
+        text: '›',
+        size: 'xs',
+        color: '#CBD5E1',
+        flex: 1,
+        align: 'center'
+      })
+    }
+  })
 
   return {
     type: 'bubble',
@@ -460,16 +648,23 @@ export function buildWorkOrderStatusFlexMessage(params: {
     header: {
       type: 'box',
       layout: 'vertical',
-      backgroundColor: '#2563EB',
+      backgroundColor: config.headerBg,
       paddingAll: '14px',
       contents: [
         {
           type: 'box',
           layout: 'horizontal',
           contents: [
-            { type: 'text', text: '🔧 อัปเดตสถานะงานซ่อม', weight: 'bold', color: '#FFFFFF', size: 'sm' },
-            { type: 'text', text: params.woNumber, color: '#93C5FD', size: 'xs', align: 'end' }
+            { type: 'text', text: config.headerTitle, weight: 'bold', color: '#FFFFFF', size: 'sm', flex: 7 },
+            { type: 'text', text: params.woNumber, color: '#FFFFFF', size: 'xs', align: 'end', weight: 'bold', flex: 4 }
           ]
+        },
+        {
+          type: 'text',
+          text: config.subText,
+          color: '#FFFFFF',
+          size: 'xxs',
+          margin: 'xs'
         }
       ]
     },
@@ -487,19 +682,52 @@ export function buildWorkOrderStatusFlexMessage(params: {
           color: '#0F172A',
           wrap: true
         },
+
+        // 📊 Visual Timeline: Past -> Present Stepper
         {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#EFF6FF',
+          backgroundColor: '#F8FAFC',
+          paddingAll: '10px',
+          cornerRadius: 'md',
+          borderColor: '#E2E8F0',
+          borderWidth: '1px',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: '📈 ลำดับขั้นตอน (Workflow Timeline):', size: 'xxs', color: '#64748B', weight: 'bold' },
+                { type: 'text', text: config.stepLabel, size: 'xxs', color: config.badgeText, weight: 'bold', align: 'end' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'sm',
+              alignItems: 'center',
+              contents: stepperContents
+            }
+          ]
+        },
+
+        // Status Details Box with Distinct Visual Control
+        {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: config.badgeBg,
+          borderColor: config.headerBg,
+          borderWidth: '1px',
           paddingAll: '10px',
           cornerRadius: 'md',
           contents: [
             {
-              type: 'text',
-              text: `สถานะปัจจุบัน: ${statusLabel}`,
-              weight: 'bold',
-              color: '#1D4ED8',
-              size: 'xs'
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: `${config.icon} สถานะปัจจุบัน:`, size: 'xs', color: config.badgeText, weight: 'bold', flex: 4 },
+                { type: 'text', text: config.label, weight: 'bold', color: config.badgeText, size: 'xs', wrap: true, flex: 6 }
+              ]
             },
             {
               type: 'text',
@@ -511,7 +739,7 @@ export function buildWorkOrderStatusFlexMessage(params: {
             ...(params.notes ? [{
               type: 'text',
               text: `บันทึก: ${params.notes}`,
-              color: '#64748B',
+              color: '#334155',
               size: 'xs',
               wrap: true,
               margin: 'xs'
@@ -562,22 +790,22 @@ export function buildWorkOrderClosedFlexMessage(params: {
     header: {
       type: 'box',
       layout: 'vertical',
-      backgroundColor: '#059669',
+      backgroundColor: '#1C1917',
       paddingAll: '14px',
       contents: [
         {
           type: 'box',
           layout: 'horizontal',
           contents: [
-            { type: 'text', text: '✅ เครื่องจักรซ่อมเสร็จสิ้น', weight: 'bold', color: '#FFFFFF', size: 'sm' },
-            { type: 'text', text: params.woNumber, color: '#A7F3D0', size: 'xs', align: 'end' }
+            { type: 'text', text: '🛡️ ปิดงานซ่อมสมบูรณ์ (Closed)', weight: 'bold', color: '#FFFFFF', size: 'sm', flex: 7 },
+            { type: 'text', text: params.woNumber, color: '#D4AF37', size: 'xs', align: 'end', weight: 'bold', flex: 4 }
           ]
         },
         {
           type: 'text',
-          text: 'เครื่องพร้อมเดินระบบการผลิตแล้ว (Ready to Run)',
-          color: '#D1FAE5',
-          size: 'xs',
+          text: 'เครื่องจักรพร้อมเดินสายผลิต 100% & บันทึกเข้าประวัติ DCC แล้ว',
+          color: '#E2E8F0',
+          size: 'xxs',
           margin: 'xs'
         }
       ]
@@ -596,10 +824,66 @@ export function buildWorkOrderClosedFlexMessage(params: {
           color: '#0F172A',
           wrap: true
         },
+
+        // 📊 Visual Timeline: All 5 Steps Completed
         {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#ECFDF5',
+          backgroundColor: '#F8FAFC',
+          paddingAll: '10px',
+          cornerRadius: 'md',
+          borderColor: '#E2E8F0',
+          borderWidth: '1px',
+          contents: [
+            {
+              type: 'box',
+              layout: 'horizontal',
+              contents: [
+                { type: 'text', text: '📈 ลำดับขั้นตอน (Workflow Timeline):', size: 'xxs', color: '#64748B', weight: 'bold' },
+                { type: 'text', text: 'ขั้นที่ 5/5: ปิดงานสมบูรณ์ 100%', size: 'xxs', color: '#15803D', weight: 'bold', align: 'end' }
+              ]
+            },
+            {
+              type: 'box',
+              layout: 'horizontal',
+              margin: 'sm',
+              alignItems: 'center',
+              contents: [
+                {
+                  type: 'box', layout: 'vertical', backgroundColor: '#E2E8F0', cornerRadius: 'sm', paddingAll: '4px', alignItems: 'center', flex: 3,
+                  contents: [{ type: 'text', text: '✓ แจ้ง', size: 'xxs', color: '#1E293B', align: 'center' }]
+                },
+                { type: 'text', text: '›', size: 'xs', color: '#CBD5E1', flex: 1, align: 'center' },
+                {
+                  type: 'box', layout: 'vertical', backgroundColor: '#E2E8F0', cornerRadius: 'sm', paddingAll: '4px', alignItems: 'center', flex: 3,
+                  contents: [{ type: 'text', text: '✓ รับงาน', size: 'xxs', color: '#1E293B', align: 'center' }]
+                },
+                { type: 'text', text: '›', size: 'xs', color: '#CBD5E1', flex: 1, align: 'center' },
+                {
+                  type: 'box', layout: 'vertical', backgroundColor: '#E2E8F0', cornerRadius: 'sm', paddingAll: '4px', alignItems: 'center', flex: 3,
+                  contents: [{ type: 'text', text: '✓ ซ่อม', size: 'xxs', color: '#1E293B', align: 'center' }]
+                },
+                { type: 'text', text: '›', size: 'xs', color: '#CBD5E1', flex: 1, align: 'center' },
+                {
+                  type: 'box', layout: 'vertical', backgroundColor: '#E2E8F0', cornerRadius: 'sm', paddingAll: '4px', alignItems: 'center', flex: 3,
+                  contents: [{ type: 'text', text: '✓ ตรวจรับ', size: 'xxs', color: '#1E293B', align: 'center' }]
+                },
+                { type: 'text', text: '›', size: 'xs', color: '#CBD5E1', flex: 1, align: 'center' },
+                {
+                  type: 'box', layout: 'vertical', backgroundColor: '#1C1917', cornerRadius: 'sm', paddingAll: '4px', alignItems: 'center', flex: 3,
+                  contents: [{ type: 'text', text: '● ปิดงาน', size: 'xxs', color: '#D4AF37', weight: 'bold', align: 'center' }]
+                }
+              ]
+            }
+          ]
+        },
+
+        {
+          type: 'box',
+          layout: 'vertical',
+          backgroundColor: '#F5F5F4',
+          borderColor: '#1C1917',
+          borderWidth: '1px',
           paddingAll: '10px',
           cornerRadius: 'md',
           contents: [
@@ -607,7 +891,7 @@ export function buildWorkOrderClosedFlexMessage(params: {
               type: 'text',
               text: `ช่างผู้ซ่อม: ${params.technicianName} (${dateStr} ${timeStr})`,
               weight: 'bold',
-              color: '#047857',
+              color: '#1C1917',
               size: 'xs'
             },
             {

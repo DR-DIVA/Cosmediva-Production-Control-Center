@@ -580,9 +580,32 @@ export default function WorkOrdersKanbanPage() {
                       ไม่มีงานในขั้นตอนนี้
                     </div>
                   ) : (
-                      colJobs.map(wo => {
-                        const isCritical = wo.priority === 'P1_CRITICAL'
+                    colJobs.map(wo => {
+                      const isCritical = wo.priority === 'P1_CRITICAL'
                         const isTimeExpanded = showAllTimes || expandedTimeCardIds.has(wo.id)
+                        
+                        const statusTopBorder = 
+                          wo.status === 'NEW' ? 'border-t-4 border-t-rose-500' :
+                          wo.status === 'ACKNOWLEDGED' ? 'border-t-4 border-t-amber-500' :
+                          wo.status === 'ASSIGNED' ? 'border-t-4 border-t-sky-500' :
+                          wo.status === 'IN_PROGRESS' ? 'border-t-4 border-t-orange-500' :
+                          wo.status === 'WAITING_PART' ? 'border-t-4 border-t-rose-600' :
+                          wo.status === 'TEST_RUN' ? 'border-t-4 border-t-indigo-500' :
+                          wo.status === 'COMPLETED' ? 'border-t-4 border-t-emerald-500' :
+                          wo.status === 'VERIFIED' ? 'border-t-4 border-t-teal-500' :
+                          wo.status === 'CLOSED' ? 'border-t-4 border-t-stone-800' :
+                          'border-t-4 border-t-stone-300'
+
+                        const statusIcon = 
+                          wo.status === 'NEW' ? '🚨' :
+                          wo.status === 'ACKNOWLEDGED' ? '🔔' :
+                          wo.status === 'ASSIGNED' ? '👷' :
+                          wo.status === 'IN_PROGRESS' ? '⚡' :
+                          wo.status === 'WAITING_PART' ? '📦' :
+                          wo.status === 'TEST_RUN' ? '▶️' :
+                          wo.status === 'COMPLETED' ? '✨' :
+                          wo.status === 'VERIFIED' ? '✅' :
+                          wo.status === 'CLOSED' ? '🛡️' : '🔧'
 
                         return (
                           <div
@@ -596,21 +619,24 @@ export default function WorkOrdersKanbanPage() {
                                 !FACTORY_TECHNICIANS.some(t => t.startsWith(currentTech))
                               )
                             }}
-                            className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${
+                            className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${statusTopBorder} ${
                               isCritical
                                 ? 'border-red-500 ring-2 ring-red-500/20'
                                 : 'border-stone-200 hover:border-[#D4AF37]'
                             }`}
                           >
-                            {/* Priority badge & WO Number */}
+                            {/* Priority badge & WO Number with Visual Status Icon */}
                             <div className="flex items-center justify-between">
-                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
-                                isCritical ? 'bg-red-600 text-white animate-pulse' :
-                                wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' :
-                                'bg-stone-100 text-stone-600'
-                              }`}>
-                                {wo.priority}
-                              </span>
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs" title={wo.status}>{statusIcon}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black ${
+                                  isCritical ? 'bg-red-600 text-white animate-pulse' :
+                                  wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-stone-100 text-stone-600'
+                                }`}>
+                                  {wo.priority}
+                                </span>
+                              </div>
                               <span className="font-mono text-[10px] text-stone-400 font-bold">{wo.wo_number}</span>
                             </div>
 
@@ -724,6 +750,26 @@ export default function WorkOrdersKanbanPage() {
                                       {wo.repair_started_at && (
                                         <span className="text-emerald-950 font-black ml-0.5">
                                           (+{Math.max(0, Math.round((new Date(wo.repair_completed_at).getTime() - new Date(wo.repair_started_at).getTime()) / 60000))}น.)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {wo.verified_at && (
+                                    <span className="bg-teal-50 text-teal-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                      5.ตรวจ: {new Date(wo.verified_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                      {wo.repair_completed_at && (
+                                        <span className="text-teal-950 font-black ml-0.5">
+                                          (+{Math.max(0, Math.round((new Date(wo.verified_at).getTime() - new Date(wo.repair_completed_at).getTime()) / 60000))}น.)
+                                        </span>
+                                      )}
+                                    </span>
+                                  )}
+                                  {wo.closed_at && (
+                                    <span className="bg-stone-100 text-stone-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                                      6.ปิด: {new Date(wo.closed_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
+                                      {wo.verified_at && (
+                                        <span className="text-stone-950 font-black ml-0.5">
+                                          (+{Math.max(0, Math.round((new Date(wo.closed_at).getTime() - new Date(wo.verified_at).getTime()) / 60000))}น.)
                                         </span>
                                       )}
                                     </span>
