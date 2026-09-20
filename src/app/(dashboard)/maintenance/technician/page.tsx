@@ -528,21 +528,6 @@ export default function TechnicianCockpitPage() {
             </button>
 
             <button
-              onClick={() => setBreakdownFilter('READY')}
-              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
-                breakdownFilter === 'READY'
-                  ? 'bg-emerald-700 text-white shadow-xs'
-                  : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200'
-              }`}
-            >
-              <Play className="w-3 h-3 fill-current" />
-              <span>⚡ พร้อมเริ่มซ่อม (Start Repair)</span>
-              <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
-                {readyToRepairJobs.length}
-              </span>
-            </button>
-
-            <button
               onClick={() => setBreakdownFilter('IN_PROGRESS')}
               className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
                 breakdownFilter === 'IN_PROGRESS'
@@ -551,9 +536,24 @@ export default function TechnicianCockpitPage() {
               }`}
             >
               <Wrench className="w-3 h-3" />
-              <span>กำลังซ่อมบำรุง</span>
+              <span>⚡ กำลังซ่อม & รออะไหล่</span>
               <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px]">
                 {inProgressJobs.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBreakdownFilter('READY')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                breakdownFilter === 'READY'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200'
+              }`}
+            >
+              <Play className="w-3 h-3 fill-current" />
+              <span>📋 คิวรอเริ่มซ่อม</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
+                {readyToRepairJobs.length}
               </span>
             </button>
 
@@ -566,7 +566,7 @@ export default function TechnicianCockpitPage() {
               }`}
             >
               <Clock className="w-3 h-3" />
-              <span>งานแจ้งใหม่</span>
+              <span>📥 งานแจ้งใหม่</span>
               <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 text-[10px]">
                 {newRequests.length}
               </span>
@@ -723,75 +723,7 @@ export default function TechnicianCockpitPage() {
             </div>
           )}
 
-          {/* 2. READY TO REPAIR (ช่างรับเรื่องแล้ว / มอบหมายแล้ว พร้อมลงมือซ่อม) */}
-          {(breakdownFilter === 'ALL' || breakdownFilter === 'READY') && (
-            <div className="space-y-3">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
-                <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" />
-                  งานที่รับเรื่องแล้ว พร้อมลงมือซ่อม (Ready to Repair) ({readyToRepairJobs.length})
-                </h3>
-                <span className="text-xs text-stone-500">
-                  ช่างเดินถึงหน้าเครื่องจักรแล้ว กดปุ่มเพื่อเริ่มซ่อมและจับเวลาทันที
-                </span>
-              </div>
-
-              {readyToRepairJobs.length === 0 ? (
-                <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
-                  ไม่มีงานที่รอเริ่มซ่อมในขณะนี้
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {readyToRepairJobs.map(wo => (
-                    <div
-                      key={wo.id}
-                      className="bg-white border-2 border-emerald-500/40 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between hover:shadow-md transition-shadow"
-                    >
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
-                          <div className="flex items-center gap-1.5">
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
-                              {formatWorkOrderStatus(wo.status)}
-                            </span>
-                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                              wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-700'
-                            }`}>
-                              {wo.priority}
-                            </span>
-                          </div>
-                        </div>
-
-                        <h4 className="text-sm font-bold text-stone-900 mt-2">{wo.machine_code} - {wo.machine_name}</h4>
-                        <div className="text-xs text-stone-600 font-medium mt-1">{wo.symptom_category}</div>
-                        {wo.symptom_description && (
-                          <p className="text-[11px] text-stone-500 mt-1 line-clamp-2 bg-stone-50 p-2 rounded-xl border border-stone-100">
-                            {wo.symptom_description}
-                          </p>
-                        )}
-                        <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between">
-                          <span>ผู้แจ้ง: {wo.requester_name}</span>
-                          {wo.assigned_technician_name && (
-                            <span className="font-bold text-blue-700">ช่าง: {wo.assigned_technician_name}</span>
-                          )}
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => handleStartRepair(wo)}
-                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl h-11 shadow-md shadow-emerald-900/10 flex items-center justify-center gap-2"
-                      >
-                        <Play className="w-4 h-4 fill-white" />
-                        START REPAIR (เริ่มซ่อม & จับเวลา)
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* 3. IN PROGRESS / WAITING PART (กำลังดำเนินการซ่อมบำรุง) */}
+          {/* 2. IN PROGRESS / WAITING PART (กำลังดำเนินการซ่อมบำรุง) */}
           {(breakdownFilter === 'ALL' || breakdownFilter === 'IN_PROGRESS') && (
             <div className="space-y-3">
               <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
@@ -954,6 +886,74 @@ export default function TechnicianCockpitPage() {
                           </div>
                         )}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. READY TO REPAIR (คิวงานที่พร้อมลงมือซ่อม - รับเรื่องแล้ว/มอบหมายแล้ว) */}
+          {(breakdownFilter === 'ALL' || breakdownFilter === 'READY') && (
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                  คิวงานถัดไปที่พร้อมลงมือซ่อม (Next in Queue - Ready to Repair) ({readyToRepairJobs.length})
+                </h3>
+                <span className="text-xs text-stone-500">
+                  งานที่รับเรื่องแล้ว — เมื่อช่างเดินถึงหน้าเครื่อง กดปุ่มเพื่อเริ่มซ่อมและจับเวลาจริง
+                </span>
+              </div>
+
+              {readyToRepairJobs.length === 0 ? (
+                <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                  ไม่มีงานที่รอเริ่มซ่อมในขณะนี้
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {readyToRepairJobs.map(wo => (
+                    <div
+                      key={wo.id}
+                      className="bg-white border-2 border-emerald-500/40 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between hover:shadow-md transition-shadow"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                              {formatWorkOrderStatus(wo.status)}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-700'
+                            }`}>
+                              {wo.priority}
+                            </span>
+                          </div>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-stone-900 mt-2">{wo.machine_code} - {wo.machine_name}</h4>
+                        <div className="text-xs text-stone-600 font-medium mt-1">{wo.symptom_category}</div>
+                        {wo.symptom_description && (
+                          <p className="text-[11px] text-stone-500 mt-1 line-clamp-2 bg-stone-50 p-2 rounded-xl border border-stone-100">
+                            {wo.symptom_description}
+                          </p>
+                        )}
+                        <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between">
+                          <span>ผู้แจ้ง: {wo.requester_name}</span>
+                          {wo.assigned_technician_name && (
+                            <span className="font-bold text-blue-700">ช่าง: {wo.assigned_technician_name}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => handleStartRepair(wo)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl h-11 shadow-md shadow-emerald-900/10 flex items-center justify-center gap-2"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        START REPAIR (เริ่มซ่อม & จับเวลา)
+                      </Button>
                     </div>
                   ))}
                 </div>
