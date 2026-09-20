@@ -69,7 +69,7 @@ export default function ProductionVerifyModal({
             <ShieldCheck className="w-5 h-5" />
           </div>
           <DialogTitle className="text-lg font-bold text-stone-900">
-            ฝ่ายผลิตยืนยันผลการซ่อม (Production Sign-Off)
+            ผู้แจ้งซ่อมตรวจรับผลงาน (Verification Sign-Off)
           </DialogTitle>
           <DialogDescription className="text-xs text-stone-500">
             เครื่อง {machineCode} - {machineName}

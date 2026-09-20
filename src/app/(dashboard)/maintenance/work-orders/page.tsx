@@ -34,7 +34,7 @@ const KANBAN_COLUMNS: { id: WorkOrderStatus; title: string; color: string; badge
   { id: 'WAITING_PART', title: 'รออะไหล่ (Waiting Part)', color: 'border-t-orange-500', badge: 'bg-orange-100 text-orange-800' },
   { id: 'TEST_RUN', title: 'ทดสอบเครื่อง (Test Run)', color: 'border-t-purple-500', badge: 'bg-purple-100 text-purple-800' },
   { id: 'COMPLETED', title: 'ช่างซ่อมเสร็จ (Completed)', color: 'border-t-emerald-500', badge: 'bg-emerald-100 text-emerald-800' },
-  { id: 'VERIFIED', title: 'ผลิตยืนยัน (Verified)', color: 'border-t-teal-500', badge: 'bg-teal-100 text-teal-800' },
+  { id: 'VERIFIED', title: 'ผู้แจ้งตรวจรับ (Verified)', color: 'border-t-teal-500', badge: 'bg-teal-100 text-teal-800' },
   { id: 'CLOSED', title: 'ปิดงาน (Closed)', color: 'border-t-stone-500', badge: 'bg-stone-100 text-stone-800' }
 ]
 

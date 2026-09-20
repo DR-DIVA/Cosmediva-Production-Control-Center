@@ -35,7 +35,7 @@ export const WORK_ORDER_STATUS_MAP: Record<string, { label: string; color: strin
   WAITING_EXTERNAL: { label: 'รอช่างภายนอก', color: 'text-purple-800', badge: 'bg-purple-100 text-purple-900 border-purple-300' },
   TEST_RUN: { label: 'ทดสอบเดินเครื่อง', color: 'text-indigo-800', badge: 'bg-indigo-100 text-indigo-900 border-indigo-300' },
   COMPLETED: { label: 'ซ่อมเสร็จสิ้น', color: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
-  VERIFIED: { label: 'ฝ่ายผลิตตรวจรับแล้ว', color: 'text-teal-800', badge: 'bg-teal-100 text-teal-900 border-teal-300' },
+  VERIFIED: { label: 'ผู้แจ้งซ่อมตรวจรับแล้ว', color: 'text-teal-800', badge: 'bg-teal-100 text-teal-900 border-teal-300' },
   CLOSED: { label: 'ปิดงานสมบูรณ์', color: 'text-stone-800', badge: 'bg-stone-100 text-stone-900 border-stone-300' },
   CANCELLED: { label: 'ยกเลิก', color: 'text-stone-500', badge: 'bg-stone-100 text-stone-600 border-stone-200' }
 }

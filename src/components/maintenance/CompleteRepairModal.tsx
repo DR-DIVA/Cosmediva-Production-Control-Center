@@ -89,8 +89,8 @@ export default function CompleteRepairModal({
         preventive_recommendation: preventiveRec,
         photo_after_urls: photoAfter ? [photoAfter] : [],
         notes: targetStatus === 'TEST_RUN' 
-          ? 'ซ่อมเบื้องต้นเสร็จสิ้น ส่งต่อให้ฝ่ายผลิตทดลองเดินเครื่อง (Test Run)' 
-          : 'ช่างบันทึกซ่อมเสร็จสมบูรณ์ รอฝ่ายผลิตยืนยัน (Verify)'
+          ? 'ซ่อมเบื้องต้นเสร็จสิ้น ส่งต่อให้ผู้แจ้งซ่อมทดลองเดินเครื่อง (Test Run)' 
+          : 'ช่างบันทึกซ่อมเสร็จสมบูรณ์ รอผู้แจ้งซ่อมตรวจรับ (Verify)'
       })
 
       if (res.success) {

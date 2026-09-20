@@ -625,7 +625,7 @@ export default function TechnicianCockpitPage() {
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-black text-amber-900 flex items-center gap-2">
                   <CheckSquare className="w-5 h-5 text-amber-700" />
-                  งานรอฝ่ายผลิตทดสอบ & ยืนยันเครื่องพร้อมใช้งาน (Production Sign-Off)
+                  งานรอผู้แจ้งซ่อมทดสอบ & ยืนยันเครื่องพร้อมใช้งาน (Verification Sign-Off)
                 </h3>
                 <span className="text-xs text-amber-700 font-semibold">คลิกเพื่อยืนยันผล</span>
               </div>
