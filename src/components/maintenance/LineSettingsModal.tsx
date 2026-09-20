@@ -422,7 +422,7 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
                 <div className="bg-[#B91C1C] p-3 text-white">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-xs">🚨 แจ้งซ่อมเครื่องจักร</span>
-                    <span className="text-[10px] text-yellow-300 font-mono font-bold">WO-2026-100012</span>
+                    <span className="text-[10px] text-yellow-300 font-mono font-bold">MTR-2609001</span>
                   </div>
                   <div className="text-[10px] text-yellow-100 font-bold mt-0.5">
                     🚨 ฉุกเฉิน: หยุดการผลิต (Critical)

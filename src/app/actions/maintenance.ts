@@ -18,29 +18,36 @@ import {
 import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
 
 /**
- * Generate sequential WO number: WO-YYYY-XXXXXX
+ * Generate sequential WO number: MTR-YYMMXXX (e.g. MTR-2609001)
+ * MTR = Maintenance Request Form (ใบแจ้งซ่อม)
+ * YY  = 2 หลักท้ายของปี ค.ศ. ปัจจุบัน
+ * MM  = เลข 2 หลักของเดือนปัจจุบัน (01-12)
+ * XXX = เลขรันลำดับ 3 หลัก (001, 002, ...)
  */
 async function generateWONumber(supabase: any): Promise<string> {
-  const currentYear = new Date().getFullYear()
-  const prefix = `WO-${currentYear}-`
+  const now = new Date()
+  const bangkokDateStr = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Bangkok' }) // 'YYYY-MM-DD'
+  const [yyyy, mm] = bangkokDateStr.split('-')
+  const yy = yyyy.slice(-2)
+  const prefix = `MTR-${yy}${mm}`
   
   const { data } = await supabase
     .from('maintenance_work_orders')
     .select('wo_number')
     .like('wo_number', `${prefix}%`)
-    .order('created_at', { ascending: false })
+    .order('wo_number', { ascending: false })
     .limit(1)
 
-  let nextSeq = 100001
+  let nextSeq = 1
   if (data && data.length > 0) {
     const lastNumber = data[0].wo_number
-    const match = lastNumber.match(/WO-\d{4}-(\d+)/)
-    if (match && match[1]) {
-      nextSeq = parseInt(match[1], 10) + 1
+    const num = parseInt(lastNumber.slice(prefix.length), 10)
+    if (!isNaN(num)) {
+      nextSeq = num + 1
     }
   }
 
-  return `${prefix}${nextSeq.toString().padStart(6, '0')}`
+  return `${prefix}${nextSeq.toString().padStart(3, '0')}`
 }
 
 /**
