@@ -18,6 +18,7 @@ import {
   AlertTriangle
 } from 'lucide-react'
 import { getMaintenanceKPIs, getWorkOrders, getMachines } from '@/app/actions/maintenance'
+import { formatWorkOrderStatus } from '@/types/maintenance'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,7 +163,7 @@ export default async function MaintenanceHubPage() {
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">
-                      <span>สถานะ: <b className="text-stone-800">{wo.status}</b></span>
+                      <span>สถานะ: <b className="text-stone-800">{formatWorkOrderStatus(wo.status)}</b></span>
                       <span className="flex items-center gap-1 text-red-600 font-bold">
                         <Clock className="w-3 h-3" />
                         {wo.total_downtime_minutes} นาที

@@ -27,7 +27,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
+import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo, formatWorkOrderStatus } from '@/types/maintenance'
 import { 
   getWorkOrders, 
   transitionWorkOrderStatus, 
@@ -424,7 +424,7 @@ export default function TechnicianCockpitPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-stone-500">สถานะงาน:</span>
                         <span className="font-bold px-2 py-0.5 rounded bg-stone-900 text-white">
-                          {wo.status}
+                          {formatWorkOrderStatus(wo.status)}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 text-stone-700 font-semibold">
@@ -533,7 +533,7 @@ export default function TechnicianCockpitPage() {
                         wo.status === 'WAITING_PART' ? 'bg-orange-100 text-orange-900' :
                         'bg-indigo-100 text-indigo-900'
                       }`}>
-                        {wo.status}
+                        {formatWorkOrderStatus(wo.status)}
                       </span>
                     </div>
 
@@ -636,7 +636,7 @@ export default function TechnicianCockpitPage() {
                     <div>
                       <div className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</div>
                       <div className="font-bold text-stone-900 text-sm">{wo.machine_code} - {wo.machine_name}</div>
-                      <div className="text-xs text-stone-500">สถานะ: <b className="text-indigo-700">{wo.status}</b></div>
+                      <div className="text-xs text-stone-500">สถานะ: <b className="text-indigo-700">{formatWorkOrderStatus(wo.status)}</b></div>
                     </div>
 
                     <Button

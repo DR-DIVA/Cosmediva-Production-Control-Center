@@ -25,6 +25,26 @@ export type WorkOrderStatus =
   | 'VERIFIED'
   | 'CLOSED'
 
+export const WORK_ORDER_STATUS_MAP: Record<string, { label: string; color: string; badge: string }> = {
+  NEW: { label: 'แจ้งซ่อมใหม่', color: 'text-rose-700', badge: 'bg-rose-100 text-rose-900 border-rose-300' },
+  ACKNOWLEDGED: { label: 'ช่างรับเรื่องแล้ว', color: 'text-amber-800', badge: 'bg-amber-100 text-amber-900 border-amber-300' },
+  ASSIGNED: { label: 'มอบหมายงานแล้ว', color: 'text-blue-800', badge: 'bg-blue-100 text-blue-900 border-blue-300' },
+  IN_PROGRESS: { label: 'กำลังดำเนินการซ่อม', color: 'text-yellow-800', badge: 'bg-yellow-100 text-yellow-900 border-yellow-300' },
+  WAITING_PART: { label: 'รออะไหล่', color: 'text-orange-800', badge: 'bg-orange-100 text-orange-900 border-orange-300' },
+  PENDING_PARTS: { label: 'รออะไหล่', color: 'text-orange-800', badge: 'bg-orange-100 text-orange-900 border-orange-300' },
+  WAITING_EXTERNAL: { label: 'รอช่างภายนอก', color: 'text-purple-800', badge: 'bg-purple-100 text-purple-900 border-purple-300' },
+  TEST_RUN: { label: 'ทดสอบเดินเครื่อง', color: 'text-indigo-800', badge: 'bg-indigo-100 text-indigo-900 border-indigo-300' },
+  COMPLETED: { label: 'ซ่อมเสร็จสิ้น', color: 'text-emerald-800', badge: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+  VERIFIED: { label: 'ฝ่ายผลิตตรวจรับแล้ว', color: 'text-teal-800', badge: 'bg-teal-100 text-teal-900 border-teal-300' },
+  CLOSED: { label: 'ปิดงานสมบูรณ์', color: 'text-stone-800', badge: 'bg-stone-100 text-stone-900 border-stone-300' },
+  CANCELLED: { label: 'ยกเลิก', color: 'text-stone-500', badge: 'bg-stone-100 text-stone-600 border-stone-200' }
+}
+
+export function formatWorkOrderStatus(status?: string | null): string {
+  if (!status) return '-'
+  return WORK_ORDER_STATUS_MAP[status]?.label || status
+}
+
 export type SymptomCategory = 
   | 'เครื่องไม่ทำงาน'
   | 'เครื่องหยุดกลางงาน'

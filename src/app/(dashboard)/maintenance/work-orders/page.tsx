@@ -22,13 +22,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { MaintenanceWorkOrder, WorkOrderStatus } from '@/types/maintenance'
+import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP } from '@/types/maintenance'
 import { getWorkOrders, transitionWorkOrderStatus } from '@/app/actions/maintenance'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 
 const KANBAN_COLUMNS: { id: WorkOrderStatus; title: string; color: string; badge: string }[] = [
   { id: 'NEW', title: 'แจ้งใหม่ (New)', color: 'border-t-rose-500', badge: 'bg-rose-100 text-rose-800' },
-  { id: 'ACKNOWLEDGED', title: 'รับทราบ (Ack)', color: 'border-t-amber-500', badge: 'bg-amber-100 text-amber-800' },
+  { id: 'ACKNOWLEDGED', title: 'ช่างรับเรื่องแล้ว (Ack)', color: 'border-t-amber-500', badge: 'bg-amber-100 text-amber-800' },
   { id: 'ASSIGNED', title: 'มอบหมาย (Assigned)', color: 'border-t-blue-500', badge: 'bg-blue-100 text-blue-800' },
   { id: 'IN_PROGRESS', title: 'กำลังซ่อม (In Progress)', color: 'border-t-yellow-500', badge: 'bg-yellow-100 text-yellow-800' },
   { id: 'WAITING_PART', title: 'รออะไหล่ (Waiting Part)', color: 'border-t-orange-500', badge: 'bg-orange-100 text-orange-800' },
@@ -250,7 +250,9 @@ export default function WorkOrdersKanbanPage() {
             <div className="grid grid-cols-2 gap-2 text-xs bg-stone-50 p-3 rounded-2xl border border-stone-200">
               <div>
                 <span className="text-stone-400 block">สถานะปัจจุบัน:</span>
-                <span className="font-bold text-stone-900">{detailWO.status}</span>
+                <span className={`inline-flex items-center px-2.5 py-0.5 mt-0.5 rounded-full text-xs font-extrabold border ${WORK_ORDER_STATUS_MAP[detailWO.status]?.badge || 'bg-stone-100 text-stone-900 border-stone-300'}`}>
+                  {formatWorkOrderStatus(detailWO.status)}
+                </span>
               </div>
               <div>
                 <span className="text-stone-400 block">เวลา Downtime รวม:</span>

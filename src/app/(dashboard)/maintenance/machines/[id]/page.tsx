@@ -1,5 +1,6 @@
 import React from 'react'
 import { getMachine360 } from '@/app/actions/maintenance'
+import { formatWorkOrderStatus } from '@/types/maintenance'
 import MaintenanceHeader from '@/components/maintenance/MaintenanceHeader'
 import MachineQRBadge from '@/components/maintenance/MachineQRBadge'
 import Link from 'next/link'
@@ -343,7 +344,7 @@ export default async function Machine360Page({ params }: Props) {
                 <div>
                   <div className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</div>
                   <div className="text-sm font-bold text-stone-900">{wo.symptom_category}: {wo.symptom_description || wo.production_impact}</div>
-                  <div className="text-xs text-stone-500 mt-0.5">สถานะ: <b className="text-amber-700">{wo.status}</b> | ช่าง: {wo.assigned_technician_name || '-'}</div>
+                  <div className="text-xs text-stone-500 mt-0.5">สถานะ: <b className="text-amber-700">{formatWorkOrderStatus(wo.status)}</b> | ช่าง: {wo.assigned_technician_name || '-'}</div>
                 </div>
 
                 <Link

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { searchMaintenance } from '@/app/actions/maintenance'
+import { formatWorkOrderStatus } from '@/types/maintenance'
 
 export default function MaintenanceSearchPage() {
   const [query, setQuery] = useState('')
@@ -143,8 +144,8 @@ export default function MaintenanceSearchPage() {
                       <div className="flex items-center gap-2">
                         <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
                         <span className="font-bold text-sm text-stone-900">{wo.machine_code}</span>
-                        <span className="px-2 py-0.2 rounded-md bg-stone-100 text-stone-700 text-[10px] font-bold">
-                          {wo.status}
+                        <span className="px-2 py-0.5 rounded-full bg-stone-100 text-stone-800 text-[10px] font-bold border border-stone-200">
+                          {formatWorkOrderStatus(wo.status)}
                         </span>
                       </div>
                       <div className="text-xs text-stone-700 mt-1">
