@@ -14,8 +14,9 @@ import {
 
 /**
  * Get all configured LINE Notification Channels (Multi-Channel Gateway)
+ * Sensitive tokens are masked with •••• to prevent credential leakage to the browser.
  */
-export async function getLineChannels(): Promise<{ success: boolean; data: LineChannelConfig[]; error?: string }> {
+export async function getLineChannels(): Promise<{ success: boolean; data: (LineChannelConfig & { has_token?: boolean })[]; error?: string }> {
   try {
     const supabase = createAdminClient()
     const { data, error } = await supabase
@@ -27,7 +28,22 @@ export async function getLineChannels(): Promise<{ success: boolean; data: LineC
       return { success: false, data: [], error: error.message }
     }
 
-    return { success: true, data: data || [] }
+    const sanitizedData = (data || []).map((ch: any) => {
+      const rawToken = ch.channel_access_token || ''
+      const hasToken = rawToken.trim().length > 10
+      // Mask token: only show first 6 and last 4 characters, with dots in between
+      const maskedToken = hasToken
+        ? `${rawToken.slice(0, 6)}••••••••••••••••••••••••${rawToken.slice(-4)}`
+        : ''
+
+      return {
+        ...ch,
+        channel_access_token: maskedToken,
+        has_token: hasToken
+      }
+    })
+
+    return { success: true, data: sanitizedData }
   } catch (err: any) {
     console.error('Error fetching line channels:', err)
     return { success: false, data: [], error: err.message }
@@ -54,7 +70,15 @@ export async function updateLineChannel(
       updated_at: new Date().toISOString()
     }
     if (payload.channel_name !== undefined) updateData.channel_name = payload.channel_name.trim()
-    if (payload.channel_access_token !== undefined) updateData.channel_access_token = payload.channel_access_token.trim()
+    
+    // Only update token if user provided a genuine new token (not masked dots or empty)
+    if (payload.channel_access_token !== undefined) {
+      const trimmed = payload.channel_access_token.trim()
+      if (trimmed && !trimmed.includes('••••')) {
+        updateData.channel_access_token = trimmed
+      }
+    }
+
     if (payload.destination_id !== undefined) updateData.destination_id = payload.destination_id.trim()
     if (payload.is_active !== undefined) updateData.is_active = payload.is_active
     if (payload.notify_events !== undefined) updateData.notify_events = payload.notify_events
@@ -85,13 +109,15 @@ export async function testLineChannel(
   overrideDestination?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
+    // If override token contains masked characters, use saved token from DB instead
+    const cleanToken = overrideToken && !overrideToken.includes('••••') ? overrideToken : undefined
     const testFlex = buildTestFlexMessage(channelKey, '🛠️ ซ่อมบำรุง (Maintenance)')
     
     const res = await pushLineFlexMessage({
       channelKey,
       altText: '🧪 ทดสอบระบบแจ้งเตือน LINE CosmeFlow',
       flexContents: testFlex,
-      overrideToken,
+      overrideToken: cleanToken,
       overrideDestination
     })
 

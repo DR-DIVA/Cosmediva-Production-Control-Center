@@ -240,9 +240,17 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
             </div>
 
             {/* Token Input */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-stone-800 flex items-center justify-between">
-                <span>LINE Channel Access Token (v2.1 Long-Lived) *</span>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <label className="text-xs font-bold text-stone-800">
+                    LINE Channel Access Token (v2.1 Long-Lived) *
+                  </label>
+                  <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3" />
+                    <span>ความลับสูงสุด (พรางรหัส)</span>
+                  </span>
+                </div>
                 <a
                   href="https://developers.line.biz/console/"
                   target="_blank"
@@ -252,13 +260,13 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
                   <span>LINE Console</span>
                   <ExternalLink className="w-3 h-3" />
                 </a>
-              </label>
+              </div>
               <div className="relative">
                 <Input
                   type={showToken ? 'text' : 'password'}
                   value={token}
                   onChange={e => setToken(e.target.value)}
-                  placeholder="วาง Channel Access Token ที่ได้จาก LINE Developers..."
+                  placeholder={token ? 'วางใหม่เพื่อเปลี่ยน Token...' : 'วาง Channel Access Token ที่ได้จาก LINE Developers...'}
                   className="h-10 text-xs font-mono pr-10 rounded-xl bg-stone-50 border-stone-300"
                 />
                 <button
@@ -270,7 +278,7 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
                 </button>
               </div>
               <p className="text-[10px] text-stone-500">
-                เข้า LINE Developers Console &gt; บอทของแผนกนี้ &gt; แท็บ Messaging API &gt; Channel access token
+                🔐 <b>ความปลอดภัย:</b> รหัสนี้จะถูกจัดเก็บเป็นความลับและพรางตา (••••) ทันที ไม่มีใครสามารถกดอ่านรหัสเต็มย้อนหลังได้ หรือสามารถใส่ตรงใน Railway Environment Variables ได้เช่นกันค่ะ
               </p>
             </div>
 
