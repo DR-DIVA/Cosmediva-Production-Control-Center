@@ -2,6 +2,11 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
+  // Completely bypass API routes for external webhooks like LINE
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    return NextResponse.next()
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   })
@@ -40,10 +45,6 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const user = supabaseUser
-  // Allow API routes (like /api/line/webhook) to pass through without page login redirect
-  if (request.nextUrl.pathname.startsWith('/api')) {
-    return supabaseResponse
-  }
 
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
   const isProtectedRoute = !isAuthRoute && request.nextUrl.pathname !== '/'
@@ -65,6 +66,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
