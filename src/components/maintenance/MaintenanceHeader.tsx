@@ -95,7 +95,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
   return (
     <div className="space-y-4">
       {/* Top Banner */}
-      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-5 md:p-6 rounded-3xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center bg-gradient-to-r from-[#2A2521] via-[#3A332B] to-[#2A2521] p-5 md:p-6 rounded-3xl shadow-xl border border-[#D4AF37]/40 gap-4 text-white">
         <div>
           <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-[#D4AF37]">
             <span className="inline-block w-2 h-2 rounded-full bg-[#D4AF37] animate-pulse"></span>
@@ -114,12 +114,12 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
           </div>
         </div>
 
-        {/* Global Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full lg:w-auto">
+        {/* Global Action Buttons: 4 in 1 line on wide screens, 2x2 grid when narrower */}
+        <div className="grid grid-cols-2 2xl:grid-cols-4 gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0">
           {/* 1. แจ้งเครื่องเสียด่วน */}
           <Link
             href="/maintenance/report?type=EMERGENCY"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-red-900/30 border border-red-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
+            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-red-900/30 border border-red-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
           >
             <AlertOctagon className="w-4 h-4 animate-pulse shrink-0" />
             <span>🚨 แจ้งเครื่องเสียด่วน</span>
@@ -128,7 +128,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
           {/* 2. แจ้งซ่อมทั่วไป */}
           <Link
             href="/maintenance/report?type=GENERAL"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-blue-900/30 border border-blue-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
+            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-blue-900/30 border border-blue-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
           >
             <Wrench className="w-4 h-4 shrink-0" />
             <span>🛠️ แจ้งซ่อมทั่วไป</span>
@@ -137,19 +137,19 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
           {/* 3. แจ้งซ่อมบริการ */}
           <Link
             href="/maintenance/report?type=SERVICE"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md shadow-purple-900/30 border border-purple-400/40 transition-all transform active:scale-95 text-xs sm:text-sm"
+            className="w-full inline-flex items-center justify-center gap-1.5 bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white font-bold px-3 py-2.5 rounded-2xl shadow-md shadow-purple-900/30 border border-purple-400/40 transition-all transform active:scale-95 text-xs sm:text-sm whitespace-nowrap"
           >
             <Zap className="w-4 h-4 shrink-0" />
             <span>💡 แจ้งซ่อมบริการ</span>
           </Link>
 
-          {/* โหมดช่างซ่อม */}
+          {/* 4. โหมดช่างซ่อม */}
           <Link
             href="/maintenance/technician"
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-3.5 py-2.5 rounded-2xl shadow-md transition-all text-xs sm:text-sm active:scale-95"
+            className="w-full inline-flex items-center justify-center gap-1.5 bg-[#D4AF37] hover:bg-[#bfa030] text-[#2A2521] font-bold px-3 py-2.5 rounded-2xl shadow-md transition-all text-xs sm:text-sm active:scale-95 whitespace-nowrap"
           >
             <HardHat className="w-4 h-4 shrink-0" />
-            <span>โหมดช่างซ่อม</span>
+            <span>🔧 โหมดช่างซ่อม</span>
           </Link>
         </div>
       </div>
