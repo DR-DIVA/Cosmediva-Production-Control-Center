@@ -48,7 +48,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       color: 'bg-blue-100 text-blue-700 border-blue-200' 
     },
     { 
-      label: 'ช่างหน้างาน', 
+      label: 'สำหรับช่างซ่อม', 
       href: '/maintenance/technician', 
       icon: HardHat, 
       badge: 'My Tasks',
@@ -185,7 +185,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             </div>
           </Link>
 
-          {/* 4. ช่างหน้างาน */}
+          {/* 4. สำหรับช่างซ่อม */}
           <Link
             href="/maintenance/technician"
             className="group flex items-center gap-2 sm:gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer w-full"
@@ -196,7 +196,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             </div>
             <div className="flex items-center gap-1.5 min-w-0">
               <span className="text-xs sm:text-sm font-extrabold text-amber-950 truncate">
-                ช่างหน้างาน 📱
+                สำหรับช่างซ่อม 📱
               </span>
               <span className="px-1.5 py-0.5 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
                 My Tasks

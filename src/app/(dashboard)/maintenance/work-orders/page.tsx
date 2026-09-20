@@ -509,7 +509,7 @@ export default function WorkOrdersKanbanPage() {
             className="inline-flex items-center gap-1.5 h-10 px-3.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-2xs transition-colors"
             title="สำหรับช่างประจำกะลงมือซ่อมจริง & จับเวลา"
           >
-            <span>📱 ช่างหน้างาน (My Tasks)</span>
+            <span>📱 สำหรับช่างซ่อม (My Tasks)</span>
           </Link>
 
           <Link

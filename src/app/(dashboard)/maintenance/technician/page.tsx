@@ -356,7 +356,7 @@ export default function TechnicianCockpitPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-stone-900">ช่างซ่อมหน้างาน (Technician Mobile Cockpit)</h2>
+              <h2 className="text-lg font-black text-stone-900">สำหรับช่างซ่อม (Technician Mobile Cockpit)</h2>
               <span className="px-2.5 py-0.5 text-[10px] font-extrabold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-200">
                 สำหรับลงมือซ่อมจริง
               </span>
