@@ -57,7 +57,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       iconClass: 'border border-amber-400 bg-amber-500 text-white' 
     },
     { 
-      label: 'ศูนย์ควบคุมงาน', 
+      label: 'KANBAN BOARD', 
       href: '/maintenance/work-orders', 
       icon: KanbanSquare,
       frameClass: 'bg-purple-50 hover:bg-purple-100 text-purple-950 border border-purple-300 hover:border-purple-400',

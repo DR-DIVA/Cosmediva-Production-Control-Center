@@ -469,7 +469,7 @@ export default function WorkOrdersKanbanPage() {
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black text-stone-900">ศูนย์ควบคุมงานซ่อม (Kanban Hub)</h2>
+              <h2 className="text-lg font-black text-stone-900">KANBAN BOARD</h2>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold bg-purple-100 text-purple-800 border border-purple-200">
                 สำหรับหัวหน้างาน & ฝ่ายผลิต
               </span>
