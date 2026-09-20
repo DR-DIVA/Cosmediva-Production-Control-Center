@@ -686,118 +686,127 @@ export async function createRepairRequest(payload: {
   requester_department_name?: string
   photo_before_urls?: string[]
 }) {
-  const supabase = createAdminClient()
+  try {
+    const supabase = createAdminClient()
 
-  // 1. Resolve Machine
-  const { data: machine, error: mErr } = await supabase
-    .from('maintenance_machines')
-    .select('*')
-    .eq('machine_code', payload.machine_code)
-    .single()
-
-  if (mErr || !machine) {
-    return { success: false, error: `ไม่พบเครื่องจักร ${payload.machine_code}` }
-  }
-
-  // 2. Recommend/Calculate Priority
-  let priority: PriorityLevel = 'P3_NORMAL'
-  if (payload.is_emergency_breakdown || payload.production_impact === 'Production stopped') {
-    priority = 'P1_CRITICAL'
-  } else if (payload.production_impact === 'Machine stopped' || payload.production_impact === 'Safety risk') {
-    priority = 'P2_HIGH'
-  } else if (payload.production_impact === 'Quality risk' || payload.production_impact === 'Intermittent stops') {
-    priority = 'P2_HIGH'
-  }
-
-  // 3. Generate Ticket Number
-  const woNumber = await generateWONumber(supabase)
-
-  // 4. Check repeated failures in past 90 days
-  const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-  const { count: repeatCount } = await supabase
-    .from('maintenance_work_orders')
-    .select('*', { count: 'exact', head: true })
-    .eq('machine_id', machine.id)
-    .eq('symptom_category', payload.symptom_category)
-    .gte('reported_at', ninetyDaysAgo)
-
-  const isRepeated = (repeatCount || 0) > 0
-
-  // 5. Insert Work Order
-  const now = new Date().toISOString()
-  const { data: newWO, error: woErr } = await supabase
-    .from('maintenance_work_orders')
-    .insert({
-      wo_number: woNumber,
-      machine_id: machine.id,
-      machine_code: machine.machine_code,
-      machine_name: machine.machine_name,
-      requester_name: payload.requester_name || 'พนักงานสายการผลิต',
-      requester_department_name: payload.requester_department_name || machine.department_name,
-      priority,
-      status: 'NEW',
-      symptom_category: payload.symptom_category,
-      symptom_description: payload.symptom_description || '',
-      production_impact: payload.production_impact,
-      is_emergency_breakdown: !!payload.is_emergency_breakdown,
-      photo_before_urls: payload.photo_before_urls || [],
-      reported_at: now,
-      is_repeated_failure: isRepeated,
-      repeat_count_90d: repeatCount || 0
-    })
-    .select()
-    .single()
-
-  if (woErr) {
-    console.error('Error creating work order:', woErr)
-    return { success: false, error: woErr.message }
-  }
-
-  // 6. If Emergency or Production Stopped, update machine status to Breakdown
-  if (priority === 'P1_CRITICAL' || priority === 'P2_HIGH') {
-    await supabase
+    // 1. Resolve Machine
+    const { data: machine, error: mErr } = await supabase
       .from('maintenance_machines')
-      .update({ status: 'Breakdown', updated_at: now })
-      .eq('id', machine.id)
+      .select('*')
+      .eq('machine_code', payload.machine_code)
+      .single()
+
+    if (mErr || !machine) {
+      return { success: false, error: `ไม่พบเครื่องจักร ${payload.machine_code}` }
+    }
+
+    // 2. Recommend/Calculate Priority
+    let priority: PriorityLevel = 'P3_NORMAL'
+    if (payload.is_emergency_breakdown || payload.production_impact === 'Production stopped') {
+      priority = 'P1_CRITICAL'
+    } else if (payload.production_impact === 'Machine stopped' || payload.production_impact === 'Safety risk') {
+      priority = 'P2_HIGH'
+    } else if (payload.production_impact === 'Quality risk' || payload.production_impact === 'Intermittent stops') {
+      priority = 'P2_HIGH'
+    }
+
+    // 3. Generate Ticket Number
+    const woNumber = await generateWONumber(supabase)
+
+    // 4. Check repeated failures in past 90 days
+    const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
+    const { count: repeatCount } = await supabase
+      .from('maintenance_work_orders')
+      .select('*', { count: 'exact', head: true })
+      .eq('machine_id', machine.id)
+      .eq('symptom_category', payload.symptom_category)
+      .gte('reported_at', ninetyDaysAgo)
+
+    const isRepeated = (repeatCount || 0) > 0
+
+    // 5. Insert Work Order
+    const now = new Date().toISOString()
+    const { data: newWO, error: woErr } = await supabase
+      .from('maintenance_work_orders')
+      .insert({
+        wo_number: woNumber,
+        machine_id: machine.id,
+        machine_code: machine.machine_code,
+        machine_name: machine.machine_name,
+        requester_name: payload.requester_name || 'พนักงานสายการผลิต',
+        requester_department_name: payload.requester_department_name || machine.department_name,
+        priority,
+        status: 'NEW',
+        symptom_category: payload.symptom_category,
+        symptom_description: payload.symptom_description || '',
+        production_impact: payload.production_impact,
+        is_emergency_breakdown: !!payload.is_emergency_breakdown,
+        photo_before_urls: payload.photo_before_urls || [],
+        reported_at: now,
+        is_repeated_failure: isRepeated,
+        repeat_count_90d: repeatCount || 0
+      })
+      .select()
+      .single()
+
+    if (woErr) {
+      console.error('Error creating work order:', woErr)
+      return { success: false, error: woErr.message }
+    }
+
+    // 6. If Emergency or Production Stopped, update machine status to Breakdown
+    if (priority === 'P1_CRITICAL' || priority === 'P2_HIGH') {
+      await supabase
+        .from('maintenance_machines')
+        .update({ status: 'Breakdown', updated_at: now })
+        .eq('id', machine.id)
+    }
+
+    // 7. Add Audit status log
+    await supabase
+      .from('maintenance_wo_status_logs')
+      .insert({
+        work_order_id: newWO.id,
+        from_status: null,
+        to_status: 'NEW',
+        changed_by_name: payload.requester_name || 'Requester',
+        notes: payload.is_emergency_breakdown ? '🚨 กดแจ้งหยุดการผลิตฉุกเฉิน (BREAKDOWN NOW)' : 'แจ้งซ่อมผ่านระบบดิจิทัล'
+      })
+
+    // 8. Create Notification
+    await supabase
+      .from('maintenance_notifications')
+      .insert({
+        recipient_role: 'technician',
+        title: priority === 'P1_CRITICAL' ? `🚨 [CRITICAL] เครื่อง ${machine.machine_code} หยุดการผลิต!` : `งานแจ้งซ่อมใหม่: ${machine.machine_code}`,
+        message: `อาการ: ${payload.symptom_category} | โดย: ${payload.requester_name}`,
+        priority: priority === 'P1_CRITICAL' ? 'CRITICAL' : 'NORMAL',
+        work_order_id: newWO.id,
+        machine_code: machine.machine_code,
+        link_url: `/maintenance/technician`
+      })
+
+    // 9. Dispatch LINE notification in background
+    dispatchWorkOrderLineAlert({
+      eventType: 'NEW_REPORT',
+      workOrder: newWO,
+      machine
+    }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
+
+    try {
+      revalidatePath('/maintenance')
+      revalidatePath('/maintenance/work-orders')
+      revalidatePath('/maintenance/technician')
+      revalidatePath(`/maintenance/machines/${machine.machine_code}`)
+    } catch (e) {
+      console.warn('revalidatePath warning:', e)
+    }
+
+    return { success: true, data: newWO }
+  } catch (err: any) {
+    console.error('Unexpected error in createRepairRequest:', err)
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดในการสร้างใบแจ้งซ่อม' }
   }
-
-  // 7. Add Audit status log
-  await supabase
-    .from('maintenance_wo_status_logs')
-    .insert({
-      work_order_id: newWO.id,
-      from_status: null,
-      to_status: 'NEW',
-      changed_by_name: payload.requester_name || 'Requester',
-      notes: payload.is_emergency_breakdown ? '🚨 กดแจ้งหยุดการผลิตฉุกเฉิน (BREAKDOWN NOW)' : 'แจ้งซ่อมผ่านระบบดิจิทัล'
-    })
-
-  // 8. Create Notification
-  await supabase
-    .from('maintenance_notifications')
-    .insert({
-      recipient_role: 'technician',
-      title: priority === 'P1_CRITICAL' ? `🚨 [CRITICAL] เครื่อง ${machine.machine_code} หยุดการผลิต!` : `งานแจ้งซ่อมใหม่: ${machine.machine_code}`,
-      message: `อาการ: ${payload.symptom_category} | โดย: ${payload.requester_name}`,
-      priority: priority === 'P1_CRITICAL' ? 'CRITICAL' : 'NORMAL',
-      work_order_id: newWO.id,
-      machine_code: machine.machine_code,
-      link_url: `/maintenance/technician`
-    })
-
-  // 9. Dispatch LINE notification in background
-  dispatchWorkOrderLineAlert({
-    eventType: 'NEW_REPORT',
-    workOrder: newWO,
-    machine
-  }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
-
-  revalidatePath('/maintenance')
-  revalidatePath('/maintenance/work-orders')
-  revalidatePath('/maintenance/technician')
-  revalidatePath(`/maintenance/machines/${machine.machine_code}`)
-
-  return { success: true, data: newWO }
 }
 
 /**

@@ -103,16 +103,58 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
     })
   }
 
-  // Handle Photo input
+  // Handle Photo input with smart client-side compression for mobile cameras
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-    if (file) {
+    if (!file) return
+
+    // If video, read directly
+    if (file.type.startsWith('video/')) {
       const reader = new FileReader()
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string)
       }
       reader.readAsDataURL(file)
+      return
     }
+
+    // Canvas Compression: Resize high-res iPhone/Android photos (8-15MB) down to crisp ~120KB
+    const reader = new FileReader()
+    reader.onload = (event) => {
+      const img = new window.Image()
+      img.onload = () => {
+        const MAX_DIMENSION = 1024
+        let width = img.width
+        let height = img.height
+
+        if (width > height) {
+          if (width > MAX_DIMENSION) {
+            height = Math.round((height * MAX_DIMENSION) / width)
+            width = MAX_DIMENSION
+          }
+        } else {
+          if (height > MAX_DIMENSION) {
+            width = Math.round((width * MAX_DIMENSION) / height)
+            height = MAX_DIMENSION
+          }
+        }
+
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72)
+          setPhotoPreview(compressedDataUrl)
+          toast.success('แนบรูปภาพพร้อมปรับขนาดความคมชัดเรียบร้อย')
+        } else {
+          setPhotoPreview(event.target?.result as string)
+        }
+      }
+      img.src = event.target?.result as string
+    }
+    reader.readAsDataURL(file)
   }
 
   // Handle Voice Input simulation
