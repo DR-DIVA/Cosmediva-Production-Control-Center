@@ -44,6 +44,7 @@ export default function TechnicianCockpitPage() {
   const [workOrders, setWorkOrders] = useState<MaintenanceWorkOrder[]>([])
   const [pmPlans, setPmPlans] = useState<MaintenancePMPlan[]>([])
   const [activeGroupTab, setActiveGroupTab] = useState<'breakdown' | 'pm_plan'>('breakdown')
+  const [breakdownFilter, setBreakdownFilter] = useState<'ALL' | 'READY' | 'IN_PROGRESS' | 'NEW'>('ALL')
   const [technicianName, setTechnicianName] = useState('ช่างสมหมาย เก่งการช่าง')
   const [isLoading, setIsLoading] = useState(true)
 
@@ -154,8 +155,9 @@ export default function TechnicianCockpitPage() {
 
   // Filter groups for Breakdowns
   const criticalJobs = workOrders.filter(w => w.priority === 'P1_CRITICAL' && !['CLOSED', 'VERIFIED'].includes(w.status))
+  const readyToRepairJobs = workOrders.filter(w => ['ACKNOWLEDGED', 'ASSIGNED'].includes(w.status) && w.priority !== 'P1_CRITICAL')
   const inProgressJobs = workOrders.filter(w => ['IN_PROGRESS', 'WAITING_PART', 'TEST_RUN'].includes(w.status) && w.priority !== 'P1_CRITICAL')
-  const newPendingJobs = workOrders.filter(w => ['NEW', 'ACKNOWLEDGED', 'ASSIGNED'].includes(w.status) && w.priority !== 'P1_CRITICAL')
+  const newRequests = workOrders.filter(w => w.status === 'NEW' && w.priority !== 'P1_CRITICAL')
   const recentlyCompleted = workOrders.filter(w => ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(w.status)).slice(0, 5)
   const activeBreakdownCount = workOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
 
@@ -290,6 +292,68 @@ export default function TechnicianCockpitPage() {
       {/* GROUP 1: BREAKDOWN WORK ORDERS */}
       {activeGroupTab === 'breakdown' && (
         <div className="space-y-6">
+          {/* Quick Sub-Filter Pills aligned with Kanban */}
+          <div className="flex flex-wrap items-center gap-2 bg-stone-100/80 p-1.5 rounded-2xl border border-stone-200 text-xs">
+            <button
+              onClick={() => setBreakdownFilter('ALL')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                breakdownFilter === 'ALL'
+                  ? 'bg-stone-900 text-white shadow-xs'
+                  : 'bg-white text-stone-600 hover:bg-stone-200 border border-stone-200'
+              }`}
+            >
+              <span>ทั้งหมด</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-stone-200 text-stone-800 text-[10px]">
+                {activeBreakdownCount}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBreakdownFilter('READY')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                breakdownFilter === 'READY'
+                  ? 'bg-emerald-700 text-white shadow-xs'
+                  : 'bg-white text-emerald-800 hover:bg-emerald-50 border border-emerald-200'
+              }`}
+            >
+              <Play className="w-3 h-3 fill-current" />
+              <span>⚡ พร้อมเริ่มซ่อม (Start Repair)</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-emerald-100 text-emerald-800 text-[10px]">
+                {readyToRepairJobs.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBreakdownFilter('IN_PROGRESS')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                breakdownFilter === 'IN_PROGRESS'
+                  ? 'bg-amber-600 text-white shadow-xs'
+                  : 'bg-white text-amber-800 hover:bg-amber-50 border border-amber-200'
+              }`}
+            >
+              <Wrench className="w-3 h-3" />
+              <span>กำลังซ่อมบำรุง</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 text-[10px]">
+                {inProgressJobs.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setBreakdownFilter('NEW')}
+              className={`px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1.5 ${
+                breakdownFilter === 'NEW'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'bg-white text-blue-800 hover:bg-blue-50 border border-blue-200'
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              <span>งานแจ้งใหม่</span>
+              <span className="px-1.5 py-0.2 rounded-full bg-blue-100 text-blue-800 text-[10px]">
+                {newRequests.length}
+              </span>
+            </button>
+          </div>
+
           {/* AI MAINTENANCE ASSISTANT PANEL */}
           {aiInsight && selectedWOForAI && (
             <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 p-5 rounded-3xl text-white shadow-xl border border-[#D4AF37]/50 relative overflow-hidden">
@@ -359,7 +423,7 @@ export default function TechnicianCockpitPage() {
           )}
 
           {/* 1. CRITICAL BREAKDOWNS (P1) */}
-          {criticalJobs.length > 0 && (
+          {criticalJobs.length > 0 && (breakdownFilter === 'ALL' || breakdownFilter === 'READY' || breakdownFilter === 'IN_PROGRESS') && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <Flame className="w-5 h-5 text-red-600 animate-bounce" />
@@ -508,116 +572,188 @@ export default function TechnicianCockpitPage() {
             </div>
           )}
 
-          {/* 2. IN PROGRESS / WAITING PART */}
-          <div className="space-y-3">
-            <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
-              <Wrench className="w-5 h-5 text-amber-600" />
-              งานที่กำลังดำเนินการ (In Progress & Waiting) ({inProgressJobs.length})
-            </h3>
-
-            {inProgressJobs.length === 0 ? (
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
-                ไม่มีงานซ่อมที่ค้างอยู่
+          {/* 2. READY TO REPAIR (ช่างรับเรื่องแล้ว / มอบหมายแล้ว พร้อมลงมือซ่อม) */}
+          {(breakdownFilter === 'ALL' || breakdownFilter === 'READY') && (
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+                  <Play className="w-5 h-5 text-emerald-600 fill-emerald-600" />
+                  งานที่รับเรื่องแล้ว พร้อมลงมือซ่อม (Ready to Repair) ({readyToRepairJobs.length})
+                </h3>
+                <span className="text-xs text-stone-500">
+                  ช่างเดินถึงหน้าเครื่องจักรแล้ว กดปุ่มเพื่อเริ่มซ่อมและจับเวลาทันที
+                </span>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {inProgressJobs.map(wo => (
-                  <div
-                    key={wo.id}
-                    className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 hover:shadow-md transition-shadow"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                        wo.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-900' :
-                        wo.status === 'WAITING_PART' ? 'bg-orange-100 text-orange-900' :
-                        'bg-indigo-100 text-indigo-900'
-                      }`}>
-                        {formatWorkOrderStatus(wo.status)}
-                      </span>
-                    </div>
 
-                    <div>
-                      <h4 className="text-sm font-bold text-stone-900">{wo.machine_code} - {wo.machine_name}</h4>
-                      <p className="text-xs text-stone-600 mt-1 line-clamp-2">{wo.symptom_description || wo.symptom_category}</p>
-                    </div>
-
-                    {/* Attachments preview */}
-                    {wo.photo_before_urls && wo.photo_before_urls.length > 0 && (
-                      <div className="pt-1">
-                        <MediaAttachmentViewer
-                          urls={wo.photo_before_urls}
-                          title="ภาพถ่าย/วิดีโออาการ"
-                          woNumber={wo.wo_number}
-                        />
-                      </div>
-                    )}
-
-                    <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
-                      <Button
-                        onClick={() => setPartModalWO(wo)}
-                        size="sm"
-                        variant="outline"
-                        className="flex-1 text-xs rounded-xl h-9 border-stone-300"
-                      >
-                        + ใช้อะไหล่
-                      </Button>
-                      <Button
-                        onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
-                        size="sm"
-                        className="flex-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9"
-                      >
-                        ปิดงานซ่อม
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* 3. NEW & ASSIGNED JOBS */}
-          <div className="space-y-3">
-            <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
-              <Clock className="w-5 h-5 text-blue-600" />
-              งานใหม่รอดำเนินการ (New & Assigned) ({newPendingJobs.length})
-            </h3>
-
-            {newPendingJobs.length === 0 ? (
-              <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
-                ไม่มีงานรอรับใหม่ในขณะนี้
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {newPendingJobs.map(wo => (
-                  <div
-                    key={wo.id}
-                    className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between"
-                  >
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700">
-                          {wo.priority}
-                        </span>
-                      </div>
-
-                      <h4 className="text-sm font-bold text-stone-900 mt-1">{wo.machine_code} - {wo.machine_name}</h4>
-                      <div className="text-xs text-stone-600 font-medium mt-0.5">{wo.symptom_category}</div>
-                      <div className="text-[11px] text-stone-400 mt-1">ผู้แจ้ง: {wo.requester_name}</div>
-                    </div>
-
-                    <Button
-                      onClick={() => handleAcceptJob(wo)}
-                      className="w-full bg-[#2A2521] hover:bg-stone-800 text-white font-bold text-xs rounded-xl h-10"
+              {readyToRepairJobs.length === 0 ? (
+                <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                  ไม่มีงานที่รอเริ่มซ่อมในขณะนี้
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {readyToRepairJobs.map(wo => (
+                    <div
+                      key={wo.id}
+                      className="bg-white border-2 border-emerald-500/40 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between hover:shadow-md transition-shadow"
                     >
-                      ACCEPT (รับงานนี้)
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800">
+                              {formatWorkOrderStatus(wo.status)}
+                            </span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                              wo.priority === 'P2_HIGH' ? 'bg-amber-100 text-amber-800' : 'bg-stone-100 text-stone-700'
+                            }`}>
+                              {wo.priority}
+                            </span>
+                          </div>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-stone-900 mt-2">{wo.machine_code} - {wo.machine_name}</h4>
+                        <div className="text-xs text-stone-600 font-medium mt-1">{wo.symptom_category}</div>
+                        {wo.symptom_description && (
+                          <p className="text-[11px] text-stone-500 mt-1 line-clamp-2 bg-stone-50 p-2 rounded-xl border border-stone-100">
+                            {wo.symptom_description}
+                          </p>
+                        )}
+                        <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between">
+                          <span>ผู้แจ้ง: {wo.requester_name}</span>
+                          {wo.assigned_technician_name && (
+                            <span className="font-bold text-blue-700">ช่าง: {wo.assigned_technician_name}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={() => handleStartRepair(wo)}
+                        className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl h-11 shadow-md shadow-emerald-900/10 flex items-center justify-center gap-2"
+                      >
+                        <Play className="w-4 h-4 fill-white" />
+                        START REPAIR (เริ่มซ่อม & จับเวลา)
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 3. IN PROGRESS / WAITING PART (กำลังดำเนินการซ่อมบำรุง) */}
+          {(breakdownFilter === 'ALL' || breakdownFilter === 'IN_PROGRESS') && (
+            <div className="space-y-3">
+              <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-amber-600" />
+                งานที่กำลังดำเนินการซ่อม (In Progress & Waiting) ({inProgressJobs.length})
+              </h3>
+
+              {inProgressJobs.length === 0 ? (
+                <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                  ไม่มีงานซ่อมที่กำลังดำเนินการอยู่
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {inProgressJobs.map(wo => (
+                    <div
+                      key={wo.id}
+                      className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 hover:shadow-md transition-shadow flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            wo.status === 'IN_PROGRESS' ? 'bg-amber-100 text-amber-900' :
+                            wo.status === 'WAITING_PART' ? 'bg-orange-100 text-orange-900' :
+                            'bg-indigo-100 text-indigo-900'
+                          }`}>
+                            {formatWorkOrderStatus(wo.status)}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-stone-900 mt-2">{wo.machine_code} - {wo.machine_name}</h4>
+                        <p className="text-xs text-stone-600 mt-1 line-clamp-2">{wo.symptom_description || wo.symptom_category}</p>
+
+                        {/* Attachments preview */}
+                        {wo.photo_before_urls && wo.photo_before_urls.length > 0 && (
+                          <div className="pt-2">
+                            <MediaAttachmentViewer
+                              urls={wo.photo_before_urls}
+                              title="ภาพถ่าย/วิดีโออาการ"
+                              woNumber={wo.wo_number}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2 border-t border-stone-100">
+                        <Button
+                          onClick={() => setPartModalWO(wo)}
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 text-xs rounded-xl h-9 border-stone-300"
+                        >
+                          + ใช้อะไหล่
+                        </Button>
+                        <Button
+                          onClick={() => setCompleteModalData({ wo, targetStatus: 'COMPLETED' })}
+                          size="sm"
+                          className="flex-1 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl h-9"
+                        >
+                          ปิดงานซ่อม
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 4. NEW REQUESTS (งานแจ้งซ่อมใหม่ รอรับเรื่อง) */}
+          {(breakdownFilter === 'ALL' || breakdownFilter === 'NEW') && (
+            <div className="space-y-3">
+              <h3 className="text-base font-black text-stone-800 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+                งานแจ้งซ่อมใหม่ รอรับเรื่อง (New Requests) ({newRequests.length})
+              </h3>
+
+              {newRequests.length === 0 ? (
+                <div className="bg-white p-6 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
+                  ไม่มีงานแจ้งซ่อมใหม่ที่รอรับเรื่องในขณะนี้
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {newRequests.map(wo => (
+                    <div
+                      key={wo.id}
+                      className="bg-white border border-stone-200 rounded-3xl p-5 shadow-sm space-y-3 flex flex-col justify-between"
+                    >
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <span className="font-mono text-xs font-bold text-stone-500">{wo.wo_number}</span>
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-stone-100 text-stone-700">
+                            {wo.priority}
+                          </span>
+                        </div>
+
+                        <h4 className="text-sm font-bold text-stone-900 mt-1">{wo.machine_code} - {wo.machine_name}</h4>
+                        <div className="text-xs text-stone-600 font-medium mt-0.5">{wo.symptom_category}</div>
+                        <div className="text-[11px] text-stone-400 mt-1">ผู้แจ้ง: {wo.requester_name}</div>
+                      </div>
+
+                      <Button
+                        onClick={() => handleAcceptJob(wo)}
+                        className="w-full bg-[#2A2521] hover:bg-stone-800 text-white font-bold text-xs rounded-xl h-10 shadow-xs"
+                      >
+                        ACCEPT (รับงานนี้)
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4. JOBS WAITING PRODUCTION VERIFY */}
           {workOrders.filter(w => w.status === 'COMPLETED' || w.status === 'TEST_RUN').length > 0 && (
