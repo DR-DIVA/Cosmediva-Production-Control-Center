@@ -205,8 +205,8 @@ export function buildBreakdownFlexMessage(params: {
               text: '🚨 แจ้งซ่อมเครื่องจักร',
               weight: 'bold',
               color: '#FFFFFF',
-              size: 'md',
-              flex: 1
+              size: 'sm',
+              flex: 3
             },
             {
               type: 'text',
@@ -214,7 +214,8 @@ export function buildBreakdownFlexMessage(params: {
               color: '#FDE047',
               size: 'xs',
               weight: 'bold',
-              align: 'end'
+              align: 'end',
+              flex: 2
             }
           ]
         },
@@ -224,7 +225,7 @@ export function buildBreakdownFlexMessage(params: {
           color: '#FEF08A',
           size: 'xs',
           weight: 'bold',
-          margin: 'sm'
+          margin: 'xs'
         }
       ]
     },
@@ -279,7 +280,8 @@ export function buildBreakdownFlexMessage(params: {
               text: `📍 ${params.departmentName || 'ฝ่ายผลิต'} • ${params.location || 'คลัง/ไลน์ผลิต'}`,
               size: 'xs',
               color: '#64748B',
-              margin: 'xs'
+              margin: 'xs',
+              wrap: true
             }
           ]
         },
