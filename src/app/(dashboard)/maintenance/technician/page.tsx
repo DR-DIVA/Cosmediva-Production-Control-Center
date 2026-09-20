@@ -444,7 +444,7 @@ export default function TechnicianCockpitPage() {
                         </Button>
                       )}
 
-                      {wo.status === 'ACKNOWLEDGED' && (
+                      {(wo.status === 'ACKNOWLEDGED' || wo.status === 'ASSIGNED') && (
                         <Button
                           onClick={() => handleStartRepair(wo)}
                           className="col-span-2 h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-sm rounded-2xl shadow-lg shadow-emerald-900/20 flex items-center justify-center gap-2"

@@ -16,7 +16,8 @@ import {
   CheckCircle2,
   ExternalLink,
   RefreshCw,
-  Plus
+  Plus,
+  Play
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -45,6 +46,7 @@ export default function WorkOrdersKanbanPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [selectedWOForVerify, setSelectedWOForVerify] = useState<MaintenanceWorkOrder | null>(null)
   const [detailWO, setDetailWO] = useState<MaintenanceWorkOrder | null>(null)
+  const [assignTechName, setAssignTechName] = useState('')
 
   const fetchWOs = async () => {
     setIsLoading(true)
@@ -68,6 +70,43 @@ export default function WorkOrdersKanbanPage() {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     fetchWOs()
+  }
+
+  const handleAssignTechnician = async () => {
+    if (!detailWO || !assignTechName.trim()) return
+    const res = await transitionWorkOrderStatus({
+      work_order_id: detailWO.id,
+      to_status: 'ASSIGNED',
+      assigned_technician_name: assignTechName.trim(),
+      changed_by_name: assignTechName.trim(),
+      notes: `มอบหมายงานให้ ${assignTechName.trim()} รับผิดชอบ`
+    })
+    if (res.success) {
+      toast.success(`มอบหมายงาน ${detailWO.wo_number} ให้ ${assignTechName} สำเร็จ!`)
+      setDetailWO(null)
+      fetchWOs()
+    } else {
+      toast.error(res.error || 'เกิดข้อผิดพลาดในการมอบหมายงาน')
+    }
+  }
+
+  const handleStartRepairFromModal = async () => {
+    if (!detailWO) return
+    const tech = detailWO.assigned_technician_name || assignTechName.trim() || 'ช่างซ่อมบำรุง'
+    const res = await transitionWorkOrderStatus({
+      work_order_id: detailWO.id,
+      to_status: 'IN_PROGRESS',
+      assigned_technician_name: tech,
+      changed_by_name: tech,
+      notes: `${tech} เริ่มดำเนินการตรวจซ่อม`
+    })
+    if (res.success) {
+      toast.success(`เริ่มงานซ่อม ${detailWO.wo_number} แล้ว! ระบบเริ่มจับเวลา Downtime`)
+      setDetailWO(null)
+      fetchWOs()
+    } else {
+      toast.error(res.error || 'เกิดข้อผิดพลาด')
+    }
   }
 
   return (
@@ -164,7 +203,10 @@ export default function WorkOrdersKanbanPage() {
                       return (
                         <div
                           key={wo.id}
-                          onClick={() => setDetailWO(wo)}
+                          onClick={() => {
+                            setDetailWO(wo)
+                            setAssignTechName(wo.assigned_technician_name || '')
+                          }}
                           className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${
                             isCritical
                               ? 'border-red-500 ring-2 ring-red-500/20'
@@ -293,6 +335,71 @@ export default function WorkOrdersKanbanPage() {
                     <span className="font-bold">{p.quantity} {p.unit} (฿{Number(p.total_cost).toLocaleString()})</span>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {/* Action Bar for Technician Assignment and Start Repair */}
+            {['NEW', 'ACKNOWLEDGED', 'ASSIGNED'].includes(detailWO.status) && (
+              <div className="bg-blue-50/70 p-3.5 rounded-2xl border border-blue-200/70 space-y-2.5">
+                <div className="flex items-center justify-between text-xs font-bold text-blue-950">
+                  <span>⚡ ดำเนินการฝ่ายช่าง (Technician Actions)</span>
+                  <Link
+                    href="/maintenance/technician"
+                    className="text-[11px] text-blue-700 hover:text-blue-900 hover:underline flex items-center gap-1 font-semibold"
+                  >
+                    <Wrench className="w-3 h-3" />
+                    เปิดโหมดช่าง 📱
+                  </Link>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="flex-1 flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-blue-200 shadow-2xs">
+                    <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
+                    <input
+                      type="text"
+                      placeholder="พิมพ์หรือระบุชื่อช่างผู้รับผิดชอบ..."
+                      value={assignTechName}
+                      onChange={e => setAssignTechName(e.target.value)}
+                      className="text-xs w-full bg-transparent border-none outline-none font-medium text-stone-800"
+                    />
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={handleAssignTechnician}
+                    disabled={!assignTechName.trim()}
+                    className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-xs"
+                  >
+                    มอบหมายช่าง (Assign)
+                  </Button>
+                </div>
+
+                <Button
+                  size="sm"
+                  onClick={handleStartRepairFromModal}
+                  className="w-full h-9 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white" />
+                  START REPAIR (เริ่มซ่อม & จับเวลาทันที)
+                </Button>
+              </div>
+            )}
+
+            {detailWO.status === 'IN_PROGRESS' && (
+              <div className="bg-amber-50 p-3 rounded-2xl border border-amber-200 flex items-center justify-between">
+                <div className="text-xs text-amber-900">
+                  <span className="font-bold flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
+                    กำลังดำเนินการซ่อม
+                  </span>
+                  <span className="text-[11px] text-amber-700 block mt-0.5">ช่างกำลังซ่อมและจับเวลาจริง สามารถไปบันทึกผล/เบิกอะไหล่ได้ในโหมดช่าง</span>
+                </div>
+                <Link
+                  href="/maintenance/technician"
+                  className="px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white text-xs font-bold rounded-xl transition flex items-center gap-1 shrink-0 ml-2"
+                >
+                  <Wrench className="w-3.5 h-3.5 text-amber-400" />
+                  โหมดช่าง 🔧
+                </Link>
               </div>
             )}
 
