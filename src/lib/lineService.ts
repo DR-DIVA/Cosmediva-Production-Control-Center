@@ -300,21 +300,25 @@ export function buildBreakdownFlexMessage(params: {
             {
               type: 'box',
               layout: 'horizontal',
+              alignItems: 'center',
               contents: [
                 {
                   type: 'text',
                   text: isService ? '🏢 งานบริการอาคาร & สถานที่' : params.machineCode,
                   weight: 'bold',
-                  size: isService ? 'md' : 'lg',
+                  size: 'md',
                   color: isService ? '#6B21A8' : '#0F172A',
-                  flex: 1
+                  wrap: true,
+                  flex: 4
                 },
                 {
                   type: 'text',
                   text: isService ? 'บริการทั่วไป' : `Grade ${params.criticality || 'B'}`,
                   size: 'xs',
                   color: isService ? '#7C3AED' : (params.criticality === 'A' ? '#DC2626' : '#2563EB'),
-                  weight: 'bold'
+                  weight: 'bold',
+                  align: 'end',
+                  flex: 1
                 }
               ]
             },
@@ -462,7 +466,8 @@ export function buildWorkOrderStatusFlexMessage(params: {
           text: `${params.machineCode} - ${params.machineName}`,
           weight: 'bold',
           size: 'md',
-          color: '#0F172A'
+          color: '#0F172A',
+          wrap: true
         },
         {
           type: 'box',
@@ -569,7 +574,8 @@ export function buildWorkOrderClosedFlexMessage(params: {
           text: `${params.machineCode} - ${params.machineName}`,
           weight: 'bold',
           size: 'md',
-          color: '#0F172A'
+          color: '#0F172A',
+          wrap: true
         },
         {
           type: 'box',
