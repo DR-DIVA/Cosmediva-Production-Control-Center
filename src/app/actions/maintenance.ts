@@ -700,9 +700,39 @@ export async function createRepairRequest(payload: {
       machine = m
     }
 
-    const machineId = machine?.id || null
+    // Fallback: If FACILITY or machine not found, resolve to FACILITY machine record
+    if (!machine) {
+      const { data: fac } = await supabase
+        .from('maintenance_machines')
+        .select('*')
+        .eq('machine_code', 'FACILITY')
+        .maybeSingle()
+      machine = fac
+
+      if (!machine) {
+        const { data: facCreated } = await supabase
+          .from('maintenance_machines')
+          .upsert({
+            machine_code: 'FACILITY',
+            machine_name: 'งานบริการอาคาร & สิ่งอำนวยความสะดวก (Facility & Building Service)',
+            category: 'Utility',
+            department_name: payload.requester_department_name || 'ฝ่ายบริการทั่วไป & อาคาร',
+            criticality: 'C',
+            status: 'Running',
+            hourly_downtime_cost: 0,
+            is_active: true
+          }, { onConflict: 'machine_code' })
+          .select()
+          .single()
+        machine = facCreated
+      }
+    }
+
+    const machineId = machine?.id
     const machineCode = machine?.machine_code || 'FACILITY'
-    const machineName = machine?.machine_name || 'งานบริการอาคาร & สิ่งอำนวยความสะดวก (Facility Service)'
+    const machineName = machine?.machine_code === 'FACILITY'
+      ? 'งานบริการอาคาร & สิ่งอำนวยความสะดวก (Facility Service)'
+      : (machine?.machine_name || 'งานบริการอาคาร & สิ่งอำนวยความสะดวก (Facility Service)')
     const departmentName = payload.requester_department_name || machine?.department_name || 'ฝ่ายบริการทั่วไป & อาคาร'
 
     // 2. Recommend/Calculate Priority
@@ -764,7 +794,7 @@ export async function createRepairRequest(payload: {
     }
 
     // 6. If Emergency or Production Stopped, update machine status to Breakdown
-    if (machine && (priority === 'P1_CRITICAL' || priority === 'P2_HIGH')) {
+    if (machine && machine.machine_code !== 'FACILITY' && (priority === 'P1_CRITICAL' || priority === 'P2_HIGH')) {
       await supabase
         .from('maintenance_machines')
         .update({ status: 'Breakdown', updated_at: now })
