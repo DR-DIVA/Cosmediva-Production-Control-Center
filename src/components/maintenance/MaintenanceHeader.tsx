@@ -27,12 +27,20 @@ interface MaintenanceHeaderProps {
   machines?: MaintenanceMachine[]
 }
 
+interface NavItem {
+  label: string
+  href: string
+  icon: any
+  badge?: string
+  color: string
+}
+
 export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [] }: MaintenanceHeaderProps) {
   const pathname = usePathname()
   const [isLineOpen, setIsLineOpen] = useState(false)
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false)
 
-  const navItems = [
+  const row1Items: NavItem[] = [
     { 
       label: 'ภาพรวมระบบ', 
       href: '/maintenance', 
@@ -40,17 +48,17 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       color: 'bg-blue-100 text-blue-700 border-blue-200' 
     },
     { 
-      label: 'ช่างหน้างาน (My Tasks)', 
+      label: 'ช่างหน้างาน', 
       href: '/maintenance/technician', 
       icon: HardHat, 
-      badge: 'ช่าง',
+      badge: 'My Tasks',
       color: 'bg-amber-100 text-amber-800 border-amber-200' 
     },
     { 
-      label: 'ศูนย์ควบคุมงาน (Kanban)', 
+      label: 'ศูนย์ควบคุมงาน', 
       href: '/maintenance/work-orders', 
       icon: KanbanSquare,
-      badge: 'หัวหน้า',
+      badge: 'Kanban',
       color: 'bg-purple-100 text-purple-700 border-purple-200' 
     },
     { 
@@ -73,6 +81,9 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       badge: 'QR',
       color: 'bg-rose-100 text-rose-800 border-rose-200' 
     },
+  ]
+
+  const row2NavItems: NavItem[] = [
     { 
       label: 'คลังอะไหล่', 
       href: '/maintenance/spare-parts', 
@@ -195,38 +206,83 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
         </div>
       </div>
 
-      {/* Prominent Icon Navigation Deck (Large, Clear, Tactile & Responsive) */}
-      <div className="bg-white p-2.5 sm:p-3 rounded-3xl border border-stone-200 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
-          {navItems.map(item => {
+      {/* 11 Sub-Menu Buttons Structured into Exactly 2 Rows */}
+      <div className="bg-white p-2.5 sm:p-3 rounded-3xl border border-stone-200 shadow-sm space-y-2">
+        {/* Row 1: 6 Functional Modules */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+          {row1Items.map(item => {
             const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
             const Icon = item.icon
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 ${
+                className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
                   isActive
                     ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
                     : 'bg-stone-50/80 hover:bg-stone-100 text-stone-800 border border-stone-200 hover:border-stone-300 shadow-2xs hover:shadow-xs'
                 }`}
               >
-                {/* Large Icon Image Container */}
-                <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+                {/* Large Icon Container */}
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                   isActive
                     ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
                     : `${item.color}`
                 }`}>
-                  <Icon className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+                  <Icon className="w-4 h-4 stroke-[2.2]" />
                 </div>
 
-                {/* Text Label */}
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-xs sm:text-sm font-extrabold ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                {/* Text Label & Badge */}
+                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                  <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
                     {item.label}
                   </span>
                   {item.badge && (
-                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono ${
+                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono shrink-0 ${
+                      isActive 
+                        ? 'bg-[#D4AF37] text-stone-950' 
+                        : 'bg-stone-200 text-stone-700 border border-stone-300'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+
+        {/* Row 2: 5 Management & Quick Tool Modules */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+          {row2NavItems.map(item => {
+            const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
+            const Icon = item.icon
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
+                  isActive
+                    ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
+                    : 'bg-stone-50/80 hover:bg-stone-100 text-stone-800 border border-stone-200 hover:border-stone-300 shadow-2xs hover:shadow-xs'
+                }`}
+              >
+                {/* Large Icon Container */}
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
+                  isActive
+                    ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
+                    : `${item.color}`
+                }`}>
+                  <Icon className="w-4 h-4 stroke-[2.2]" />
+                </div>
+
+                {/* Text Label & Badge */}
+                <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+                  <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-stone-900'}`}>
+                    {item.label}
+                  </span>
+                  {item.badge && (
+                    <span className={`px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono shrink-0 ${
                       isActive 
                         ? 'bg-[#D4AF37] text-stone-950' 
                         : 'bg-stone-200 text-stone-700 border border-stone-300'
@@ -239,21 +295,21 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             )
           })}
 
-          {/* LINE Notification Settings Button (Moved to Lower Deck) */}
+          {/* LINE Notification Settings Button */}
           <button
             type="button"
             onClick={() => setIsLineOpen(true)}
-            className="group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400 shadow-2xs hover:shadow-xs cursor-pointer"
+            className="group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all active:scale-95 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400 shadow-2xs hover:shadow-xs cursor-pointer w-full min-w-0 justify-start"
             title="ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-emerald-400 bg-[#06C755] text-white shadow-xs transition-transform group-hover:scale-105">
-              <MessageSquare className="w-4.5 h-4.5 sm:w-5 sm:h-5 fill-white stroke-none" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-emerald-400 bg-[#06C755] text-white shadow-xs transition-transform group-hover:scale-105">
+              <MessageSquare className="w-4 h-4 fill-white stroke-none" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs sm:text-sm font-extrabold text-emerald-950">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+              <span className="text-xs font-extrabold text-emerald-950 truncate">
                 ตั้งค่า LINE
               </span>
-              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-emerald-200 text-emerald-900 border border-emerald-300">
+              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-emerald-200 text-emerald-900 border border-emerald-300 shrink-0">
                 LINE Bot
               </span>
             </div>
@@ -266,17 +322,17 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
               if (onOpenQR) onOpenQR()
               else setIsQRScannerOpen(true)
             }}
-            className="group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer"
+            className="group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer w-full min-w-0 justify-start"
             title="สแกน QR Code หน้าเครื่อง เพื่อแจ้งซ่อมหรือดูประวัติ 360°"
           >
-            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-amber-500 text-white shadow-xs transition-transform group-hover:scale-105">
-              <QrCode className="w-4.5 h-4.5 sm:w-5 sm:h-5 stroke-[2.2]" />
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-amber-500 text-white shadow-xs transition-transform group-hover:scale-105">
+              <QrCode className="w-4 h-4 stroke-[2.2]" />
             </div>
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs sm:text-sm font-extrabold text-amber-950">
+            <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+              <span className="text-xs font-extrabold text-amber-950 truncate">
                 สแกน QR หน้าเครื่อง
               </span>
-              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300">
+              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-amber-200 text-amber-900 border border-amber-300 shrink-0">
                 Scan
               </span>
             </div>
