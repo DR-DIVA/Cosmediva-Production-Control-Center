@@ -705,7 +705,7 @@ export async function createRepairRequest(payload: {
     priority = 'P1_CRITICAL'
   } else if (payload.production_impact === 'Machine stopped' || payload.production_impact === 'Safety risk') {
     priority = 'P2_HIGH'
-  } else if (payload.production_impact === 'Quality risk') {
+  } else if (payload.production_impact === 'Quality risk' || payload.production_impact === 'Intermittent stops') {
     priority = 'P2_HIGH'
   }
 

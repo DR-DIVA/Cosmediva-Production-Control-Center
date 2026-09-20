@@ -41,13 +41,16 @@ export type SymptomCategory =
   | 'Quality Problem'
   | 'Safety Problem'
   | 'Other'
+  | (string & {})
 
 export type ProductionImpact = 
   | 'Machine stopped'
   | 'Production stopped'
+  | 'Intermittent stops'
   | 'Production can continue'
   | 'Quality risk'
   | 'Safety risk'
+  | (string & {})
 
 export type RootCauseCategory = 
   | 'Wear & Tear'

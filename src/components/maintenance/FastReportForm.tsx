@@ -57,6 +57,7 @@ const SYMPTOMS: { label: SymptomCategory; icon: any; color: string }[] = [
 const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] = [
   { label: 'Production stopped', text: '🛑 Production หยุดทั้งหมด (สายการผลิตชะงัก)', badgeColor: 'bg-red-600 text-white' },
   { label: 'Machine stopped', text: '⏸️ เครื่องจักรหยุด (แต่แผนกอื่นยังเดินได้)', badgeColor: 'bg-orange-600 text-white' },
+  { label: 'Intermittent stops', text: '🔄 เครื่องยังเดินต่อได้ (แต่หยุดบ่อยเพราะไม่ปกติ)', badgeColor: 'bg-amber-500 text-stone-950' },
   { label: 'Quality risk', text: '⚠️ เสี่ยงกระทบคุณภาพสินค้า / ต้องซ่อมด่วน', badgeColor: 'bg-amber-500 text-white' },
   { label: 'Safety risk', text: '🚨 อันตรายต่อความปลอดภัยของผู้ปฏิบัติงาน', badgeColor: 'bg-rose-600 text-white' },
   { label: 'Production can continue', text: '🟢 เครื่องยังเดินต่อได้ (ซ่อมตามรอบ/มีนัดหมาย)', badgeColor: 'bg-emerald-600 text-white' }
@@ -66,6 +67,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
   const router = useRouter()
   const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || machines[0] || null)
   const [symptom, setSymptom] = useState<SymptomCategory>('เครื่องหยุดกลางงาน')
+  const [customSymptom, setCustomSymptom] = useState('')
   const [impact, setImpact] = useState<ProductionImpact>('Production stopped')
   const [isEmergency, setIsEmergency] = useState(true)
   const [description, setDescription] = useState('')
@@ -80,6 +82,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
     setIsEmergency(true)
     setImpact('Production stopped')
     setSymptom('เครื่องหยุดกลางงาน')
+    setCustomSymptom('')
     toast.error('🚨 โหมด BREAKDOWN NOW: กำหนดงานเป็น P1 Critical และจะจับเวลา Downtime ทันที', {
       duration: 3500
     })
@@ -122,11 +125,13 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
       return
     }
 
+    const finalSymptom = customSymptom.trim() || symptom
+
     setIsSubmitting(true)
     try {
       const res = await createRepairRequest({
         machine_code: selectedMachine.machine_code,
-        symptom_category: symptom,
+        symptom_category: finalSymptom,
         symptom_description: description,
         production_impact: impact,
         is_emergency_breakdown: isEmergency,
@@ -358,20 +363,23 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           <label className="text-xs font-bold text-stone-700 uppercase tracking-wider">
             เลือกอาการที่พบ (TAP อาการ):
           </label>
-          <span className="text-xs font-bold text-[#D4AF37] bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-            เลือก: {symptom}
+          <span className="text-xs font-bold text-[#D4AF37] bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 max-w-[200px] truncate">
+            {customSymptom.trim() ? `ระบุเอง: ${customSymptom}` : `เลือก: ${symptom}`}
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
           {SYMPTOMS.map(s => {
-            const isSelected = symptom === s.label
+            const isSelected = !customSymptom.trim() && symptom === s.label
             const Icon = s.icon
             return (
               <button
                 type="button"
                 key={s.label}
-                onClick={() => setSymptom(s.label)}
+                onClick={() => {
+                  setSymptom(s.label)
+                  setCustomSymptom('')
+                }}
                 className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all text-xs font-bold ${
                   isSelected
                     ? 'bg-stone-900 text-white border-stone-900 shadow-md transform scale-[1.02]'
@@ -383,6 +391,34 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
               </button>
             )
           })}
+        </div>
+
+        {/* Custom Symptom Input Field */}
+        <div className="pt-3 border-t border-stone-100 space-y-1.5">
+          <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+            <span>✍️ หรือระบุ/พิมพ์อาการเสียด้วยตัวเอง (กรณีไม่มีในตัวเลือก):</span>
+          </label>
+          <div className="relative">
+            <Input
+              type="text"
+              value={customSymptom}
+              onChange={(e) => setCustomSymptom(e.target.value)}
+              placeholder="พิมพ์ระบุอาการเสียเอง เช่น ซีลยางขาด, ความร้อนไม่ขึ้น, ฟิล์มติดขัด..."
+              className="w-full h-11 px-3.5 rounded-xl bg-stone-50 border border-stone-200 text-xs font-medium text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37] focus:bg-white transition-all placeholder:text-stone-400"
+            />
+            {customSymptom && (
+              <button
+                type="button"
+                onClick={() => setCustomSymptom('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-500 hover:text-stone-900 bg-stone-200 px-2 py-0.5 rounded-md font-bold"
+              >
+                ล้าง
+              </button>
+            )}
+          </div>
+          <p className="text-[11px] text-stone-400">
+            * หากพิมพ์ระบุในช่องนี้ ระบบจะใช้อาการที่คุณพิมพ์เป็นหัวข้อหลักในการแจ้งเตือนทันที
+          </p>
         </div>
       </div>
 

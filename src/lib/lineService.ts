@@ -187,6 +187,15 @@ export function buildBreakdownFlexMessage(params: {
     year: '2-digit'
   })
 
+  const impactLabel = 
+    params.productionImpact === 'Production stopped' ? '🛑 หยุดการผลิตทั้งหมด (Production Stopped)' :
+    params.productionImpact === 'Machine stopped' ? '⏸️ เครื่องจักรหยุดชะงัก (Machine Stopped)' :
+    params.productionImpact === 'Intermittent stops' ? '🔄 เครื่องยังเดินต่อได้ (แต่หยุดบ่อยเพราะไม่ปกติ)' :
+    params.productionImpact === 'Quality risk' ? '⚠️ เสี่ยงกระทบคุณภาพสินค้า (Quality Risk)' :
+    params.productionImpact === 'Safety risk' ? '🚨 อันตรายต่อความปลอดภัย (Safety Risk)' :
+    params.productionImpact === 'Production can continue' ? '🟢 เครื่องยังเดินต่อได้ (ซ่อมตามรอบ)' :
+    params.productionImpact
+
   return {
     type: 'bubble',
     size: 'mega',
@@ -312,7 +321,7 @@ export function buildBreakdownFlexMessage(params: {
               layout: 'baseline',
               contents: [
                 { type: 'text', text: 'ผลกระทบ:', size: 'xs', color: '#64748B', flex: 2 },
-                { type: 'text', text: params.productionImpact, size: 'xs', color: '#0F172A', weight: 'bold', wrap: true, flex: 5 }
+                { type: 'text', text: impactLabel, size: 'xs', color: '#0F172A', weight: 'bold', wrap: true, flex: 5 }
               ]
             },
             {
