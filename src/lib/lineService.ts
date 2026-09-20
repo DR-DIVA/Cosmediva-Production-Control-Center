@@ -23,7 +23,7 @@ export function getAppBaseUrl(): string {
   if (process.env.RAILWAY_PUBLIC_DOMAIN) {
     return `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
   }
-  return 'https://cosmeflow.up.railway.app'
+  return 'https://cosmediva-production-control-center-production.up.railway.app'
 }
 
 /**

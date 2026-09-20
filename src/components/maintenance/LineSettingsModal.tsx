@@ -311,7 +311,7 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
                   <button
                     type="button"
                     onClick={() => {
-                      const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://cosmeflow.up.railway.app'}/api/line/webhook`
+                      const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://cosmediva-production-control-center-production.up.railway.app'}/api/line/webhook`
                       navigator.clipboard.writeText(url)
                       toast.success('คัดลอก Webhook URL เรียบร้อยแล้ว!')
                     }}
