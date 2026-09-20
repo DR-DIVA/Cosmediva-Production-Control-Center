@@ -174,8 +174,25 @@ export function buildBreakdownFlexMessage(params: {
   const eformUrl = params.workOrderId ? `${baseUrl}/maintenance/work-orders/${params.workOrderId}/eform` : techUrl
 
   const isCritical = params.priority === 'P1_CRITICAL' || params.productionImpact === 'Production stopped'
-  const headerBgColor = isCritical ? '#B91C1C' : '#EA580C'
-  const urgencyLabel = isCritical ? '🚨 ฉุกเฉิน: หยุดการผลิต (Critical)' : '⚠️ แจ้งซ่อมด่วน (High Priority)'
+  const isService = params.symptomCategory.includes('บริการ') || params.symptomCategory.includes('หลอดไฟ') || params.symptomCategory.includes('แอร์') || params.symptomCategory.includes('ประปา')
+
+  const headerBgColor = 
+    isCritical ? '#B91C1C' : 
+    isService ? '#6B21A8' : 
+    params.priority === 'P2_HIGH' ? '#EA580C' : 
+    '#2563EB'
+
+  const headerTitle = 
+    isCritical ? '🚨 แจ้งซ่อมด่วน (ฉุกเฉิน)' :
+    isService ? '💡 แจ้งซ่อมบริการ & อาคาร' :
+    params.priority === 'P2_HIGH' ? '⚠️ แจ้งซ่อมด่วน' :
+    '🛠️ แจ้งซ่อมทั่วไป'
+
+  const urgencyLabel = 
+    isCritical ? '🚨 กระทบการผลิต: หยุดการผลิตทันที (Critical)' :
+    isService ? '💡 งานบริการสิ่งอำนวยความสะดวก & อาคารสถานที่' :
+    params.priority === 'P2_HIGH' ? '⚠️ มีความเสี่ยงต่อการผลิต (High Priority)' :
+    '🛠️ ไม่กระทบการผลิต (ซ่อมบำรุงตามรอบ)'
 
   const timeStr = params.reportedAt
     ? new Date(params.reportedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) + ' น.'
@@ -211,7 +228,7 @@ export function buildBreakdownFlexMessage(params: {
           contents: [
             {
               type: 'text',
-              text: '🚨 แจ้งซ่อมเครื่องจักร',
+              text: headerTitle,
               weight: 'bold',
               color: '#FFFFFF',
               size: 'sm',

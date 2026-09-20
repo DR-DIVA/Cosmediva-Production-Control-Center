@@ -54,6 +54,18 @@ const SYMPTOMS: { label: SymptomCategory; icon: any; color: string }[] = [
   { label: 'Other', icon: HelpCircle, color: 'hover:border-stone-400 hover:bg-stone-50' }
 ]
 
+const FACILITY_SYMPTOMS: { label: string; icon: any; color: string }[] = [
+  { label: '💡 เปลี่ยนหลอดไฟ / แสงสว่าง', icon: Zap, color: 'hover:border-amber-500 hover:bg-amber-50' },
+  { label: '❄️ แอร์ไม่เย็น / น้ำแอร์หยด', icon: Thermometer, color: 'hover:border-cyan-500 hover:bg-cyan-50' },
+  { label: '🚰 ประปา / ก๊อกน้ำรั่ว / ท่อตัน', icon: Droplets, color: 'hover:border-blue-500 hover:bg-blue-50' },
+  { label: '🔌 ปลั๊กไฟ / สวิตช์ / ไฟดับ', icon: Zap, color: 'hover:border-yellow-500 hover:bg-yellow-50' },
+  { label: '🚪 ประตู / หน้าต่าง / ลูกบิดชำรุด', icon: Wrench, color: 'hover:border-purple-500 hover:bg-purple-50' },
+  { label: '🧹 ท่อระบายน้ำ / กลิ่นผิดปกติ', icon: HelpCircle, color: 'hover:border-stone-500 hover:bg-stone-50' },
+  { label: '📦 งานช่างบริการอื่นๆ', icon: HelpCircle, color: 'hover:border-stone-400 hover:bg-stone-50' }
+]
+
+export type RepairTypeCategory = 'EMERGENCY' | 'GENERAL' | 'SERVICE'
+
 const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] = [
   { label: 'Production stopped', text: '🛑 Production หยุดทั้งหมด (สายการผลิตชะงัก)', badgeColor: 'bg-red-600 text-white' },
   { label: 'Machine stopped', text: '⏸️ เครื่องจักรหยุด (แต่แผนกอื่นยังเดินได้)', badgeColor: 'bg-orange-600 text-white' },
@@ -66,6 +78,8 @@ const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] =
 export default function FastReportForm({ initialMachine, machines }: FastReportFormProps) {
   const router = useRouter()
   const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || machines[0] || null)
+  const [repairType, setRepairType] = useState<RepairTypeCategory>('EMERGENCY')
+  const [facilityLocation, setFacilityLocation] = useState('')
   const [symptom, setSymptom] = useState<SymptomCategory>('เครื่องหยุดกลางงาน')
   const [customSymptom, setCustomSymptom] = useState('')
   const [impact, setImpact] = useState<ProductionImpact>('Production stopped')
@@ -79,6 +93,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
 
   // One-tap EMERGENCY BREAKDOWN trigger
   const handleTriggerEmergency = () => {
+    setRepairType('EMERGENCY')
     setIsEmergency(true)
     setImpact('Production stopped')
     setSymptom('เครื่องหยุดกลางงาน')
@@ -126,13 +141,18 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
     }
 
     const finalSymptom = customSymptom.trim() || symptom
+    const fullDescription = [
+      facilityLocation.trim() ? `📍 พื้นที่/จุดเกิดเหตุ: ${facilityLocation.trim()}` : null,
+      repairType === 'SERVICE' ? `[ประเภท: แจ้งซ่อมบริการ & อาคารสถานที่]` : repairType === 'GENERAL' ? `[ประเภท: แจ้งซ่อมทั่วไป (ไม่กระทบการผลิต)]` : `[ประเภท: แจ้งซ่อมด่วนฉุกเฉิน (กระทบการผลิต)]`,
+      description.trim() ? description.trim() : null
+    ].filter(Boolean).join('\n')
 
     setIsSubmitting(true)
     try {
       const res = await createRepairRequest({
         machine_code: selectedMachine.machine_code,
-        symptom_category: finalSymptom,
-        symptom_description: description,
+        symptom_category: repairType === 'SERVICE' && !finalSymptom.includes('บริการ') ? `[บริการ] ${finalSymptom}` : finalSymptom,
+        symptom_description: fullDescription,
         production_impact: impact,
         is_emergency_breakdown: isEmergency,
         requester_name: requesterName,
@@ -287,14 +307,97 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
 
   return (
     <form onSubmit={handleSubmit} className="max-w-xl mx-auto space-y-5 pb-10">
-      {/* 1. MACHINE IDENTIFICATION */}
+      {/* 0. REPAIR TYPE SELECTOR (3 CASES) */}
+      <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+        <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
+          ประเภทการแจ้งซ่อม (เลือก 1 กรณี):
+        </label>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Case 1: แจ้งซ่อมด่วน */}
+          <button
+            type="button"
+            onClick={() => {
+              setRepairType('EMERGENCY')
+              setIsEmergency(true)
+              setImpact('Production stopped')
+              setSymptom('เครื่องหยุดกลางงาน')
+              setCustomSymptom('')
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+              repairType === 'EMERGENCY'
+                ? 'bg-red-50/80 border-red-500 ring-2 ring-red-400 text-red-950 shadow-sm'
+                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-black text-xs sm:text-sm text-red-700">🚨 แจ้งซ่อมด่วน</span>
+              {repairType === 'EMERGENCY' && <CheckCircle2 className="w-4 h-4 text-red-600" />}
+            </div>
+            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+              กระทบกับการผลิต (เครื่องหยุด / สายชะงัก)
+            </div>
+          </button>
+
+          {/* Case 2: แจ้งซ่อมทั่วไป */}
+          <button
+            type="button"
+            onClick={() => {
+              setRepairType('GENERAL')
+              setIsEmergency(false)
+              setImpact('Production can continue')
+              setSymptom('เสียงผิดปกติ')
+              setCustomSymptom('')
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+              repairType === 'GENERAL'
+                ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-400 text-blue-950 shadow-sm'
+                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-black text-xs sm:text-sm text-blue-700">🛠️ แจ้งซ่อมทั่วไป</span>
+              {repairType === 'GENERAL' && <CheckCircle2 className="w-4 h-4 text-blue-600" />}
+            </div>
+            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+              ไม่กระทบกับการผลิต (เครื่องยังเดินต่อได้)
+            </div>
+          </button>
+
+          {/* Case 3: แจ้งซ่อมบริการ */}
+          <button
+            type="button"
+            onClick={() => {
+              setRepairType('SERVICE')
+              setIsEmergency(false)
+              setImpact('Production can continue')
+              setSymptom('เปลี่ยนหลอดไฟ / แสงสว่าง')
+              setCustomSymptom('')
+            }}
+            className={`p-3.5 rounded-2xl border text-left transition-all relative ${
+              repairType === 'SERVICE'
+                ? 'bg-purple-50/80 border-purple-500 ring-2 ring-purple-400 text-purple-950 shadow-sm'
+                : 'bg-stone-50 border-stone-200 text-stone-700 hover:bg-stone-100'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="font-black text-xs sm:text-sm text-purple-700">💡 แจ้งซ่อมบริการ</span>
+              {repairType === 'SERVICE' && <CheckCircle2 className="w-4 h-4 text-purple-600" />}
+            </div>
+            <div className="text-[11px] text-stone-600 mt-1 font-medium leading-tight">
+              งานบริการอาคาร (เปลี่ยนหลอดไฟ, แอร์, ประปา)
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* 1. MACHINE / LOCATION IDENTIFICATION */}
       <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-xs font-bold text-[#8B7355] uppercase tracking-wider flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-[#D4AF37]"></span>
-            เครื่องจักรที่เกิดปัญหา (Machine)
+            {repairType === 'SERVICE' ? 'เครื่องจักรหรือพื้นที่อาคารที่เกี่ยวข้อง (Location/Asset)' : 'เครื่องจักรที่เกิดปัญหา (Machine)'}
           </div>
-          <span className="text-[11px] text-stone-400">ระบุจาก QR อัตโนมัติ</span>
+          <span className="text-[11px] text-stone-400">ระบุจาก QR หรือเลือกเอง</span>
         </div>
 
         <div className="relative">
@@ -315,6 +418,22 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           <ChevronDown className="w-5 h-5 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
 
+        {/* Extra location field for Facility Service */}
+        {repairType === 'SERVICE' && (
+          <div className="pt-2 border-t border-stone-100 space-y-1.5">
+            <label className="text-xs font-bold text-stone-700">
+              📍 ระบุห้อง / จุดเกิดเหตุ (เช่น ห้องประชุม 2, โรงอาหาร, แผนกแพ็คกิ้ง, เสา B3):
+            </label>
+            <Input
+              type="text"
+              value={facilityLocation}
+              onChange={(e) => setFacilityLocation(e.target.value)}
+              placeholder="พิมพ์ระบุจุดติดตั้งหรือห้องที่ต้องการให้ช่างไปบริการ..."
+              className="h-11 rounded-xl bg-stone-50 border-stone-200 text-xs font-medium text-stone-900 focus:bg-white"
+            />
+          </div>
+        )}
+
         {selectedMachine && (
           <div className="flex items-center justify-between text-xs text-stone-600 bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/50">
             <div>
@@ -331,37 +450,59 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
         )}
       </div>
 
-      {/* 2. EMERGENCY BREAKDOWN BUTTON */}
-      <button
-        type="button"
-        onClick={handleTriggerEmergency}
-        className={`w-full p-4 rounded-3xl flex items-center justify-between transition-all transform active:scale-98 shadow-lg ${
-          isEmergency
-            ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-2 border-red-400 ring-4 ring-red-500/20 shadow-red-900/30'
-            : 'bg-stone-100 text-stone-700 border border-stone-300 hover:bg-red-50 hover:text-red-700 hover:border-red-400'
-        }`}
-      >
-        <div className="flex items-center gap-3 text-left">
-          <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
-            <Flame className="w-7 h-7 animate-bounce" />
+      {/* 2. MODE BANNER */}
+      {repairType === 'EMERGENCY' ? (
+        <button
+          type="button"
+          onClick={handleTriggerEmergency}
+          className={`w-full p-4 rounded-3xl flex items-center justify-between transition-all transform active:scale-98 shadow-lg ${
+            isEmergency
+              ? 'bg-gradient-to-r from-red-600 via-rose-600 to-red-700 text-white border-2 border-red-400 ring-4 ring-red-500/20 shadow-red-900/30'
+              : 'bg-stone-100 text-stone-700 border border-stone-300 hover:bg-red-50 hover:text-red-700 hover:border-red-400'
+          }`}
+        >
+          <div className="flex items-center gap-3 text-left">
+            <div className="w-12 h-12 rounded-2xl bg-white/20 flex items-center justify-center text-white shrink-0">
+              <Flame className="w-7 h-7 animate-bounce" />
+            </div>
+            <div>
+              <div className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
+                🚨 BREAKDOWN NOW
+                {isEmergency && <span className="text-xs bg-white text-red-700 font-extrabold px-2 py-0.5 rounded-full">เปิดใช้งาน</span>}
+              </div>
+              <div className="text-xs opacity-90">
+                กดทันทีเมื่อเครื่องจักรหยุดและส่งผลให้การผลิตหยุดชะงัก (P1 Critical)
+              </div>
+            </div>
+          </div>
+        </button>
+      ) : repairType === 'GENERAL' ? (
+        <div className="p-4 rounded-3xl bg-blue-50 border border-blue-200 flex items-center gap-3 text-blue-900 shadow-xs">
+          <div className="w-10 h-10 rounded-2xl bg-blue-100 flex items-center justify-center text-blue-700 shrink-0">
+            <Wrench className="w-5 h-5" />
           </div>
           <div>
-            <div className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
-              🚨 BREAKDOWN NOW
-              {isEmergency && <span className="text-xs bg-white text-red-700 font-extrabold px-2 py-0.5 rounded-full">เปิดใช้งาน</span>}
-            </div>
-            <div className="text-xs opacity-90">
-              กดทันทีเมื่อเครื่องจักรหยุดและส่งผลให้การผลิตหยุดชะงัก (P1 Critical)
-            </div>
+            <div className="font-bold text-xs sm:text-sm text-blue-800">โหมด: แจ้งซ่อมทั่วไป (ไม่กระทบกับการผลิต)</div>
+            <div className="text-[11px] text-blue-600 mt-0.5">ระบบจะจัดคิวงานระดับปกติ (P3 Normal) เพื่อให้ช่างเข้าตรวจสอบตามรอบคิวงาน</div>
           </div>
         </div>
-      </button>
+      ) : (
+        <div className="p-4 rounded-3xl bg-purple-50 border border-purple-200 flex items-center gap-3 text-purple-900 shadow-xs">
+          <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
+            <Zap className="w-5 h-5" />
+          </div>
+          <div>
+            <div className="font-bold text-xs sm:text-sm text-purple-800">โหมด: แจ้งซ่อมบริการ & อาคารสถานที่ (Facility Service)</div>
+            <div className="text-[11px] text-purple-600 mt-0.5">สำหรับงานบริการ เช่น เปลี่ยนหลอดไฟ แอร์ ประปา สุขาภิบาล ช่างบริการจะเข้าดูแลโดยเร็ว</div>
+          </div>
+        </div>
+      )}
 
       {/* 3. SYMPTOM SELECTION (1 TAP) */}
       <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
         <div className="flex justify-between items-center">
           <label className="text-xs font-bold text-stone-700 uppercase tracking-wider">
-            เลือกอาการที่พบ (TAP อาการ):
+            {repairType === 'SERVICE' ? 'เลือกประเภทงานบริการที่ต้องการ (TAP อาการ):' : 'เลือกอาการที่พบ (TAP อาการ):'}
           </label>
           <span className="text-xs font-bold text-[#D4AF37] bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200 max-w-[200px] truncate">
             {customSymptom.trim() ? `ระบุเอง: ${customSymptom}` : `เลือก: ${symptom}`}
@@ -369,7 +510,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-          {SYMPTOMS.map(s => {
+          {(repairType === 'SERVICE' ? FACILITY_SYMPTOMS : SYMPTOMS).map(s => {
             const isSelected = !customSymptom.trim() && symptom === s.label
             const Icon = s.icon
             return (
@@ -377,7 +518,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
                 type="button"
                 key={s.label}
                 onClick={() => {
-                  setSymptom(s.label)
+                  setSymptom(s.label as SymptomCategory)
                   setCustomSymptom('')
                 }}
                 className={`p-3 rounded-2xl border text-left flex items-center gap-2.5 transition-all text-xs font-bold ${

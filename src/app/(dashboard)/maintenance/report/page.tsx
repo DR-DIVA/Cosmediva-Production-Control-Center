@@ -28,10 +28,10 @@ export default async function FastReportPage() {
 
       <div className="text-center space-y-1">
         <h1 className="text-2xl sm:text-3xl font-black text-stone-900 tracking-tight">
-          🚨 แจ้งเครื่องเสียด่วน
+          🔧 แจ้งซ่อมบำรุง & งานบริการ
         </h1>
         <p className="text-xs sm:text-sm text-stone-500 font-medium">
-          ระบบบันทึกงานซ่อมอัตโนมัติใน 30–60 วินาที • ไม่ต้องกรอกเอกสารกระดาษ
+          แจ้งซ่อมด่วน (กระทบการผลิต) • แจ้งซ่อมทั่วไป • แจ้งซ่อมบริการอาคารสถานที่
         </p>
       </div>
 
