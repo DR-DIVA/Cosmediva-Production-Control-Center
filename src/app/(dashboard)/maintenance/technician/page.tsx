@@ -25,13 +25,14 @@ import {
   Check,
   ShoppingCart,
   Timer,
-  RotateCcw
+  RotateCcw,
+  User
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import Link from 'next/link'
-import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo, formatWorkOrderStatus } from '@/types/maintenance'
+import { MaintenanceWorkOrder, MaintenancePMPlan, getPmFrequencyInfo, formatWorkOrderStatus, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { 
   getWorkOrders, 
   transitionWorkOrderStatus, 
@@ -69,7 +70,32 @@ export default function TechnicianCockpitPage() {
   const [activeGroupTab, setActiveGroupTab] = useState<'breakdown' | 'pm_plan'>('breakdown')
   const [breakdownFilter, setBreakdownFilter] = useState<'ALL' | 'READY' | 'IN_PROGRESS' | 'NEW'>('ALL')
   const [technicianName, setTechnicianName] = useState('ช่างสมหมาย เก่งการช่าง')
+  const [isCustomTech, setIsCustomTech] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
+
+  // Load remembered technician name from localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('cosmediva_technician_name')
+      if (saved && saved.trim()) {
+        setTechnicianName(saved.trim())
+        if (!FACTORY_TECHNICIANS.some(t => t.startsWith(saved.trim()))) {
+          setIsCustomTech(true)
+        }
+      }
+    } catch (e) {
+      // Ignore in environments without localStorage
+    }
+  }, [])
+
+  const handleTechnicianChange = (name: string) => {
+    setTechnicianName(name)
+    try {
+      if (name.trim()) {
+        localStorage.setItem('cosmediva_technician_name', name.trim())
+      }
+    } catch (e) {}
+  }
 
   // PM Filter state
   const [selectedPlanForExecute, setSelectedPlanForExecute] = useState<MaintenancePMPlan | null>(null)
@@ -335,16 +361,49 @@ export default function TechnicianCockpitPage() {
                 สำหรับลงมือซ่อมจริง
               </span>
             </div>
-            <div className="text-xs text-stone-500 flex flex-wrap items-center gap-2 mt-1">
-              <span className="font-bold text-stone-700">ช่างประจำกะ:</span>
-              <input
-                type="text"
-                value={technicianName}
-                onChange={e => setTechnicianName(e.target.value)}
-                className="font-bold text-stone-800 bg-stone-100 hover:bg-stone-200/80 px-2.5 py-1 rounded-xl border border-stone-200 text-xs w-48 transition focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-              />
-              <span className="text-[11px] text-stone-400">
-                (ระบบจะโฟกัสงานของ <span className="font-semibold text-stone-700">{technicianName.split(' ')[0]}</span> ให้อัตโนมัติ)
+            <div className="text-xs text-stone-500 flex flex-wrap items-center gap-2 mt-1.5">
+              <span className="font-bold text-stone-700 flex items-center gap-1">
+                <User className="w-3.5 h-3.5 text-amber-600" />
+                ช่างประจำกะ:
+              </span>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <select
+                  value={isCustomTech ? '__CUSTOM__' : technicianName}
+                  onChange={e => {
+                    const val = e.target.value
+                    if (val === '__CUSTOM__') {
+                      setIsCustomTech(true)
+                    } else {
+                      setIsCustomTech(false)
+                      handleTechnicianChange(val)
+                    }
+                  }}
+                  className="font-bold text-stone-900 bg-amber-50 hover:bg-amber-100/90 px-3 py-1.5 rounded-xl border border-amber-300 text-xs transition focus:outline-none focus:ring-2 focus:ring-amber-500/30 cursor-pointer shadow-2xs"
+                >
+                  {FACTORY_TECHNICIANS.map(t => {
+                    const cleanName = t.split(' (')[0]
+                    return (
+                      <option key={t} value={cleanName}>
+                        {t}
+                      </option>
+                    )
+                  })}
+                  <option value="__CUSTOM__">✍️ ระบุชื่อช่างคนอื่นเอง...</option>
+                </select>
+
+                {isCustomTech && (
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="พิมพ์ชื่อช่างของคุณ..."
+                    value={technicianName}
+                    onChange={e => handleTechnicianChange(e.target.value)}
+                    className="font-bold text-stone-800 bg-white px-2.5 py-1.5 rounded-xl border border-amber-400 text-xs w-44 transition focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
+                  />
+                )}
+              </div>
+              <span className="text-[11px] text-stone-500">
+                (ระบบจะโฟกัสงานของ <span className="font-bold text-amber-800">{technicianName.split(' ')[0] || 'คุณ'}</span> ให้อัตโนมัติ)
               </span>
             </div>
           </div>

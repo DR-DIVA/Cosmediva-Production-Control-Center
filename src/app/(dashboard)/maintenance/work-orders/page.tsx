@@ -31,7 +31,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP } from '@/types/maintenance'
+import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { getWorkOrders, transitionWorkOrderStatus } from '@/app/actions/maintenance'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
@@ -252,6 +252,7 @@ export default function WorkOrdersKanbanPage() {
   const [selectedWOForVerify, setSelectedWOForVerify] = useState<MaintenanceWorkOrder | null>(null)
   const [detailWO, setDetailWO] = useState<MaintenanceWorkOrder | null>(null)
   const [assignTechName, setAssignTechName] = useState('')
+  const [isCustomTech, setIsCustomTech] = useState(false)
 
   // Live timer ticking every second
   const [currentTime, setCurrentTime] = useState<number>(Date.now())
@@ -515,7 +516,12 @@ export default function WorkOrdersKanbanPage() {
                           key={wo.id}
                           onClick={() => {
                             setDetailWO(wo)
-                            setAssignTechName(wo.assigned_technician_name || '')
+                            const currentTech = wo.assigned_technician_name || ''
+                            setAssignTechName(currentTech)
+                            setIsCustomTech(
+                              !!currentTech && 
+                              !FACTORY_TECHNICIANS.some(t => t.startsWith(currentTech))
+                            )
                           }}
                           className={`p-3.5 rounded-xl border bg-white shadow-xs hover:shadow-md transition-all cursor-pointer space-y-2 relative ${
                             isCritical
@@ -757,25 +763,58 @@ export default function WorkOrdersKanbanPage() {
                   </Link>
                 </div>
 
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <div className="flex-1 flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-blue-200 shadow-2xs">
-                    <User className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="พิมพ์หรือระบุชื่อช่างผู้รับผิดชอบ..."
-                      value={assignTechName}
-                      onChange={e => setAssignTechName(e.target.value)}
-                      className="text-xs w-full bg-transparent border-none outline-none font-medium text-stone-800"
-                    />
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                    <div className="flex-1 flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-blue-200 shadow-2xs">
+                      <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                      <select
+                        value={isCustomTech ? '__CUSTOM__' : assignTechName}
+                        onChange={e => {
+                          const val = e.target.value
+                          if (val === '__CUSTOM__') {
+                            setIsCustomTech(true)
+                          } else {
+                            setIsCustomTech(false)
+                            setAssignTechName(val)
+                          }
+                        }}
+                        className="text-xs w-full bg-transparent border-none outline-none font-bold text-stone-800 cursor-pointer"
+                      >
+                        <option value="">-- เลือกรายชื่อช่างผู้รับผิดชอบ --</option>
+                        {FACTORY_TECHNICIANS.map(t => {
+                          const cleanName = t.split(' (')[0]
+                          return (
+                            <option key={t} value={cleanName}>
+                              {t}
+                            </option>
+                          )
+                        })}
+                        <option value="__CUSTOM__">✍️ ระบุชื่อช่างคนอื่น / ซัพพลายเออร์เอง...</option>
+                      </select>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      onClick={handleAssignTechnician}
+                      disabled={!assignTechName.trim()}
+                      className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-xs"
+                    >
+                      มอบหมายช่าง (Assign)
+                    </Button>
                   </div>
-                  <Button
-                    size="sm"
-                    onClick={handleAssignTechnician}
-                    disabled={!assignTechName.trim()}
-                    className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl whitespace-nowrap shadow-xs"
-                  >
-                    มอบหมายช่าง (Assign)
-                  </Button>
+
+                  {isCustomTech && (
+                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-2xs">
+                      <input
+                        type="text"
+                        autoFocus
+                        placeholder="พิมพ์ชื่อช่างผู้รับผิดชอบ..."
+                        value={assignTechName}
+                        onChange={e => setAssignTechName(e.target.value)}
+                        className="text-xs w-full bg-transparent border-none outline-none font-medium text-stone-800"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <Button

@@ -20,7 +20,7 @@ import {
   FileText,
   AlertCircle
 } from 'lucide-react'
-import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
+import { MaintenancePMPlan, getPmFrequencyInfo, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { dispatchPMWorkOrder } from '@/app/actions/maintenance'
 
 interface AssignPMTechnicianModalProps {
@@ -29,15 +29,6 @@ interface AssignPMTechnicianModalProps {
   plan: MaintenancePMPlan | null
   onSuccess: () => void
 }
-
-const COMMON_TECHNICIANS = [
-  'ช่างสมหมาย เก่งการช่าง (ช่างไฟฟ้า & ระบบควบคุม)',
-  'ช่างวิชัย ซ่อมไว (ช่างกลโรงงาน & สายการผลิต)',
-  'ช่างมานพ เช็คละเอียด (ช่างไฮดรอลิก & นิวเมติกส์)',
-  'ช่างธีรศักดิ์ บำรุงดี (ช่างระบบปรับอากาศ & Cleanroom)',
-  'ช่างสุรพล เชี่ยวชาญ (ช่างซ่อมบำรุงทั่วไป)',
-  'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)'
-]
 
 export default function AssignPMTechnicianModal({
   isOpen,
@@ -151,8 +142,8 @@ export default function AssignPMTechnicianModal({
               }}
               className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-900 font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
             >
-              {COMMON_TECHNICIANS.map(t => (
-                <option key={t} value={t.split(' ')[0] + ' ' + t.split(' ')[1]}>
+              {FACTORY_TECHNICIANS.map(t => (
+                <option key={t} value={t.split(' (')[0]}>
                   {t}
                 </option>
               ))}
