@@ -43,27 +43,86 @@ export default function MaintenanceWorkflowPage() {
           </div>
         </div>
 
-        <a
-          href="/maintenance_workflow_diagram.jpg"
-          download="CosmeFlow_Maintenance_Workflow.jpg"
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-[#2A2521] to-[#3A332B] hover:from-[#1E1B18] hover:to-[#2A2521] text-[#D4AF37] border border-[#D4AF37]/50 font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap"
-        >
-          <Download className="w-4 h-4" />
-          <span>💾 บันทึกรูปภาพ (Save / Download Image)</span>
-        </a>
+        <div className="flex flex-wrap items-center gap-2">
+          <a
+            href="/maintenance_workflow_flowchart.png"
+            download="CosmeFlow_Maintenance_Flowchart.png"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-700 hover:from-emerald-500 hover:to-teal-600 text-white font-black text-xs sm:text-sm shadow-md transition active:scale-95 cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            <span>💾 โหลดผัง Flowchart (PNG)</span>
+          </a>
+          <a
+            href="/maintenance_workflow_flowchart.svg"
+            download="CosmeFlow_Maintenance_Flowchart.svg"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-stone-100 hover:bg-stone-200 text-stone-800 border border-stone-300 font-black text-xs sm:text-sm shadow-xs transition active:scale-95 cursor-pointer whitespace-nowrap"
+          >
+            <Download className="w-4 h-4" />
+            <span>📥 ผังแบบ Vector (SVG)</span>
+          </a>
+        </div>
       </div>
 
-      {/* Workflow Infographic Showcase */}
-      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-stone-200 shadow-md space-y-4">
+      {/* Section 1: Raw Flowchart (ผังงานดิบตามแผนภาพที่ต้องการบันทึก) */}
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-stone-200 shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+              <span>📋 ผังการไหลของงานแบบละเอียด (Detailed Process Flowchart)</span>
+            </h3>
+            <p className="text-xs text-stone-500">
+              ภาพผังงานแยกตาม 6 ขอบเขต (Scope) พร้อมข้อความภาษาไทยคมชัด สามารถคลิกขวาบันทึกเป็นรูปภาพได้ทันที
+            </p>
+          </div>
+          <a
+            href="/maintenance_workflow_flowchart.png"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-800 underline hidden sm:inline"
+          >
+            เปิดดูภาพขนาดเต็ม (Full Size) ↗
+          </a>
+        </div>
+
+        <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-inner group bg-white p-2 sm:p-4 flex justify-center">
+          <img
+            src="/maintenance_workflow_flowchart.png"
+            alt="End-to-End Maintenance Process Flowchart"
+            className="w-full max-w-4xl h-auto object-contain rounded-xl"
+          />
+          <div className="absolute bottom-4 right-4 bg-stone-900/90 text-amber-300 border border-amber-500/40 text-xs px-3 py-1.5 rounded-xl backdrop-blur-md shadow-lg font-semibold pointer-events-none hidden sm:block">
+            💡 คลิกขวาที่ภาพแล้วเลือก "Save image as..." (บันทึกรูปภาพเป็น...)
+          </div>
+        </div>
+      </div>
+
+      {/* Section 2: Visual Infographic Showcase */}
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-stone-200 shadow-md space-y-3">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base sm:text-lg font-black text-stone-900 flex items-center gap-2">
+              <span>🎨 แผนภาพกราฟิกอินโฟกราฟิก (Infographic Overview)</span>
+            </h3>
+            <p className="text-xs text-stone-500">
+              ภาพกราฟิกสรุป 6 เสาหลักกระบวนการซ่อมบำรุง
+            </p>
+          </div>
+          <a
+            href="/maintenance_workflow_diagram.jpg"
+            download="CosmeFlow_Maintenance_Workflow.jpg"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-amber-600 hover:text-amber-700 underline"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>ดาวน์โหลดภาพนี้ (JPG)</span>
+          </a>
+        </div>
+
         <div className="relative rounded-2xl overflow-hidden border border-stone-200 shadow-inner group bg-stone-950">
           <img
             src="/maintenance_workflow_diagram.jpg"
             alt="End-to-End Maintenance Workflow Infographic"
             className="w-full h-auto object-cover rounded-2xl"
           />
-          <div className="absolute bottom-4 right-4 bg-stone-900/90 text-amber-300 border border-amber-500/40 text-xs px-3 py-1.5 rounded-xl backdrop-blur-md shadow-lg font-semibold pointer-events-none hidden sm:block">
-            💡 คลิกขวาที่ภาพแล้วเลือก "Save image as..." เพื่อบันทึกภาพได้ทันที
-          </div>
         </div>
       </div>
 
