@@ -412,7 +412,7 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
               </span>
               <div className="h-10 print:h-9 flex flex-col items-center justify-center">
                 <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
-                  {wo.supervisor_name || 'หัวหน้าแผนกซ่อมบำรุง'}
+                  {wo.supervisor_name || 'ปิยะราช รามมา'}
                 </span>
                 <span className="text-[9px] text-stone-500">
                   (ตรวจสอบความถูกต้อง)
