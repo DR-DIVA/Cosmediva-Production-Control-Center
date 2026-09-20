@@ -40,6 +40,11 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   const user = supabaseUser
+  // Allow API routes (like /api/line/webhook) to pass through without page login redirect
+  if (request.nextUrl.pathname.startsWith('/api')) {
+    return supabaseResponse
+  }
+
   const isAuthRoute = request.nextUrl.pathname.startsWith('/login')
   const isProtectedRoute = !isAuthRoute && request.nextUrl.pathname !== '/'
   
