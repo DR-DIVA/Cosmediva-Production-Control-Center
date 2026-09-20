@@ -147,17 +147,6 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
             <HardHat className="w-4 h-4 shrink-0" />
             <span>โหมดช่างซ่อม</span>
           </Link>
-
-          {/* LINE Notification Settings Button */}
-          <button
-            type="button"
-            onClick={() => setIsLineOpen(true)}
-            className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 bg-[#06C755] hover:bg-[#05b34c] text-white font-bold px-3.5 py-2.5 rounded-2xl shadow-md transition-all text-sm active:scale-95 border border-[#06C755]/40"
-            title="ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)"
-          >
-            <MessageSquare className="w-4 h-4 fill-white" />
-            <span>ตั้งค่า LINE</span>
-          </button>
         </div>
       </div>
 
@@ -204,6 +193,26 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR }: Maintenanc
               </Link>
             )
           })}
+
+          {/* LINE Notification Settings Button (Moved to Lower Deck) */}
+          <button
+            type="button"
+            onClick={() => setIsLineOpen(true)}
+            className="group flex items-center gap-2.5 px-3 py-2 sm:px-3.5 sm:py-2.5 rounded-2xl font-bold transition-all shrink-0 active:scale-95 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400 shadow-2xs hover:shadow-xs cursor-pointer"
+            title="ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)"
+          >
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shrink-0 border border-emerald-400 bg-[#06C755] text-white shadow-xs transition-transform group-hover:scale-105">
+              <MessageSquare className="w-4.5 h-4.5 sm:w-5 sm:h-5 fill-white stroke-none" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs sm:text-sm font-extrabold text-emerald-950">
+                ตั้งค่า LINE
+              </span>
+              <span className="px-1.5 py-0.2 text-[9px] font-black rounded-full font-mono bg-emerald-200 text-emerald-900 border border-emerald-300">
+                LINE Bot
+              </span>
+            </div>
+          </button>
         </div>
       </div>
 
