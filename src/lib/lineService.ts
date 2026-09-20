@@ -293,32 +293,32 @@ export function buildBreakdownFlexMessage(params: {
               type: 'box',
               layout: 'baseline',
               contents: [
-                { type: 'text', text: 'อาการเสีย:', size: 'xs', color: '#64748B', width: '70px' },
-                { type: 'text', text: params.symptomCategory, size: 'xs', color: '#DC2626', weight: 'bold', wrap: true }
+                { type: 'text', text: 'อาการเสีย:', size: 'xs', color: '#64748B', flex: 2 },
+                { type: 'text', text: params.symptomCategory, size: 'xs', color: '#DC2626', weight: 'bold', wrap: true, flex: 5 }
               ]
             },
             {
               type: 'box',
               layout: 'baseline',
               contents: [
-                { type: 'text', text: 'รายละเอียด:', size: 'xs', color: '#64748B', width: '70px' },
-                { type: 'text', text: params.symptomDescription || 'ไม่ระบุ', size: 'xs', color: '#1E293B', wrap: true }
+                { type: 'text', text: 'รายละเอียด:', size: 'xs', color: '#64748B', flex: 2 },
+                { type: 'text', text: params.symptomDescription || 'ไม่ระบุ', size: 'xs', color: '#1E293B', wrap: true, flex: 5 }
               ]
             },
             {
               type: 'box',
               layout: 'baseline',
               contents: [
-                { type: 'text', text: 'ผลกระทบ:', size: 'xs', color: '#64748B', width: '70px' },
-                { type: 'text', text: params.productionImpact, size: 'xs', color: '#0F172A', weight: 'bold', wrap: true }
+                { type: 'text', text: 'ผลกระทบ:', size: 'xs', color: '#64748B', flex: 2 },
+                { type: 'text', text: params.productionImpact, size: 'xs', color: '#0F172A', weight: 'bold', wrap: true, flex: 5 }
               ]
             },
             {
               type: 'box',
               layout: 'baseline',
               contents: [
-                { type: 'text', text: 'ผู้แจ้งซ่อม:', size: 'xs', color: '#64748B', width: '70px' },
-                { type: 'text', text: `${params.requesterName} (${dateStr} ${timeStr})`, size: 'xs', color: '#475569', wrap: true }
+                { type: 'text', text: 'ผู้แจ้งซ่อม:', size: 'xs', color: '#64748B', flex: 2 },
+                { type: 'text', text: `${params.requesterName} (${dateStr} ${timeStr})`, size: 'xs', color: '#475569', wrap: true, flex: 5 }
               ]
             }
           ]
@@ -431,14 +431,14 @@ export function buildWorkOrderStatusFlexMessage(params: {
               size: 'xs',
               margin: 'xs'
             },
-            params.notes ? {
+            ...(params.notes ? [{
               type: 'text',
               text: `บันทึก: ${params.notes}`,
               color: '#64748B',
               size: 'xs',
               wrap: true,
               margin: 'xs'
-            } : { type: 'filler' }
+            }] : [])
           ]
         }
       ]
