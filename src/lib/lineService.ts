@@ -291,10 +291,10 @@ export function buildBreakdownFlexMessage(params: {
         {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: '#F8FAFC',
+          backgroundColor: isService ? '#FAF5FF' : '#F8FAFC',
           cornerRadius: 'md',
           paddingAll: '12px',
-          borderColor: '#E2E8F0',
+          borderColor: isService ? '#E9D5FF' : '#E2E8F0',
           borderWidth: '1px',
           contents: [
             {
@@ -303,17 +303,17 @@ export function buildBreakdownFlexMessage(params: {
               contents: [
                 {
                   type: 'text',
-                  text: params.machineCode,
+                  text: isService ? '🏢 งานบริการอาคาร & สถานที่' : params.machineCode,
                   weight: 'bold',
-                  size: 'lg',
-                  color: '#0F172A',
+                  size: isService ? 'md' : 'lg',
+                  color: isService ? '#6B21A8' : '#0F172A',
                   flex: 1
                 },
                 {
                   type: 'text',
-                  text: `Grade ${params.criticality || 'B'}`,
+                  text: isService ? 'บริการทั่วไป' : `Grade ${params.criticality || 'B'}`,
                   size: 'xs',
-                  color: params.criticality === 'A' ? '#DC2626' : '#2563EB',
+                  color: isService ? '#7C3AED' : (params.criticality === 'A' ? '#DC2626' : '#2563EB'),
                   weight: 'bold'
                 }
               ]
@@ -402,8 +402,8 @@ export function buildBreakdownFlexMessage(params: {
           height: 'sm',
           action: {
             type: 'uri',
-            label: '🔍 ดูประวัติเครื่องจักร 360°',
-            uri: machineUrl
+            label: isService ? '📋 เปิดบอร์ดงานซ่อม' : '🔍 ดูประวัติเครื่องจักร 360°',
+            uri: isService ? `${baseUrl}/maintenance/work-orders` : machineUrl
           }
         }
       ]

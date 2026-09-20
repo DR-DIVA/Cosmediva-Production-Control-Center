@@ -187,7 +187,9 @@ export async function dispatchWorkOrderLineAlert(params: {
 
       await pushLineFlexMessage({
         channelKey: 'maintenance',
-        altText: `${altPrefix} ${resolvedMachine.machine_code}: ${workOrder.symptom_category}`,
+        altText: isService 
+          ? `💡 [ซ่อมบริการ] ${workOrder.symptom_category}` 
+          : `${altPrefix} ${resolvedMachine.machine_code}: ${workOrder.symptom_category}`,
         flexContents: flex
       })
     } else if (eventType === 'STATUS_CHANGED') {
