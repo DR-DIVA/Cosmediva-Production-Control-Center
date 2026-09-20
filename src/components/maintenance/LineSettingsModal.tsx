@@ -22,7 +22,9 @@ import {
   Factory,
   FileText,
   Package,
-  Activity
+  Activity,
+  Sparkles,
+  Copy
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { LineChannelConfig } from '@/lib/lineService'
@@ -273,19 +275,49 @@ export default function LineSettingsModal({ isOpen, onClose }: LineSettingsModal
             </div>
 
             {/* Destination / Group ID Input */}
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-stone-800 block">
-                Destination ID (Group ID หรือ User ID ที่ต้องการให้แจ้งเตือน) *
-              </label>
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-stone-800 block">
+                  Destination ID (Group ID หรือ User ID ที่ต้องการให้แจ้งเตือน) *
+                </label>
+                {destinationId && (
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                    มี Group ID แล้ว
+                  </span>
+                )}
+              </div>
               <Input
                 value={destinationId}
                 onChange={e => setDestinationId(e.target.value)}
-                placeholder="เช่น C1234567890abcdef... หรือ U..."
+                placeholder="เช่น C1234567890abcdef... หรือพิมพ์ /id ในกลุ่มไลน์"
                 className="h-10 text-xs font-mono rounded-xl bg-stone-50 border-stone-300"
               />
-              <p className="text-[10px] text-stone-500">
-                ดึง LINE Bot ของคุณเข้ากลุ่ม LINE ของแผนก (ขึ้นต้นด้วย <code>C...</code> หรือ <code>R...</code>)
-              </p>
+
+              {/* Webhook Auto-detect helper */}
+              <div className="p-3 bg-emerald-50/70 rounded-2xl border border-emerald-200 space-y-1.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-emerald-950 flex items-center gap-1 text-[11px]">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>ระบบบันทึก Group ID อัตโนมัติ (แนะนำ ไม่ต้องพิมพ์เอง)</span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const url = `${typeof window !== 'undefined' ? window.location.origin : 'https://cosmeflow.up.railway.app'}/api/line/webhook`
+                      navigator.clipboard.writeText(url)
+                      toast.success('คัดลอก Webhook URL เรียบร้อยแล้ว!')
+                    }}
+                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 bg-white px-2 py-0.5 rounded-md border border-emerald-300 flex items-center gap-1 shadow-2xs"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>คัดลอก Webhook URL</span>
+                  </button>
+                </div>
+                <p className="text-[10px] text-emerald-800 leading-relaxed">
+                  นำ Webhook URL ไปวางใน LINE Developers Console &gt; แท็บ Messaging API &gt; Webhook URL แล้วกด Verify
+                  จากนั้นเพียงดึงบอทเข้ากลุ่ม LINE หรือพิมพ์ <b>/id</b> ในกลุ่ม ระบบจะดึงรหัสกลุ่มมาบันทึกที่นี่ให้อัตโนมัติทันทีค่ะ!
+                </p>
+              </div>
             </div>
 
             {/* Notification Event Toggles for Maintenance */}
