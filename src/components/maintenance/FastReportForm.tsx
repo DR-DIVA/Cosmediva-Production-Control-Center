@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -24,7 +24,9 @@ import {
   Clock,
   ChevronDown,
   Download,
-  Share2
+  Share2,
+  Search,
+  X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -70,6 +72,7 @@ const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] =
   { label: 'Production stopped', text: '🛑 Production หยุดทั้งหมด (สายการผลิตชะงัก)', badgeColor: 'bg-red-600 text-white' },
   { label: 'Machine stopped', text: '⏸️ เครื่องจักรหยุด (แต่แผนกอื่นยังเดินได้)', badgeColor: 'bg-orange-600 text-white' },
   { label: 'Intermittent stops', text: '🔄 เครื่องยังเดินต่อได้ (แต่หยุดบ่อยเพราะไม่ปกติ)', badgeColor: 'bg-amber-500 text-stone-950' },
+  { label: 'Facility no impact', text: '🟢 ไม่กระทบการผลิต (แจ้งซ่อมบริการ)', badgeColor: 'bg-emerald-600 text-white' },
   { label: 'Quality risk', text: '⚠️ เสี่ยงกระทบคุณภาพสินค้า / ต้องซ่อมด่วน', badgeColor: 'bg-amber-500 text-white' },
   { label: 'Safety risk', text: '🚨 อันตรายต่อความปลอดภัยของผู้ปฏิบัติงาน', badgeColor: 'bg-rose-600 text-white' },
   { label: 'Production can continue', text: '🟢 เครื่องยังเดินต่อได้ (ซ่อมตามรอบ/มีนัดหมาย)', badgeColor: 'bg-emerald-600 text-white' }
@@ -78,6 +81,8 @@ const IMPACTS: { label: ProductionImpact; text: string; badgeColor: string }[] =
 export default function FastReportForm({ initialMachine, machines }: FastReportFormProps) {
   const router = useRouter()
   const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || machines[0] || null)
+  const [machineSearchQuery, setMachineSearchQuery] = useState('')
+  const [isSearchingMachine, setIsSearchingMachine] = useState(false)
   const [repairType, setRepairType] = useState<RepairTypeCategory>('EMERGENCY')
   const [facilityLocation, setFacilityLocation] = useState('')
   const [symptom, setSymptom] = useState<SymptomCategory>('เครื่องหยุดกลางงาน')
@@ -90,6 +95,27 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
+
+  // Live Machine Search Filter
+  const filteredMachines = useMemo(() => {
+    if (!machineSearchQuery.trim()) return machines
+    const q = machineSearchQuery.toLowerCase().trim()
+    return machines.filter(m => 
+      m.machine_code.toLowerCase().includes(q) ||
+      m.machine_name.toLowerCase().includes(q) ||
+      (m.production_area && m.production_area.toLowerCase().includes(q)) ||
+      (m.department_name && m.department_name.toLowerCase().includes(q)) ||
+      (m.category && m.category.toLowerCase().includes(q))
+    )
+  }, [machines, machineSearchQuery])
+
+  // Context-aware visible impacts: Service repair vs Machine repair
+  const visibleImpacts = useMemo(() => {
+    if (repairType === 'SERVICE') {
+      return IMPACTS.filter(i => i.label === 'Facility no impact' || i.label === 'Safety risk' || i.label === 'Production can continue')
+    }
+    return IMPACTS.filter(i => i.label !== 'Facility no impact')
+  }, [repairType])
 
   // One-tap EMERGENCY BREAKDOWN trigger
   const handleTriggerEmergency = () => {
@@ -177,27 +203,37 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
   // Submit Handler (< 60s Flow)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!selectedMachine) {
+    if (repairType !== 'SERVICE' && !selectedMachine) {
       toast.error('กรุณาเลือกเครื่องจักร')
+      return
+    }
+
+    if (repairType === 'SERVICE' && !facilityLocation.trim()) {
+      toast.error('กรุณาระบุห้อง หรือพื้นที่/จุดเกิดเหตุที่ต้องการให้ช่างบริการ')
       return
     }
 
     const finalSymptom = customSymptom.trim() || symptom
     const fullDescription = [
-      facilityLocation.trim() ? `📍 พื้นที่/จุดเกิดเหตุ: ${facilityLocation.trim()}` : null,
-      repairType === 'SERVICE' ? `[ประเภท: แจ้งซ่อมบริการ & อาคารสถานที่]` : repairType === 'GENERAL' ? `[ประเภท: แจ้งซ่อมทั่วไป (ไม่กระทบการผลิต)]` : `[ประเภท: แจ้งซ่อมด่วนฉุกเฉิน (กระทบการผลิต)]`,
+      facilityLocation.trim() ? `📍 จุดเกิดเหตุ/สถานที่: ${facilityLocation.trim()}` : null,
+      repairType === 'SERVICE' 
+        ? `[ประเภท: แจ้งซ่อมบริการ & อาคารสถานที่]` 
+        : repairType === 'GENERAL' 
+        ? `[ประเภท: แจ้งซ่อมทั่วไป (ไม่กระทบการผลิต)]` 
+        : `[ประเภท: แจ้งซ่อมด่วนฉุกเฉิน (กระทบการผลิต)]`,
       description.trim() ? description.trim() : null
     ].filter(Boolean).join('\n')
 
     setIsSubmitting(true)
     try {
       const res = await createRepairRequest({
-        machine_code: selectedMachine.machine_code,
+        machine_code: repairType === 'SERVICE' ? 'FACILITY' : selectedMachine!.machine_code,
         symptom_category: repairType === 'SERVICE' && !finalSymptom.includes('บริการ') ? `[บริการ] ${finalSymptom}` : finalSymptom,
         symptom_description: fullDescription,
         production_impact: impact,
         is_emergency_breakdown: isEmergency,
         requester_name: requesterName,
+        requester_department_name: repairType === 'SERVICE' ? (facilityLocation.trim() || 'ฝ่ายบริการทั่วไป & อาคาร') : (selectedMachine?.department_name || undefined),
         photo_before_urls: photoPreview ? [photoPreview] : []
       })
 
@@ -229,7 +265,11 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
             {submittedWO.wo_number}
           </h2>
           <p className="text-stone-600 text-sm mt-1">
-            เครื่องจักร: <b className="text-stone-900">{submittedWO.machine_code} - {submittedWO.machine_name}</b>
+            {submittedWO.machine_code === 'FACILITY' ? (
+              <span>จุดบริการ: <b className="text-stone-900">{submittedWO.requester_department_name || 'งานบริการอาคาร & สถานที่'}</b></span>
+            ) : (
+              <span>เครื่องจักร: <b className="text-stone-900">{submittedWO.machine_code} - {submittedWO.machine_name}</b></span>
+            )}
           </p>
         </div>
 
@@ -258,7 +298,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
 
         <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-800 font-medium flex items-center gap-2">
           <Clock className="w-4 h-4 text-red-600 shrink-0" />
-          <span>ระบบเริ่มจับเวลา Downtime และแจ้งเตือนทีมช่างแล้ว</span>
+          <span>ระบบบันทึกเวลาและแจ้งเตือนไปยังทีมช่างแล้ว</span>
         </div>
 
         {/* Photo attached preview & Share to LINE / Download */}
@@ -281,7 +321,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
                   document.body.removeChild(a)
                   toast.success('ดาวน์โหลดรูปภาพลงมือถือเรียบร้อยแล้ว')
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95"
+                className="flex-1 py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
                 <span>โหลดเก็บไว้</span>
@@ -290,7 +330,9 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
               <button
                 type="button"
                 onClick={async () => {
-                  const shareText = `🚨 แจ้งเครื่องเสียด่วน (CosmeFlow Maintenance)\nเลขที่: ${submittedWO.wo_number}\nเครื่องจักร: ${submittedWO.machine_code} - ${submittedWO.machine_name}\nระดับ: ${submittedWO.priority}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ช่างกำลังเข้าตรวจสอบ`
+                  const shareText = submittedWO.machine_code === 'FACILITY'
+                    ? `💡 แจ้งซ่อมบริการ & อาคาร (CosmeFlow)\nเลขที่: ${submittedWO.wo_number}\nสถานที่: ${submittedWO.requester_department_name || 'งานบริการอาคาร'}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ส่งเรื่องให้ทีมช่างแล้ว`
+                    : `🚨 แจ้งเครื่องเสียด่วน (CosmeFlow Maintenance)\nเลขที่: ${submittedWO.wo_number}\nเครื่องจักร: ${submittedWO.machine_code} - ${submittedWO.machine_name}\nระดับ: ${submittedWO.priority}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ช่างกำลังเข้าตรวจสอบ`
                   if (navigator.share) {
                     try {
                       await navigator.share({
@@ -411,8 +453,8 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
             onClick={() => {
               setRepairType('SERVICE')
               setIsEmergency(false)
-              setImpact('Production can continue')
-              setSymptom('เปลี่ยนหลอดไฟ / แสงสว่าง')
+              setImpact('Facility no impact')
+              setSymptom('💡 เปลี่ยนหลอดไฟ / แสงสว่าง' as any)
               setCustomSymptom('')
             }}
             className={`p-3.5 rounded-2xl border text-left transition-all relative ${
@@ -432,65 +474,167 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
         </div>
       </div>
 
-      {/* 1. MACHINE / LOCATION IDENTIFICATION */}
-      <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="text-xs font-bold text-[#8B7355] uppercase tracking-wider flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-[#D4AF37]"></span>
-            {repairType === 'SERVICE' ? 'เครื่องจักรหรือพื้นที่อาคารที่เกี่ยวข้อง (Location/Asset)' : 'เครื่องจักรที่เกิดปัญหา (Machine)'}
-          </div>
-          <span className="text-[11px] text-stone-400">ระบุจาก QR หรือเลือกเอง</span>
-        </div>
-
-        <div className="relative">
-          <select
-            value={selectedMachine?.machine_code || ''}
-            onChange={e => {
-              const m = machines.find(item => item.machine_code === e.target.value) || null
-              setSelectedMachine(m)
-            }}
-            className="w-full h-12 px-4 rounded-2xl bg-stone-50 border border-stone-300 font-bold text-stone-900 text-base focus:ring-2 focus:ring-[#D4AF37] focus:outline-none appearance-none pr-10"
-          >
-            {machines.map(m => (
-              <option key={m.id} value={m.machine_code}>
-                {m.machine_code} - {m.machine_name} ({m.production_area || m.category})
-              </option>
-            ))}
-          </select>
-          <ChevronDown className="w-5 h-5 text-stone-400 absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-        </div>
-
-        {/* Extra location field for Facility Service */}
-        {repairType === 'SERVICE' && (
-          <div className="pt-2 border-t border-stone-100 space-y-1.5">
-            <label className="text-xs font-bold text-stone-700">
-              📍 ระบุห้อง / จุดเกิดเหตุ (เช่น ห้องประชุม 2, โรงอาหาร, แผนกแพ็คกิ้ง, เสา B3):
-            </label>
-            <Input
-              type="text"
-              value={facilityLocation}
-              onChange={(e) => setFacilityLocation(e.target.value)}
-              placeholder="พิมพ์ระบุจุดติดตั้งหรือห้องที่ต้องการให้ช่างไปบริการ..."
-              className="h-11 rounded-xl bg-stone-50 border-stone-200 text-xs font-medium text-stone-900 focus:bg-white"
-            />
-          </div>
-        )}
-
-        {selectedMachine && (
-          <div className="flex items-center justify-between text-xs text-stone-600 bg-amber-50/50 p-2.5 rounded-xl border border-amber-200/50">
-            <div>
-              <span className="text-stone-400">แผนก: </span>
-              <span className="font-semibold text-stone-800">{selectedMachine.department_name}</span>
+      {/* 1. LOCATION (FACILITY SERVICE) or MACHINE SELECTOR (EMERGENCY/GENERAL) */}
+      {repairType === 'SERVICE' ? (
+        <div className="bg-white rounded-3xl p-5 border border-purple-200 shadow-sm space-y-3 bg-purple-50/20">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-purple-800 uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-purple-600"></span>
+              สถานที่ / ห้อง / จุดเกิดเหตุ (Location / Area) *
             </div>
-            <div>
-              <span className="text-stone-400">สถานะปัจจุบัน: </span>
-              <span className={`font-bold ${selectedMachine.status === 'Running' ? 'text-emerald-700' : 'text-red-600'}`}>
-                {selectedMachine.status}
-              </span>
-            </div>
+            <span className="text-[11px] text-purple-600 font-bold bg-purple-100 px-2 py-0.5 rounded-full">
+              ไม่ต้องเลือกเครื่องจักร
+            </span>
           </div>
-        )}
-      </div>
+
+          <Input
+            type="text"
+            value={facilityLocation}
+            onChange={(e) => setFacilityLocation(e.target.value)}
+            placeholder="พิมพ์ระบุจุดเกิดเหตุ เช่น ห้องประชุม 2, โรงอาหาร, แผนกแพ็คกิ้ง ชั้น 2, เสา B3..."
+            className="h-12 rounded-2xl bg-white border-purple-300 text-sm font-semibold text-stone-900 focus:ring-2 focus:ring-purple-400 focus:outline-none placeholder:text-stone-400"
+            required
+            autoFocus
+          />
+
+          <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+            <span>💡 สำหรับงานบริการอาคาร เช่น หลอดไฟ แอร์ ประปา ไฟฟ้า ให้ระบุสถานที่เพื่อให้ช่างเข้าจุดได้ทันที</span>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="text-xs font-bold text-[#8B7355] uppercase tracking-wider flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#D4AF37]"></span>
+              เครื่องจักรที่เกิดปัญหา (Machine) *
+            </div>
+            <span className="text-[11px] text-stone-400">
+              {selectedMachine ? 'เลือกแล้ว' : 'กรุณาเลือกเครื่องจักร'}
+            </span>
+          </div>
+
+          {/* If machine is selected and user is not searching, show selected machine card */}
+          {selectedMachine && !isSearchingMachine ? (
+            <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-300/80 space-y-2.5">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="text-xs font-black text-stone-900 flex items-center gap-1.5 flex-wrap">
+                    <span className="px-2 py-0.5 rounded bg-stone-900 text-[#D4AF37] font-mono text-xs font-bold">
+                      {selectedMachine.machine_code}
+                    </span>
+                    <span className="text-sm">{selectedMachine.machine_name}</span>
+                  </div>
+                  <div className="text-[11px] text-stone-500 mt-1 flex items-center gap-2">
+                    <span>📍 {selectedMachine.department_name || 'ฝ่ายผลิต'}</span>
+                    {selectedMachine.production_area && <span>• {selectedMachine.production_area}</span>}
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSearchingMachine(true)
+                    setMachineSearchQuery('')
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-xl bg-white border border-stone-300 text-stone-700 text-xs font-bold hover:bg-stone-50 transition flex items-center gap-1 shadow-2xs cursor-pointer"
+                >
+                  <Search className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>ค้นหา / เปลี่ยนเครื่อง</span>
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between text-[11px] text-stone-600 pt-2 border-t border-amber-200/60">
+                <span className="text-stone-500">หมวดหมู่: {selectedMachine.category || 'เครื่องจักร'}</span>
+                <span className={`font-bold ${selectedMachine.status === 'Running' ? 'text-emerald-700' : 'text-red-600'}`}>
+                  ● สถานะ: {selectedMachine.status}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={machineSearchQuery}
+                  onChange={(e) => setMachineSearchQuery(e.target.value)}
+                  placeholder="พิมพ์ค้นหา เช่น SINK, MIX, 003, แผนก..."
+                  className="w-full h-12 pl-10 pr-10 rounded-2xl bg-stone-50 border border-stone-300 font-bold text-stone-900 text-sm focus:ring-2 focus:ring-[#D4AF37] focus:bg-white focus:outline-none transition"
+                  autoFocus={isSearchingMachine}
+                />
+                {machineSearchQuery ? (
+                  <button
+                    type="button"
+                    onClick={() => setMachineSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-stone-400 hover:text-stone-600 cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                ) : (
+                  selectedMachine && (
+                    <button
+                      type="button"
+                      onClick={() => setIsSearchingMachine(false)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-stone-500 hover:text-stone-800 cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                  )
+                )}
+              </div>
+
+              {/* Filtered Machine Results List */}
+              <div className="max-h-56 overflow-y-auto rounded-2xl border border-stone-200 divide-y divide-stone-100 bg-white shadow-inner">
+                {filteredMachines.length === 0 ? (
+                  <div className="p-4 text-center text-xs text-stone-400">
+                    ไม่พบเครื่องจักรที่ตรงกับ &quot;{machineSearchQuery}&quot;
+                  </div>
+                ) : (
+                  filteredMachines.map((m) => {
+                    const isCur = selectedMachine?.machine_code === m.machine_code
+                    return (
+                      <button
+                        type="button"
+                        key={m.id}
+                        onClick={() => {
+                          setSelectedMachine(m)
+                          setIsSearchingMachine(false)
+                          setMachineSearchQuery('')
+                        }}
+                        className={`w-full p-3 text-left flex items-center justify-between transition-colors cursor-pointer ${
+                          isCur ? 'bg-amber-50 text-amber-950 font-bold' : 'hover:bg-stone-50 text-stone-800'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="font-mono text-xs px-2 py-0.5 rounded bg-stone-100 text-stone-900 font-bold shrink-0">
+                            {m.machine_code}
+                          </span>
+                          <div className="truncate">
+                            <div className="text-xs font-semibold truncate">{m.machine_name}</div>
+                            <div className="text-[10px] text-stone-400 truncate">
+                              {m.department_name} {m.production_area ? `• ${m.production_area}` : ''}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-1.5 ml-2">
+                          <span className={`text-[10px] font-bold ${m.status === 'Running' ? 'text-emerald-600' : 'text-stone-400'}`}>
+                            {m.status}
+                          </span>
+                          {isCur && <CheckCircle2 className="w-4 h-4 text-[#D4AF37]" />}
+                        </div>
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+              <p className="text-[11px] text-stone-400">
+                พบ {filteredMachines.length} เครื่องจักร (แตะเพื่อเลือกเครื่องที่ต้องการแจ้งซ่อม)
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 2. MODE BANNER */}
       {repairType === 'EMERGENCY' ? (
@@ -611,7 +755,7 @@ export default function FastReportForm({ initialMachine, machines }: FastReportF
           ผลกระทบต่อกระบวนการผลิต (Impact):
         </label>
         <div className="space-y-2">
-          {IMPACTS.map(item => {
+          {visibleImpacts.map(item => {
             const isSelected = impact === item.label
             return (
               <button

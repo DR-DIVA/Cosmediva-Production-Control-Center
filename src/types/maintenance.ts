@@ -48,6 +48,7 @@ export type ProductionImpact =
   | 'Production stopped'
   | 'Intermittent stops'
   | 'Production can continue'
+  | 'Facility no impact'
   | 'Quality risk'
   | 'Safety risk'
   | (string & {})

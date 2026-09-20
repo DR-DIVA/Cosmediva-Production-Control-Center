@@ -689,16 +689,21 @@ export async function createRepairRequest(payload: {
   try {
     const supabase = createAdminClient()
 
-    // 1. Resolve Machine
-    const { data: machine, error: mErr } = await supabase
-      .from('maintenance_machines')
-      .select('*')
-      .eq('machine_code', payload.machine_code)
-      .single()
-
-    if (mErr || !machine) {
-      return { success: false, error: `ไม่พบเครื่องจักร ${payload.machine_code}` }
+    // 1. Resolve Machine (Allow optional / FACILITY for service requests)
+    let machine: any = null
+    if (payload.machine_code && payload.machine_code !== 'FACILITY') {
+      const { data: m } = await supabase
+        .from('maintenance_machines')
+        .select('*')
+        .eq('machine_code', payload.machine_code)
+        .maybeSingle()
+      machine = m
     }
+
+    const machineId = machine?.id || null
+    const machineCode = machine?.machine_code || 'FACILITY'
+    const machineName = machine?.machine_name || 'งานบริการอาคาร & สิ่งอำนวยความสะดวก (Facility Service)'
+    const departmentName = payload.requester_department_name || machine?.department_name || 'ฝ่ายบริการทั่วไป & อาคาร'
 
     // 2. Recommend/Calculate Priority
     let priority: PriorityLevel = 'P3_NORMAL'
@@ -715,14 +720,18 @@ export async function createRepairRequest(payload: {
 
     // 4. Check repeated failures in past 90 days
     const ninetyDaysAgo = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString()
-    const { count: repeatCount } = await supabase
-      .from('maintenance_work_orders')
-      .select('*', { count: 'exact', head: true })
-      .eq('machine_id', machine.id)
-      .eq('symptom_category', payload.symptom_category)
-      .gte('reported_at', ninetyDaysAgo)
+    let repeatCount = 0
+    if (machineId) {
+      const { count } = await supabase
+        .from('maintenance_work_orders')
+        .select('*', { count: 'exact', head: true })
+        .eq('machine_id', machineId)
+        .eq('symptom_category', payload.symptom_category)
+        .gte('reported_at', ninetyDaysAgo)
+      repeatCount = count || 0
+    }
 
-    const isRepeated = (repeatCount || 0) > 0
+    const isRepeated = repeatCount > 0
 
     // 5. Insert Work Order
     const now = new Date().toISOString()
@@ -730,11 +739,11 @@ export async function createRepairRequest(payload: {
       .from('maintenance_work_orders')
       .insert({
         wo_number: woNumber,
-        machine_id: machine.id,
-        machine_code: machine.machine_code,
-        machine_name: machine.machine_name,
+        machine_id: machineId,
+        machine_code: machineCode,
+        machine_name: machineName,
         requester_name: payload.requester_name || 'พนักงานสายการผลิต',
-        requester_department_name: payload.requester_department_name || machine.department_name,
+        requester_department_name: departmentName,
         priority,
         status: 'NEW',
         symptom_category: payload.symptom_category,
@@ -744,7 +753,7 @@ export async function createRepairRequest(payload: {
         photo_before_urls: payload.photo_before_urls || [],
         reported_at: now,
         is_repeated_failure: isRepeated,
-        repeat_count_90d: repeatCount || 0
+        repeat_count_90d: repeatCount
       })
       .select()
       .single()
@@ -755,7 +764,7 @@ export async function createRepairRequest(payload: {
     }
 
     // 6. If Emergency or Production Stopped, update machine status to Breakdown
-    if (priority === 'P1_CRITICAL' || priority === 'P2_HIGH') {
+    if (machine && (priority === 'P1_CRITICAL' || priority === 'P2_HIGH')) {
       await supabase
         .from('maintenance_machines')
         .update({ status: 'Breakdown', updated_at: now })
@@ -778,11 +787,11 @@ export async function createRepairRequest(payload: {
       .from('maintenance_notifications')
       .insert({
         recipient_role: 'technician',
-        title: priority === 'P1_CRITICAL' ? `🚨 [CRITICAL] เครื่อง ${machine.machine_code} หยุดการผลิต!` : `งานแจ้งซ่อมใหม่: ${machine.machine_code}`,
+        title: priority === 'P1_CRITICAL' ? `🚨 [CRITICAL] เครื่อง ${machineCode} หยุดการผลิต!` : `งานแจ้งซ่อมใหม่: ${machineCode}`,
         message: `อาการ: ${payload.symptom_category} | โดย: ${payload.requester_name}`,
         priority: priority === 'P1_CRITICAL' ? 'CRITICAL' : 'NORMAL',
         work_order_id: newWO.id,
-        machine_code: machine.machine_code,
+        machine_code: machineCode,
         link_url: `/maintenance/technician`
       })
 
@@ -790,14 +799,21 @@ export async function createRepairRequest(payload: {
     dispatchWorkOrderLineAlert({
       eventType: 'NEW_REPORT',
       workOrder: newWO,
-      machine
+      machine: machine || {
+        machine_code: machineCode,
+        machine_name: machineName,
+        criticality: 'C',
+        department_name: departmentName
+      }
     }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
 
     try {
       revalidatePath('/maintenance')
       revalidatePath('/maintenance/work-orders')
       revalidatePath('/maintenance/technician')
-      revalidatePath(`/maintenance/machines/${machine.machine_code}`)
+      if (machine?.machine_code) {
+        revalidatePath(`/maintenance/machines/${machine.machine_code}`)
+      }
     } catch (e) {
       console.warn('revalidatePath warning:', e)
     }

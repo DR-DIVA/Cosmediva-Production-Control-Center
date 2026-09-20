@@ -208,6 +208,7 @@ export function buildBreakdownFlexMessage(params: {
     params.productionImpact === 'Production stopped' ? '🛑 หยุดการผลิตทั้งหมด (Production Stopped)' :
     params.productionImpact === 'Machine stopped' ? '⏸️ เครื่องจักรหยุดชะงัก (Machine Stopped)' :
     params.productionImpact === 'Intermittent stops' ? '🔄 เครื่องยังเดินต่อได้ (แต่หยุดบ่อยเพราะไม่ปกติ)' :
+    params.productionImpact === 'Facility no impact' ? '🟢 ไม่กระทบการผลิต (แจ้งซ่อมบริการ)' :
     params.productionImpact === 'Quality risk' ? '⚠️ เสี่ยงกระทบคุณภาพสินค้า (Quality Risk)' :
     params.productionImpact === 'Safety risk' ? '🚨 อันตรายต่อความปลอดภัย (Safety Risk)' :
     params.productionImpact === 'Production can continue' ? '🟢 เครื่องยังเดินต่อได้ (ซ่อมตามรอบ)' :
