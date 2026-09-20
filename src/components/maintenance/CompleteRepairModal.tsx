@@ -22,25 +22,42 @@ interface CompleteRepairModalProps {
 }
 
 const PROBLEM_CATEGORIES = [
-  'Mechanical', 'Electrical', 'Pneumatic', 'Sensor', 'Motor', 'Bearing',
-  'PLC', 'Hydraulic', 'Conveyor', 'Heating', 'Cooling', 'Utility', 'Other'
+  'ระบบกลไก (Mechanical)',
+  'ระบบไฟฟ้า (Electrical)',
+  'ระบบลม (Pneumatic)',
+  'เซนเซอร์ (Sensor)',
+  'มอเตอร์ / เกียร์ขับ (Motor & Drive)',
+  'ลูกปืน / เพลา (Bearing)',
+  'หัวจ่าย / กระบอกสูบ / ซีล (Nozzle & Seal)',
+  'สายพานลำเลียง (Conveyor)',
+  'PLC / จอควบคุม (PLC & HMI)',
+  'ฮีตเตอร์ / ความร้อน (Heating)',
+  'ระบบความเย็น (Cooling)',
+  'เครื่องพิมพ์วันที่ / ติดฉลาก (Coder & Labeler)',
+  'ระบบไฮดรอลิกส์ (Hydraulic)',
+  'ระบบสาธารณูปโภค (Utility)',
+  'โครงสร้าง / เซฟตี้ (Structure & Safety)',
+  'อื่นๆ (Other)'
 ]
 
 const ROOT_CAUSES: RootCauseCategory[] = [
-  'Wear & Tear',
-  'Loose Part',
-  'Lack of Lubrication',
-  'Sensor Failure',
-  'Electrical Failure',
-  'Part Lifetime',
-  'Contamination',
-  'Cleaning Issue',
-  'Incorrect Setup',
-  'Overload',
-  'Improper Operation',
-  'PM Missed',
-  'Design Problem',
-  'Unknown'
+  'สึกหรอตามอายุการใช้งาน',
+  'น็อต / สกรู / ข้อต่อคลายตัว',
+  'ขาดการหล่อลื่น / จารบีแห้ง',
+  'สิ่งสกปรก / วัตถุดิบอุดตัน',
+  'เซนเซอร์สกปรก / เคลื่อนตำแหน่ง',
+  'ชิ้นส่วนแตกหัก / หักงอ / ชำรุด',
+  'สายไฟชำรุด / ช็อต / ฟิวส์ขาด',
+  'ปรับตั้งเครื่องไม่ถูกต้อง / คลาดเคลื่อน',
+  'ชิ้นงานติดขัดในระบบ',
+  'การใช้งานผิดวิธี',
+  'ใช้งานเกินกำลัง (Overload)',
+  'ปัญหาจากการล้างทำความสะอาด',
+  'รั่วซึม / ลมรั่ว / ซีลฉีกขาด',
+  'ฮีตเตอร์ขาด / อุณหภูมิผิดปกติ',
+  'ไม่ได้รับการบำรุงรักษาตามรอบ PM',
+  'ปัญหาคุณภาพอะไหล่ / โครงสร้างเครื่อง',
+  'ไม่ทราบสาเหตุแน่ชัด'
 ]
 
 export default function CompleteRepairModal({
@@ -53,8 +70,8 @@ export default function CompleteRepairModal({
   targetStatus,
   onSuccess
 }: CompleteRepairModalProps) {
-  const [category, setCategory] = useState('Mechanical')
-  const [rootCause, setRootCause] = useState<RootCauseCategory>('Wear & Tear')
+  const [category, setCategory] = useState('ระบบกลไก (Mechanical)')
+  const [rootCause, setRootCause] = useState<RootCauseCategory>('สึกหรอตามอายุการใช้งาน')
   const [diagnosis, setDiagnosis] = useState('')
   const [correctiveAction, setCorrectiveAction] = useState('')
   const [preventiveRec, setPreventiveRec] = useState('')
@@ -151,7 +168,7 @@ export default function CompleteRepairModal({
             <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
               สาเหตุหลัก (Quick Root Cause - เลือก 1 ข้อ):
             </label>
-            <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto pr-1 no-scrollbar">
+            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 no-scrollbar">
               {ROOT_CAUSES.map(rc => (
                 <button
                   type="button"
@@ -175,7 +192,16 @@ export default function CompleteRepairModal({
               สิ่งที่ดำเนินการแก้ไข (Corrective Action) *
             </label>
             <div className="flex flex-wrap gap-1 mb-1.5">
-              {['เปลี่ยนลูกปืนใหม่และตั้งศูนย์', 'เปลี่ยนชุด Mechanical Seal', 'ปรับตั้งตำแหน่งเซนเซอร์และขันแน่น', 'ทำความสะอาดคราบและหล่อลื่น', 'เปลี่ยนสายพานขับ'].map(preset => (
+              {[
+                'เปลี่ยนลูกปืนใหม่และตั้งศูนย์',
+                'เปลี่ยนชุด Mechanical Seal',
+                'ปรับตั้งตำแหน่งเซนเซอร์และขันแน่น',
+                'ขันแน่นน็อต/จุดยึดที่คลายตัว',
+                'แก้ไขสายลมรั่ว/เปลี่ยนข้อต่อลม',
+                'ล้างทำความสะอาดหัวจ่าย/กำจัดสิ่งอุดตัน',
+                'ทำความสะอาดคราบและหล่อลื่น',
+                'เปลี่ยนสายพานขับ'
+              ].map(preset => (
                 <button
                   type="button"
                   key={preset}
@@ -200,6 +226,23 @@ export default function CompleteRepairModal({
             <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1">
               ข้อเสนอแนะเพื่อป้องกันการเกิดซ้ำ (Preventive Recommendation):
             </label>
+            <div className="flex flex-wrap gap-1 mb-1.5">
+              {[
+                'ตรวจสอบการคลายตัวของน็อตใน PM ประจำเดือน',
+                'เพิ่มรอบอัดจารบี/ตรวจระดับการหล่อลื่น',
+                'ย้ำเตือนพนักงานทำความสะอาดหลังจบกะ',
+                'เตรียมสั่งอะไหล่สำรอง (Buffer Stock)'
+              ].map(rec => (
+                <button
+                  type="button"
+                  key={rec}
+                  onClick={() => setPreventiveRec(rec)}
+                  className="text-[10px] bg-blue-50 text-blue-900 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors"
+                >
+                  + {rec}
+                </button>
+              ))}
+            </div>
             <Input
               value={preventiveRec}
               onChange={e => setPreventiveRec(e.target.value)}
