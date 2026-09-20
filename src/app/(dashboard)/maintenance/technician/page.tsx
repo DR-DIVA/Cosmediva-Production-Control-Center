@@ -436,74 +436,6 @@ export default function TechnicianCockpitPage() {
             </button>
           </div>
 
-          {/* AI MAINTENANCE ASSISTANT PANEL */}
-          {aiInsight && selectedWOForAI && (
-            <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 p-5 rounded-3xl text-white shadow-xl border border-[#D4AF37]/50 relative overflow-hidden">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/40 rounded-xl text-[#D4AF37]">
-                    <Sparkles className="w-4 h-4 animate-spin" />
-                  </span>
-                  <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
-                    AI Maintenance Assistant • ระบบช่วยวินิจฉัยหน้างาน
-                  </span>
-                </div>
-                <span className="text-[11px] bg-amber-500/20 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
-                  วิเคราะห์สำหรับ {selectedWOForAI.machine_code}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
-                {/* Box 1: Probable Root Causes */}
-                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
-                    <Wrench className="w-3.5 h-3.5" />
-                    สาเหตุที่พบบ่อยในอดีต (Probable Causes)
-                  </div>
-                  <ul className="space-y-1 text-stone-200">
-                    {aiInsight.suggestedRootCauses?.map((c: string, i: number) => (
-                      <li key={i} className="flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span>
-                        <span>{c}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Box 2: Suggested Spare Parts */}
-                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
-                    <Package className="w-3.5 h-3.5" />
-                    อะไหล่ที่แนะนำให้เตรียมไป (Recommended Parts)
-                  </div>
-                  {aiInsight.recommendedParts && aiInsight.recommendedParts.length > 0 ? (
-                    <ul className="space-y-1 text-stone-200">
-                      {aiInsight.recommendedParts.map((p: any, i: number) => (
-                        <li key={i} className="flex items-center justify-between">
-                          <span className="truncate">{p.name}</span>
-                          <span className="text-amber-300 font-mono text-[10px] shrink-0 ml-1">เคยใช้ {p.count} ครั้ง</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-stone-400 text-[11px]">ยังไม่มีประวัติการใช้อะไหล่เฉพาะ</p>
-                  )}
-                </div>
-
-                {/* Box 3: Safety & Inspection */}
-                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
-                  <div className="text-rose-300 font-bold flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
-                    ข้อควรระวังความปลอดภัย (Safety Note)
-                  </div>
-                  <p className="text-stone-300 text-[11px] leading-relaxed">
-                    {aiInsight.safetyPrecautions || 'ตัดไฟหลัก (LOTO) ก่อนเปิดฝาครอบเครื่องทุกครั้ง'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* 1. CRITICAL BREAKDOWNS (P1) */}
           {criticalJobs.length > 0 && (breakdownFilter === 'ALL' || breakdownFilter === 'READY' || breakdownFilter === 'IN_PROGRESS') && (
             <div className="space-y-3">
@@ -966,6 +898,74 @@ export default function TechnicianCockpitPage() {
                     </Button>
                   </div>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* AI MAINTENANCE ASSISTANT PANEL (ย้ายมาไว้ด้านล่างสุดของรายการงานซ่อม) */}
+          {aiInsight && selectedWOForAI && (
+            <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-amber-950 p-5 rounded-3xl text-white shadow-xl border border-[#D4AF37]/50 relative overflow-hidden mt-6">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className="p-1.5 bg-[#D4AF37]/20 border border-[#D4AF37]/40 rounded-xl text-[#D4AF37]">
+                    <Sparkles className="w-4 h-4 animate-spin" />
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-wider text-[#D4AF37]">
+                    AI Maintenance Assistant • ระบบช่วยวินิจฉัยหน้างาน
+                  </span>
+                </div>
+                <span className="text-[11px] bg-amber-500/20 text-amber-300 font-bold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                  วิเคราะห์สำหรับ {selectedWOForAI.machine_code}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 text-xs">
+                {/* Box 1: Probable Root Causes */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
+                    <Wrench className="w-3.5 h-3.5" />
+                    สาเหตุที่พบบ่อยในอดีต (Probable Causes)
+                  </div>
+                  <ul className="space-y-1 text-stone-200">
+                    {aiInsight.suggestedRootCauses?.map((c: string, i: number) => (
+                      <li key={i} className="flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#D4AF37]"></span>
+                        <span>{c}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Box 2: Suggested Spare Parts */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-[#D4AF37] font-bold flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5" />
+                    อะไหล่ที่แนะนำให้เตรียมไป (Recommended Parts)
+                  </div>
+                  {aiInsight.recommendedParts && aiInsight.recommendedParts.length > 0 ? (
+                    <ul className="space-y-1 text-stone-200">
+                      {aiInsight.recommendedParts.map((p: any, i: number) => (
+                        <li key={i} className="flex items-center justify-between">
+                          <span className="truncate">{p.name}</span>
+                          <span className="text-amber-300 font-mono text-[10px] shrink-0 ml-1">เคยใช้ {p.count} ครั้ง</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-stone-400 text-[11px]">ยังไม่มีประวัติการใช้อะไหล่เฉพาะ</p>
+                  )}
+                </div>
+
+                {/* Box 3: Safety & Inspection */}
+                <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 space-y-1.5">
+                  <div className="text-rose-300 font-bold flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-rose-400" />
+                    ข้อควรระวังความปลอดภัย (Safety Note)
+                  </div>
+                  <p className="text-stone-300 text-[11px] leading-relaxed">
+                    {aiInsight.safetyPrecautions || 'ตัดไฟหลัก (LOTO) ก่อนเปิดฝาครอบเครื่องทุกครั้ง'}
+                  </p>
+                </div>
               </div>
             </div>
           )}
