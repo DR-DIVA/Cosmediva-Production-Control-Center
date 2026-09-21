@@ -463,7 +463,7 @@ export async function askMtexAI(question: string): Promise<{
       .from('maintenance_chat_history')
       .select('sender_name, message_text, machine_code, chat_date, raw_log, created_at')
       .order('chat_date', { ascending: false, nullsFirst: false })
-      .limit(filterYear ? 50 : 250)
+      .limit(filterYear ? 100 : 500)
 
     if (detectedMachine) {
       chatQuery = chatQuery.or(`machine_code.ilike.%${detectedMachine}%,message_text.ilike.%${detectedMachine}%`)
@@ -479,34 +479,46 @@ export async function askMtexAI(question: string): Promise<{
 
     const { data: rawMatchedChats } = await chatQuery
 
-    // Deduplicate chats by text similarity
-    const seenMsgs = new Set<string>()
-    const uniqueChats = (rawMatchedChats || []).filter(c => {
-      const key = c.message_text.trim().slice(0, 45)
-      if (seenMsgs.has(key)) return false
-      seenMsgs.add(key)
-      return true
+    // Deduplicate chats with clean text normalization (ignore leading mentions, symbols, whitespace)
+    function cleanForDedup(text: string): string {
+      return text
+        .replace(/@\S+/g, '')
+        .replace(/^[pP]\s*[:@\s]*/g, '')
+        .replace(/[^a-zA-Z0-9ก-๙]/g, '')
+        .trim()
+        .toLowerCase()
+    }
+
+    const yearCounts: Record<string, number> = {}
+    ;(rawMatchedChats || []).forEach(c => {
+      const y = c.chat_date ? new Date(c.chat_date).getFullYear().toString() : 'อื่นๆ'
+      yearCounts[y] = (yearCounts[y] || 0) + 1
     })
 
-    // Multi-year distribution: balance results across all available years (2019 - 2026)
+    const seenHashes = new Set<string>()
+    const yearGroups: Record<string, any[]> = {}
+    ;(rawMatchedChats || []).forEach(c => {
+      const y = c.chat_date ? new Date(c.chat_date).getFullYear().toString() : 'อื่นๆ'
+      if (!yearGroups[y]) yearGroups[y] = []
+
+      const norm = cleanForDedup(c.message_text || '')
+      const hash = norm.slice(0, 35)
+      if (hash.length > 3 && !seenHashes.has(hash)) {
+        seenHashes.add(hash)
+        yearGroups[y].push(c)
+      }
+    })
+
+    const yearsSorted = Object.keys(yearGroups).sort((a, b) => Number(b) - Number(a))
+
     let matchedChats: any[] = []
     if (filterYear) {
-      matchedChats = uniqueChats.slice(0, 8)
+      matchedChats = (yearGroups[filterYear.toString()] || []).slice(0, 10)
     } else {
-      const yearGroups: Record<string, any[]> = {}
-      uniqueChats.forEach(c => {
-        const y = c.chat_date ? new Date(c.chat_date).getFullYear().toString() : 'อื่นๆ'
-        if (!yearGroups[y]) yearGroups[y] = []
-        yearGroups[y].push(c)
-      })
-
-      const yearsSorted = Object.keys(yearGroups).sort((a, b) => Number(b) - Number(a))
-      const balanced: any[] = []
+      // Balance results across ALL available years (2019 - 2026), 1-2 distinct items per year
       for (const y of yearsSorted) {
-        balanced.push(...yearGroups[y].slice(0, 2))
-        if (balanced.length >= 10) break
+        matchedChats.push(...(yearGroups[y] || []).slice(0, 2))
       }
-      matchedChats = balanced.length > 0 ? balanced : uniqueChats.slice(0, 8)
     }
 
     // 4. Query Machines Master
@@ -630,13 +642,36 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     }
 
     if (matchedChats && matchedChats.length > 0) {
-      answerText += `💬 ข้อมูลประวัติจากแชทกลุ่มช่าง (นำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
-      matchedChats.slice(0, 6).forEach(c => {
-        const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
-        const datePrefix = dateStr ? `[📅 ${dateStr}] ` : ''
-        answerText += `• ${datePrefix}${c.sender_name}: "${c.message_text}"\n`
-      })
-      answerText += '\n'
+      const totalRaw = rawMatchedChats?.length || 0
+      if (filterYear) {
+        answerText += `📊 สถิติประวัติแชทเกี่ยวกับ "${q}" ประจำปี ${filterYear} (พบทั้งหมด ${yearCounts[filterYear.toString()] || matchedChats.length} ข้อความ):\n\n`
+        answerText += `💬 ข้อมูลประวัติจากแชทกลุ่มช่าง (นำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
+        matchedChats.forEach(c => {
+          const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
+          const datePrefix = dateStr ? `[📅 ${dateStr}] ` : ''
+          answerText += `• ${datePrefix}${c.sender_name}: "${c.message_text.trim()}"\n`
+        })
+        answerText += '\n'
+      } else {
+        answerText += `📊 สถิติประวัติแชทในระบบ (พบทั้งหมด ${totalRaw} ข้อความ):\n`
+        const summaryParts = yearsSorted.map(y => `ปี ${y}: ${yearCounts[y]} ข้อความ`)
+        answerText += summaryParts.join(' | ') + '\n\n'
+
+        answerText += `💬 ไทม์ไลน์ประวัติสำคัญแยกตามปี (นำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n\n`
+        for (const y of yearsSorted) {
+          const msgs = yearGroups[y] || []
+          const sampleMsgs = msgs.slice(0, 2)
+          if (sampleMsgs.length > 0) {
+            answerText += `🔹 ปี ${y} (${yearCounts[y]} ข้อความในระบบ):\n`
+            sampleMsgs.forEach(c => {
+              const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
+              const datePrefix = dateStr ? `[📅 ${dateStr}] ` : ''
+              answerText += `• ${datePrefix}${c.sender_name}: "${c.message_text.trim()}"\n`
+            })
+            answerText += '\n'
+          }
+        }
+      }
     }
 
     if (matchedParts && matchedParts.length > 0) {
