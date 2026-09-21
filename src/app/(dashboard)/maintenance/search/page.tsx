@@ -9,6 +9,8 @@ import Link from 'next/link'
 import { searchMaintenance } from '@/app/actions/maintenance'
 import { formatWorkOrderStatus } from '@/types/maintenance'
 import ImportLineChatModal from '@/components/maintenance/ImportLineChatModal'
+import { askMtexAI } from '@/app/actions/mtex-ai'
+import { RefreshCw } from 'lucide-react'
 
 export default function MaintenanceSearchPage() {
   const [query, setQuery] = useState('')
@@ -18,23 +20,43 @@ export default function MaintenanceSearchPage() {
     workOrders: any[]
     parts: any[]
   }>({ machines: [], workOrders: [], parts: [] })
+  const [aiAnswer, setAiAnswer] = useState<string | null>(null)
+  const [isAiLoading, setIsAiLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
-  const handleSearch = async (e?: React.FormEvent) => {
+  const handleSearch = async (e?: React.FormEvent, directQuery?: string) => {
     if (e) e.preventDefault()
-    if (!query.trim()) return
+    const targetQuery = (directQuery ?? query).trim()
+    if (!targetQuery) return
 
     setIsLoading(true)
-    try {
-      const res = await searchMaintenance(query)
-      if (res.success && res.data) {
-        setResults(res.data)
-        setHasSearched(true)
-      }
-    } finally {
-      setIsLoading(false)
-    }
+    setIsAiLoading(true)
+    setAiAnswer(null)
+    setHasSearched(true)
+
+    // 1. Run traditional database search
+    searchMaintenance(targetQuery)
+      .then(res => {
+        if (res.success && res.data) {
+          setResults(res.data)
+        }
+      })
+      .catch(console.error)
+      .finally(() => setIsLoading(false))
+
+    // 2. Run MTEX AI Assistant search on chat history & knowledge base
+    askMtexAI(targetQuery)
+      .then(res => {
+        if (res && res.answer) {
+          setAiAnswer(res.answer)
+        }
+      })
+      .catch(err => {
+        console.error('MTEX AI search error:', err)
+        setAiAnswer('ขออภัยครับ เกิดข้อผิดพลาดในการเชื่อมต่อกับน้อง MTEX AI ชั่วคราว')
+      })
+      .finally(() => setIsAiLoading(false))
   }
 
   const quickQueries = ['MX-04', 'Bearing', 'FL-01', 'Sensor', 'Wear & Tear', 'Solenoid', 'CP-01']
@@ -95,16 +117,9 @@ export default function MaintenanceSearchPage() {
               key={q}
               onClick={() => {
                 setQuery(q)
-                setTimeout(() => {
-                  searchMaintenance(q).then(res => {
-                    if (res.success && res.data) {
-                      setResults(res.data)
-                      setHasSearched(true)
-                    }
-                  })
-                }, 50)
+                handleSearch(undefined, q)
               }}
-              className="px-2.5 py-1 text-xs font-semibold rounded-xl bg-stone-100 hover:bg-amber-50 hover:text-amber-900 border border-stone-200 transition-colors"
+              className="px-2.5 py-1 text-xs font-semibold rounded-xl bg-stone-100 hover:bg-amber-50 hover:text-amber-900 border border-stone-200 transition-colors cursor-pointer"
             >
               {q}
             </button>
@@ -115,6 +130,43 @@ export default function MaintenanceSearchPage() {
       {/* Results View */}
       {hasSearched && (
         <div className="space-y-6 animate-in fade-in duration-200">
+          {/* MTEX AI Smart Assistant Answer Card */}
+          {(isAiLoading || aiAnswer) && (
+            <div className="p-5 sm:p-6 bg-gradient-to-br from-stone-900 via-[#1e1b18] to-stone-900 text-stone-100 rounded-3xl border-2 border-[#D4AF37]/50 shadow-xl space-y-3.5 text-left relative overflow-hidden">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[#D4AF37]/20 border border-[#D4AF37]/60 flex items-center justify-center text-[#D4AF37] shadow-inner">
+                    <Bot className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-white flex items-center gap-2">
+                      <span>คำตอบจากน้อง MTEX AI Assistant</span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold">
+                        คลังแชท & ประวัติช่าง 12,181 รายการ
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-stone-400">
+                      สืบค้นและวิเคราะห์ประวัติงานซ่อมจริงจากกลุ่มแชท LINE CMD Maintenance
+                    </p>
+                  </div>
+                </div>
+
+                {isAiLoading && (
+                  <div className="flex items-center gap-2 text-xs font-bold text-amber-400 bg-amber-400/10 px-3 py-1.5 rounded-xl border border-amber-400/20 animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>น้อง MTEX กำลังคิดและสรุปข้อมูล...</span>
+                  </div>
+                )}
+              </div>
+
+              {aiAnswer && (
+                <div className="text-xs sm:text-sm text-stone-200 leading-relaxed whitespace-pre-line bg-stone-950/70 p-4 sm:p-5 rounded-2xl border border-stone-800/80 font-sans shadow-inner">
+                  {aiAnswer}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Machines Result */}
           {results.machines.length > 0 && (
             <div className="bg-white p-5 rounded-3xl border border-stone-200 shadow-sm space-y-3">
@@ -203,7 +255,7 @@ export default function MaintenanceSearchPage() {
             </div>
           )}
 
-          {results.machines.length === 0 && results.workOrders.length === 0 && results.parts.length === 0 && (
+          {results.machines.length === 0 && results.workOrders.length === 0 && results.parts.length === 0 && !isAiLoading && !aiAnswer && (
             <div className="bg-white p-12 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
               ไม่พบข้อมูลที่ตรงกับคำค้นหา &quot;{query}&quot;
             </div>
