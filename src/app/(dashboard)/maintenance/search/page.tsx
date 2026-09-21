@@ -57,9 +57,11 @@ export default function MaintenanceSearchPage() {
           <Button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
-            className="h-10 px-4 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs flex items-center gap-2 shrink-0 cursor-pointer"
+            className="h-11 px-5 rounded-2xl text-xs font-black bg-emerald-600 hover:bg-emerald-700 text-white shadow-md hover:shadow-lg flex items-center gap-2.5 shrink-0 cursor-pointer transition-transform active:scale-95"
           >
-            <Bot className="w-4 h-4 text-emerald-600" />
+            <div className="w-6 h-6 rounded-lg bg-emerald-700/50 flex items-center justify-center">
+              <Bot className="w-4 h-4 text-emerald-200" />
+            </div>
             <span>📥 นำเข้าประวัติแชท LINE & ถามน้อง MTEX</span>
           </Button>
         </div>

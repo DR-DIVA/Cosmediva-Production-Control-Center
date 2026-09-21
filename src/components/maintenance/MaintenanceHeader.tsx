@@ -105,6 +105,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       label: 'ค้นหาประวัติ', 
       href: '/maintenance/search', 
       icon: Search,
+      badge: 'MTEX AI',
       frameClass: 'bg-teal-50 hover:bg-teal-100 text-teal-950 border border-teal-300 hover:border-teal-400',
       iconClass: 'border border-teal-400 bg-teal-600 text-white' 
     },
@@ -136,6 +137,14 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
               title="ดูผังภาพรวมการไหลของงานแจ้งซ่อมบำรุง (End-to-End Workflow)"
             >
               <span>🧭 ผังขั้นตอนการแจ้งซ่อม (Workflow)</span>
+            </Link>
+            <span className="text-slate-400">|</span>
+            <Link 
+              href="/maintenance/search" 
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200 underline underline-offset-4 decoration-emerald-400/50 hover:decoration-emerald-300 transition"
+              title="สืบค้นประวัติงานซ่อม & MTEX AI Assistant"
+            >
+              <span>🤖 ค้นหาประวัติ & MTEX AI</span>
             </Link>
           </div>
         </div>
@@ -263,6 +272,12 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                 <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-inherit'}`}>
                   {item.label}
                 </span>
+
+                {item.badge && (
+                  <span className="ml-auto text-[9px] px-1.5 py-0.5 rounded-md font-extrabold bg-emerald-600 text-white tracking-wide shadow-2xs shrink-0 animate-pulse">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             )
           })}
