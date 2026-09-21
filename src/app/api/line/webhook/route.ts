@@ -81,6 +81,60 @@ export async function POST(req: NextRequest) {
           continue
         }
 
+        const cleanQuery = rawText
+          .replace(/@mtex/gi, '')
+          .replace(/^mtex[:\s]*/i, '')
+          .trim()
+
+        // 1. Social Greetings, Thanks & Conversational Words (do not search database)
+        if (/^(ขอบคุณ|ขอบใจ|แต๊ง|thanks|thank you|thx|เยี่ยม|ยอดเยี่ยม|เก่งมาก|ดีมาก)/i.test(cleanQuery)) {
+          if (token && event.replyToken) {
+            await replyLineMessage(token, event.replyToken, [
+              {
+                type: 'text',
+                text: 'ยินดีเป็นอย่างยิ่งครับ! 😊 หากมีข้อสงสัยงานช่าง หรือต้องการค้นหาประวัติเครื่องจักรตัวไหน สอบถามน้อง MTEX ได้ตลอดเลยนะครับ 🛠️🤖'
+              }
+            ])
+          }
+          continue
+        }
+
+        if (/^(สวัสดี|หวัดดี|ดีครับ|ดีค่ะ|hello|hi|hey|morning|มอนิ่ง)/i.test(cleanQuery)) {
+          if (token && event.replyToken) {
+            await replyLineMessage(token, event.replyToken, [
+              {
+                type: 'text',
+                text: 'สวัสดีครับ! ผมน้อง MTEX ผู้ช่วยช่างอัจฉริยะ CosmeFlow 🤖 มีอะไรให้ผมช่วยค้นหาประวัติงานซ่อม อะไหล่ หรือเช็คอาการเครื่องจักร สอบถามได้เลยนะครับ 🛠️'
+              }
+            ])
+          }
+          continue
+        }
+
+        if (/^(โอเค|โอเช|ok|okay|รับทราบ|รับแซ่บ|เรียบร้อย|ได้ครับ|ได้ค่ะ|เข้าใจแล้ว)$/i.test(cleanQuery)) {
+          if (isPrivate && token && event.replyToken) {
+            await replyLineMessage(token, event.replyToken, [
+              {
+                type: 'text',
+                text: 'รับทราบครับผม! พร้อมช่วยเหลือเสมอครับ 🤖👍'
+              }
+            ])
+          }
+          continue
+        }
+
+        if (/(ไม่ได้ให้ค้น|ไม่ใช่|ไม่ได้ถาม|ขอบคุณน้อง|ไม่ได้ให้หา)/i.test(cleanQuery)) {
+          if (token && event.replyToken) {
+            await replyLineMessage(token, event.replyToken, [
+              {
+                type: 'text',
+                text: 'รับทราบและขออภัยด้วยครับผม! 🤖🙏 น้อง MTEX เข้าใจแล้วครับ มีข้อมูลงานซ่อมส่วนไหนที่อยากให้ช่วยค้นหา แจ้งรหัสเครื่องหรืออาการเสียได้เลยนะครับ 🛠️'
+              }
+            ])
+          }
+          continue
+        }
+
         // B. Check if message is a Note / Work log shared privately
         const isQuestion = 
           lowerText.includes('?') ||
@@ -103,12 +157,16 @@ export async function POST(req: NextRequest) {
           try {
             const { parseLineChatLog } = await import('@/app/actions/mtex-ai')
             const noteParsed = await parseLineChatLog(rawText)
-            if (noteParsed.length > 0 && (noteParsed[0].is_troubleshooting || noteParsed[0].machine_code || rawText.length >= 15)) {
-              const item = noteParsed[0]
+            const item = noteParsed[0]
+            const isValidMachine = item?.machine_code && item.machine_code !== 'MTEX'
+            const hasDatePrefix = /^\d{1,2}[\/\.\-]\d{1,2}/.test(rawText.trim())
+            const isCasualText = /^(ขอบคุณ|สวัสดี|โอเค|คือ|ทำไม|อะไร|ไม่ใช่|จ้า)/i.test(rawText.trim())
+
+            if (!isCasualText && (hasDatePrefix || isValidMachine || (item?.is_troubleshooting && rawText.length >= 20))) {
               await supabase.from('maintenance_chat_history').insert({
-                sender_name: item.sender_name || 'แชร์โน้ตส่วนตัว',
+                sender_name: item?.sender_name || 'แชร์โน้ตส่วนตัว',
                 message_text: rawText,
-                machine_code: item.machine_code || null,
+                machine_code: isValidMachine ? item.machine_code : null,
                 is_troubleshooting: true,
                 raw_log: { userId, source: 'line_private_note_share' }
               })
@@ -117,9 +175,9 @@ export async function POST(req: NextRequest) {
                 {
                   type: 'text',
                   text: `✅ น้อง MTEX บันทึกเข้าคลังความรู้เรียบร้อยแล้วครับ!\n\n` +
-                        `⚙️ เครื่องจักร: ${item.machine_code || 'ทั่วไป / ตามเนื้อหา'}\n` +
-                        `👤 ผู้บันทึก: ${item.sender_name || 'ช่างซ่อมบำรุง'}\n` +
-                        (item.chat_date ? `📅 วันที่: ${item.chat_date}\n` : '') +
+                        `⚙️ เครื่องจักร: ${isValidMachine ? item.machine_code : 'ทั่วไป / ตามเนื้อหา'}\n` +
+                        `👤 ผู้บันทึก: ${item?.sender_name || 'ช่างซ่อมบำรุง'}\n` +
+                        (item?.chat_date ? `📅 วันที่: ${item.chat_date}\n` : '') +
                         `📝 ข้อความ: ${rawText.length > 70 ? rawText.slice(0, 70) + '...' : rawText}\n\n` +
                         `💡 บันทึกเข้าสมองน้อง MTEX แล้ว ช่างสามารถสอบถามประวัตินี้ได้ตลอดเวลาครับ 🤖`
                 }

@@ -19,6 +19,17 @@ export interface ParsedLineChatMessage {
 const MACHINE_CODE_REGEX = /\b(Homo\s*mix\s*\d+|Homo[-_]?\d+|Mixer[-_]?\d+|Tank[-_]?\d+|[A-Z]{2,6}[-_]?[A-Z0-9]{1,10})\b/i
 
 /**
+ * Clean machine code extractor (excludes bot name and system keywords)
+ */
+function extractMachineCode(text: string): string | null {
+  const m = text.match(MACHINE_CODE_REGEX)
+  if (!m) return null
+  const code = m[1].toUpperCase()
+  if (['MTEX', 'LINE', 'TRUE', 'FALSE', 'NULL', 'ERROR', 'CHAT', 'POST', 'HTTP', 'HTTPS'].includes(code)) return null
+  return code
+}
+
+/**
  * Common Thai maintenance keywords
  */
 const TROUBLESHOOTING_KEYWORDS = [
@@ -389,11 +400,41 @@ export async function askMtexAI(question: string): Promise<{
     const q = question.trim()
     if (!q) return { success: false, answer: 'กรุณาระบุคำถาม เช่น "เครื่องผสม MX-02 เคยเสียอะไร?" หรือ "เช็กสต็อกสายพาน"' }
 
+    const cleanQ = q.replace(/^[@\s]*mtex[:\s]*/i, '').trim()
+
+    // 0. Intercept common conversational / social words (do not search database)
+    if (/^(ขอบคุณ|ขอบใจ|แต๊ง|thanks|thank you|thx|เยี่ยม|ยอดเยี่ยม|เก่งมาก|ดีมาก)/i.test(cleanQ)) {
+      return {
+        success: true,
+        answer: 'ยินดีเป็นอย่างยิ่งครับ! 😊 หากมีข้อสงสัยงานช่าง หรือต้องการค้นหาประวัติเครื่องจักรตัวไหน สอบถามน้อง MTEX ได้ตลอดเลยนะครับ 🛠️🤖'
+      }
+    }
+
+    if (/^(สวัสดี|หวัดดี|ดีครับ|ดีค่ะ|hello|hi|hey|morning|มอนิ่ง)/i.test(cleanQ)) {
+      return {
+        success: true,
+        answer: 'สวัสดีครับ! ผมน้อง MTEX ผู้ช่วยช่างอัจฉริยะ CosmeFlow 🤖 มีอะไรให้ผมช่วยค้นหาประวัติงานซ่อม อะไหล่ หรือเช็คอาการเครื่องจักร สอบถามได้เลยนะครับ 🛠️'
+      }
+    }
+
+    if (/^(โอเค|โอเช|ok|okay|รับทราบ|รับแซ่บ|เรียบร้อย|ได้ครับ|ได้ค่ะ|เข้าใจแล้ว)$/i.test(cleanQ)) {
+      return {
+        success: true,
+        answer: 'รับทราบครับผม! พร้อมช่วยเหลือเสมอครับ 🤖👍'
+      }
+    }
+
+    if (/(ไม่ได้ให้ค้น|ไม่ใช่|ไม่ได้ถาม|ขอบคุณน้อง|ไม่ได้ให้หา)/i.test(cleanQ)) {
+      return {
+        success: true,
+        answer: 'รับทราบและขออภัยด้วยครับผม! 🤖🙏 มีข้อมูลงานซ่อมส่วนไหนที่อยากให้น้อง MTEX ช่วยค้นหา แจ้งรหัสเครื่องหรืออาการเสียได้เลยนะครับ 🛠️'
+      }
+    }
+
     const supabase = createAdminClient()
 
     // 1. Extract potential machine code or keywords
-    const mcMatch = q.match(MACHINE_CODE_REGEX)
-    const detectedMachine = mcMatch ? mcMatch[1].toUpperCase() : null
+    const detectedMachine = extractMachineCode(cleanQ)
 
     // 2. Query Work Orders
     let woQuery = supabase
