@@ -14,8 +14,9 @@ export interface ParsedLineChatMessage {
 /**
  * Common regex for detecting machine codes in factory:
  * E.g., MX-01, FL-02, TB-03, CP-04, PK-01, PM-02, TC-01, CT-02
+ * Also catches names like Homo mix 4, Homo 4, Mixer 2, Tank 1
  */
-const MACHINE_CODE_REGEX = /\b([A-Z]{2,4}[-_]?\d{1,4}[A-Z]?)\b/i
+const MACHINE_CODE_REGEX = /\b(Homo\s*mix\s*\d+|Homo[-_]?\d+|Mixer[-_]?\d+|Tank[-_]?\d+|[A-Z]{2,6}[-_]?[A-Z0-9]{1,10})\b/i
 
 /**
  * Common Thai maintenance keywords
@@ -24,13 +25,50 @@ const TROUBLESHOOTING_KEYWORDS = [
   'ซ่อม', 'เสีย', 'พัง', 'ดับ', 'หยุด', 'รั่ว', 'ร้อน', 'ไหม้', 'หลวม', 'ขาด', 'แตก',
   'ไม่ติด', 'ไม่หมุน', 'ไม่ดูด', 'ไม่ร้อน', 'เออเร่อ', 'error', 'alarm', 'ลูกปืน',
   'สายพาน', 'เซนเซอร์', 'sensor', 'ฮีตเตอร์', 'heater', 'มอเตอร์', 'motor', 'ปั๊ม',
-  'โซลินอยด์', 'solenoid', 'รีเลย์', 'relay', 'วาล์ว', 'valve', 'อะไหล่', 'part', 'เบิก', 'เปลี่ยน'
+  'โซลินอยด์', 'solenoid', 'รีเลย์', 'relay', 'วาล์ว', 'valve', 'อะไหล่', 'part', 'เบิก', 'เปลี่ยน',
+  'ประกอบ', 'ทดสอบ', 'ส่งซ่อม', 'คืนเครื่อง', 'ใบพัด', 'ใบกวน', 'ซีล', 'แอร์', 'เครื่องปั่น'
 ]
 
 /**
- * Smart Parser for exported LINE chat text files (.txt)
+ * Smart Date Parser for various Thai / LINE formats
  */
-export function parseLineChatLog(rawContent: string): ParsedLineChatMessage[] {
+function parseToIsoDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return new Date().toISOString()
+  
+  const trimmed = dateStr.trim()
+  const d = new Date(trimmed)
+  if (!isNaN(d.getTime())) return d.toISOString()
+
+  // Match DD/MM/YY or DD/MM/YYYY
+  const m1 = trimmed.match(/^(\d{1,2})[\/\.\-](\d{1,2})[\/\.\-](\d{2,4})/)
+  if (m1) {
+    const day = parseInt(m1[1], 10)
+    const month = parseInt(m1[2], 10) - 1
+    let year = parseInt(m1[3], 10)
+    if (year < 100) year += 2000
+    else if (year > 2500) year -= 543
+    const dateObj = new Date(year, month, day, 12, 0, 0)
+    if (!isNaN(dateObj.getTime())) return dateObj.toISOString()
+  }
+
+  // Match YYYY/MM/DD
+  const m2 = trimmed.match(/^(\d{4})[\/\.\-](\d{1,2})[\/\.\-](\d{1,2})/)
+  if (m2) {
+    let year = parseInt(m2[1], 10)
+    if (year > 2500) year -= 543
+    const month = parseInt(m2[2], 10) - 1
+    const day = parseInt(m2[3], 10)
+    const dateObj = new Date(year, month, day, 12, 0, 0)
+    if (!isNaN(dateObj.getTime())) return dateObj.toISOString()
+  }
+
+  return new Date().toISOString()
+}
+
+/**
+ * Smart Parser for exported LINE chat text files (.txt) and Group Notes
+ */
+export async function parseLineChatLog(rawContent: string): Promise<ParsedLineChatMessage[]> {
   const lines = rawContent.split(/\r?\n/)
   const results: ParsedLineChatMessage[] = []
 
@@ -91,6 +129,52 @@ export function parseLineChatLog(rawContent: string): ParsedLineChatMessage[] {
       })
       continue
     }
+
+    // LINE format 3 (Note group format with Date at beginning: e.g. "17/08/26 ช่างกิตติพงษ์ นำเครื่องปั่น Homo mix 4 มาคืนกำลังประกอบเพื่อทดสอบครับ")
+    const noteDateMatch = line.match(/^(\d{1,2}[\/\.\-]\d{1,2}[\/\.\-]\d{2,4})\s+(.+)$/)
+    if (noteDateMatch) {
+      const dateStr = noteDateMatch[1]
+      const rest = noteDateMatch[2].trim()
+
+      if (shouldIgnoreMessage(rest)) continue
+
+      let sender = 'โน้ตกลุ่ม LINE'
+      let message = rest
+
+      const senderMatch = rest.match(/^([^\s:]{2,25})[:\s]+(.+)$/)
+      if (senderMatch && (senderMatch[1].startsWith('ช่าง') || senderMatch[1].includes('เกาเหลา') || senderMatch[1].length <= 15)) {
+        sender = senderMatch[1]
+        message = senderMatch[2]
+      }
+
+      const mcMatch = (message + ' ' + rest).match(MACHINE_CODE_REGEX)
+      const isTrouble = TROUBLESHOOTING_KEYWORDS.some(k => (message + ' ' + rest).toLowerCase().includes(k))
+
+      results.push({
+        chat_date: dateStr,
+        sender_name: sender,
+        message_text: rest,
+        machine_code: mcMatch ? mcMatch[1].toUpperCase() : null,
+        is_troubleshooting: isTrouble
+      })
+      continue
+    }
+
+    // LINE format 4 (Freeform note line containing maintenance keywords or machine code)
+    if (line.length >= 6) {
+      const isTrouble = TROUBLESHOOTING_KEYWORDS.some(k => line.toLowerCase().includes(k))
+      const mcMatch = line.match(MACHINE_CODE_REGEX)
+
+      if (isTrouble || mcMatch) {
+        results.push({
+          chat_date: currentDate || new Date().toISOString().split('T')[0],
+          sender_name: 'โน้ตกลุ่ม LINE',
+          message_text: line,
+          machine_code: mcMatch ? mcMatch[1].toUpperCase() : null,
+          is_troubleshooting: isTrouble
+        })
+      }
+    }
   }
 
   return results
@@ -121,14 +205,14 @@ export async function importLineChatHistory(rawText: string): Promise<{
   error?: string
 }> {
   try {
-    const parsed = parseLineChatLog(rawText)
+    const parsed = await parseLineChatLog(rawText)
     if (parsed.length === 0) {
       return {
         success: false,
         totalParsed: 0,
         troubleshootingCount: 0,
         insertedCount: 0,
-        error: 'ไม่พบข้อความที่สามารถอ่านรูปแบบ LINE Chat ได้ กรุณาตรวจสอบไฟล์ .txt หรือข้อความที่วาง'
+        error: 'ไม่พบข้อความที่สามารถอ่านรูปแบบ LINE Chat หรือโน้ตงานซ่อมได้ กรุณาตรวจสอบไฟล์หรือข้อความที่วาง'
       }
     }
 
@@ -136,14 +220,14 @@ export async function importLineChatHistory(rawText: string): Promise<{
 
     // Filter relevant messages (troubleshooting or mentions machines or has meaningful length)
     const recordsToInsert = parsed
-      .filter(p => p.is_troubleshooting || p.machine_code || p.message_text.length >= 10)
+      .filter(p => p.is_troubleshooting || p.machine_code || p.message_text.length >= 8)
       .map(p => ({
-        chat_date: p.chat_date ? new Date().toISOString() : null,
+        chat_date: parseToIsoDate(p.chat_date),
         sender_name: p.sender_name,
         message_text: p.message_text,
         machine_code: p.machine_code || null,
         is_troubleshooting: p.is_troubleshooting,
-        raw_log: { originalDate: p.chat_date }
+        raw_log: { originalDate: p.chat_date, source: p.sender_name === 'โน้ตกลุ่ม LINE' ? 'line_note' : 'line_chat' }
       }))
 
     if (recordsToInsert.length > 0) {

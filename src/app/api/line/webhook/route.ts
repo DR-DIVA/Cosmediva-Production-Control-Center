@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
         if (rawText.length >= 8 && !rawText.startsWith('/')) {
           try {
             const { parseLineChatLog } = await import('@/app/actions/mtex-ai')
-            const singleParsed = parseLineChatLog(`${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}\t${userId || 'LineMember'}\t${rawText}`)
+            const singleParsed = await parseLineChatLog(`${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}\t${userId || 'LineMember'}\t${rawText}`)
             if (singleParsed.length > 0 && (singleParsed[0].is_troubleshooting || singleParsed[0].machine_code)) {
               await supabase.from('maintenance_chat_history').insert({
                 sender_name: userId || 'LineMember',

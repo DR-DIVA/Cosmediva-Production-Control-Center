@@ -230,14 +230,19 @@ export default function ImportLineChatModal({ isOpen, onClose }: Props) {
 
             {/* Paste Textarea */}
             <div className="space-y-1.5">
-              <label className="text-xs font-bold text-stone-700 block">
-                หรือวางข้อความแชทโดยตรงที่นี่:
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-stone-700 block">
+                  หรือวางข้อความแชท / คัดลอกข้อความจากโน้ตกลุ่ม LINE (Notes):
+                </label>
+                <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  รองรับโน้ตงานช่าง & บันทึกซ่อม
+                </span>
+              </div>
               <textarea
                 value={rawText}
                 onChange={e => setRawText(e.target.value)}
                 rows={5}
-                placeholder="วางข้อความแชทจาก LINE เช่น&#10;14:20 ช่างสุรเชษฐ์: เครื่องผสม MX-02 ใบพัดเสียงดัง&#10;14:25 ช่างอานนท์: ลูกปืนแตก เปลี่ยนเบอร์ 6205 แล้วหายครับ"
+                placeholder="วางข้อความแชท หรือคัดลอกข้อความจากโน้ตกลุ่ม LINE (Note Group) ได้ทันที เช่น&#10;17/08/26 ช่างกิตติพงษ์ นำเครื่องปั่น Homo mix 4 มาคืนกำลังประกอบเพื่อทดสอบครับ&#10;14:20 ช่างสุรเชษฐ์: เครื่องผสม MX-02 ใบพัดเสียงดัง&#10;14:25 ช่างอานนท์: ลูกปืนแตก เปลี่ยนเบอร์ 6205 แล้วหายครับ"
                 className="w-full text-xs font-mono p-3 rounded-2xl bg-stone-50 border border-stone-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
               />
               {rawText && (
