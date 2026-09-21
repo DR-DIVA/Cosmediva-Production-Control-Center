@@ -165,7 +165,11 @@ export async function POST(req: NextRequest) {
             const hasDatePrefix = /^\d{1,2}[\/\.\-]\d{1,2}/.test(rawText.trim())
             const isCasualText = /^(ขอบคุณ|สวัสดี|โอเค|คือ|ทำไม|อะไร|ไม่ใช่|จ้า)/i.test(rawText.trim())
 
-            if (!isCasualText && (hasDatePrefix || isValidMachine || (item?.is_troubleshooting && rawText.length >= 20))) {
+            // A shared note MUST have an explicit note keyword, date prefix, or be a multiline/detailed log (>= 35 chars with newline)
+            const isExplicitNote = hasDatePrefix || /^(โน้ต|บันทึก|แจ้งซ่อม|รายงาน|บันทึกงาน|note[:\s])/i.test(rawText.trim())
+            const isLongDetailedNote = rawText.includes('\n') && rawText.length >= 35
+
+            if (!isCasualText && (isExplicitNote || isLongDetailedNote)) {
               await supabase.from('maintenance_chat_history').insert({
                 sender_name: item?.sender_name || 'แชร์โน้ตส่วนตัว',
                 message_text: rawText,
