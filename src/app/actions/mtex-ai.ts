@@ -450,28 +450,64 @@ export async function askMtexAI(question: string): Promise<{
     }
     const { data: matchedWOs } = await woQuery
 
-    // 3. Query Chat History
+    // 3. Query Chat History (multi-year support)
+    const yearMatch = cleanQ.match(/\b(201[9]|202[0-6]|256[2-9])\b/)
+    let filterYear: number | null = null
+    if (yearMatch) {
+      let y = parseInt(yearMatch[1], 10)
+      if (y > 2500) y -= 543
+      filterYear = y
+    }
+
     let chatQuery = supabase
       .from('maintenance_chat_history')
       .select('sender_name, message_text, machine_code, chat_date, raw_log, created_at')
       .order('chat_date', { ascending: false, nullsFirst: false })
-      .limit(10)
+      .limit(filterYear ? 30 : 60)
 
     if (detectedMachine) {
       chatQuery = chatQuery.or(`machine_code.ilike.%${detectedMachine}%,message_text.ilike.%${detectedMachine}%`)
     } else {
       chatQuery = chatQuery.ilike('message_text', `%${q}%`)
     }
+
+    if (filterYear) {
+      chatQuery = chatQuery
+        .gte('chat_date', `${filterYear}-01-01T00:00:00Z`)
+        .lte('chat_date', `${filterYear}-12-31T23:59:59Z`)
+    }
+
     const { data: rawMatchedChats } = await chatQuery
 
     // Deduplicate chats by text similarity
     const seenMsgs = new Set<string>()
-    const matchedChats = (rawMatchedChats || []).filter(c => {
-      const key = c.message_text.trim().slice(0, 50)
+    const uniqueChats = (rawMatchedChats || []).filter(c => {
+      const key = c.message_text.trim().slice(0, 45)
       if (seenMsgs.has(key)) return false
       seenMsgs.add(key)
       return true
     })
+
+    // Multi-year distribution: balance results across different years
+    let matchedChats: any[] = []
+    if (filterYear) {
+      matchedChats = uniqueChats.slice(0, 6)
+    } else {
+      const yearGroups: Record<string, any[]> = {}
+      uniqueChats.forEach(c => {
+        const y = c.chat_date ? new Date(c.chat_date).getFullYear().toString() : 'อื่นๆ'
+        if (!yearGroups[y]) yearGroups[y] = []
+        yearGroups[y].push(c)
+      })
+
+      const yearsSorted = Object.keys(yearGroups).sort((a, b) => Number(b) - Number(a))
+      const balanced: any[] = []
+      for (const y of yearsSorted) {
+        balanced.push(...yearGroups[y].slice(0, 2))
+        if (balanced.length >= 8) break
+      }
+      matchedChats = balanced.length > 0 ? balanced : uniqueChats.slice(0, 6)
+    }
 
     // 4. Query Machines Master
     let machineQuery = supabase
@@ -594,8 +630,8 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     }
 
     if (matchedChats && matchedChats.length > 0) {
-      answerText += `💬 ข้อมูลจากแชทกลุ่มช่าง (สามารถนำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
-      matchedChats.slice(0, 4).forEach(c => {
+      answerText += `💬 ข้อมูลประวัติจากแชทกลุ่มช่าง (นำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
+      matchedChats.slice(0, 6).forEach(c => {
         const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
         const datePrefix = dateStr ? `[📅 ${dateStr}] ` : ''
         answerText += `• ${datePrefix}${c.sender_name}: "${c.message_text}"\n`
