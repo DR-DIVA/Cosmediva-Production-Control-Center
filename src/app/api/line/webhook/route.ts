@@ -81,7 +81,57 @@ export async function POST(req: NextRequest) {
           continue
         }
 
-        // B. Handle MTEX AI Assistant Questions
+        // B. Check if message is a Note / Work log shared privately
+        const isQuestion = 
+          lowerText.includes('?') ||
+          lowerText.includes('ไหม') ||
+          lowerText.includes('มั้ย') ||
+          lowerText.includes('หรือยัง') ||
+          lowerText.includes('อะไร') ||
+          lowerText.includes('เท่าไหร่') ||
+          lowerText.includes('ยังไง') ||
+          lowerText.includes('อย่างไร') ||
+          lowerText.startsWith('ถาม') ||
+          lowerText.startsWith('สอบถาม') ||
+          lowerText.startsWith('เช็ค') ||
+          lowerText.startsWith('ค้นหา') ||
+          lowerText.startsWith('ช่วย') ||
+          lowerText.includes('ประวัติของ')
+
+        // If in private 1-on-1 chat and not an explicit question, check if it's a shared note or work update
+        if (isPrivate && !isQuestion && token && event.replyToken) {
+          try {
+            const { parseLineChatLog } = await import('@/app/actions/mtex-ai')
+            const noteParsed = await parseLineChatLog(rawText)
+            if (noteParsed.length > 0 && (noteParsed[0].is_troubleshooting || noteParsed[0].machine_code || rawText.length >= 15)) {
+              const item = noteParsed[0]
+              await supabase.from('maintenance_chat_history').insert({
+                sender_name: item.sender_name || 'แชร์โน้ตส่วนตัว',
+                message_text: rawText,
+                machine_code: item.machine_code || null,
+                is_troubleshooting: true,
+                raw_log: { userId, source: 'line_private_note_share' }
+              })
+
+              await replyLineMessage(token, event.replyToken, [
+                {
+                  type: 'text',
+                  text: `✅ น้อง MTEX บันทึกเข้าคลังความรู้เรียบร้อยแล้วครับ!\n\n` +
+                        `⚙️ เครื่องจักร: ${item.machine_code || 'ทั่วไป / ตามเนื้อหา'}\n` +
+                        `👤 ผู้บันทึก: ${item.sender_name || 'ช่างซ่อมบำรุง'}\n` +
+                        (item.chat_date ? `📅 วันที่: ${item.chat_date}\n` : '') +
+                        `📝 ข้อความ: ${rawText.length > 70 ? rawText.slice(0, 70) + '...' : rawText}\n\n` +
+                        `💡 บันทึกเข้าสมองน้อง MTEX แล้ว ช่างสามารถสอบถามประวัตินี้ได้ตลอดเวลาครับ 🤖`
+                }
+              ])
+              continue
+            }
+          } catch (shareErr) {
+            console.error('[LINE Webhook] Note share error:', shareErr)
+          }
+        }
+
+        // C. Handle MTEX AI Assistant Questions
         const isMentioned = lowerText.includes('@mtex') || 
                             lowerText.startsWith('mtex') || 
                             lowerText.startsWith('ถาม') || 
@@ -115,7 +165,7 @@ export async function POST(req: NextRequest) {
           }
         }
 
-        // C. Continuous Real-time Learning: Auto-log technician messages into maintenance_chat_history
+        // D. Continuous Real-time Learning: Auto-log technician messages in group chat into maintenance_chat_history
         if (rawText.length >= 8 && !rawText.startsWith('/')) {
           try {
             const { parseLineChatLog } = await import('@/app/actions/mtex-ai')
