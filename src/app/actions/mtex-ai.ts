@@ -388,6 +388,11 @@ export async function clearMtexChatHistory(): Promise<{ success: boolean; error?
 export async function askMtexAI(question: string): Promise<{
   success: boolean
   answer: string
+  yearsAvailable?: string[]
+  yearCounts?: Record<string, number>
+  isFilteredByYear?: boolean
+  filterYear?: number | null
+  detectedKeyword?: string
   sources?: {
     workOrders?: any[]
     chatHistory?: any[]
@@ -671,7 +676,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
             answerText += '\n'
           }
         }
-        answerText += `💡 ต้องการดูประวัติอย่างละเอียดของปีใด สามารถพิมพ์ระบุปีได้เลยครับ เช่น "${q} 2026", "${q} 2024" หรือ "${q} 2023"\n\n`
+        answerText += `❓ คุณพี่ต้องการดูประวัติอย่างละเอียดของปีไหนเป็นพิเศษไหมครับ?\n(สามารถกดปุ่มเลือกปีด้านล่าง หรือพิมพ์ตอบกลับมาได้เลยครับ เช่น "${detectedMachine || cleanQ} 2026" หรือพิมพ์แค่เลขปี เช่น "2026") 👇\n\n`
       }
     }
 
@@ -690,6 +695,11 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     return {
       success: true,
       answer: answerText,
+      yearsAvailable: yearsSorted || [],
+      yearCounts: yearCounts || {},
+      isFilteredByYear: !!filterYear,
+      filterYear: filterYear,
+      detectedKeyword: detectedMachine || cleanQ,
       sources: {
         workOrders: matchedWOs || [],
         chatHistory: matchedChats || [],

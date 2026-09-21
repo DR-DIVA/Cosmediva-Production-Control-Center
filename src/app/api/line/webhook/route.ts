@@ -6,6 +6,9 @@ export async function GET() {
   return NextResponse.json({ status: 'CosmeFlow LINE Webhook Gateway is running' })
 }
 
+// Store last queried topic per group or user (in memory, valid for 15 minutes)
+const conversationMemory = new Map<string, { topic: string; timestamp: number }>()
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
@@ -189,33 +192,59 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        const isYearOnly = /^(ปี\s*)?(201[9]|202[0-6]|256[2-9])$/.test(cleanQuery)
+        const contextKey = groupId || userId || 'default'
+        const prevContext = conversationMemory.get(contextKey)
+        const isContextActive = prevContext && (Date.now() - prevContext.timestamp < 15 * 60 * 1000)
+
+        // If user simply responds with a year (e.g. "2026" or "ปี 2026") after a previous inquiry
+        let queryToExecute = cleanQuery
+        if (isYearOnly && isContextActive && prevContext) {
+          queryToExecute = `${prevContext.topic} ${cleanQuery}`
+        }
+
         // C. Handle MTEX AI Assistant Questions
         const isMentioned = lowerText.includes('@mtex') || 
                             lowerText.startsWith('mtex') || 
                             lowerText.startsWith('ถาม') || 
                             lowerText.startsWith('สอบถาม') || 
                             lowerText.startsWith('ประวัติ') ||
+                            (isYearOnly && isContextActive) ||
                             isPrivate
 
         if (isMentioned && token && event.replyToken) {
-          // Clean search query
-          const cleanQuery = rawText
-            .replace(/@mtex/gi, '')
-            .replace(/^mtex[:\s]*/i, '')
-            .trim()
-
-          if (cleanQuery.length >= 2) {
+          if (queryToExecute.length >= 2) {
             try {
               // Call MTEX AI
               const { askMtexAI } = await import('@/app/actions/mtex-ai')
-              const aiRes = await askMtexAI(cleanQuery)
+              const aiRes = await askMtexAI(queryToExecute)
 
-              await replyLineMessage(token, event.replyToken, [
-                {
-                  type: 'text',
-                  text: aiRes.answer
+              // Save query context for subsequent year follow-up
+              if (aiRes.detectedKeyword && !aiRes.isFilteredByYear) {
+                conversationMemory.set(contextKey, { topic: aiRes.detectedKeyword, timestamp: Date.now() })
+              }
+
+              // Build reply message with Quick Reply buttons for years
+              const replyMsg: any = {
+                type: 'text',
+                text: aiRes.answer
+              }
+
+              if (aiRes.yearsAvailable && aiRes.yearsAvailable.length > 1 && !aiRes.isFilteredByYear) {
+                const baseTopic = aiRes.detectedKeyword || cleanQuery
+                replyMsg.quickReply = {
+                  items: aiRes.yearsAvailable.slice(0, 10).map((y: string) => ({
+                    type: 'action',
+                    action: {
+                      type: 'message',
+                      label: `📅 ปี ${y}`,
+                      text: `${baseTopic} ${y}`
+                    }
+                  }))
                 }
-              ])
+              }
+
+              await replyLineMessage(token, event.replyToken, [replyMsg])
             } catch (aiErr) {
               console.error('[LINE Webhook] AI Answer error:', aiErr)
             }

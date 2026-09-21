@@ -22,6 +22,7 @@ export default function MaintenanceSearchPage() {
     chats: any[]
   }>({ machines: [], workOrders: [], parts: [], chats: [] })
   const [aiAnswer, setAiAnswer] = useState<string | null>(null)
+  const [aiData, setAiData] = useState<any>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -34,6 +35,7 @@ export default function MaintenanceSearchPage() {
     setIsLoading(true)
     setIsAiLoading(true)
     setAiAnswer(null)
+    setAiData(null)
     setHasSearched(true)
 
     // 1. Run traditional database search
@@ -51,6 +53,7 @@ export default function MaintenanceSearchPage() {
       .then(res => {
         if (res && res.answer) {
           setAiAnswer(res.answer)
+          setAiData(res)
         }
       })
       .catch(err => {
@@ -163,6 +166,38 @@ export default function MaintenanceSearchPage() {
               {aiAnswer && (
                 <div className="text-xs sm:text-sm text-stone-200 leading-relaxed whitespace-pre-line bg-stone-950/70 p-4 sm:p-5 rounded-2xl border border-stone-800/80 font-sans shadow-inner">
                   {aiAnswer}
+                </div>
+              )}
+
+              {/* Interactive Year Quick Select Buttons */}
+              {aiData?.yearsAvailable && aiData.yearsAvailable.length > 1 && !aiData.isFilteredByYear && (
+                <div className="pt-2 border-t border-stone-800/80 flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-[#D4AF37] font-bold flex items-center gap-1">
+                    <span>👉 เจาะจงดูรายปี:</span>
+                  </span>
+                  {aiData.yearsAvailable.map((y: string) => {
+                    const count = aiData.yearCounts?.[y]
+                    return (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => {
+                          const base = aiData.detectedKeyword || query
+                          const newQ = `${base} ${y}`
+                          setQuery(newQ)
+                          handleSearch(undefined, newQ)
+                        }}
+                        className="px-3 py-1.5 rounded-xl bg-stone-800/90 hover:bg-[#D4AF37] hover:text-stone-900 border border-stone-700/80 text-xs font-bold text-stone-200 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95 shadow-sm"
+                      >
+                        <span>📅 ปี {y}</span>
+                        {count !== undefined && (
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-stone-700 text-stone-300">
+                            {count}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>
