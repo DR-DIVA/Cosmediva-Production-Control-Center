@@ -513,7 +513,7 @@ export async function askMtexAI(question: string): Promise<{
 
     let matchedChats: any[] = []
     if (filterYear) {
-      matchedChats = (yearGroups[filterYear.toString()] || []).slice(0, 10)
+      matchedChats = (yearGroups[filterYear.toString()] || []).slice(0, 15)
     } else {
       // Balance results across ALL available years (2019 - 2026), 1-2 distinct items per year
       for (const y of yearsSorted) {
@@ -671,6 +671,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
             answerText += '\n'
           }
         }
+        answerText += `💡 ต้องการดูประวัติอย่างละเอียดของปีใด สามารถพิมพ์ระบุปีได้เลยครับ เช่น "${q} 2026", "${q} 2024" หรือ "${q} 2023"\n\n`
       }
     }
 

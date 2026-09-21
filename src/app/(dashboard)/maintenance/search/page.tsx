@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import MaintenanceHeader from '@/components/maintenance/MaintenanceHeader'
-import { Search, Wrench, Package, FileText, ArrowRight, Clock, Bot, Sparkles, Upload } from 'lucide-react'
+import { Search, Wrench, Package, FileText, ArrowRight, Clock, Bot, Sparkles, Upload, MessageSquare } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -19,7 +19,8 @@ export default function MaintenanceSearchPage() {
     machines: any[]
     workOrders: any[]
     parts: any[]
-  }>({ machines: [], workOrders: [], parts: [] })
+    chats: any[]
+  }>({ machines: [], workOrders: [], parts: [], chats: [] })
   const [aiAnswer, setAiAnswer] = useState<string | null>(null)
   const [isAiLoading, setIsAiLoading] = useState(false)
   const [hasSearched, setHasSearched] = useState(false)
@@ -255,7 +256,56 @@ export default function MaintenanceSearchPage() {
             </div>
           )}
 
-          {results.machines.length === 0 && results.workOrders.length === 0 && results.parts.length === 0 && !isAiLoading && !aiAnswer && (
+          {/* LINE Chat History Result */}
+          {results.chats && results.chats.length > 0 && (
+            <div className="bg-white p-5 rounded-3xl border border-stone-200 shadow-sm space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-stone-900 font-bold text-sm">
+                  <MessageSquare className="w-4 h-4 text-emerald-600" />
+                  <span>บันทึกประวัติการพูดคุยในกลุ่มช่าง LINE ({results.chats.length} รายการล่าสุด)</span>
+                </div>
+                <span className="text-[11px] text-stone-400 font-medium">
+                  นำวัน-เวลาไปค้นหารูป/วิดีโอในแชท LINE ได้
+                </span>
+              </div>
+              <div className="space-y-2 max-h-[480px] overflow-y-auto pr-1">
+                {results.chats.map((c, idx) => {
+                  const d = c.chat_date ? new Date(c.chat_date) : null
+                  const dateStr = d && !isNaN(d.getTime()) 
+                    ? `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+                    : ''
+                  return (
+                    <div
+                      key={c.id || idx}
+                      className="p-3.5 rounded-2xl border border-stone-100 bg-stone-50/70 hover:bg-emerald-50/20 hover:border-emerald-200 transition-all space-y-1.5"
+                    >
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="font-bold text-stone-800">{c.sender_name || 'ไม่ระบุผู้ส่ง'}</span>
+                          {c.machine_code && (
+                            <span className="px-2 py-0.5 rounded-md bg-stone-200 text-stone-700 font-mono text-[10px] font-bold">
+                              {c.machine_code}
+                            </span>
+                          )}
+                        </div>
+                        {dateStr && (
+                          <span className="font-mono text-[11px] text-stone-500 flex items-center gap-1 bg-white px-2 py-0.5 rounded-md border border-stone-200/60 shadow-2xs">
+                            <Clock className="w-3 h-3 text-stone-400" />
+                            {dateStr}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-stone-700 leading-relaxed break-words whitespace-pre-line">
+                        {c.message_text}
+                      </p>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {results.machines.length === 0 && results.workOrders.length === 0 && results.parts.length === 0 && results.chats.length === 0 && !isAiLoading && !aiAnswer && (
             <div className="bg-white p-12 rounded-3xl border border-stone-200 text-center text-xs text-stone-400">
               ไม่พบข้อมูลที่ตรงกับคำค้นหา &quot;{query}&quot;
             </div>

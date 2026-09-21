@@ -1673,13 +1673,13 @@ export async function getMaintenanceKPIs() {
  */
 export async function searchMaintenance(query: string) {
   if (!query || query.trim().length === 0) {
-    return { success: true, data: { machines: [], workOrders: [], parts: [] } }
+    return { success: true, data: { machines: [], workOrders: [], parts: [], chats: [] } }
   }
 
   const supabase = createAdminClient()
   const q = `%${query.trim()}%`
 
-  const [mRes, woRes, spRes] = await Promise.all([
+  const [mRes, woRes, spRes, chatRes] = await Promise.all([
     supabase
       .from('maintenance_machines')
       .select('id, machine_code, machine_name, category, status, production_area')
@@ -1694,7 +1694,13 @@ export async function searchMaintenance(query: string) {
       .from('maintenance_spare_parts')
       .select('id, part_code, part_name, category, stock_qty, unit, storage_location')
       .or(`part_code.ilike.${q},part_name.ilike.${q},brand.ilike.${q},storage_location.ilike.${q}`)
-      .limit(5)
+      .limit(5),
+    supabase
+      .from('maintenance_chat_history')
+      .select('id, sender_name, message_text, machine_code, chat_date, raw_log')
+      .or(`message_text.ilike.${q},machine_code.ilike.${q}`)
+      .order('chat_date', { ascending: false, nullsFirst: false })
+      .limit(100)
   ])
 
   return {
@@ -1702,7 +1708,8 @@ export async function searchMaintenance(query: string) {
     data: {
       machines: mRes.data || [],
       workOrders: woRes.data || [],
-      parts: spRes.data || []
+      parts: spRes.data || [],
+      chats: chatRes.data || []
     }
   }
 }
