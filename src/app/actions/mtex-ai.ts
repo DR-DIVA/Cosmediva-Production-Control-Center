@@ -66,6 +66,49 @@ function parseToIsoDate(dateStr: string | null | undefined): string {
 }
 
 /**
+ * Format timestamp / rawLog to readable Thai date format (e.g. 15/09/2026 09:48)
+ */
+function formatDisplayDate(chatDate?: string | null, rawLog?: any, createdAt?: string | null): string {
+  if (rawLog && typeof rawLog === 'object') {
+    if (typeof rawLog.dateStr === 'string' && rawLog.dateStr.trim()) {
+      const m = rawLog.dateStr.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})(?:T|\s+)(\d{1,2}:\d{2})?/)
+      if (m) {
+        const timePart = m[4] ? ` ${m[4]}` : ''
+        return `${m[3].padStart(2, '0')}/${m[2].padStart(2, '0')}/${m[1]}${timePart}`
+      }
+    }
+    if (typeof rawLog.originalDate === 'string' && rawLog.originalDate.trim()) {
+      const orig = rawLog.originalDate.trim()
+      const mOrig = orig.match(/^(\d{4})[-\/\.](\d{1,2})[-\/\.](\d{1,2})(?:\s+(\d{1,2}:\d{2}))?/)
+      if (mOrig) {
+        const timePart = mOrig[4] ? ` ${mOrig[4]}` : ''
+        return `${mOrig[3].padStart(2, '0')}/${mOrig[2].padStart(2, '0')}/${mOrig[1]}${timePart}`
+      }
+      return orig
+    }
+  }
+
+  if (chatDate) {
+    try {
+      const d = new Date(chatDate)
+      if (!isNaN(d.getTime())) {
+        const day = String(d.getDate()).padStart(2, '0')
+        const month = String(d.getMonth() + 1).padStart(2, '0')
+        const year = d.getFullYear()
+        const hours = String(d.getHours()).padStart(2, '0')
+        const mins = String(d.getMinutes()).padStart(2, '0')
+        const timePart = (hours !== '00' || mins !== '00') ? ` ${hours}:${mins}` : ''
+        return `${day}/${month}/${year}${timePart}`
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return ''
+}
+
+/**
  * Smart Parser for exported LINE chat text files (.txt) and Group Notes
  */
 export async function parseLineChatLog(rawContent: string): Promise<ParsedLineChatMessage[]> {
@@ -369,16 +412,25 @@ export async function askMtexAI(question: string): Promise<{
     // 3. Query Chat History
     let chatQuery = supabase
       .from('maintenance_chat_history')
-      .select('sender_name, message_text, machine_code, created_at')
-      .order('created_at', { ascending: false })
-      .limit(8)
+      .select('sender_name, message_text, machine_code, chat_date, raw_log, created_at')
+      .order('chat_date', { ascending: false, nullsFirst: false })
+      .limit(10)
 
     if (detectedMachine) {
       chatQuery = chatQuery.or(`machine_code.ilike.%${detectedMachine}%,message_text.ilike.%${detectedMachine}%`)
     } else {
       chatQuery = chatQuery.ilike('message_text', `%${q}%`)
     }
-    const { data: matchedChats } = await chatQuery
+    const { data: rawMatchedChats } = await chatQuery
+
+    // Deduplicate chats by text similarity
+    const seenMsgs = new Set<string>()
+    const matchedChats = (rawMatchedChats || []).filter(c => {
+      const key = c.message_text.trim().slice(0, 50)
+      if (seenMsgs.has(key)) return false
+      seenMsgs.add(key)
+      return true
+    })
 
     // 4. Query Machines Master
     let machineQuery = supabase
@@ -420,7 +472,9 @@ export async function askMtexAI(question: string): Promise<{
     if (matchedChats && matchedChats.length > 0) {
       contextLines.push('--- ข้อมูลบทสนทนาจากกลุ่มไลน์ช่าง (LINE Chat History) ---')
       matchedChats.forEach(c => {
-        contextLines.push(`- ${c.sender_name}: "${c.message_text}"`)
+        const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
+        const datePrefix = dateStr ? `[วันที่ ${dateStr}] ` : ''
+        contextLines.push(`- ${datePrefix}${c.sender_name}: "${c.message_text}"`)
       })
     }
 
@@ -448,9 +502,10 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
 "${q}"
 
 คำแนะนำในการตอบ:
-1. หากพบประวัติซ่อมในอดีต ให้ระบุว่าเคยเกิดอาการนี้เมื่อไหร่ สาเหตุคืออะไร และแก้ด้วยวิธีไหน
-2. หากมีการพูดถึงอะไหล่ ให้ระบุชื่ออะไหล่และจำนวนคงเหลือในคลัง (ถ้ามีข้อมูล)
-3. หากในระบบไม่มีข้อมูลแน่ชัด ให้แนะนำขั้นตอนการตรวจสอบเบื้องต้นตามหลักการช่างอุตสาหกรรมอย่างปลอดภัย`
+1. หากนำข้อมูลมาจากประวัติแชทกลุ่มช่าง "ต้องระบุวันที่และเวลาเสมอ (เช่น [📅 15/09/2026 09:48])" เพื่อให้ผู้ใช้สามารถนำวันที่ไปค้นหารูปภาพและรายละเอียดเพิ่มเติมในกลุ่ม LINE ได้
+2. สรุปอาการ สาเหตุ และวิธีแก้ปัญหาที่ช่างได้ทำ
+3. หากมีการพูดถึงอะไหล่ ให้ระบุชื่ออะไหล่และจำนวนคงเหลือในคลัง (ถ้ามีข้อมูล)
+4. หากในระบบไม่มีข้อมูลแน่ชัด ให้แนะนำขั้นตอนการตรวจสอบเบื้องต้นตามหลักการช่างอุตสาหกรรมอย่างปลอดภัย`
 
         const geminiRes = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -498,9 +553,11 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     }
 
     if (matchedChats && matchedChats.length > 0) {
-      answerText += `💬 ข้อมูลจากแชทกลุ่มช่างที่เคยพูดคุยกัน:\n`
-      matchedChats.slice(0, 3).forEach(c => {
-        answerText += `• ${c.sender_name}: "${c.message_text}"\n`
+      answerText += `💬 ข้อมูลจากแชทกลุ่มช่าง (สามารถนำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
+      matchedChats.slice(0, 4).forEach(c => {
+        const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
+        const datePrefix = dateStr ? `[📅 ${dateStr}] ` : ''
+        answerText += `• ${datePrefix}${c.sender_name}: "${c.message_text}"\n`
       })
       answerText += '\n'
     }
