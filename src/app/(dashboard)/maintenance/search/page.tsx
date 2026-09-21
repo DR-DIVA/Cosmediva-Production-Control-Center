@@ -2,15 +2,17 @@
 
 import React, { useState } from 'react'
 import MaintenanceHeader from '@/components/maintenance/MaintenanceHeader'
-import { Search, Wrench, Package, FileText, ArrowRight, Clock } from 'lucide-react'
+import { Search, Wrench, Package, FileText, ArrowRight, Clock, Bot, Sparkles, Upload } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { searchMaintenance } from '@/app/actions/maintenance'
 import { formatWorkOrderStatus } from '@/types/maintenance'
+import ImportLineChatModal from '@/components/maintenance/ImportLineChatModal'
 
 export default function MaintenanceSearchPage() {
   const [query, setQuery] = useState('')
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
   const [results, setResults] = useState<{
     machines: any[]
     workOrders: any[]
@@ -41,15 +43,25 @@ export default function MaintenanceSearchPage() {
     <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
 
-      {/* Search Box */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-sm space-y-4 text-center">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-black text-stone-900">
-            ระบบสืบค้นประวัติงานซ่อมบำรุงอัจฉริยะ (Global Search)
-          </h2>
-          <p className="text-xs text-stone-500 mt-1">
-            ค้นหาครอบคลุมทุกมิติ: รหัสเครื่อง, ชื่องานซ่อม, เลขที่ใบสั่ง, อาการเสีย, อะไหล่ หรือสาเหตุ (Root Cause)
-          </p>
+      {/* Search Box & Knowledge AI Header */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-stone-200 shadow-sm space-y-4 text-center relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-stone-100 pb-4 mb-2">
+          <div className="text-left">
+            <h2 className="text-xl sm:text-2xl font-black text-stone-900">
+              ระบบสืบค้นประวัติงานซ่อมบำรุงอัจฉริยะ (Global Search)
+            </h2>
+            <p className="text-xs text-stone-500 mt-0.5">
+              ค้นหาครอบคลุมทุกมิติ: รหัสเครื่อง, ชื่องานซ่อม, เลขที่ใบสั่ง, อาการเสีย, อะไหล่ หรือสาเหตุ (Root Cause)
+            </p>
+          </div>
+          <Button
+            type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="h-10 px-4 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs flex items-center gap-2 shrink-0 cursor-pointer"
+          >
+            <Bot className="w-4 h-4 text-emerald-600" />
+            <span>📥 นำเข้าประวัติแชท LINE & ถามน้อง MTEX</span>
+          </Button>
         </div>
 
         <form onSubmit={handleSearch} className="max-w-2xl mx-auto flex gap-2">
@@ -196,6 +208,12 @@ export default function MaintenanceSearchPage() {
           )}
         </div>
       )}
+
+      {/* Import LINE Chat Modal */}
+      <ImportLineChatModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+      />
     </div>
   )
 }

@@ -43,15 +43,17 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // 2. When someone types /id or groupid in the group
+      // 2. When someone sends a text message
       if (event.type === 'message' && event.message?.type === 'text') {
-        const text = (event.message.text || '').trim().toLowerCase()
+        const rawText = (event.message.text || '').trim()
+        const lowerText = rawText.toLowerCase()
         const groupId = event.source?.groupId || event.source?.roomId
         const userId = event.source?.userId
+        const isPrivate = event.source?.type === 'user' && !groupId
 
-        if (text === '/id' || text === 'id' || text === 'groupid' || text === 'ขอ id' || text === 'รหัสกลุ่ม') {
+        // A. Handle /id or groupid
+        if (lowerText === '/id' || lowerText === 'id' || lowerText === 'groupid' || lowerText === 'ขอ id' || lowerText === 'รหัสกลุ่ม') {
           if (groupId) {
-            // Auto-update
             await supabase
               .from('line_notification_channels')
               .update({
@@ -75,6 +77,60 @@ export async function POST(req: NextRequest) {
                 text: `📌 รหัส User ID ของคุณคือ:\n${userId}`
               }
             ])
+          }
+          continue
+        }
+
+        // B. Handle MTEX AI Assistant Questions
+        const isMentioned = lowerText.includes('@mtex') || 
+                            lowerText.startsWith('mtex') || 
+                            lowerText.startsWith('ถาม') || 
+                            lowerText.startsWith('สอบถาม') || 
+                            lowerText.startsWith('ประวัติ') ||
+                            isPrivate
+
+        if (isMentioned && token && event.replyToken) {
+          // Clean search query
+          const cleanQuery = rawText
+            .replace(/@mtex/gi, '')
+            .replace(/^mtex[:\s]*/i, '')
+            .trim()
+
+          if (cleanQuery.length >= 2) {
+            try {
+              // Call MTEX AI
+              const { askMtexAI } = await import('@/app/actions/mtex-ai')
+              const aiRes = await askMtexAI(cleanQuery)
+
+              await replyLineMessage(token, event.replyToken, [
+                {
+                  type: 'text',
+                  text: aiRes.answer
+                }
+              ])
+            } catch (aiErr) {
+              console.error('[LINE Webhook] AI Answer error:', aiErr)
+            }
+            continue
+          }
+        }
+
+        // C. Continuous Real-time Learning: Auto-log technician messages into maintenance_chat_history
+        if (rawText.length >= 8 && !rawText.startsWith('/')) {
+          try {
+            const { parseLineChatLog } = await import('@/app/actions/mtex-ai')
+            const singleParsed = parseLineChatLog(`${new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}\t${userId || 'LineMember'}\t${rawText}`)
+            if (singleParsed.length > 0 && (singleParsed[0].is_troubleshooting || singleParsed[0].machine_code)) {
+              await supabase.from('maintenance_chat_history').insert({
+                sender_name: userId || 'LineMember',
+                message_text: rawText,
+                machine_code: singleParsed[0].machine_code || null,
+                is_troubleshooting: true,
+                raw_log: { groupId, userId, source: 'realtime_webhook' }
+              })
+            }
+          } catch (logErr) {
+            console.error('[LINE Webhook] Realtime log error:', logErr)
           }
         }
       }
