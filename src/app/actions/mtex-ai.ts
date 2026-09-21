@@ -463,7 +463,7 @@ export async function askMtexAI(question: string): Promise<{
       .from('maintenance_chat_history')
       .select('sender_name, message_text, machine_code, chat_date, raw_log, created_at')
       .order('chat_date', { ascending: false, nullsFirst: false })
-      .limit(filterYear ? 30 : 60)
+      .limit(filterYear ? 50 : 250)
 
     if (detectedMachine) {
       chatQuery = chatQuery.or(`machine_code.ilike.%${detectedMachine}%,message_text.ilike.%${detectedMachine}%`)
@@ -488,10 +488,10 @@ export async function askMtexAI(question: string): Promise<{
       return true
     })
 
-    // Multi-year distribution: balance results across different years
+    // Multi-year distribution: balance results across all available years (2019 - 2026)
     let matchedChats: any[] = []
     if (filterYear) {
-      matchedChats = uniqueChats.slice(0, 6)
+      matchedChats = uniqueChats.slice(0, 8)
     } else {
       const yearGroups: Record<string, any[]> = {}
       uniqueChats.forEach(c => {
@@ -504,9 +504,9 @@ export async function askMtexAI(question: string): Promise<{
       const balanced: any[] = []
       for (const y of yearsSorted) {
         balanced.push(...yearGroups[y].slice(0, 2))
-        if (balanced.length >= 8) break
+        if (balanced.length >= 10) break
       }
-      matchedChats = balanced.length > 0 ? balanced : uniqueChats.slice(0, 6)
+      matchedChats = balanced.length > 0 ? balanced : uniqueChats.slice(0, 8)
     }
 
     // 4. Query Machines Master
