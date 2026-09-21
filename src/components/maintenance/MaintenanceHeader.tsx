@@ -138,14 +138,6 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
             >
               <span>🧭 ผังขั้นตอนการแจ้งซ่อม (Workflow)</span>
             </Link>
-            <span className="text-slate-400">|</span>
-            <Link 
-              href="/maintenance/search" 
-              className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-300 hover:text-emerald-200 underline underline-offset-4 decoration-emerald-400/50 hover:decoration-emerald-300 transition"
-              title="สืบค้นประวัติงานซ่อม & MTEX AI Assistant"
-            >
-              <span>🤖 ค้นหาประวัติ & MTEX AI</span>
-            </Link>
           </div>
         </div>
 
