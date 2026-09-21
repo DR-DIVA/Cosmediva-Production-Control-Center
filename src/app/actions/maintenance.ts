@@ -1676,8 +1676,25 @@ export async function searchMaintenance(query: string) {
     return { success: true, data: { machines: [], workOrders: [], parts: [], chats: [] } }
   }
 
+  const { extractSearchTerms } = await import('@/app/actions/mtex-ai')
+  const { cleanKeyword, filterYear } = await extractSearchTerms(query)
+  const effectiveTerm = cleanKeyword || query.trim()
+
   const supabase = createAdminClient()
-  const q = `%${query.trim()}%`
+  const q = `%${effectiveTerm}%`
+
+  let chatQuery = supabase
+    .from('maintenance_chat_history')
+    .select('id, sender_name, message_text, machine_code, chat_date, raw_log')
+    .or(`message_text.ilike.${q},machine_code.ilike.${q}`)
+    .order('chat_date', { ascending: false, nullsFirst: false })
+    .limit(100)
+
+  if (filterYear) {
+    chatQuery = chatQuery
+      .gte('chat_date', `${filterYear}-01-01T00:00:00Z`)
+      .lte('chat_date', `${filterYear}-12-31T23:59:59Z`)
+  }
 
   const [mRes, woRes, spRes, chatRes] = await Promise.all([
     supabase
@@ -1695,12 +1712,7 @@ export async function searchMaintenance(query: string) {
       .select('id, part_code, part_name, category, stock_qty, unit, storage_location')
       .or(`part_code.ilike.${q},part_name.ilike.${q},brand.ilike.${q},storage_location.ilike.${q}`)
       .limit(5),
-    supabase
-      .from('maintenance_chat_history')
-      .select('id, sender_name, message_text, machine_code, chat_date, raw_log')
-      .or(`message_text.ilike.${q},machine_code.ilike.${q}`)
-      .order('chat_date', { ascending: false, nullsFirst: false })
-      .limit(100)
+    chatQuery
   ])
 
   return {

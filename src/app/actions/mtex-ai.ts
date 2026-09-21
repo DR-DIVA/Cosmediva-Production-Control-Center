@@ -30,6 +30,40 @@ function extractMachineCode(text: string): string | null {
 }
 
 /**
+ * Clean Thai conversational filler words, question particles, and extract target year
+ */
+export async function extractSearchTerms(rawQuery: string): Promise<{ cleanKeyword: string; filterYear: number | null }> {
+  let text = rawQuery
+    .replace(/^[@\s]*mtex[:\s]*/i, '')
+    .trim()
+
+  // 1. Extract and remove Year
+  const yearMatch = text.match(/\b(201[9]|202[0-6]|256[2-9])\b|ปี\s*(201[9]|202[0-6]|256[2-9])/i)
+  let filterYear: number | null = null
+  if (yearMatch) {
+    const rawY = yearMatch[1] || yearMatch[2]
+    let y = parseInt(rawY, 10)
+    if (y > 2500) y -= 543
+    filterYear = y
+    text = text.replace(yearMatch[0], ' ')
+  }
+
+  // 2. Strip leading / trailing conversational / question particles
+  let prevText = ''
+  while (prevText !== text) {
+    prevText = text
+    text = text
+      .replace(/^(ขอข้อมูล|ขอประวัติ|มีข้อมูล|มีประวัติ|มีเกี่ยวกับ|เกี่ยวกับเรื่อง|เกี่ยวกับ|เรื่อง|ประวัติของ|ประวัติ|ข้อมูลของ|ข้อมูล|เช็ค|ตรวจสอบ|ค้นหา|ช่วยหา|ช่วยดู|ดู|ถาม|สอบถาม|อยากทราบ|อยากรู้|พบ|มี)\s*/gi, '')
+      .replace(/\s*(ไหมคะ|มั้ยคะ|ไหมครับ|มั้ยครับ|ไหม|มั้ย|หรือยัง|ยังไง|อย่างไร|บ้างคะ|บ้างครับ|บ้าง|คะ|ค่ะ|ครับ|จ้ะ|จ้า|หน่อยคะ|หน่อยครับ|หน่อย|นะ|นะครับ|นะคะ|เด้อ)\s*$/gi, '')
+      .trim()
+  }
+
+  const cleanKeyword = text.replace(/\s+/g, ' ').trim() || rawQuery.replace(/^[@\s]*mtex[:\s]*/i, '').trim()
+
+  return { cleanKeyword, filterYear }
+}
+
+/**
  * Common Thai maintenance keywords
  */
 const TROUBLESHOOTING_KEYWORDS = [
@@ -438,8 +472,10 @@ export async function askMtexAI(question: string): Promise<{
 
     const supabase = createAdminClient()
 
-    // 1. Extract potential machine code or keywords
-    const detectedMachine = extractMachineCode(cleanQ)
+    // 1. Extract clean keyword & target year using NLP stopword stripper
+    const { cleanKeyword, filterYear } = await extractSearchTerms(cleanQ)
+    const detectedMachine = extractMachineCode(cleanKeyword)
+    const effectiveKeyword = cleanKeyword || cleanQ
 
     // 2. Query Work Orders
     let woQuery = supabase
@@ -451,19 +487,11 @@ export async function askMtexAI(question: string): Promise<{
     if (detectedMachine) {
       woQuery = woQuery.or(`machine_code.ilike.%${detectedMachine}%,problem_description.ilike.%${detectedMachine}%`)
     } else {
-      woQuery = woQuery.or(`problem_description.ilike.%${q}%,root_cause.ilike.%${q}%,action_taken.ilike.%${q}%,machine_code.ilike.%${q}%`)
+      woQuery = woQuery.or(`problem_description.ilike.%${effectiveKeyword}%,root_cause.ilike.%${effectiveKeyword}%,action_taken.ilike.%${effectiveKeyword}%,machine_code.ilike.%${effectiveKeyword}%`)
     }
     const { data: matchedWOs } = await woQuery
 
     // 3. Query Chat History (multi-year support)
-    const yearMatch = cleanQ.match(/\b(201[9]|202[0-6]|256[2-9])\b/)
-    let filterYear: number | null = null
-    if (yearMatch) {
-      let y = parseInt(yearMatch[1], 10)
-      if (y > 2500) y -= 543
-      filterYear = y
-    }
-
     let chatQuery = supabase
       .from('maintenance_chat_history')
       .select('sender_name, message_text, machine_code, chat_date, raw_log, created_at')
@@ -473,7 +501,7 @@ export async function askMtexAI(question: string): Promise<{
     if (detectedMachine) {
       chatQuery = chatQuery.or(`machine_code.ilike.%${detectedMachine}%,message_text.ilike.%${detectedMachine}%`)
     } else {
-      chatQuery = chatQuery.ilike('message_text', `%${q}%`)
+      chatQuery = chatQuery.ilike('message_text', `%${effectiveKeyword}%`)
     }
 
     if (filterYear) {
@@ -535,7 +563,7 @@ export async function askMtexAI(question: string): Promise<{
     if (detectedMachine) {
       machineQuery = machineQuery.ilike('machine_code', `%${detectedMachine}%`)
     } else {
-      machineQuery = machineQuery.or(`machine_code.ilike.%${q}%,machine_name.ilike.%${q}%`)
+      machineQuery = machineQuery.or(`machine_code.ilike.%${effectiveKeyword}%,machine_name.ilike.%${effectiveKeyword}%`)
     }
     const { data: matchedMachines } = await machineQuery
 
@@ -543,7 +571,7 @@ export async function askMtexAI(question: string): Promise<{
     const { data: matchedParts } = await supabase
       .from('maintenance_spare_parts')
       .select('part_code, part_name, category, stock_quantity, unit, unit_price, location')
-      .or(`part_name.ilike.%${q}%,part_code.ilike.%${q}%,specification.ilike.%${q}%`)
+      .or(`part_name.ilike.%${effectiveKeyword}%,part_code.ilike.%${effectiveKeyword}%,specification.ilike.%${effectiveKeyword}%`)
       .limit(4)
 
     // Build context summary for AI
@@ -636,7 +664,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     }
 
     // 7. Heuristic Fallback Answer if no Gemini API Key or Gemini call fails:
-    let answerText = `🤖 น้อง MTEX ค้นหาข้อมูลสำหรับ "${q}":\n\n`
+    let answerText = `🤖 น้อง MTEX ค้นหาข้อมูลสำหรับ "${effectiveKeyword}${filterYear ? ` (ปี ${filterYear})` : ''}":\n\n`
 
     if (matchedWOs && matchedWOs.length > 0) {
       answerText += `📋 ประวัติงานซ่อมที่ผ่านมา (${matchedWOs.length} รายการ):\n`
@@ -649,7 +677,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     if (matchedChats && matchedChats.length > 0) {
       const totalRaw = rawMatchedChats?.length || 0
       if (filterYear) {
-        answerText += `📊 สถิติประวัติแชทเกี่ยวกับ "${q}" ประจำปี ${filterYear} (พบทั้งหมด ${yearCounts[filterYear.toString()] || matchedChats.length} ข้อความ):\n\n`
+        answerText += `📊 สถิติประวัติแชทเกี่ยวกับ "${effectiveKeyword}" ประจำปี ${filterYear} (พบทั้งหมด ${yearCounts[filterYear.toString()] || matchedChats.length} ข้อความ):\n\n`
         answerText += `💬 ข้อมูลประวัติจากแชทกลุ่มช่าง (นำวันที่ไปค้นหารูปใน LINE ได้ครับ):\n`
         matchedChats.forEach(c => {
           const dateStr = formatDisplayDate(c.chat_date, c.raw_log, c.created_at)
@@ -676,7 +704,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
             answerText += '\n'
           }
         }
-        answerText += `❓ คุณพี่ต้องการดูประวัติอย่างละเอียดของปีไหนเป็นพิเศษไหมครับ?\n(สามารถกดปุ่มเลือกปีด้านล่าง หรือพิมพ์ตอบกลับมาได้เลยครับ เช่น "${detectedMachine || cleanQ} 2026" หรือพิมพ์แค่เลขปี เช่น "2026") 👇\n\n`
+        answerText += `❓ คุณพี่ต้องการดูประวัติอย่างละเอียดของปีไหนเป็นพิเศษไหมครับ?\n(สามารถกดปุ่มเลือกปีด้านล่าง หรือพิมพ์ตอบกลับมาได้เลยครับ เช่น "${detectedMachine || effectiveKeyword} 2026" หรือพิมพ์แค่เลขปี เช่น "2026") 👇\n\n`
       }
     }
 
@@ -689,7 +717,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     }
 
     if (!matchedWOs?.length && !matchedChats?.length && !matchedParts?.length) {
-      answerText += `ขออภัยครับ ยังไม่พบบันทึกงานซ่อมหรือข้อความแชทที่ตรงกับคำค้นนี้ในระบบครับ\n💡 แนะนำลองค้นด้วยรหัสเครื่อง เช่น "MX-02", "FL-01" หรือชื่ออะไหล่ เช่น "ลูกปืน", "สายพาน", "ฮีตเตอร์" ครับ`
+      answerText += `ขออภัยครับ ยังไม่พบบันทึกงานซ่อมหรือข้อความแชทเกี่ยวกับ "${effectiveKeyword}" ในระบบครับ\n💡 แนะนำลองค้นด้วยรหัสเครื่อง เช่น "MX-02", "FL-01" หรือชื่ออะไหล่ เช่น "สลิง", "ลูกปืน", "สายพาน", "ฮีตเตอร์" ครับ`
     }
 
     return {
@@ -699,7 +727,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
       yearCounts: yearCounts || {},
       isFilteredByYear: !!filterYear,
       filterYear: filterYear,
-      detectedKeyword: detectedMachine || cleanQ,
+      detectedKeyword: detectedMachine || effectiveKeyword,
       sources: {
         workOrders: matchedWOs || [],
         chatHistory: matchedChats || [],
