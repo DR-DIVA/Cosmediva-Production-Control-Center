@@ -844,15 +844,12 @@ export async function createRepairRequest(payload: {
       }
     }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
 
-    try {
-      revalidatePath('/maintenance')
-      revalidatePath('/maintenance/work-orders')
-      revalidatePath('/maintenance/technician')
-      if (machine?.machine_code) {
-        revalidatePath(`/maintenance/machines/${machine.machine_code}`)
-      }
-    } catch (e) {
-      console.warn('revalidatePath warning:', e)
+    try { revalidatePath('/maintenance') } catch {}
+    try { revalidatePath('/maintenance/work-orders') } catch {}
+    try { revalidatePath('/maintenance/technician') } catch {}
+    try { revalidatePath('/maintenance/report') } catch {}
+    if (machine?.machine_code && machine.machine_code !== 'FACILITY') {
+      try { revalidatePath(`/maintenance/machines/${machine.machine_code}`) } catch {}
     }
 
     return { success: true, data: newWO }

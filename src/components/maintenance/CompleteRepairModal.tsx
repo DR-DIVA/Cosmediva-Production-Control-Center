@@ -9,6 +9,7 @@ import { CheckCircle, Camera, AlertCircle, Wrench, ShieldCheck } from 'lucide-re
 import { toast } from 'sonner'
 import { RootCauseCategory, WorkOrderStatus } from '@/types/maintenance'
 import { transitionWorkOrderStatus } from '@/app/actions/maintenance'
+import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
 
 interface CompleteRepairModalProps {
   isOpen: boolean
@@ -76,14 +77,26 @@ export default function CompleteRepairModal({
   const [correctiveAction, setCorrectiveAction] = useState('')
   const [preventiveRec, setPreventiveRec] = useState('')
   const [photoAfter, setPhotoAfter] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      const reader = new FileReader()
-      reader.onloadend = () => setPhotoAfter(reader.result as string)
-      reader.readAsDataURL(file)
+      setPhotoFile(file)
+      const localUrl = URL.createObjectURL(file)
+      setPhotoAfter(localUrl)
+
+      try {
+        const compressed = await compressImage(file, 1280, 0.75)
+        const res = await uploadMaintenancePhoto(compressed, file.name)
+        if (res.success && res.url) {
+          setPhotoAfter(res.url)
+          toast.success('อัปโหลดรูปภาพเสร็จสิ้น')
+        }
+      } catch (err) {
+        console.warn('Background upload notice:', err)
+      }
     }
   }
 
@@ -95,6 +108,29 @@ export default function CompleteRepairModal({
 
     setIsSubmitting(true)
     try {
+      let finalPhotoUrl = photoAfter || ''
+      if (finalPhotoUrl && !finalPhotoUrl.startsWith('http')) {
+        toast.info('กำลังอัปโหลดรูปภาพงานซ่อมเสร็จ...')
+        try {
+          if (photoFile) {
+            const compressed = await compressImage(photoFile, 1280, 0.75)
+            const upRes = await uploadMaintenancePhoto(compressed, photoFile.name)
+            if (upRes.success && upRes.url) {
+              finalPhotoUrl = upRes.url
+            }
+          } else if (finalPhotoUrl.startsWith('data:')) {
+            const upRes = await uploadMaintenancePhoto(finalPhotoUrl)
+            if (upRes.success && upRes.url) {
+              finalPhotoUrl = upRes.url
+            }
+          }
+        } catch (uploadErr) {
+          console.warn('Upload fallback warning:', uploadErr)
+        }
+      }
+
+      const validPhotos = finalPhotoUrl && finalPhotoUrl.startsWith('http') ? [finalPhotoUrl] : []
+
       const res = await transitionWorkOrderStatus({
         work_order_id: workOrderId,
         to_status: targetStatus,
@@ -104,7 +140,7 @@ export default function CompleteRepairModal({
         root_cause: rootCause,
         corrective_action: correctiveAction,
         preventive_recommendation: preventiveRec,
-        photo_after_urls: photoAfter ? [photoAfter] : [],
+        photo_after_urls: validPhotos,
         notes: targetStatus === 'TEST_RUN' 
           ? 'ซ่อมเบื้องต้นเสร็จสิ้น ส่งต่อให้ผู้แจ้งซ่อมทดลองเดินเครื่อง (Test Run)' 
           : 'ช่างบันทึกซ่อมเสร็จสมบูรณ์ รอผู้แจ้งซ่อมตรวจรับ (Verify)'
@@ -118,6 +154,7 @@ export default function CompleteRepairModal({
         toast.error(res.error || 'เกิดข้อผิดพลาดในการบันทึก')
       }
     } catch (err: any) {
+      console.error('Complete repair submit error:', err)
       toast.error(err.message || 'ไม่สามารถบันทึกได้')
     } finally {
       setIsSubmitting(false)
@@ -273,9 +310,19 @@ export default function CompleteRepairModal({
               </label>
 
               {photoAfter && (
-                <div className="relative rounded-xl overflow-hidden border border-stone-200 max-h-36 w-full bg-black flex items-center justify-center mt-2">
+                <div className="relative rounded-xl overflow-hidden border border-stone-200 max-h-36 w-full bg-black flex items-center justify-center mt-2 group">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={photoAfter} alt="After Preview" className="max-h-36 object-contain" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPhotoAfter(null)
+                      setPhotoFile(null)
+                    }}
+                    className="absolute top-2 right-2 bg-black/75 hover:bg-black text-white text-xs px-2.5 py-1 rounded-lg border border-white/20 transition cursor-pointer"
+                  >
+                    ลบรูป
+                  </button>
                 </div>
               )}
             </div>

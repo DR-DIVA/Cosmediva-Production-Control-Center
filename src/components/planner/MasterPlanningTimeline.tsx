@@ -19,7 +19,8 @@ import {
   GripVertical,
   Pin,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Check
 } from 'lucide-react'
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
@@ -47,6 +48,8 @@ import {
   cleanDisplayNote,
   extractUserComment,
   isTaskStartedByShopfloor,
+  isTaskCompleted,
+  canResetStartedTask,
   ACTUAL_DELAY_CATEGORIES,
   parseActualDelayInfo,
   formatActualDelayNote,
@@ -198,6 +201,7 @@ export function MasterPlanningTimeline({
     revisionCount: number
     isSlideDrag?: boolean
     deltaDays?: number
+    isStartedOverride?: boolean
   } | null>(null)
 
   // Actual Delay Modal State (สำหรับหน้างานบันทึกเหตุผลการทำงานจริงล่าช้ากว่าแผน - ไม่มีการล็อกแถบ A)
@@ -620,10 +624,11 @@ export function MasterPlanningTimeline({
       toast.info('คุณอยู่ในโหมดดูอย่างเดียว ไม่สามารถปรับเลื่อนแผนได้')
       return
     }
-    if (isTaskStartedByShopfloor(log)) {
-      toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวันตามแผน หากต้องการระบุเหตุผลที่เริ่มงานช้ากว่าแผน ให้คลิกที่แถบ A (จริง) ค่ะ`)
+    if (isTaskCompleted(log)) {
+      toast.info(`คิวงานนี้หน้างาน${process?.process_name || ''}ดำเนินการเสร็จสิ้นแล้ว (${log.status})`)
       return
     }
+    const isStarted = isTaskStartedByShopfloor(log)
     const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
     setRescheduleModal({
       isOpen: true,
@@ -634,10 +639,11 @@ export function MasterPlanningTimeline({
       originalDate: planInfo.originalDate || log.activity_date || '',
       newDate: log.activity_date || '',
       field: 'activity_date',
-      category: planInfo.category || 'WAIT_RM_PM',
+      category: isStarted ? (planInfo.category || 'SHOPFLOOR_HOLD') : (planInfo.category || 'WAIT_RM_PM'),
       reason: planInfo.reason ? cleanDisplayNote(planInfo.reason) : '',
       currentNote: extractUserComment(log.note),
-      revisionCount: planInfo.revisionCount || 1
+      revisionCount: planInfo.revisionCount || 1,
+      isStartedOverride: isStarted
     })
   }
 
@@ -650,8 +656,8 @@ export function MasterPlanningTimeline({
     planData: { start: Date; end: Date; leftPercent: number; widthPercent: number }
   ) => {
     if (!canEdit) return
-    if (isTaskStartedByShopfloor(log)) {
-      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+    if (isTaskCompleted(log)) {
+      toast.info(`คิวงานนี้หน้างาน${process?.process_name || ''}ดำเนินการเสร็จสิ้นแล้ว (${log.status}) ไม่อนุญาตให้ปรับเลื่อนแถบแผน`)
       return
     }
 
@@ -714,12 +720,13 @@ export function MasterPlanningTimeline({
           newDate: format(newStartDate, 'yyyy-MM-dd'),
           newEndDate: format(newEndDate, 'yyyy-MM-dd'),
           field: 'activity_date',
-          category: planInfo.category || 'WAIT_RM_PM',
+          category: isTaskStartedByShopfloor(log) ? (planInfo.category || 'SHOPFLOOR_HOLD') : (planInfo.category || 'WAIT_RM_PM'),
           reason: '',
           currentNote: extractUserComment(log.note),
           revisionCount: (planInfo.revisionCount || 0) + 1,
           isSlideDrag: true,
-          deltaDays: currentDeltaDays
+          deltaDays: currentDeltaDays,
+          isStartedOverride: isTaskStartedByShopfloor(log)
         })
       }
     }
@@ -731,17 +738,17 @@ export function MasterPlanningTimeline({
   // Save Reschedule Confirmation
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
-    const { logId, field, newDate, newEndDate, originalDate, category, reason, currentNote, revisionCount, isSlideDrag } = rescheduleModal
+    const { logId, field, newDate, newEndDate, originalDate, category, reason, currentNote, revisionCount, isSlideDrag, isStartedOverride } = rescheduleModal
 
-    if (isSlideDrag && !reason.trim()) {
-      toast.error('กรุณาระบุรายละเอียดเหตุผลในการเลื่อนแผนงาน')
+    const existingLog = logs.find(l => l.id === logId)
+    if (existingLog && isTaskCompleted(existingLog)) {
+      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานผลิตเสร็จสิ้นแล้ว')
+      setRescheduleModal(null)
       return
     }
 
-    const existingLog = logs.find(l => l.id === logId)
-    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)')
-      setRescheduleModal(null)
+    if ((isSlideDrag || isStartedOverride) && !reason.trim()) {
+      toast.error('กรุณาระบุรายละเอียดเหตุผลในการเลื่อนแผนงาน')
       return
     }
 
@@ -790,10 +797,14 @@ export function MasterPlanningTimeline({
 
   const handleQuickRescheduleWithoutReason = async () => {
     if (!rescheduleModal) return
-    const { logId, field, newDate } = rescheduleModal
+    const { logId, field, newDate, isStartedOverride, isSlideDrag } = rescheduleModal
+    if (isStartedOverride || isSlideDrag) {
+      toast.warning('งานที่เริ่มดำเนินการแล้ว บังคับต้องระบุเหตุผลในการขยับแผน')
+      return
+    }
     const existingLog = logs.find(l => l.id === logId)
     if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)')
+      toast.error('ไม่อนุญาตให้ปรับเลื่อนแผนงานโดยไม่ระบุเหตุผล เนื่องจากหน้างานเริ่มงานแล้ว')
       setRescheduleModal(null)
       return
     }
@@ -1672,15 +1683,18 @@ export function MasterPlanningTimeline({
                       const actualDelayInfo = parseActualDelayInfo(log.note)
                       const userComment = extractUserComment(log.note)
                       const isStarted = isTaskStartedByShopfloor(log)
+                      const isCompleted = isTaskCompleted(log)
 
                       const tooltipPlanText = [
                         `📌 [แผนงาน] SKU: ${lot.products?.sku || '-'} | Lot: ${lot.lot_no}`,
                         `⚙️ ขั้นตอน: ${process?.process_name || 'งานผลิต'} (ถัง T${log.tank_start || 1}-${log.tank_end || 1})`,
                         planData ? `📅 กำหนดตามแผน: ${format(planData.start, 'dd/MM/yyyy')}${planData.end > planData.start ? ` ถึง ${format(planData.end, 'dd/MM/yyyy')}` : ''}` : '',
                         planInfo.isRescheduled ? `🔄 ปรับแผนล่าสุด: ${planInfo.categoryLabel}${planInfo.reason ? ` - ${planInfo.reason}` : ''}` : '',
-                        isStarted 
-                          ? `🔒 หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวันตามแผน (ล็อกแผนเพื่อประเมิน KPI ความแม่นยำ)`
-                          : (canEdit ? `↔️ ลากแถบนี้เพื่อเลื่อนวัน (Slide Bar Period) หรือคลิกเพื่อเปิดหน้าต่างปรับแผน` : '')
+                        isCompleted
+                          ? `✅ งานผลิตเสร็จสิ้นแล้ว (${log.status})`
+                          : isStarted 
+                            ? `⚠️ หน้างานเริ่มงานแล้ว: ลากแถบหรือคลิกเพื่อปรับเลื่อนแผนงาน (บันทึกประวัติ KPI)`
+                            : (canEdit ? `↔️ ลากแถบนี้เพื่อเลื่อนวัน (Slide Bar Period) หรือคลิกเพื่อเปิดหน้าต่างปรับแผน` : '')
                       ].filter(Boolean).join('\n')
 
                       const tooltipActualText = [
@@ -1714,7 +1728,7 @@ export function MasterPlanningTimeline({
                                 className="text-xs font-semibold text-slate-800 truncate cursor-pointer hover:text-indigo-600 transition-colors flex items-center gap-1"
                                 title={isStarted ? tooltipActualText : tooltipPlanText}
                                 onClick={() => {
-                                  if (isStarted || actualDelayInfo.hasDelayReason) {
+                                  if (isCompleted || actualDelayInfo.hasDelayReason) {
                                     handleOpenActualDelayModal(log, lot, process, variance)
                                   } else {
                                     handleOpenRescheduleDetail(log, lot, process)
@@ -1722,19 +1736,24 @@ export function MasterPlanningTimeline({
                                 }}
                               >
                                 <span className="truncate">{process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})</span>
-                                {isStarted && (
-                                  <span className="text-[9.5px] px-1 py-0 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0 flex items-center gap-0.5" title="ล็อกแถบแผนงาน P เพื่อประเมิน KPI (แต่แถบ A ยังคลิกบันทึกเหตุผลได้ตามปกติ)">
-                                    <Lock className="w-2.5 h-2.5 text-amber-700" />
-                                    <span className="font-normal text-[8.5px]">ล็อกแผน</span>
+                                {isCompleted ? (
+                                  <span className="text-[9.5px] px-1 py-0 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-0.5" title="ผลิตเสร็จสิ้นแล้ว">
+                                    <Check className="w-2.5 h-2.5 text-emerald-700" />
+                                    <span className="font-normal text-[8.5px]">เสร็จสิ้น</span>
                                   </span>
-                                )}
+                                ) : isStarted ? (
+                                  <span className="text-[9.5px] px-1 py-0 rounded bg-amber-50 text-amber-700 border border-amber-200 shrink-0 flex items-center gap-0.5" title="หน้างานเริ่มงานแล้ว (คลิกแถบ P เพื่อขยับวันตามแผน หรือคลิกแถบ A เพื่อบันทึกเหตุผล)">
+                                    <Lock className="w-2.5 h-2.5 text-amber-700" />
+                                    <span className="font-normal text-[8.5px]">กำลังทำ/แช่</span>
+                                  </span>
+                                ) : null}
                               </span>
                             </div>
                             {/* Variance Label Badge */}
                             <div className="flex items-center gap-1.5 mt-0.5">
                               <span
                                 onClick={() => {
-                                  if (isStarted || actualDelayInfo.hasDelayReason) {
+                                  if (isCompleted || actualDelayInfo.hasDelayReason) {
                                     handleOpenActualDelayModal(log, lot, process, variance)
                                   } else {
                                     handleOpenRescheduleDetail(log, lot, process)
@@ -1777,7 +1796,7 @@ export function MasterPlanningTimeline({
                                   className={cn(
                                     "absolute h-6 rounded-md px-2 flex items-center text-xs font-medium border shadow-xs overflow-hidden select-none transition-all",
                                     pt.color,
-                                    isStarted
+                                    isCompleted
                                       ? "cursor-not-allowed opacity-90"
                                       : canEdit
                                         ? "cursor-grab active:cursor-grabbing hover:brightness-95 hover:shadow-md touch-none"
@@ -1788,22 +1807,26 @@ export function MasterPlanningTimeline({
                                   )}
                                   style={{ left: `calc(${effectiveLeftPercent}% + 4px)`, width: `calc(${planData.widthPercent}% - 8px)` }}
                                   onPointerDown={(e) => {
-                                    if (canEdit && !isStarted) {
+                                    if (canEdit && !isCompleted) {
                                       handleBarPointerDown(e, log, lot, process, planData)
                                     }
                                   }}
                                   onClick={() => {
-                                    if (isStarted) {
-                                      toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ฝ่ายวางแผนแก้ไขวัน หากต้องการบันทึกเหตุผลความล่าช้า ให้สลับไปโหมด Compare/Actual เพื่อคลิกแถบ A (จริง) ค่ะ`)
+                                    if (isCompleted) {
+                                      toast.info(`คิวงานนี้หน้างาน${process?.process_name || ''}ดำเนินการเสร็จสิ้นแล้ว (${log.status})`)
                                     } else if (canEdit) {
                                       handleOpenRescheduleDetail(log, lot, process)
                                     }
                                   }}
-                                  title={isStarted 
-                                    ? `🔒 แผนงานถูกล็อกเนื่องจากหน้างานเริ่มงานแล้ว (ล็อกแผนเพื่อประเมิน KPI ความแม่นยำ)\n👉 สลับไปดูแถบ A เพื่อบันทึกเหตุผลที่ทำงานล่าช้ากว่าแผน` 
+                                  title={isCompleted
+                                    ? `✅ งานผลิตเสร็จสิ้นแล้ว (${log.status})`
+                                    : isStarted
+                                    ? `⚠️ หน้างานเริ่มงานแล้ว: ลากแถบหรือคลิกเพื่อปรับเลื่อนแผนงาน (บันทึกประวัติ KPI)\n👉 หรือสลับไปดูแถบ A เพื่อบันทึกเหตุผลที่ทำงานจริงล่าช้ากว่าแผน` 
                                     : tooltipPlanText}
                                 >
-                                  {isStarted ? (
+                                  {isCompleted ? (
+                                    <Check className="w-3 h-3 text-emerald-700 mr-1 shrink-0" />
+                                  ) : isStarted ? (
                                     <Lock className="w-3 h-3 text-amber-800/80 mr-1 shrink-0" />
                                   ) : canEdit ? (
                                     <GripVertical className="w-3 h-3 text-slate-500/70 mr-0.5 shrink-0 hover:text-slate-900" />
@@ -1869,7 +1892,7 @@ export function MasterPlanningTimeline({
                                     <div
                                       className={cn(
                                         "absolute top-1.5 h-5 rounded px-2 flex items-center font-bold text-[10px] border border-dashed border-indigo-400 bg-indigo-50/90 text-indigo-900 shadow-2xs overflow-hidden select-none transition-all",
-                                        isStarted
+                                        isCompleted
                                           ? "cursor-not-allowed opacity-90"
                                           : canEdit
                                             ? "cursor-grab active:cursor-grabbing hover:bg-indigo-100 touch-none"
@@ -1884,22 +1907,26 @@ export function MasterPlanningTimeline({
                                         minWidth: isTimelineExpanded ? '90px' : '54px'
                                       }}
                                       onPointerDown={(e) => {
-                                        if (canEdit && !isStarted) {
+                                        if (canEdit && !isCompleted) {
                                           handleBarPointerDown(e, log, lot, process, planData)
                                         }
                                       }}
                                       onClick={() => {
-                                        if (isStarted) {
-                                          toast.warning(`🔒 คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว จึงล็อกแถบ P (แผนงาน) เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้แก้ไขวัน หากต้องการระบุเหตุผลความล่าช้า ให้คลิกที่แถบ 🅰️ ด้านล่างค่ะ`)
+                                        if (isCompleted) {
+                                          toast.info(`คิวงานนี้หน้างาน${process?.process_name || ''}ดำเนินการเสร็จสิ้นแล้ว (${log.status})`)
                                         } else if (canEdit) {
                                           handleOpenRescheduleDetail(log, lot, process)
                                         }
                                       }}
-                                      title={isStarted 
-                                        ? `🔒 แถบ P (แผนงาน) ถูกล็อกเนื่องจากหน้างานเริ่มงานแล้ว (เพื่อประเมิน KPI ความแม่นยำ)\n👉 ให้คลิกที่แถบ 🅰️ ด้านล่างเพื่อใส่เหตุผลที่ทำงานล่าช้ากว่าแผน` 
+                                      title={isCompleted
+                                        ? `✅ งานผลิตเสร็จสิ้นแล้ว (${log.status})`
+                                        : isStarted
+                                        ? `⚠️ หน้างานเริ่มงานแล้ว: ลากแถบเพื่อปรับเลื่อนแผนงาน (บันทึกประวัติ KPI)\n👉 หรือคลิกแถบ 🅰️ ด้านล่างเพื่อใส่เหตุผลที่ทำงานจริงล่าช้ากว่าแผน` 
                                         : `↔️ แถบ P (แผนงาน): ลากแถบเพื่อเลื่อนวัน หรือคลิกเพื่อปรับแผน`}
                                     >
-                                      {isStarted ? (
+                                      {isCompleted ? (
+                                        <Check className="w-2.5 h-2.5 text-emerald-700 mr-1 shrink-0" />
+                                      ) : isStarted ? (
                                         <Lock className="w-2.5 h-2.5 text-amber-700 mr-1 shrink-0" />
                                       ) : canEdit ? (
                                         <GripVertical className="w-2.5 h-2.5 text-indigo-400 mr-0.5 shrink-0" />
@@ -2013,6 +2040,21 @@ export function MasterPlanningTimeline({
                 </div>
               )}
 
+              {/* Started Override Banner */}
+              {rescheduleModal.isStartedOverride && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg flex items-start gap-2.5 text-amber-950 shadow-2xs">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5 shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-amber-900">
+                      ⚠️ คิวงานนี้เริ่มดำเนินการแล้ว (กำลังดำเนินการ)
+                    </div>
+                    <p className="text-[11.5px] text-amber-800 mt-0.5 leading-relaxed">
+                      ระบบอนุญาตให้ขยับวันตามแผนเพื่อให้ตรงกับหน้างานจริง โดยจะบันทึกประวัติการ Re-plan ไว้อย่างชัดเจนเพื่อประเมิน KPI/OTIF <strong className="text-amber-950 font-bold">กรุณาระบุเหตุผลในการเลื่อนแผน</strong>
+                    </p>
+                  </div>
+                </div>
+              )}
+
               {/* Context Summary */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between">
@@ -2085,18 +2127,18 @@ export function MasterPlanningTimeline({
               {/* Additional Note */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  รายละเอียดเหตุผลการเลื่อนแผน {rescheduleModal.isSlideDrag ? <span className="text-red-500">* (จำเป็นต้องระบุ)</span> : null}
+                  รายละเอียดเหตุผลการเลื่อนแผน {(rescheduleModal.isSlideDrag || rescheduleModal.isStartedOverride) ? <span className="text-red-500">* (จำเป็นต้องระบุ)</span> : null}
                 </Label>
                 <Textarea
-                  placeholder={rescheduleModal.isSlideDrag ? "ระบุเหตุผลการเลื่อนแผน (จำเป็น) เช่น ลูกค้าขอเลื่อนวันส่ง, วัตถุดิบเข้าช้า, ซ่อมบำรุงเครื่องจักร..." : "เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"}
+                  placeholder={(rescheduleModal.isSlideDrag || rescheduleModal.isStartedOverride) ? "ระบุเหตุผลการเลื่อนแผน (จำเป็น) เช่น หน้างานแช่ไว้รอถังผสม, วัตถุดิบเข้าช้า, ซ่อมบำรุงเครื่องจักร..." : "เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"}
                   value={rescheduleModal.reason}
                   onChange={(e) => setRescheduleModal({ ...rescheduleModal, reason: e.target.value })}
                   className={cn(
                     "text-xs min-h-[75px] resize-none bg-white",
-                    rescheduleModal.isSlideDrag && !rescheduleModal.reason.trim() ? "border-amber-400 focus:border-indigo-500" : ""
+                    (rescheduleModal.isSlideDrag || rescheduleModal.isStartedOverride) && !rescheduleModal.reason.trim() ? "border-amber-400 focus:border-indigo-500" : ""
                   )}
                 />
-                {rescheduleModal.isSlideDrag && !rescheduleModal.reason.trim() && (
+                {(rescheduleModal.isSlideDrag || rescheduleModal.isStartedOverride) && !rescheduleModal.reason.trim() && (
                   <p className="text-[11px] text-amber-700 font-medium">⚠️ กรุณากรอกเหตุผลเพื่อยืนยันการเลื่อนแผนงาน</p>
                 )}
               </div>
@@ -2104,7 +2146,7 @@ export function MasterPlanningTimeline({
           )}
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
-            {!rescheduleModal?.isSlideDrag ? (
+            {(!rescheduleModal?.isSlideDrag && !rescheduleModal?.isStartedOverride) ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -2115,8 +2157,9 @@ export function MasterPlanningTimeline({
                 ปรับวันโดยไม่บันทึกสาเหตุ
               </Button>
             ) : (
-              <div className="text-[11px] text-slate-500 hidden sm:block">
-                * ต้องระบุเหตุผลเมื่อปรับเลื่อนจาก Timeline
+              <div className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                <Lock className="w-3 h-3 text-amber-600" />
+                <span>งานที่เริ่มแล้ว บังคับบันทึกสาเหตุเพื่อประเมิน KPI</span>
               </div>
             )}
             <div className="flex gap-2 w-full sm:w-auto justify-end">

@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { MaintenanceMachine, SymptomCategory, ProductionImpact } from '@/types/maintenance'
 import { createRepairRequest } from '@/app/actions/maintenance'
+import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
 
 interface FastReportFormProps {
   initialMachine?: MaintenanceMachine | null
@@ -99,6 +100,8 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   const [description, setDescription] = useState('')
   const [requesterName, setRequesterName] = useState('พนักงานหน้างาน (Operator)')
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -160,58 +163,30 @@ export default function FastReportForm({ initialMachine, machines, initialType }
     })
   }
 
-  // Handle Photo input with smart client-side compression for mobile cameras
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle Photo input with smart client-side compression and cloud upload
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
 
-    // If video, read directly
-    if (file.type.startsWith('video/')) {
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string)
+    setPhotoFile(file)
+    // Instant local preview for immediate visual feedback (< 50ms)
+    const localUrl = URL.createObjectURL(file)
+    setPhotoPreview(localUrl)
+
+    // Background upload directly to Supabase storage bucket 'maintenance-media'
+    try {
+      setIsUploadingPhoto(true)
+      const compressed = await compressImage(file, 1280, 0.75)
+      const res = await uploadMaintenancePhoto(compressed, file.name)
+      if (res.success && res.url) {
+        setPhotoPreview(res.url)
+        toast.success('อัปโหลดรูปภาพเข้าสู่คลังจัดเก็บเรียบร้อย')
       }
-      reader.readAsDataURL(file)
-      return
+    } catch (err) {
+      console.warn('Background upload notice:', err)
+    } finally {
+      setIsUploadingPhoto(false)
     }
-
-    // Canvas Compression: Resize high-res iPhone/Android photos (8-15MB) down to crisp ~120KB
-    const reader = new FileReader()
-    reader.onload = (event) => {
-      const img = new window.Image()
-      img.onload = () => {
-        const MAX_DIMENSION = 1024
-        let width = img.width
-        let height = img.height
-
-        if (width > height) {
-          if (width > MAX_DIMENSION) {
-            height = Math.round((height * MAX_DIMENSION) / width)
-            width = MAX_DIMENSION
-          }
-        } else {
-          if (height > MAX_DIMENSION) {
-            width = Math.round((width * MAX_DIMENSION) / height)
-            height = MAX_DIMENSION
-          }
-        }
-
-        const canvas = document.createElement('canvas')
-        canvas.width = width
-        canvas.height = height
-        const ctx = canvas.getContext('2d')
-        if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height)
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.72)
-          setPhotoPreview(compressedDataUrl)
-          toast.success('แนบรูปภาพพร้อมปรับขนาดความคมชัดเรียบร้อย')
-        } else {
-          setPhotoPreview(event.target?.result as string)
-        }
-      }
-      img.src = event.target?.result as string
-    }
-    reader.readAsDataURL(file)
   }
 
   // Handle Voice Input simulation
@@ -257,6 +232,34 @@ export default function FastReportForm({ initialMachine, machines, initialType }
 
     setIsSubmitting(true)
     try {
+      let finalPhotoUrl = photoPreview || ''
+      // If photoPreview is not yet uploaded to storage (e.g. still blob: or data:)
+      if (finalPhotoUrl && !finalPhotoUrl.startsWith('http')) {
+        toast.info('กำลังเชื่อมต่ออัปโหลดรูปภาพ...')
+        try {
+          if (photoFile) {
+            const compressed = await compressImage(photoFile, 1280, 0.75)
+            const upRes = await uploadMaintenancePhoto(compressed, photoFile.name)
+            if (upRes.success && upRes.url) {
+              finalPhotoUrl = upRes.url
+            }
+          } else if (finalPhotoUrl.startsWith('data:')) {
+            const upRes = await uploadMaintenancePhoto(finalPhotoUrl)
+            if (upRes.success && upRes.url) {
+              finalPhotoUrl = upRes.url
+            }
+          }
+        } catch (uploadErr) {
+          console.warn('Upload fallback warning:', uploadErr)
+        }
+      }
+
+      // Safeguard: Only send URL if it is a valid cloud URL or clean string, never a multi-megabyte raw blob
+      const validPhotoUrls: string[] = []
+      if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
+        validPhotoUrls.push(finalPhotoUrl)
+      }
+
       const res = await createRepairRequest({
         machine_code: repairType === 'SERVICE' ? 'FACILITY' : selectedMachine!.machine_code,
         symptom_category: repairType === 'SERVICE' && !finalSymptom.includes('บริการ') ? `[บริการ] ${finalSymptom}` : finalSymptom,
@@ -265,7 +268,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
         is_emergency_breakdown: isEmergency,
         requester_name: requesterName,
         requester_department_name: repairType === 'SERVICE' ? (facilityLocation.trim() || 'ฝ่ายบริการทั่วไป & อาคาร') : (selectedMachine?.department_name || undefined),
-        photo_before_urls: photoPreview ? [photoPreview] : []
+        photo_before_urls: validPhotoUrls
       })
 
       if (res.success && res.data) {
@@ -275,6 +278,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
         toast.error(res.error || 'เกิดข้อผิดพลาดในการแจ้งซ่อม')
       }
     } catch (err: any) {
+      console.error('Submit error:', err)
       toast.error(err.message || 'ไม่สามารถส่งข้อมูลได้')
     } finally {
       setIsSubmitting(false)
@@ -908,7 +912,10 @@ export default function FastReportForm({ initialMachine, machines, initialType }
 
             <button
               type="button"
-              onClick={() => setPhotoPreview(null)}
+              onClick={() => {
+                setPhotoPreview(null)
+                setPhotoFile(null)
+              }}
               className="absolute top-2 right-2 bg-black/75 hover:bg-black text-white text-xs px-2.5 py-1.5 rounded-xl border border-white/20 transition"
             >
               ลบไฟล์

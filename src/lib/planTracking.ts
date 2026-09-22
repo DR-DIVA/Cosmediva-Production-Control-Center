@@ -14,6 +14,8 @@ export const PLAN_CHANGE_CATEGORIES = [
   { id: 'WAIT_RM_PM', label: 'รอวัตถุดิบ/บรรจุภัณฑ์ (Wait RM/PM)', icon: '📦' },
   { id: 'CAPACITY_REBALANCE', label: 'เกลี่ยกำลังการผลิต / คิวงานแน่น (Capacity Rebalance)', icon: '⚖️' },
   { id: 'RUSH_ORDER_INSERT', label: 'แทรกคิวงานด่วน (Rush Order Insert)', icon: '⚡' },
+  { id: 'SHOPFLOOR_HOLD', label: 'หน้างานแช่ไว้ / ชะลอผลิตระหว่างทำ (Shopfloor Hold/Pause)', icon: '⏸️' },
+  { id: 'MISTAKEN_START', label: 'เผลอกดเริ่มผิด / ปรับคืนแผน (Mistaken Start)', icon: '↩️' },
   { id: 'FLOOR_DOWNTIME', label: 'หน้างานขัดข้อง / ชะลอผลิต (Shopfloor Downtime)', icon: '⚙️' },
   { id: 'CUSTOMER_RESCHEDULE', label: 'ลูกค้า/ฝ่ายขายขอปรับวัน (Customer/Sales Request)', icon: '👤' },
   { id: 'PLAN_CALIBRATION', label: 'ทบทวนปรับแผนงานปกติ (Plan Calibration)', icon: '📋' },
@@ -86,6 +88,7 @@ export function cleanDisplayNote(note?: string | null): string {
     .replace(/\[PLAN_RESCHEDULE:.*?\]/g, '')
     .replace(/\[ACTUAL_DELAY:.*?\]/g, '')
     .replace(/\[DELAY_TRACKING:.*?\]/g, '')
+    .replace(/\[RESET_START:.*?\]/g, '')
     .replace(/^\s*[\r\n]/gm, '')
     .trim()
 }
@@ -100,6 +103,7 @@ export function extractUserComment(note?: string | null): string {
     .replace(/\[เลื่อนแผนเป็น .*?\]/g, '')
     .replace(/\*?\s*\(เลื่อนแผนเป็น .*?\)/g, '')
     .replace(/\[เลื่อนเป็น .*?\]/g, '')
+    .replace(/\[ยกเลิกเริ่มงานผิด:.*?\]/g, '')
     .replace(/\[เหตุผลล่าช้าหน้างาน:.*?\]/g, '')
     .replace(/\[เหตุผลทำจริงล่าช้า:.*?\]/g, '')
     .replace(/^\s*[\r\n]/gm, '')
@@ -145,9 +149,51 @@ export function formatPlanChangeNote(
 }
 
 /**
+ * Checks if a task has completely finished production (COMPLETED or DONE).
+ */
+export function isTaskCompleted(log: any): boolean {
+  if (!log) return false
+  const status = (log.status || '').toUpperCase()
+  return status === 'DONE' || status === 'COMPLETED'
+}
+
+/**
+ * Checks if a production task was started (IN_PROGRESS or has start_time) but not yet completed.
+ * These tasks can be reset back to WAITING / PLANNED if started accidentally.
+ */
+export function canResetStartedTask(log: any): boolean {
+  if (!log) return false
+  if (isTaskCompleted(log)) return false
+  const status = (log.status || '').toUpperCase()
+  return Boolean(log.start_time || status === 'IN_PROGRESS')
+}
+
+/**
+ * Formats note when resetting an accidentally started task back to WAITING / PLANNED.
+ */
+export function formatResetStartNote(
+  existingNote: string | null | undefined,
+  data: {
+    userIdentifier: string
+    reason?: string
+  }
+): string {
+  const payload = {
+    ...data,
+    resetAt: new Date().toISOString()
+  }
+  const tag = `[RESET_START:${JSON.stringify(payload)}]`
+  let cleanNote = (existingNote || '')
+    .replace(/\[RESET_START:.*?\]/g, '')
+    .trim()
+
+  const humanSummary = `[ยกเลิกเริ่มงานผิด: คืนสถานะรอเริ่ม โดย ${data.userIdentifier}${data.reason ? ` - ${data.reason}` : ''}]`
+  return cleanNote ? `${humanSummary} ${tag}\n${cleanNote}` : `${humanSummary} ${tag}`
+}
+
+/**
  * Checks if a production task/log has already been started by the shopfloor.
- * If true, Planning is strictly disallowed from modifying, deleting, or rescheduling
- * the planned dates/process/tanks/status to protect Plan Adherence KPI accuracy.
+ * If true, dates and queue changes require a logged reschedule reason to protect KPI accuracy.
  */
 export function isTaskStartedByShopfloor(log: any): boolean {
   if (!log) return false

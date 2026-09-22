@@ -52,7 +52,10 @@ import {
   getPlanCategoryLabel,
   cleanDisplayNote,
   extractUserComment,
-  isTaskStartedByShopfloor
+  isTaskStartedByShopfloor,
+  isTaskCompleted,
+  canResetStartedTask,
+  formatResetStartNote
 } from "@/lib/planTracking"
 
 const PROCESS_TYPES = [
@@ -170,6 +173,19 @@ export default function PlannerPage() {
     reason: string
     currentNote: string
     revisionCount: number
+    isStartedOverride?: boolean
+  } | null>(null)
+
+  // Reset Mistaken Start Dialog State
+  const [resetStartModal, setResetStartModal] = useState<{
+    isOpen: boolean
+    logId: string
+    lotNo: string
+    sku: string
+    processName: string
+    startTime?: string | null
+    reason: string
+    isSubmitting: boolean
   } | null>(null)
 
   useEffect(() => {
@@ -521,7 +537,7 @@ const fetchAllProductionLots = async (client: any) => {
   const handleDeleteLog = async (logId: string) => {
     const existingLog = logs.find(l => l.id === logId)
     if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-      toast.error("ไม่อนุญาตให้ลบคิวงานนี้ เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)")
+      toast.error("ไม่อนุญาตให้ลบคิวงานนี้ เนื่องจากหน้างานกดเริ่มงานแล้ว (หากเผลอกดเริ่มผิด ให้คลิกปุ่ม 'ยกเลิกเริ่มผิด' เพื่อคืนสถานะก่อนลบ)")
       return
     }
     if (!confirm("ยืนยันการลบคิวงานนี้?")) return
@@ -535,11 +551,67 @@ const fetchAllProductionLots = async (client: any) => {
     }
   }
 
+  const handleOpenResetStart = (log: any, lot: any, process: any) => {
+    if (!canEdit) return
+    setResetStartModal({
+      isOpen: true,
+      logId: log.id,
+      lotNo: lot?.lot_no || '-',
+      sku: lot?.products?.sku || lot?.products?.product_name || '-',
+      processName: process?.process_name || 'งานผลิต',
+      startTime: log.start_time,
+      reason: 'พนักงานเผลอกดเริ่มงานผิด',
+      isSubmitting: false
+    })
+  }
+
+  const handleConfirmResetStart = async () => {
+    if (!resetStartModal) return
+    const { logId, reason } = resetStartModal
+    const targetLog = logs.find(l => l.id === logId)
+    if (!targetLog) {
+      setResetStartModal(null)
+      return
+    }
+
+    setResetStartModal(prev => prev ? { ...prev, isSubmitting: true } : null)
+
+    const userIdentifier = (currentUserInfo?.employee_id || currentUser || 'PLANNER').toUpperCase()
+    const updatedNote = formatResetStartNote(targetLog.note, {
+      userIdentifier,
+      reason: reason.trim() || 'พนักงานเผลอกดเริ่มงานผิด'
+    })
+
+    const updateData: any = {
+      status: 'WAITING',
+      start_time: null,
+      note: updatedNote,
+      updated_at: new Date().toISOString(),
+      updated_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
+    }
+
+    // Optimistic Update
+    setLogs(logs.map(l => l.id === logId ? { ...l, ...updateData } : l))
+    setResetStartModal(null)
+
+    try {
+      const { error } = await supabase.from("production_logs").update(updateData).eq("id", logId)
+      if (error) throw error
+      toast.success("ยกเลิกการเริ่มงานเรียบร้อยแล้ว คิวงานกลับสู่สถานะรอเริ่ม")
+      fetchData()
+    } catch (e: any) {
+      toast.error("ยกเลิกการเริ่มงานไม่สำเร็จ: " + e.message)
+      fetchData()
+    }
+  }
+
   const handleUpdateLogDirect = async (logId: string, field: string, value: any) => {
       const existingLog = logs.find(l => l.id === logId)
       if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-        toast.error("ไม่อนุญาตให้แก้ไขคิวงานนี้ เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)")
-        return
+        if (field === 'process_id' || field === 'tank_start' || field === 'tank_end') {
+          toast.error("ไม่อนุญาตให้แก้ไขขั้นตอน/ถัง เนื่องจากหน้างานกดเริ่มงานแล้ว")
+          return
+        }
       }
 
       let updateData: any = { 
@@ -572,12 +644,22 @@ const fetchAllProductionLots = async (client: any) => {
   }
 
   const handleDateInputChange = (log: any, lot: any, process: any, field: 'activity_date' | 'end_date', newDateValue: string) => {
-    if (isTaskStartedByShopfloor(log)) {
-      toast.error(`ไม่อนุญาตให้แก้ไขวันตามแผน เนื่องจากหน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)`)
+    if (isTaskCompleted(log)) {
+      toast.error(`ไม่อนุญาตให้แก้ไขวันตามแผน เนื่องจากงาน${process?.process_name || ''}ผลิตเสร็จสิ้นแล้ว`)
+      return
+    }
+
+    const isStarted = isTaskStartedByShopfloor(log)
+    if (isStarted && !canEdit) {
+      toast.error(`ไม่อนุญาตให้แก้ไขวันตามแผน เนื่องจากหน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว`)
       return
     }
 
     if (!newDateValue) {
+      if (isStarted) {
+        toast.warning('งานที่เริ่มแล้วไม่สามารถลบวันที่ออกได้')
+        return
+      }
       handleUpdateLogDirect(log.id, field, newDateValue)
       return
     }
@@ -605,14 +687,14 @@ const fetchAllProductionLots = async (client: any) => {
       ? format(createdAt, 'yyyy-MM-dd') === log.activity_date
       : false
 
-    const isInitialSetup = (isCreatedToday || isDefaultCreationDate || !currentVal) && !planInfo.isRescheduled
+    const isInitialSetup = (isCreatedToday || isDefaultCreationDate || !currentVal) && !planInfo.isRescheduled && !isStarted
 
     if (isInitialSetup) {
       handleUpdateLogDirect(log.id, field, newDateValue)
       return
     }
 
-    // It's an existing plan date being modified on a subsequent day -> Open Reschedule Modal to track reason
+    // It's an existing plan date being modified or a task that has started -> Open Reschedule Modal to track reason
     setRescheduleModal({
       isOpen: true,
       logId: log.id,
@@ -622,18 +704,20 @@ const fetchAllProductionLots = async (client: any) => {
       originalDate: planInfo.originalDate || currentVal, // preserve first baseline plan date
       newDate: newDateValue,
       field,
-      category: planInfo.category || 'WAIT_RM_PM',
+      category: isStarted ? (planInfo.category || 'SHOPFLOOR_HOLD') : (planInfo.category || 'WAIT_RM_PM'),
       reason: planInfo.reason ? cleanDisplayNote(planInfo.reason) : '',
       currentNote: extractUserComment(log.note),
-      revisionCount: (planInfo.revisionCount || 0) + 1
+      revisionCount: (planInfo.revisionCount || 0) + 1,
+      isStartedOverride: isStarted
     })
   }
 
   const handleOpenRescheduleDetail = (log: any, lot: any, process: any) => {
-    if (isTaskStartedByShopfloor(log)) {
-      toast.warning(`คิวงานนี้หน้างาน${process?.process_name || ''}กดเริ่มงานแล้ว (${log.status || 'เริ่มงานแล้ว'}) จึงล็อกแผนงานไว้เพื่อประเมิน KPI ความแม่นยำ ไม่อนุญาตให้ปรับเลื่อนแผน`)
+    if (isTaskCompleted(log)) {
+      toast.info(`คิวงานนี้หน้างาน${process?.process_name || ''}ดำเนินการเสร็จสิ้นแล้ว (${log.status})`)
       return
     }
+    const isStarted = isTaskStartedByShopfloor(log)
     const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)
     setRescheduleModal({
       isOpen: true,
@@ -644,20 +728,26 @@ const fetchAllProductionLots = async (client: any) => {
       originalDate: planInfo.originalDate || log.activity_date || '',
       newDate: log.activity_date || '',
       field: 'activity_date',
-      category: planInfo.category || 'WAIT_RM_PM',
+      category: isStarted ? (planInfo.category || 'SHOPFLOOR_HOLD') : (planInfo.category || 'WAIT_RM_PM'),
       reason: planInfo.reason ? cleanDisplayNote(planInfo.reason) : '',
       currentNote: extractUserComment(log.note),
-      revisionCount: planInfo.revisionCount || 1
+      revisionCount: planInfo.revisionCount || 1,
+      isStartedOverride: isStarted
     })
   }
 
   const handleConfirmReschedule = async () => {
     if (!rescheduleModal) return
-    const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount } = rescheduleModal
+    const { logId, field, newDate, originalDate, category, reason, currentNote, revisionCount, isStartedOverride } = rescheduleModal
     const existingLog = logs.find(l => l.id === logId)
-    if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)")
+    if (existingLog && isTaskCompleted(existingLog)) {
+      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานผลิตเสร็จสิ้นแล้ว")
       setRescheduleModal(null)
+      return
+    }
+
+    if (isStartedOverride && !reason?.trim()) {
+      toast.error("คิวงานนี้เริ่มดำเนินการแล้ว กรุณาระบุรายละเอียดเหตุผลในการขยับแผนงาน")
       return
     }
 
@@ -700,11 +790,14 @@ const fetchAllProductionLots = async (client: any) => {
 
   const handleQuickRescheduleWithoutReason = async () => {
     if (!rescheduleModal) return
-    const { logId, field, newDate } = rescheduleModal
+    const { logId, field, newDate, isStartedOverride } = rescheduleModal
+    if (isStartedOverride) {
+      toast.warning("งานที่เริ่มดำเนินการแล้ว บังคับต้องระบุเหตุผลในการขยับแผน")
+      return
+    }
     const existingLog = logs.find(l => l.id === logId)
     if (existingLog && isTaskStartedByShopfloor(existingLog)) {
-      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงาน เนื่องจากหน้างานกดเริ่มงานแล้ว (ล็อกเพื่อประเมิน KPI ความแม่นยำ)")
-      setRescheduleModal(null)
+      toast.error("ไม่อนุญาตให้ปรับเลื่อนแผนงานโดยไม่ระบุเหตุผล เนื่องจากหน้างานเริ่มงานแล้ว")
       return
     }
     setRescheduleModal(null)
@@ -2466,14 +2559,17 @@ const fetchAllProductionLots = async (client: any) => {
                         if (filterDept !== "ALL" && filterDept !== pt.id) return null
 
                         const isStarted = isTaskStartedByShopfloor(log)
+                        const isCompleted = isTaskCompleted(log)
+                        const canReset = canResetStartedTask(log)
                         const isEditable = canEdit && !isStarted
+                        const isDateEditable = canEdit && !isCompleted
 
                         return (
                           <TableRow key={log.id} className={cn("hover:bg-slate-100/50", isStarted ? "bg-slate-50/70" : "bg-[#F8F6F0]/")}>
                             <TableCell className="text-center">
                               {isStarted ? (
                                 <span 
-                                  title="หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้ลบคิวงาน (ล็อกแผนงานเพื่อประเมิน KPI ความแม่นยำ)" 
+                                  title="หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้ลบคิวงาน (หากเผลอกดเริ่มผิด ให้คลิกปุ่ม 'ยกเลิกเริ่มผิด' เพื่อคืนสถานะก่อนลบ)" 
                                   className="inline-flex items-center justify-center p-1 text-slate-400 cursor-not-allowed"
                                 >
                                   <Lock className="w-3.5 h-3.5 text-amber-600/80" />
@@ -2575,14 +2671,18 @@ const fetchAllProductionLots = async (client: any) => {
                                   <TableCell className="py-2">
                                     <div className="flex flex-col gap-1">
                                       <Input 
-                                        disabled={!isEditable}
+                                        disabled={!isDateEditable}
                                         type="date" 
                                         className={cn(
                                           "h-8 text-xs w-[130px] transition-colors", 
-                                          isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white",
-                                          planInfo.isRescheduled && !isStarted && "border-amber-400 bg-amber-50/50 text-amber-900 font-medium"
+                                          isCompleted ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200" :
+                                          isStarted ? "bg-amber-50/70 border-amber-300 text-amber-900 font-medium" : "bg-white",
+                                          planInfo.isRescheduled && !isCompleted && "border-amber-400 bg-amber-50/50 text-amber-900 font-medium"
                                         )} 
-                                        title={isStarted ? "หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกเพื่อประเมิน KPI ความแม่นยำ)" : undefined}
+                                        title={
+                                          isCompleted ? "งานเสร็จสิ้นแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน" :
+                                          isStarted ? "หน้างานเริ่มงานแล้ว: สามารถแก้ไขวันได้ โดยระบบจะบันทึกประวัติการปรับเลื่อนแผนงาน" : undefined
+                                        }
                                         value={log.activity_date || ""} 
                                         onChange={(e) => handleDateInputChange(log, lot, process, "activity_date", e.target.value)}
                                       />
@@ -2590,28 +2690,32 @@ const fetchAllProductionLots = async (client: any) => {
                                         <button 
                                           type="button"
                                           onClick={() => handleOpenRescheduleDetail(log, lot, process)}
-                                          title={isStarted 
-                                            ? `บันทึกเลื่อนแผนเดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel} (เริ่มงานแล้ว ล็อกการแก้ไข)` 
+                                          title={isCompleted 
+                                            ? `บันทึกเลื่อนแผนเดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel}` 
                                             : `คลิกเพื่อดู/แก้ไขบันทึกเลื่อนแผน (เดิม: ${planInfo.originalDate} -> สาเหตุ: ${planInfo.categoryLabel})`
                                           }
                                           className="text-[10px] text-amber-800 bg-amber-100 hover:bg-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1 w-fit transition-colors text-left font-medium"
                                         >
                                           <span>🔄 เดิม:</span>
                                           <span>{planInfo.originalDate ? format(new Date(planInfo.originalDate), 'dd/MM/yy') : '-'}</span>
-                                          {isStarted && <Lock className="w-2.5 h-2.5 text-amber-700 ml-0.5" />}
+                                          {isStarted && !isCompleted && <span className="text-[9px] bg-amber-200 text-amber-800 px-1 rounded ml-0.5 font-normal">แช่/ปรับแผน</span>}
                                         </button>
                                       )}
                                     </div>
                                   </TableCell>
                                   <TableCell className="py-2">
                                     <Input 
-                                      disabled={!isEditable}
+                                      disabled={!isDateEditable}
                                       type="date" 
                                       className={cn(
                                         "h-8 text-xs w-[130px] transition-colors",
-                                        isStarted ? "bg-slate-100 text-slate-500 cursor-not-allowed border-slate-200" : "bg-white"
+                                        isCompleted ? "bg-slate-100 text-slate-400 cursor-not-allowed border-slate-200" :
+                                        isStarted ? "bg-amber-50/70 border-amber-300 text-amber-900 font-medium" : "bg-white"
                                       )} 
-                                      title={isStarted ? "หน้างานกดเริ่มงานแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน (ล็อกเพื่อประเมิน KPI ความแม่นยำ)" : undefined}
+                                      title={
+                                        isCompleted ? "งานเสร็จสิ้นแล้ว ไม่อนุญาตให้แก้ไขวันตามแผน" :
+                                        isStarted ? "หน้างานเริ่มงานแล้ว: สามารถแก้ไขวันได้ โดยระบบจะบันทึกประวัติการปรับเลื่อนแผนงาน" : undefined
+                                      }
                                       value={log.end_date || ""} 
                                       onChange={(e) => handleDateInputChange(log, lot, process, "end_date", e.target.value)}
                                     />
@@ -2621,15 +2725,29 @@ const fetchAllProductionLots = async (client: any) => {
                             })()}
                             <TableCell className="py-2">
                               {isStarted ? (
-                                <div className="flex items-center gap-1">
-                                  <Badge className={cn("h-8 text-xs px-2.5 py-1 rounded-lg border-0 inline-flex items-center gap-1.5 font-bold shadow-2xs select-none",
-                                    log.status === 'COMPLETED' || log.status === 'DONE' 
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge className={cn("h-7 text-xs px-2 py-0.5 rounded-md border-0 inline-flex items-center gap-1 font-bold shadow-2xs select-none",
+                                    isCompleted 
                                       ? 'bg-emerald-100 text-emerald-800' 
                                       : 'bg-[#D4AF37]/20 text-[#6D5A1A]'
                                   )}>
-                                    <Lock className="w-3 h-3 opacity-70" />
-                                    <span>{log.status === 'COMPLETED' || log.status === 'DONE' ? 'เสร็จสิ้น (DONE)' : 'กำลังดำเนินการ'}</span>
+                                    {isCompleted ? <Check className="w-3 h-3 text-emerald-700" /> : <Lock className="w-3 h-3 opacity-70" />}
+                                    <span>{isCompleted ? 'เสร็จสิ้น (DONE)' : 'กำลังดำเนินการ'}</span>
                                   </Badge>
+
+                                  {canReset && canEdit && (
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => handleOpenResetStart(log, lot, process)}
+                                      className="h-6 text-[10.5px] px-1.5 py-0 bg-white hover:bg-amber-50 text-amber-800 border-amber-300 shadow-2xs flex items-center gap-1 cursor-pointer transition-colors"
+                                      title="พนักงานเผลอกดเริ่มผิด? คลิกเพื่อยกเลิกการเริ่มงานและคืนสถานะเป็นรอเริ่ม เพื่อให้ขยับแผนหรือย้ายวันได้"
+                                    >
+                                      <RotateCcw className="w-2.5 h-2.5 text-amber-600" />
+                                      <span>ยกเลิกเริ่มผิด</span>
+                                    </Button>
+                                  )}
                                 </div>
                               ) : (
                                 <Select 
@@ -3181,6 +3299,18 @@ const fetchAllProductionLots = async (client: any) => {
 
           {rescheduleModal && (
             <div className="space-y-4 py-2 text-sm">
+              {rescheduleModal.isStartedOverride && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-900 text-xs flex items-start gap-2.5">
+                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <div className="font-bold">⚠️ คิวงานนี้เริ่มดำเนินการแล้ว (กำลังดำเนินการ)</div>
+                    <div className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                      ระบบอนุญาตให้ฝ่ายวางแผนขยับวันตามแผนเพื่อให้สอดคล้องกับหน้างานจริง โดยจะบันทึกประวัติการ Re-plan ไว้อย่างชัดเจนเพื่อประเมิน KPI/OTIF กรุณาระบุหมวดหมู่และเหตุผล
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Context Summary */}
               <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs space-y-1.5">
                 <div className="flex justify-between">
@@ -3244,10 +3374,10 @@ const fetchAllProductionLots = async (client: any) => {
               {/* Additional Note */}
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
-                  รายละเอียดเพิ่มเติม / หมายเหตุของฝ่ายวางแผน
+                  รายละเอียดเพิ่มเติม / หมายเหตุของฝ่ายวางแผน {rescheduleModal.isStartedOverride && <span className="text-red-500">*</span>}
                 </Label>
                 <Textarea 
-                  placeholder="เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"
+                  placeholder={rescheduleModal.isStartedOverride ? "ระบุเหตุผลที่ต้องขยับแผน เช่น หน้างานแช่ไว้รอถังผสม หรือ พักสายการผลิตชั่วคราว" : "เช่น BEC ขอเลื่อนส่ง Glycerin เป็น 21/09 หรือ หน้างานรอผล Micro Lab ก่อนบรรจุ"}
                   value={rescheduleModal.reason}
                   onChange={(e) => setRescheduleModal({ ...rescheduleModal, reason: e.target.value })}
                   className="text-xs min-h-[70px] resize-none bg-white"
@@ -3257,15 +3387,22 @@ const fetchAllProductionLots = async (client: any) => {
           )}
 
           <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
-            <Button 
-              type="button" 
-              variant="ghost" 
-              size="sm" 
-              className="text-xs text-slate-500 hover:text-slate-700 w-full sm:w-auto"
-              onClick={handleQuickRescheduleWithoutReason}
-            >
-              ปรับวันโดยไม่บันทึกสาเหตุ
-            </Button>
+            {!rescheduleModal?.isStartedOverride ? (
+              <Button 
+                type="button" 
+                variant="ghost" 
+                size="sm" 
+                className="text-xs text-slate-500 hover:text-slate-700 w-full sm:w-auto"
+                onClick={handleQuickRescheduleWithoutReason}
+              >
+                ปรับวันโดยไม่บันทึกสาเหตุ
+              </Button>
+            ) : (
+              <div className="text-[11px] text-amber-700 font-medium flex items-center gap-1">
+                <Lock className="w-3 h-3 text-amber-600" />
+                <span>งานที่เริ่มแล้ว บังคับบันทึกสาเหตุเพื่อประเมิน KPI</span>
+              </div>
+            )}
             <div className="flex gap-2 w-full sm:w-auto justify-end">
               <Button 
                 type="button" 
@@ -3285,6 +3422,85 @@ const fetchAllProductionLots = async (client: any) => {
                 💾 บันทึกการเลื่อนแผน
               </Button>
             </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Mistaken Start Modal (ยกเลิกเริ่มงานผิด) */}
+      <Dialog open={!!resetStartModal?.isOpen} onOpenChange={(open) => !open && setResetStartModal(null)}>
+        <DialogContent className="sm:max-w-[450px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-800 text-base">
+              <span className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800 text-base">
+                ↩️
+              </span>
+              ยกเลิกการเริ่มงาน (เผลอกดเริ่มผิด)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              คืนสถานะคิวงานกลับเป็น &quot;รอดำเนินการ&quot; เพื่อให้ฝ่ายวางแผนสามารถขยับวันหรือจัดคิวใหม่ได้
+            </DialogDescription>
+          </DialogHeader>
+
+          {resetStartModal && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="p-3 bg-amber-50/60 rounded-lg border border-amber-200 space-y-1.5 text-slate-700">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Lot No:</span>
+                  <span className="font-bold">{resetStartModal.lotNo} ({resetStartModal.sku})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ขั้นตอน:</span>
+                  <span className="font-semibold text-blue-700">{resetStartModal.processName}</span>
+                </div>
+                {resetStartModal.startTime && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">เวลาที่กดเริ่มในระบบ:</span>
+                    <span className="font-medium text-amber-900">
+                      {format(new Date(resetStartModal.startTime), 'dd/MM/yyyy HH:mm:ss')}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-2.5 bg-blue-50/70 rounded-md border border-blue-200 text-blue-900 text-[11px] leading-relaxed">
+                ℹ️ เมื่อยืนยัน ระบบจะล้างเวลาเริ่มงาน (<code className="bg-blue-100 px-1 py-0.5 rounded">start_time = null</code>) 
+                และเปลี่ยนสถานะกลับเป็น <strong>รอเริ่มงาน (WAITING)</strong> พร้อมปลดล็อกให้สามารถย้ายหรือขยับแผนได้ทันที
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  ระบุเหตุผลในการยกเลิก <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={resetStartModal.reason}
+                  onChange={(e) => setResetStartModal({ ...resetStartModal, reason: e.target.value })}
+                  placeholder="เช่น พนักงานเผลอกดเริ่มผิด หรือ ยังไม่มีการเริ่มชั่งจริง"
+                  className="h-8 text-xs bg-white"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setResetStartModal(null)}
+              disabled={resetStartModal?.isSubmitting}
+            >
+              ปิด
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="text-xs bg-amber-600 hover:bg-amber-700 text-white font-medium"
+              onClick={handleConfirmResetStart}
+              disabled={resetStartModal?.isSubmitting}
+            >
+              {resetStartModal?.isSubmitting ? "กำลังยกเลิก..." : "↩️ ยืนยันยกเลิกเริ่มงาน"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
