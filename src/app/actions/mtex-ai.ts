@@ -637,14 +637,14 @@ ${COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE}
     // 2. Query Work Orders
     let woQuery = supabase
       .from('maintenance_work_orders')
-      .select('wo_number, machine_code, machine_name, problem_description, root_cause, action_taken, status, created_at, priority')
+      .select('wo_number, machine_code, machine_name, symptom_description, root_cause, corrective_action, status, created_at, priority')
       .order('created_at', { ascending: false })
       .limit(6)
 
     if (detectedMachine) {
-      woQuery = woQuery.or(`machine_code.ilike.%${detectedMachine}%,problem_description.ilike.%${detectedMachine}%`)
+      woQuery = woQuery.or(`machine_code.ilike.%${detectedMachine}%,symptom_description.ilike.%${detectedMachine}%`)
     } else {
-      woQuery = woQuery.or(`problem_description.ilike.%${effectiveKeyword}%,root_cause.ilike.%${effectiveKeyword}%,action_taken.ilike.%${effectiveKeyword}%,machine_code.ilike.%${effectiveKeyword}%`)
+      woQuery = woQuery.or(`symptom_description.ilike.%${effectiveKeyword}%,root_cause.ilike.%${effectiveKeyword}%,corrective_action.ilike.%${effectiveKeyword}%,machine_code.ilike.%${effectiveKeyword}%`)
     }
     const { data: matchedWOs } = await woQuery
 
@@ -714,7 +714,7 @@ ${COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE}
     // 4. Query Machines Master
     let machineQuery = supabase
       .from('maintenance_machines')
-      .select('machine_code, machine_name, category, location, status, model, serial_number')
+      .select('machine_code, machine_name, category, production_area, room_name, status, model, serial_number')
       .limit(3)
 
     if (detectedMachine) {
@@ -727,7 +727,7 @@ ${COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE}
     // 5. Query Spare Parts
     const { data: matchedParts } = await supabase
       .from('maintenance_spare_parts')
-      .select('part_code, part_name, category, stock_quantity, unit, unit_price, location')
+      .select('part_code, part_name, category, stock_qty, unit, average_cost, storage_location')
       .or(`part_name.ilike.%${effectiveKeyword}%,part_code.ilike.%${effectiveKeyword}%,specification.ilike.%${effectiveKeyword}%`)
       .limit(4)
 
@@ -737,14 +737,14 @@ ${COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE}
     if (matchedMachines && matchedMachines.length > 0) {
       contextLines.push('--- ข้อมูลเครื่องจักรที่เกี่ยวข้อง ---')
       matchedMachines.forEach(m => {
-        contextLines.push(`- รหัส: ${m.machine_code} | ชื่อ: ${m.machine_name} | รุ่น: ${m.model || '-'} | สถานะปัจจุบัน: ${m.status}`)
+        contextLines.push(`- รหัส: ${m.machine_code} | ชื่อ: ${m.machine_name} | รุ่น: ${m.model || '-'} | พื้นที่: ${m.production_area || m.room_name || '-'} | สถานะ: ${m.status}`)
       })
     }
 
     if (matchedWOs && matchedWOs.length > 0) {
       contextLines.push('--- ประวัติใบแจ้งซ่อมในระบบ (Work Orders) ---')
       matchedWOs.forEach(w => {
-        contextLines.push(`- [${w.wo_number}] เครื่อง ${w.machine_code}: อาการ "${w.problem_description}" | สาเหตุ: ${w.root_cause || '-'} | วิธีแก้: ${w.action_taken || '-'} (สถานะ: ${w.status})`)
+        contextLines.push(`- [${w.wo_number}] เครื่อง ${w.machine_code}: อาการ "${w.symptom_description || '-'}" | สาเหตุ: ${w.root_cause || '-'} | วิธีแก้: ${w.corrective_action || '-'} (สถานะ: ${w.status})`)
       })
     }
 
@@ -760,7 +760,7 @@ ${COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE}
     if (matchedParts && matchedParts.length > 0) {
       contextLines.push('--- อะไหล่ในคลังที่ตรงกับคำค้น ---')
       matchedParts.forEach(p => {
-        contextLines.push(`- รหัส ${p.part_code}: ${p.part_name} | คงเหลือ: ${p.stock_quantity} ${p.unit || 'ชิ้น'} | ที่เก็บ: ${p.location || 'คลังหลัก'}`)
+        contextLines.push(`- รหัส ${p.part_code}: ${p.part_name} | คงเหลือ: ${p.stock_qty} ${p.unit || 'ชิ้น'} | ที่เก็บ: ${p.storage_location || 'คลังหลัก'}`)
       })
     }
 
@@ -831,7 +831,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     if (matchedWOs && matchedWOs.length > 0) {
       answerText += `📋 ประวัติงานซ่อมที่ผ่านมา (${matchedWOs.length} รายการ):\n`
       matchedWOs.slice(0, 3).forEach((w, idx) => {
-        answerText += `${idx + 1}. [${w.wo_number}] เครื่อง ${w.machine_code}: อาการ "${w.problem_description}"\n   • สาเหตุ: ${w.root_cause || 'ยังไม่ระบุ'}\n   • วิธีแก้ไข: ${w.action_taken || 'รอตรวจสอบ'}\n`
+        answerText += `${idx + 1}. [${w.wo_number}] เครื่อง ${w.machine_code}: อาการ "${w.symptom_description || 'ไม่ระบุ'}"\n   • สาเหตุ: ${w.root_cause || 'ยังไม่ระบุ'}\n   • วิธีแก้ไข: ${w.corrective_action || 'รอตรวจสอบ'}\n`
       })
       answerText += '\n'
     }
@@ -873,7 +873,7 @@ ${contextText || '(ไม่พบบันทึกตรงๆ ในระบ
     if (matchedParts && matchedParts.length > 0) {
       answerText += `📦 อะไหล่ในคลังที่เกี่ยวข้อง:\n`
       matchedParts.forEach(p => {
-        answerText += `• ${p.part_name} (${p.part_code}) คงเหลือ: ${p.stock_quantity} ${p.unit || 'ชิ้น'} (เก็บที่: ${p.location || 'คลัง'})\n`
+        answerText += `• ${p.part_name} (${p.part_code}) คงเหลือ: ${p.stock_qty} ${p.unit || 'ชิ้น'} (เก็บที่: ${p.storage_location || 'คลัง'})\n`
       })
       answerText += '\n'
     }
