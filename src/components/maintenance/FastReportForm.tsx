@@ -267,7 +267,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
         validPhotoUrls.push(finalPhotoUrl)
       }
 
-      const res = await createRepairRequest({
+      const payload = {
         machine_code: repairType === 'SERVICE' ? 'FACILITY' : selectedMachine!.machine_code,
         symptom_category: repairType === 'SERVICE' && !finalSymptom.includes('บริการ') ? `[บริการ] ${finalSymptom}` : finalSymptom,
         symptom_description: fullDescription,
@@ -276,17 +276,39 @@ export default function FastReportForm({ initialMachine, machines, initialType }
         requester_name: requesterName,
         requester_department_name: repairType === 'SERVICE' ? (facilityLocation.trim() || 'ฝ่ายบริการทั่วไป & อาคาร') : (selectedMachine?.department_name || undefined),
         photo_before_urls: validPhotoUrls
-      })
+      }
 
-      if (res.success && res.data) {
+      let res: any
+      try {
+        const apiRes = await fetch('/api/maintenance/repair-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        if (apiRes.ok) {
+          res = await apiRes.json()
+        } else {
+          throw new Error(`API returned ${apiRes.status}`)
+        }
+      } catch (apiErr) {
+        console.warn('API fetch fallback to direct action:', apiErr)
+        res = await createRepairRequest(payload)
+      }
+
+      if (res && res.success && res.data) {
         setSubmittedWO(res.data)
         toast.success(`สร้างใบแจ้งซ่อม ${res.data.wo_number} สำเร็จ!`)
       } else {
-        toast.error(res.error || 'เกิดข้อผิดพลาดในการแจ้งซ่อม')
+        toast.error(res?.error || 'เกิดข้อผิดพลาดในการแจ้งซ่อม')
       }
     } catch (err: any) {
       console.error('Submit error:', err)
-      toast.error(err.message || 'ไม่สามารถส่งข้อมูลได้')
+      const msg = err.message || ''
+      if (msg.includes('Server Action') && msg.includes('was not found')) {
+        toast.error('ระบบมีการอัปเดตเวอร์ชันใหม่ กรุณารีเฟรชหน้าจอ (F5) แล้วกดส่งใหม่อีกครั้งครับ', { duration: 6000 })
+      } else {
+        toast.error(msg || 'ไม่สามารถส่งข้อมูลได้')
+      }
     } finally {
       setIsSubmitting(false)
     }
