@@ -33,7 +33,7 @@ function extractMachineCode(text: string): string | null {
  * คลังความรู้มาตรฐานระบบ CMMS CosmeFlow Maintenance (SOP & Manual Knowledge Base)
  * ใช้เป็นฐานข้อมูลให้น้อง MTEX ตอบคำถามและให้คำแนะนำผู้ใช้งานทุกคนในโรงงาน
  */
-export const COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE = `
+const COSMEFLOW_CMMS_SYSTEM_KNOWLEDGE = `
 [คู่มือและคลังความรู้มาตรฐานการใช้งานระบบแจ้งซ่อมบำรุง CosmeFlow CMMS โรงงาน Cosmediva]
 
 1. วงจรการแจ้งซ่อมบำรุง 6 ขั้นตอนหลัก (Lifecycle & Step-by-Step SOP):

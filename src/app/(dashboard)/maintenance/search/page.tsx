@@ -9,7 +9,6 @@ import Link from 'next/link'
 import { searchMaintenance } from '@/app/actions/maintenance'
 import { formatWorkOrderStatus } from '@/types/maintenance'
 import ImportLineChatModal from '@/components/maintenance/ImportLineChatModal'
-import { askMtexAI } from '@/app/actions/mtex-ai'
 import { RefreshCw } from 'lucide-react'
 
 export default function MaintenanceSearchPage() {
@@ -48,12 +47,19 @@ export default function MaintenanceSearchPage() {
       .catch(console.error)
       .finally(() => setIsLoading(false))
 
-    // 2. Run MTEX AI Assistant search on chat history & knowledge base
-    askMtexAI(targetQuery)
+    // 2. Run MTEX AI Assistant search on chat history & knowledge base via dedicated API route
+    fetch('/api/mtex-ai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: targetQuery })
+    })
+      .then(res => res.json())
       .then(res => {
         if (res && res.answer) {
           setAiAnswer(res.answer)
           setAiData(res)
+        } else {
+          setAiAnswer(res.error || 'ขออภัยครับ ยังไม่พบข้อมูลที่ตรงกับคำค้นหา')
         }
       })
       .catch(err => {
