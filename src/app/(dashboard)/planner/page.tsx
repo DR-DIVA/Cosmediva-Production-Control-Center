@@ -200,27 +200,95 @@ export default function PlannerPage() {
     fetchData()
   }, [])
 
+const fetchAllProductionLogs = async (client: any) => {
+  let allLogs: any[] = []
+  let from = 0
+  const step = 1000
+  let hasMore = true
+
+  while (hasMore) {
+    const to = from + step - 1
+    const { data, error } = await client
+      .from('production_logs')
+      .select('*')
+      .order('created_at', { ascending: true })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error fetching paginated production_logs:', error)
+      break
+    }
+
+    if (data && data.length > 0) {
+      allLogs = allLogs.concat(data)
+      if (data.length < step) {
+        hasMore = false
+      } else {
+        from += step
+      }
+    } else {
+      hasMore = false
+    }
+  }
+
+  return allLogs
+}
+
+const fetchAllProductionLots = async (client: any) => {
+  let allLots: any[] = []
+  let from = 0
+  const step = 1000
+  let hasMore = true
+
+  while (hasMore) {
+    const to = from + step - 1
+    const { data, error } = await client
+      .from('production_lots')
+      .select('*, products(sku)')
+      .order('created_at', { ascending: false })
+      .range(from, to)
+
+    if (error) {
+      console.error('Error fetching paginated production_lots:', error)
+      break
+    }
+
+    if (data && data.length > 0) {
+      allLots = allLots.concat(data)
+      if (data.length < step) {
+        hasMore = false
+      } else {
+        from += step
+      }
+    } else {
+      hasMore = false
+    }
+  }
+
+  return allLots
+}
+
   const fetchData = async () => {
     try {
-      const [lotsRes, productsRes, roomsRes, processesRes, logsRes, usersRes] = await Promise.all([
-        supabase.from("production_lots").select("*, products(sku)").order("created_at", { ascending: false }),
+      const [lotsData, productsRes, roomsRes, processesRes, logsData, usersRes] = await Promise.all([
+        fetchAllProductionLots(supabase),
         supabase.from("products").select("*").order("sku"),
         supabase.from("rooms").select("*").order("room_name"),
         supabase.from("processes").select("*").order("process_name"),
-        supabase.from("production_logs").select("*").order("created_at", { ascending: true }),
+        fetchAllProductionLogs(supabase),
         getUsers()
       ])
 
-      if (lotsRes.data) setLots(lotsRes.data)
+      if (lotsData) setLots(lotsData)
       if (productsRes.data) setProducts(productsRes.data)
       if (roomsRes.data) setRooms(roomsRes.data)
       if (processesRes.data) setProcesses(processesRes.data)
-      if (logsRes.data) setLogs(logsRes.data)
+      if (logsData) setLogs(logsData)
       if (usersRes.success && usersRes.data) setUsersList(usersRes.data)
 
-      if (logsRes.data) {
+      if (logsData) {
         let onTime = 0, delayed = 0, early = 0
-        logsRes.data.forEach(log => {
+        logsData.forEach(log => {
           if (!log.activity_date) return
           const planned = startOfDay(new Date(log.activity_date))
           const actual = startOfDay(log.end_time ? new Date(log.end_time) : new Date())
@@ -229,7 +297,7 @@ export default function PlannerPage() {
           else if (diff < 0) early++
           else onTime++
         })
-        setStats({ onTime, delayed, early, total: logsRes.data.length })
+        setStats({ onTime, delayed, early, total: logsData.length })
       }
     } catch (error) {
       console.error("Error fetching data:", error)
@@ -437,9 +505,13 @@ export default function PlannerPage() {
     }
 
     try {
-      const { error } = await supabase.from("production_logs").insert([newLogData])
+      const { data: insertedLog, error } = await supabase.from("production_logs").insert([newLogData]).select().single()
       if (error) throw error
       toast.success("เพิ่มคิวงานเรียบร้อย")
+      if (insertedLog) {
+        setLogs(prev => [...prev, insertedLog])
+      }
+      setExpandedLots(prev => ({ ...prev, [lotId]: true }))
       fetchData()
     } catch (e: any) {
       toast.error("เพิ่มคิวงานไม่สำเร็จ: " + e.message)
