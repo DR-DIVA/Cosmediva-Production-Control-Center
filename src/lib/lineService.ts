@@ -196,26 +196,29 @@ export function buildBreakdownFlexMessage(params: {
   const eformUrl = params.workOrderId ? `${baseUrl}/maintenance/work-orders/${params.workOrderId}/eform` : techUrl
 
   // 3-Case Category Classification: EMERGENCY (Red), GENERAL (Blue), SERVICE (Purple)
-  const isService = 
+  const isEmergency = 
+    params.repairType === 'EMERGENCY' ||
+    params.priority === 'P1_CRITICAL' ||
+    params.symptomDescription?.includes('แจ้งซ่อมด่วน') ||
+    params.productionImpact === 'Production stopped'
+
+  const isService = !isEmergency && (
     params.repairType === 'SERVICE' ||
     params.machineCode === 'FACILITY' ||
     params.productionImpact === 'Facility no impact' ||
     params.symptomDescription?.includes('แจ้งซ่อมบริการ') ||
-    params.symptomCategory.includes('บริการ') ||
-    params.symptomCategory.includes('หลอดไฟ') ||
-    params.symptomCategory.includes('แอร์') ||
-    params.symptomCategory.includes('ประปา')
-
-  const isEmergency = !isService && (
-    params.repairType === 'EMERGENCY' ||
-    params.symptomDescription?.includes('แจ้งซ่อมด่วน') ||
-    (!params.symptomDescription?.includes('แจ้งซ่อมทั่วไป') && (
-      params.priority === 'P1_CRITICAL' || 
-      params.productionImpact === 'Production stopped'
+    params.symptomCategory?.includes('บริการอาคาร') ||
+    params.symptomCategory?.includes('💡') ||
+    params.symptomCategory?.includes('🧹') ||
+    params.symptomCategory?.includes('🚪') ||
+    (params.machineCode === 'FACILITY' && (
+      params.symptomCategory?.includes('หลอดไฟ') ||
+      params.symptomCategory?.includes('แอร์') ||
+      params.symptomCategory?.includes('ประปา')
     ))
   )
 
-  const isGeneral = !isService && !isEmergency
+  const isGeneral = !isEmergency && !isService
 
   // 1. 🚨 แจ้งซ่อมด่วน -> สีแดง (#DC2626)
   // 2. 🛠️ แจ้งซ่อมทั่วไป -> สีน้ำเงิน (#2563EB)

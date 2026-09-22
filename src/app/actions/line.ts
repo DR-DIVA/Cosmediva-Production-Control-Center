@@ -149,19 +149,20 @@ export async function dispatchWorkOrderLineAlert(params: {
     }
 
     if (eventType === 'NEW_REPORT') {
-      const isService = 
+      const isEmergency = 
+        workOrder.repair_type === 'EMERGENCY' ||
+        workOrder.is_emergency_breakdown ||
+        workOrder.symptom_description?.includes('แจ้งซ่อมด่วน') ||
+        workOrder.priority === 'P1_CRITICAL' || 
+        workOrder.production_impact === 'Production stopped'
+
+      const isService = !isEmergency && (
+        workOrder.repair_type === 'SERVICE' ||
         workOrder.machine_code === 'FACILITY' ||
         workOrder.production_impact === 'Facility no impact' ||
         workOrder.symptom_description?.includes('แจ้งซ่อมบริการ') ||
-        workOrder.symptom_category.includes('บริการ')
-
-      const isEmergency = !isService && (
-        workOrder.is_emergency_breakdown ||
-        workOrder.symptom_description?.includes('แจ้งซ่อมด่วน') ||
-        (!workOrder.symptom_description?.includes('แจ้งซ่อมทั่วไป') && (
-          workOrder.priority === 'P1_CRITICAL' || 
-          workOrder.production_impact === 'Production stopped'
-        ))
+        workOrder.symptom_category?.includes('บริการ') ||
+        workOrder.symptom_category?.includes('💡')
       )
 
       const repairType = isEmergency ? 'EMERGENCY' : isService ? 'SERVICE' : 'GENERAL'
