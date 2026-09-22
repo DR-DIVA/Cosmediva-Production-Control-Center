@@ -233,6 +233,8 @@ export async function POST(req: NextRequest) {
         }
 
         const isYearOnly = /^(ปี\s*)?(201[9]|202[0-6]|256[2-9])$/.test(cleanQuery)
+        const isMachineAndYear = /^([a-zA-Z0-9\-_ก-๙\s]{2,25})\s+(201[9]|202[0-6]|256[2-9])$/i.test(cleanQuery)
+        const isMachineCodeOnly = /^(Homo(\s*mix\s*\d+|[-_]?\d*)?|Mixer[-_]?\d+|Tank[-_]?\d+|[A-Z]{2,6}[-_][A-Z0-9]{1,10})$/i.test(cleanQuery.trim())
         const contextKey = destinationId || 'default'
         const prevContext = conversationMemory.get(contextKey)
         const isContextActive = prevContext && (Date.now() - prevContext.timestamp < 15 * 60 * 1000)
@@ -249,8 +251,10 @@ export async function POST(req: NextRequest) {
           isDirectlyTagged || 
           hasMtexName || 
           isExplicitAsk || 
-          (isMaintenanceTopic && (isQuestion || rawText.includes('ยังไง') || rawText.includes('อย่างไร'))) || 
-          (isYearOnly && isContextActive)
+          isMachineAndYear || 
+          isMachineCodeOnly || 
+          (isYearOnly && isContextActive) || 
+          (isMaintenanceTopic && (isQuestion || rawText.includes('ยังไง') || rawText.includes('อย่างไร')))
 
         if (isMtexTriggered && token) {
           // If user just tagged the bot without asking anything
@@ -288,7 +292,7 @@ export async function POST(req: NextRequest) {
                   action: {
                     type: 'message',
                     label: `📅 ปี ${y}`,
-                    text: `${baseTopic} ${y}`
+                    text: isPrivate ? `${baseTopic} ${y}` : `@MTEX ${baseTopic} ${y}`
                   }
                 }))
               }
