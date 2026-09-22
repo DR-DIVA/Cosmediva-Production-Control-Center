@@ -126,160 +126,172 @@ export default function CompleteRepairModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-lg w-full p-6 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[90vh] overflow-y-auto">
-        <DialogHeader className="text-left space-y-1">
-          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-300">
-            <CheckCircle className="w-5 h-5" />
+      <DialogContent className="max-w-4xl w-full p-6 sm:p-8 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto">
+        <DialogHeader className="text-left space-y-1 pb-3 border-b border-stone-100">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-300 shrink-0">
+              <CheckCircle className="w-5 h-5" />
+            </div>
+            <div>
+              <DialogTitle className="text-xl font-bold text-stone-900">
+                {targetStatus === 'TEST_RUN' ? 'บันทึกการซ่อม & ขอทดสอบเครื่อง (TEST RUN)' : 'บันทึกสรุปผลงานซ่อม (COMPLETE JOB)'}
+              </DialogTitle>
+              <DialogDescription className="text-xs sm:text-sm text-stone-500 font-medium">
+                เครื่อง <span className="font-bold text-stone-800">{machineCode}</span> ({machineName}) • บันทึกรวดเร็วด้วยการเลือกชิป หรือพิมพ์ระบุ
+              </DialogDescription>
+            </div>
           </div>
-          <DialogTitle className="text-lg font-bold text-stone-900">
-            {targetStatus === 'TEST_RUN' ? 'บันทึกการซ่อม & ขอทดสอบเครื่อง (TEST RUN)' : 'บันทึกสรุปผลงานซ่อม (COMPLETE JOB)'}
-          </DialogTitle>
-          <DialogDescription className="text-xs text-stone-500">
-            เครื่อง {machineCode} ({machineName}) • บันทึกรวดเร็วด้วยการเลือกชิป ไม่ต้องเขียนรายงานยาว
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4 mt-2">
-          {/* 1. Problem Category Chips */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
-              หมวดหมู่ปัญหา (Problem Category):
-            </label>
-            <div className="flex flex-wrap gap-1.5">
-              {PROBLEM_CATEGORIES.map(c => (
-                <button
-                  type="button"
-                  key={c}
-                  onClick={() => setCategory(c)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-                    category === c
-                      ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
-                      : 'bg-stone-50 text-stone-700 border-stone-200 hover:bg-stone-100'
-                  }`}
-                >
-                  {c}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 2. Quick Root Cause Chips */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1.5">
-              สาเหตุหลัก (Quick Root Cause - เลือก 1 ข้อ):
-            </label>
-            <div className="flex flex-wrap gap-1.5 max-h-40 overflow-y-auto pr-1 no-scrollbar">
-              {ROOT_CAUSES.map(rc => (
-                <button
-                  type="button"
-                  key={rc}
-                  onClick={() => setRootCause(rc)}
-                  className={`px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all ${
-                    rootCause === rc
-                      ? 'bg-[#D4AF37] text-stone-900 font-bold border-[#D4AF37] shadow-sm'
-                      : 'bg-stone-50 text-stone-600 border-stone-200 hover:bg-stone-100'
-                  }`}
-                >
-                  {rc}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 3. Corrective Action (Required) */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1">
-              สิ่งที่ดำเนินการแก้ไข (Corrective Action) *
-            </label>
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {[
-                'เปลี่ยนลูกปืนใหม่และตั้งศูนย์',
-                'เปลี่ยนชุด Mechanical Seal',
-                'ปรับตั้งตำแหน่งเซนเซอร์และขันแน่น',
-                'ขันแน่นน็อต/จุดยึดที่คลายตัว',
-                'แก้ไขสายลมรั่ว/เปลี่ยนข้อต่อลม',
-                'ล้างทำความสะอาดหัวจ่าย/กำจัดสิ่งอุดตัน',
-                'ทำความสะอาดคราบและหล่อลื่น',
-                'เปลี่ยนสายพานขับ'
-              ].map(preset => (
-                <button
-                  type="button"
-                  key={preset}
-                  onClick={() => setCorrectiveAction(preset)}
-                  className="text-[10px] bg-amber-50 text-amber-900 hover:bg-amber-100 px-2 py-0.5 rounded-lg border border-amber-200 transition-colors"
-                >
-                  + {preset}
-                </button>
-              ))}
-            </div>
-            <Input
-              value={correctiveAction}
-              onChange={e => setCorrectiveAction(e.target.value)}
-              placeholder="เช่น เปลี่ยนตลับลูกปืน SKF 6205 และอัดจารบีทนความร้อน"
-              className="text-xs h-10 rounded-xl bg-stone-50 border-stone-300"
-              required
-            />
-          </div>
-
-          {/* 4. Preventive Recommendation */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1">
-              ข้อเสนอแนะเพื่อป้องกันการเกิดซ้ำ (Preventive Recommendation):
-            </label>
-            <div className="flex flex-wrap gap-1 mb-1.5">
-              {[
-                'ตรวจสอบการคลายตัวของน็อตใน PM ประจำเดือน',
-                'เพิ่มรอบอัดจารบี/ตรวจระดับการหล่อลื่น',
-                'ย้ำเตือนพนักงานทำความสะอาดหลังจบกะ',
-                'เตรียมสั่งอะไหล่สำรอง (Buffer Stock)'
-              ].map(rec => (
-                <button
-                  type="button"
-                  key={rec}
-                  onClick={() => setPreventiveRec(rec)}
-                  className="text-[10px] bg-blue-50 text-blue-900 hover:bg-blue-100 px-2 py-0.5 rounded-lg border border-blue-200 transition-colors"
-                >
-                  + {rec}
-                </button>
-              ))}
-            </div>
-            <Input
-              value={preventiveRec}
-              onChange={e => setPreventiveRec(e.target.value)}
-              placeholder="เช่น เพิ่มรอบตรวจสอบการคลายตัวของน็อตใน PM ประจำเดือน"
-              className="text-xs h-10 rounded-xl bg-stone-50 border-stone-200"
-            />
-          </div>
-
-          {/* 5. Photo After Repair */}
-          <div>
-            <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block mb-1">
-              ภาพถ่ายหลังการซ่อม (Photo After Repair):
-            </label>
-            <label className="h-11 rounded-2xl border-2 border-dashed border-stone-300 hover:border-[#D4AF37] hover:bg-amber-50/40 flex items-center justify-center gap-2 text-xs font-bold text-stone-600 cursor-pointer transition-colors">
-              <Camera className="w-4 h-4 text-[#D4AF37]" />
-              <span>{photoAfter ? 'เปลี่ยนรูปภาพหลังซ่อม' : 'ถ่ายรูป / แนบรูปหลังซ่อม'}</span>
-              <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
-            </label>
-
-            {photoAfter && (
-              <div className="relative rounded-xl overflow-hidden border border-stone-200 max-h-28 w-full bg-black flex items-center justify-center mt-2">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoAfter} alt="After Preview" className="max-h-28 object-contain" />
+        {/* 2-Column Responsive Layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-2">
+          {/* LEFT COLUMN: Categories & Root Causes */}
+          <div className="space-y-4">
+            {/* 1. Problem Category Chips */}
+            <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-2">
+              <label className="text-xs font-extrabold text-stone-700 uppercase tracking-wider block">
+                1. หมวดหมู่ปัญหา (Problem Category):
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-48 overflow-y-auto pr-1">
+                {PROBLEM_CATEGORIES.map(c => (
+                  <button
+                    type="button"
+                    key={c}
+                    onClick={() => setCategory(c)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                      category === c
+                        ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+                        : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    {c}
+                  </button>
+                ))}
               </div>
-            )}
+            </div>
+
+            {/* 2. Quick Root Cause Chips */}
+            <div className="bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80 space-y-2">
+              <label className="text-xs font-extrabold text-stone-700 uppercase tracking-wider block">
+                2. สาเหตุหลัก (Root Cause - เลือก 1 ข้อ):
+              </label>
+              <div className="flex flex-wrap gap-1.5 max-h-56 overflow-y-auto pr-1">
+                {ROOT_CAUSES.map(rc => (
+                  <button
+                    type="button"
+                    key={rc}
+                    onClick={() => setRootCause(rc)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all ${
+                      rootCause === rc
+                        ? 'bg-[#D4AF37] text-stone-950 font-bold border-[#D4AF37] shadow-sm'
+                        : 'bg-white text-stone-600 border-stone-200 hover:bg-stone-100'
+                    }`}
+                  >
+                    {rc}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* RIGHT COLUMN: Actions, Recommendations & Evidence */}
+          <div className="space-y-4">
+            {/* 3. Corrective Action (Required) */}
+            <div className="space-y-2 bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80">
+              <label className="text-xs font-extrabold text-stone-800 uppercase tracking-wider block">
+                3. สิ่งที่ดำเนินการแก้ไข (Corrective Action) <span className="text-red-500">*</span>
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  'เปลี่ยนลูกปืนใหม่และตั้งศูนย์',
+                  'เปลี่ยนชุด Mechanical Seal',
+                  'ปรับตั้งตำแหน่งเซนเซอร์และขันแน่น',
+                  'ขันแน่นน็อต/จุดยึดที่คลายตัว',
+                  'แก้ไขสายลมรั่ว/เปลี่ยนข้อต่อลม',
+                  'ล้างทำความสะอาดหัวจ่าย/กำจัดสิ่งอุดตัน',
+                  'ทำความสะอาดคราบและหล่อลื่น',
+                  'เปลี่ยนสายพานขับ'
+                ].map(preset => (
+                  <button
+                    type="button"
+                    key={preset}
+                    onClick={() => setCorrectiveAction(preset)}
+                    className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-950 px-2.5 py-1 rounded-lg border border-amber-200 transition-colors font-medium"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={correctiveAction}
+                onChange={e => setCorrectiveAction(e.target.value)}
+                placeholder="เช่น เปลี่ยนตลับลูกปืน SKF 6205 และอัดจารบีทนความร้อน"
+                className="text-xs sm:text-sm h-11 rounded-xl bg-white border-stone-300 focus:border-[#D4AF37]"
+                required
+              />
+            </div>
+
+            {/* 4. Preventive Recommendation */}
+            <div className="space-y-2 bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80">
+              <label className="text-xs font-extrabold text-stone-700 uppercase tracking-wider block">
+                4. ข้อเสนอแนะเพื่อป้องกันการเกิดซ้ำ (Preventive Recommendation):
+              </label>
+              <div className="flex flex-wrap gap-1">
+                {[
+                  'ตรวจสอบการคลายตัวของน็อตใน PM ประจำเดือน',
+                  'เพิ่มรอบอัดจารบี/ตรวจระดับการหล่อลื่น',
+                  'ย้ำเตือนพนักงานทำความสะอาดหลังจบกะ',
+                  'เตรียมสั่งอะไหล่สำรอง (Buffer Stock)'
+                ].map(rec => (
+                  <button
+                    type="button"
+                    key={rec}
+                    onClick={() => setPreventiveRec(rec)}
+                    className="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-950 px-2.5 py-1 rounded-lg border border-blue-200 transition-colors font-medium"
+                  >
+                    + {rec}
+                  </button>
+                ))}
+              </div>
+              <Input
+                value={preventiveRec}
+                onChange={e => setPreventiveRec(e.target.value)}
+                placeholder="เช่น เพิ่มรอบตรวจสอบการคลายตัวของน็อตใน PM ประจำเดือน"
+                className="text-xs sm:text-sm h-11 rounded-xl bg-white border-stone-200 focus:border-blue-400"
+              />
+            </div>
+
+            {/* 5. Photo After Repair */}
+            <div className="space-y-2 bg-stone-50/80 p-4 rounded-2xl border border-stone-200/80">
+              <label className="text-xs font-extrabold text-stone-700 uppercase tracking-wider block">
+                5. ภาพถ่ายหลังการซ่อม (Photo After Repair):
+              </label>
+              <label className="h-12 rounded-xl border-2 border-dashed border-stone-300 hover:border-[#D4AF37] hover:bg-amber-50/40 flex items-center justify-center gap-2 text-xs font-bold text-stone-700 cursor-pointer transition-colors bg-white">
+                <Camera className="w-4 h-4 text-[#D4AF37]" />
+                <span>{photoAfter ? 'เปลี่ยนรูปภาพหลังซ่อม' : 'ถ่ายรูป / แนบรูปหลังซ่อม (ถ้ามี)'}</span>
+                <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} className="hidden" />
+              </label>
+
+              {photoAfter && (
+                <div className="relative rounded-xl overflow-hidden border border-stone-200 max-h-36 w-full bg-black flex items-center justify-center mt-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photoAfter} alt="After Preview" className="max-h-36 object-contain" />
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="flex gap-2 pt-3 border-t border-stone-100 mt-2">
-          <Button variant="ghost" size="sm" onClick={onClose} className="flex-1 text-xs">
-            ยกเลิก
+        {/* Footer Buttons */}
+        <div className="flex gap-3 pt-4 border-t border-stone-200 mt-2">
+          <Button variant="outline" size="lg" onClick={onClose} className="w-1/3 text-xs sm:text-sm font-bold rounded-xl h-12 border-stone-300">
+            ยกเลิก / ปิด
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs h-11 rounded-xl shadow-lg shadow-emerald-900/20"
+            size="lg"
+            className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm h-12 rounded-xl shadow-lg shadow-emerald-900/20"
           >
             {isSubmitting ? 'กำลังบันทึก...' : targetStatus === 'TEST_RUN' ? 'ยืนยันเริ่ม TEST RUN' : 'ยืนยันปิดงานซ่อม (COMPLETE)'}
           </Button>
