@@ -17,6 +17,21 @@ export async function POST(req: NextRequest) {
     const events = body.events || []
 
     const supabase = createAdminClient()
+
+    // Real-time debug audit log: Records incoming webhook payloads into Supabase
+    if (events.length > 0) {
+      try {
+        await supabase.from('maintenance_chat_history').insert({
+          sender_name: 'LINE_WEBHOOK_EVENT',
+          message_text: `Events: ${events.map((e: any) => `${e.type}:${e.message?.type || ''}:${e.message?.text || ''}`).join(', ')}`,
+          is_troubleshooting: false,
+          raw_log: { events, timestamp: new Date().toISOString() }
+        })
+      } catch (logErr) {
+        console.error('[LINE Webhook] Event audit error:', logErr)
+      }
+    }
+
     const config = await getLineChannelConfig('maintenance')
     const token = config?.channel_access_token
 
