@@ -126,17 +126,17 @@ export default function CompleteRepairModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-4xl w-full p-6 sm:p-8 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[92vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl w-full p-4 sm:p-6 md:p-8 rounded-2xl sm:rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[94vh] sm:max-h-[92vh] overflow-y-auto">
         <DialogHeader className="text-left space-y-1 pb-3 border-b border-stone-100">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-300 shrink-0">
-              <CheckCircle className="w-5 h-5" />
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-700 border border-emerald-300 shrink-0">
+              <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-bold text-stone-900">
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="text-base sm:text-xl font-bold text-stone-900 leading-snug">
                 {targetStatus === 'TEST_RUN' ? 'บันทึกการซ่อม & ขอทดสอบเครื่อง (TEST RUN)' : 'บันทึกสรุปผลงานซ่อม (COMPLETE JOB)'}
               </DialogTitle>
-              <DialogDescription className="text-xs sm:text-sm text-stone-500 font-medium">
+              <DialogDescription className="text-xs sm:text-sm text-stone-500 font-medium truncate">
                 เครื่อง <span className="font-bold text-stone-800">{machineCode}</span> ({machineName}) • บันทึกรวดเร็วด้วยการเลือกชิป หรือพิมพ์ระบุ
               </DialogDescription>
             </div>
@@ -283,15 +283,15 @@ export default function CompleteRepairModal({
         </div>
 
         {/* Footer Buttons */}
-        <div className="flex gap-3 pt-4 border-t border-stone-200 mt-2">
-          <Button variant="outline" size="lg" onClick={onClose} className="w-1/3 text-xs sm:text-sm font-bold rounded-xl h-12 border-stone-300">
+        <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:gap-3 pt-3 sm:pt-4 border-t border-stone-200 mt-2">
+          <Button variant="outline" size="lg" onClick={onClose} className="w-full sm:w-1/3 text-xs sm:text-sm font-bold rounded-xl h-11 sm:h-12 border-stone-300">
             ยกเลิก / ปิด
           </Button>
           <Button
             onClick={handleSubmit}
             disabled={isSubmitting}
             size="lg"
-            className="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm h-12 rounded-xl shadow-lg shadow-emerald-900/20"
+            className="w-full sm:w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs sm:text-sm h-11 sm:h-12 rounded-xl shadow-lg shadow-emerald-900/20"
           >
             {isSubmitting ? 'กำลังบันทึก...' : targetStatus === 'TEST_RUN' ? 'ยืนยันเริ่ม TEST RUN' : 'ยืนยันปิดงานซ่อม (COMPLETE)'}
           </Button>
