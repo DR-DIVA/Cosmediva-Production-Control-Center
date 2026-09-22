@@ -59,6 +59,7 @@ const SYMPTOMS: { label: SymptomCategory; icon: any; color: string }[] = [
 ]
 
 const FACILITY_SYMPTOMS: { label: string; icon: any; color: string }[] = [
+  { label: '🌧️ หลังคารั่ว / ฝนตกน้ำรั่ว / ผนังซึม', icon: Droplets, color: 'hover:border-blue-600 hover:bg-blue-50' },
   { label: '💡 เปลี่ยนหลอดไฟ / แสงสว่าง', icon: Zap, color: 'hover:border-amber-500 hover:bg-amber-50' },
   { label: '❄️ แอร์ไม่เย็น / น้ำแอร์หยด', icon: Thermometer, color: 'hover:border-cyan-500 hover:bg-cyan-50' },
   { label: '🚰 ประปา / ก๊อกน้ำรั่ว / ท่อตัน', icon: Droplets, color: 'hover:border-blue-500 hover:bg-blue-50' },
@@ -146,7 +147,13 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   // Context-aware visible impacts: Service repair vs Machine repair
   const visibleImpacts = useMemo(() => {
     if (repairType === 'SERVICE') {
-      return IMPACTS.filter(i => i.label === 'Facility no impact' || i.label === 'Safety risk' || i.label === 'Production can continue')
+      return [
+        { label: 'Production stopped' as ProductionImpact, text: '🛑 กระทบสายการผลิต (ต้องหยุดงาน / ไลน์ชะงัก) - ด่วนฉุกเฉิน P1', badgeColor: 'bg-red-600 text-white' },
+        { label: 'Quality risk' as ProductionImpact, text: '⚠️ เสี่ยงกระทบคุณภาพสินค้า / สุขอนามัย (เช่น น้ำหยด/ฝุ่นละออง)', badgeColor: 'bg-amber-500 text-white' },
+        { label: 'Safety risk' as ProductionImpact, text: '🚨 อันตรายต่อความปลอดภัย (พื้นเปียกลื่น / เสี่ยงไฟดูด)', badgeColor: 'bg-rose-600 text-white' },
+        { label: 'Facility no impact' as ProductionImpact, text: '🟢 ไม่กระทบการผลิต (งานอาคาร/บริการทั่วไป)', badgeColor: 'bg-emerald-600 text-white' },
+        { label: 'Production can continue' as ProductionImpact, text: '🔄 เครื่องจักรยังเดินต่อได้ชั่วคราว (รอช่างตามรอบ)', badgeColor: 'bg-stone-600 text-white' }
+      ]
     }
     return IMPACTS.filter(i => i.label !== 'Facility no impact')
   }, [repairType])
@@ -501,7 +508,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
               setRepairType('SERVICE')
               setIsEmergency(false)
               setImpact('Facility no impact')
-              setSymptom('💡 เปลี่ยนหลอดไฟ / แสงสว่าง' as any)
+              setSymptom('🌧️ หลังคารั่ว / ฝนตกน้ำรั่ว / ผนังซึม' as any)
               setCustomSymptom('')
             }}
             className={`p-4 rounded-2xl border-2 text-left transition-all relative cursor-pointer ${
@@ -521,7 +528,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
               )}
             </div>
             <div className={`text-[11px] mt-1.5 font-medium leading-tight ${repairType === 'SERVICE' ? 'text-purple-100' : 'text-purple-900/80'}`}>
-              งานบริการอาคาร (เปลี่ยนหลอดไฟ, แอร์, ประปา)
+              งานบริการอาคาร (หลอดไฟ, แอร์, ประปา, ฝนตกน้ำรั่ว)
             </div>
           </button>
         </div>
@@ -726,13 +733,52 @@ export default function FastReportForm({ initialMachine, machines, initialType }
           </div>
         </div>
       ) : (
-        <div className="p-4 rounded-3xl bg-purple-50 border border-purple-200 flex items-center gap-3 text-purple-900 shadow-xs">
-          <div className="w-10 h-10 rounded-2xl bg-purple-100 flex items-center justify-center text-purple-700 shrink-0">
-            <Zap className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="font-bold text-xs sm:text-sm text-purple-800">โหมด: แจ้งซ่อมบริการ & อาคารสถานที่ (Facility Service)</div>
-            <div className="text-[11px] text-purple-600 mt-0.5">สำหรับงานบริการ เช่น เปลี่ยนหลอดไฟ แอร์ ประปา สุขาภิบาล ช่างบริการจะเข้าดูแลโดยเร็ว</div>
+        <div className={`p-4 rounded-3xl border transition-all ${
+          isEmergency
+            ? 'bg-red-50 border-red-300 text-red-950 shadow-md ring-2 ring-red-400/40'
+            : 'bg-purple-50 border-purple-200 text-purple-900 shadow-xs'
+        }`}>
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                isEmergency ? 'bg-red-100 text-red-600' : 'bg-purple-100 text-purple-700'
+              }`}>
+                {isEmergency ? <Flame className="w-5 h-5 animate-bounce" /> : <Zap className="w-5 h-5" />}
+              </div>
+              <div>
+                <div className={`font-bold text-xs sm:text-sm flex items-center gap-1.5 ${isEmergency ? 'text-red-800' : 'text-purple-800'}`}>
+                  {isEmergency ? '🚨 โหมด: บริการอาคารฉุกเฉิน (กระทบสายการผลิต P1)' : 'โหมด: แจ้งซ่อมบริการ & อาคารสถานที่ (Facility Service)'}
+                  {isEmergency && <span className="text-[10px] bg-red-600 text-white font-extrabold px-2 py-0.5 rounded-full">ด่วนที่สุด</span>}
+                </div>
+                <div className={`text-[11px] mt-0.5 ${isEmergency ? 'text-red-700 font-medium' : 'text-purple-600'}`}>
+                  {isEmergency
+                    ? 'ส่งแจ้งเตือนสีแดงฉุกเฉินเข้ากลุ่มช่างทันที • ช่างต้องเข้าพื้นที่ด่วนเพื่อไม่ให้กระทบการผลิต'
+                    : 'สำหรับงานบริการ เช่น ฝนตกน้ำรั่ว หลอดไฟ แอร์ ประปา หากกระทบการผลิตกดเปิดสวิตช์ด่วน'}
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isEmergency
+                setIsEmergency(next)
+                if (next) {
+                  setImpact('Production stopped')
+                  toast.error('🚨 เปิดโหมดงานบริการด่วนฉุกเฉิน (กระทบสายการผลิต - P1 Critical)')
+                } else {
+                  setImpact('Facility no impact')
+                  toast.info('เปลี่ยนกลับเป็นงานบริการอาคารทั่วไป')
+                }
+              }}
+              className={`shrink-0 px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 cursor-pointer ${
+                isEmergency
+                  ? 'bg-red-600 hover:bg-red-700 text-white shadow-sm'
+                  : 'bg-white hover:bg-purple-100 border border-purple-300 text-purple-700'
+              }`}
+            >
+              {isEmergency ? '✓ กระทบการผลิต (ด่วน P1)' : '⚡ กระทบการผลิต?'}
+            </button>
           </div>
         </div>
       )}
@@ -816,7 +862,12 @@ export default function FastReportForm({ initialMachine, machines, initialType }
                 key={item.label}
                 onClick={() => {
                   setImpact(item.label)
-                  if (item.label === 'Production stopped') setIsEmergency(true)
+                  if (item.label === 'Production stopped') {
+                    setIsEmergency(true)
+                    toast.error('🚨 กำหนดเป็นงานด่วนฉุกเฉิน (กระทบสายการผลิต - P1 Critical)')
+                  } else if (item.label === 'Facility no impact') {
+                    if (repairType === 'SERVICE') setIsEmergency(false)
+                  }
                 }}
                 className={`w-full p-3 rounded-2xl border text-left text-xs font-bold transition-all flex items-center justify-between ${
                   isSelected
@@ -949,7 +1000,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
         type="submit"
         disabled={isSubmitting}
         className={`w-full h-14 rounded-2xl text-base font-extrabold text-white shadow-xl flex items-center justify-center gap-2 transition-all transform active:scale-98 cursor-pointer ${
-          repairType === 'EMERGENCY'
+          repairType === 'EMERGENCY' || isEmergency
             ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 shadow-red-900/30'
             : repairType === 'GENERAL'
             ? 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-blue-900/30'
@@ -963,7 +1014,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
             <Send className="w-5 h-5" />
             <span>
               {repairType === 'SERVICE'
-                ? 'ยืนยันแจ้งซ่อมบริการ (SUBMIT SERVICE)'
+                ? (isEmergency ? '🚨 ยืนยันแจ้งซ่อมบริการด่วนฉุกเฉิน (BREAKDOWN NOW)' : 'ยืนยันแจ้งซ่อมบริการ (SUBMIT SERVICE)')
                 : repairType === 'GENERAL'
                 ? 'ยืนยันแจ้งซ่อมทั่วไป (SUBMIT TICKET)'
                 : 'ยืนยันแจ้งซ่อมด่วนทันที (BREAKDOWN NOW)'}

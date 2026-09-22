@@ -219,6 +219,7 @@ export function buildBreakdownFlexMessage(params: {
   )
 
   const isGeneral = !isEmergency && !isService
+  const isFacility = params.machineCode === 'FACILITY' || params.repairType === 'SERVICE' || isService
 
   // 1. 🚨 แจ้งซ่อมด่วน -> สีแดง (#DC2626)
   // 2. 🛠️ แจ้งซ่อมทั่วไป -> สีน้ำเงิน (#2563EB)
@@ -229,14 +230,16 @@ export function buildBreakdownFlexMessage(params: {
     '#2563EB'
 
   const headerTitle = 
-    isEmergency ? '🚨 แจ้งซ่อมด่วน (ฉุกเฉิน)' :
-    isService ? '💡 แจ้งซ่อมบริการ & อาคาร' :
-    '🛠️ แจ้งซ่อมทั่วไป'
+    isEmergency 
+      ? (isFacility ? '🚨 แจ้งซ่อมด่วน (อาคารกระทบการผลิต)' : '🚨 แจ้งซ่อมด่วน (ฉุกเฉิน)') 
+      : isService ? '💡 แจ้งซ่อมบริการ & อาคาร' :
+      '🛠️ แจ้งซ่อมทั่วไป'
 
   const urgencyLabel = 
-    isEmergency ? '🛑 กระทบการผลิต (เครื่องหยุด / สายชะงัก)' :
-    isService ? '🏢 งานบริการอาคาร & สิ่งอำนวยความสะดวก' :
-    '🟢 ไม่กระทบการผลิต (เครื่องยังเดินต่อได้)'
+    isEmergency 
+      ? (isFacility ? '🛑 กระทบสายการผลิต (ช่างต้องเข้าพื้นที่ทันที)' : '🛑 กระทบการผลิต (เครื่องหยุด / สายชะงัก)')
+      : isService ? '🏢 งานบริการอาคาร & สิ่งอำนวยความสะดวก' :
+      '🟢 ไม่กระทบการผลิต (เครื่องยังเดินต่อได้)'
 
   const urgencyColor = 
     isEmergency ? '#FEE2E2' : 
@@ -307,10 +310,10 @@ export function buildBreakdownFlexMessage(params: {
         {
           type: 'box',
           layout: 'vertical',
-          backgroundColor: isService ? '#FAF5FF' : '#F8FAFC',
+          backgroundColor: isFacility ? (isEmergency ? '#FEF2F2' : '#FAF5FF') : '#F8FAFC',
           cornerRadius: 'md',
           paddingAll: '12px',
-          borderColor: isService ? '#E9D5FF' : '#E2E8F0',
+          borderColor: isFacility ? (isEmergency ? '#FECACA' : '#E9D5FF') : '#E2E8F0',
           borderWidth: '1px',
           contents: [
             {
@@ -320,18 +323,20 @@ export function buildBreakdownFlexMessage(params: {
               contents: [
                 {
                   type: 'text',
-                  text: isService ? '🏢 งานบริการอาคาร & สถานที่' : params.machineCode,
+                  text: isFacility 
+                    ? (isEmergency ? '🚨 งานอาคาร/สถานที่ (ด่วนฉุกเฉิน)' : '🏢 งานบริการอาคาร & สถานที่') 
+                    : params.machineCode,
                   weight: 'bold',
                   size: 'md',
-                  color: isService ? '#6B21A8' : '#0F172A',
+                  color: isFacility ? (isEmergency ? '#991B1B' : '#6B21A8') : '#0F172A',
                   wrap: true,
                   flex: 4
                 },
                 {
                   type: 'text',
-                  text: isService ? 'บริการทั่วไป' : `Grade ${params.criticality || 'B'}`,
+                  text: isFacility ? (isEmergency ? 'P1 ฉุกเฉิน' : 'บริการทั่วไป') : `Grade ${params.criticality || 'B'}`,
                   size: 'xs',
-                  color: isService ? '#7C3AED' : (params.criticality === 'A' ? '#DC2626' : '#2563EB'),
+                  color: isFacility ? (isEmergency ? '#DC2626' : '#7C3AED') : (params.criticality === 'A' ? '#DC2626' : '#2563EB'),
                   weight: 'bold',
                   align: 'end',
                   flex: 1
