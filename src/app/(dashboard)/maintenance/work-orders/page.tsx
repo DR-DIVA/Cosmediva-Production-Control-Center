@@ -29,8 +29,10 @@ import {
   ChevronDown,
   ChevronUp,
   ShieldCheck,
-  FileText
+  FileText,
+  FileSpreadsheet
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
@@ -457,6 +459,58 @@ export default function WorkOrdersKanbanPage() {
     }
   }
 
+  const handleExportExcel = () => {
+    if (!workOrders || workOrders.length === 0) {
+      toast.error('ไม่พบข้อมูลงานซ่อมสำหรับ Export')
+      return
+    }
+
+    try {
+      const rows = workOrders.map(wo => {
+        const partsSummary = (wo.parts && wo.parts.length > 0)
+          ? wo.parts.map(p => `${p.part_name || ''} (${p.quantity} ${p.unit || ''})`).join(', ')
+          : '-'
+
+        return {
+          'เลขที่ใบสั่งซ่อม (WO)': wo.wo_number,
+          'วันที่แจ้ง': wo.reported_at ? new Date(wo.reported_at).toLocaleString('th-TH') : '-',
+          'รหัสเครื่องจักร': wo.machine_code,
+          'ชื่อเครื่องจักร': wo.machine_name || '-',
+          'ระดับความเร่งด่วน': wo.priority,
+          'สถานะปัจจุบัน': formatWorkOrderStatus(wo.status),
+          'อาการที่แจ้ง': wo.symptom_category,
+          'รายละเอียดอาการ': wo.symptom_description || '-',
+          'ผลกระทบการผลิต': wo.production_impact || '-',
+          'ผู้แจ้งซ่อม': wo.requester_name || '-',
+          'แผนกผู้แจ้ง': wo.requester_department_name || '-',
+          'ช่างผู้รับผิดชอบ': wo.assigned_technician_name || 'ยังไม่กำหนด',
+          'เวลารับเรื่อง': wo.acknowledged_at ? new Date(wo.acknowledged_at).toLocaleString('th-TH') : '-',
+          'เวลาเริ่มซ่อม': wo.repair_started_at ? new Date(wo.repair_started_at).toLocaleString('th-TH') : '-',
+          'เวลาซ่อมเสร็จ': wo.repair_completed_at ? new Date(wo.repair_completed_at).toLocaleString('th-TH') : '-',
+          'Downtime รวม (นาที)': wo.total_downtime_minutes || 0,
+          'หมวดหมู่ปัญหา': wo.problem_category || '-',
+          'สาเหตุที่แท้จริง (Root Cause)': wo.root_cause || '-',
+          'วิธีการแก้ไข (Corrective Action)': wo.corrective_action || '-',
+          'ข้อเสนอแนะป้องกัน (Preventive)': wo.preventive_recommendation || '-',
+          'อะไหล่ที่ตัดใช้': partsSummary,
+          'มูลค่าอะไหล่รวม (บาท)': Number(wo.total_part_cost || 0),
+          'การตรวจรับงานฝ่ายผลิต': wo.verification_status || '-'
+        }
+      })
+
+      const worksheet = XLSX.utils.json_to_sheet(rows)
+      const workbook = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'Maintenance_Work_Orders')
+
+      const dateStr = new Date().toISOString().slice(0, 10)
+      XLSX.writeFile(workbook, `CosmeFlow_Maintenance_Report_${dateStr}.xlsx`)
+      toast.success('ดาวน์โหลดรายงาน Excel สำเร็จเรียบร้อย!')
+    } catch (err: any) {
+      console.error('Export Excel error:', err)
+      toast.error('ไม่สามารถส่งออก Excel ได้')
+    }
+  }
+
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
@@ -532,8 +586,20 @@ export default function WorkOrdersKanbanPage() {
             variant="outline"
             size="sm"
             className="h-10 px-3 text-xs border-stone-200 rounded-xl"
+            title="รีเฟรชข้อมูลบอร์ด"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
+          </Button>
+
+          <Button
+            onClick={handleExportExcel}
+            variant="outline"
+            size="sm"
+            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 shadow-2xs transition-colors flex items-center gap-1.5 cursor-pointer"
+            title="ดาวน์โหลดรายงานสรุปงานซ่อมทั้งหมดเป็น Excel (.xlsx)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-700" />
+            <span>Export Excel</span>
           </Button>
 
           <Link
