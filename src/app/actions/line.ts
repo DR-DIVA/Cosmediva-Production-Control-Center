@@ -205,9 +205,21 @@ export async function dispatchWorkOrderLineAlert(params: {
         changedAt: workOrder.updated_at || new Date().toISOString()
       })
 
+      const statusLabels: Record<string, string> = {
+        ACKNOWLEDGED: '🔔 ช่างรับเรื่องแล้ว',
+        ASSIGNED: '👷 มอบหมายช่างแล้ว',
+        IN_PROGRESS: '⚡ กำลังดำเนินการซ่อม',
+        PENDING_PARTS: '📦 พักรออะไหล่',
+        WAITING_PART: '📦 พักรออะไหล่',
+        TEST_RUN: '▶️ ขอทดสอบเดินเครื่อง',
+        COMPLETED: '✨ ช่างซ่อมเสร็จสิ้นแล้ว (รอตรวจรับ)',
+        VERIFIED: '✅ ผู้แจ้งตรวจรับแล้ว'
+      }
+      const altLabel = statusLabels[workOrder.status] || `อัปเดตงานซ่อม (${workOrder.status})`
+
       await pushLineFlexMessage({
         channelKey: 'maintenance',
-        altText: `🔧 อัปเดตงานซ่อม ${workOrder.wo_number}: ${workOrder.status}`,
+        altText: `${altLabel} [${workOrder.wo_number}] ${resolvedMachine.machine_code}`,
         flexContents: flex
       })
     } else if (eventType === 'CLOSED') {
