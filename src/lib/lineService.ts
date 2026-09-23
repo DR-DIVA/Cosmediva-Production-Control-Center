@@ -157,6 +157,12 @@ export async function pushLineFlexMessage(params: {
     if (!res.ok) {
       const errBody = await res.text()
       console.error('[lineService] LINE API error response:', res.status, errBody)
+      if (res.status === 429 || errBody.includes('monthly limit')) {
+        return {
+          success: false,
+          error: 'โควตาส่งข้อความของ LINE Bot ครบกำหนดรายเดือนแล้ว (300/300 ข้อความ Free Tier) กรุณาอัปเกรดแพ็กเกจใน LINE OA Manager หรือซื้อข้อความเพิ่ม'
+        }
+      }
       return { 
         success: false, 
         error: `LINE Messaging API Error (${res.status}): ${errBody}` 

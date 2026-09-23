@@ -854,17 +854,21 @@ export async function createRepairRequest(payload: {
         link_url: `/maintenance/technician`
       })
 
-    // 9. Dispatch LINE notification in background
-    dispatchWorkOrderLineAlert({
-      eventType: 'NEW_REPORT',
-      workOrder: newWO,
-      machine: machine || {
-        machine_code: machineCode,
-        machine_name: machineName,
-        criticality: 'C',
-        department_name: departmentName
-      }
-    }).catch(err => console.error('[LINE] Dispatch error in createRepairRequest:', err))
+    // 9. Dispatch LINE notification
+    try {
+      await dispatchWorkOrderLineAlert({
+        eventType: 'NEW_REPORT',
+        workOrder: newWO,
+        machine: machine || {
+          machine_code: machineCode,
+          machine_name: machineName,
+          criticality: 'C',
+          department_name: departmentName
+        }
+      })
+    } catch (err) {
+      console.error('[LINE] Dispatch error in createRepairRequest:', err)
+    }
 
     try { revalidatePath('/maintenance') } catch {}
     try { revalidatePath('/maintenance/work-orders') } catch {}
@@ -1183,15 +1187,19 @@ export async function transitionWorkOrderStatus(payload: {
       notes: payload.notes || `เปลี่ยนสถานะเป็น ${updateFields.status}`
     })
 
-  // Dispatch LINE notification in background
+  // Dispatch LINE notification
   if (['ASSIGNED', 'IN_PROGRESS', 'PENDING_PARTS', 'ACKNOWLEDGED', 'COMPLETED', 'CLOSED', 'VERIFIED'].includes(payload.to_status)) {
-    dispatchWorkOrderLineAlert({
-      eventType: payload.to_status === 'CLOSED' ? 'CLOSED' : 'STATUS_CHANGED',
-      workOrder: updatedWO,
-      machine: wo.machine,
-      changedByName: payload.changed_by_name,
-      notes: payload.notes || payload.corrective_action
-    }).catch(err => console.error('[LINE] Dispatch status transition error:', err))
+    try {
+      await dispatchWorkOrderLineAlert({
+        eventType: payload.to_status === 'CLOSED' ? 'CLOSED' : 'STATUS_CHANGED',
+        workOrder: updatedWO,
+        machine: wo.machine,
+        changedByName: payload.changed_by_name,
+        notes: payload.notes || payload.corrective_action
+      })
+    } catch (err) {
+      console.error('[LINE] Dispatch status transition error:', err)
+    }
   }
 
   revalidatePath('/maintenance')

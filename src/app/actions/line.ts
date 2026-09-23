@@ -9,7 +9,8 @@ import {
   buildBreakdownFlexMessage,
   buildWorkOrderStatusFlexMessage,
   buildWorkOrderClosedFlexMessage,
-  getAppBaseUrl
+  getAppBaseUrl,
+  getLineChannelConfig
 } from '@/lib/lineService'
 
 /**
@@ -136,10 +137,10 @@ export async function dispatchWorkOrderLineAlert(params: {
   machine?: any
   changedByName?: string
   notes?: string
-}) {
+}): Promise<{ success: boolean; error?: string }> {
   try {
     const { eventType, workOrder, machine, changedByName, notes } = params
-    if (!workOrder) return
+    if (!workOrder) return { success: false, error: 'ข้อมูลใบแจ้งซ่อมไม่ถูกต้อง' }
 
     const resolvedMachine = machine || {
       machine_code: workOrder.machine_code,
@@ -186,7 +187,7 @@ export async function dispatchWorkOrderLineAlert(params: {
         repairType
       })
 
-      await pushLineFlexMessage({
+      return await pushLineFlexMessage({
         channelKey: 'maintenance',
         altText: isService 
           ? `💡 [ซ่อมบริการ] ${workOrder.symptom_category}` 
@@ -217,7 +218,7 @@ export async function dispatchWorkOrderLineAlert(params: {
       }
       const altLabel = statusLabels[workOrder.status] || `อัปเดตงานซ่อม (${workOrder.status})`
 
-      await pushLineFlexMessage({
+      return await pushLineFlexMessage({
         channelKey: 'maintenance',
         altText: `${altLabel} [${workOrder.wo_number}] ${resolvedMachine.machine_code}`,
         flexContents: flex
@@ -234,13 +235,85 @@ export async function dispatchWorkOrderLineAlert(params: {
         appBaseUrl: getAppBaseUrl()
       })
 
-      await pushLineFlexMessage({
+      return await pushLineFlexMessage({
         channelKey: 'maintenance',
         altText: `✅ เครื่อง ${resolvedMachine.machine_code} ซ่อมเสร็จสิ้น พร้อมเดินเครื่อง`,
         flexContents: flex
       })
     }
-  } catch (err) {
+
+    return { success: true }
+  } catch (err: any) {
     console.error('[lineActions] Background LINE alert dispatch error:', err)
+    return { success: false, error: err.message || 'Error dispatching LINE alert' }
+  }
+}
+
+/**
+ * Check LINE Bot monthly message quota and consumption
+ */
+export async function getLineQuotaStatus(channelKey: string = 'maintenance') {
+  try {
+    const config = await getLineChannelConfig(channelKey)
+    const token = config?.channel_access_token
+    if (!token) return { success: false, error: 'ไม่พบ LINE Channel Access Token' }
+
+    const [rLimit, rUsage] = await Promise.all([
+      fetch('https://api.line.me/v2/bot/message/quota', {
+        headers: { Authorization: `Bearer ${token.trim()}` }
+      }).then(r => r.json()),
+      fetch('https://api.line.me/v2/bot/message/quota/consumption', {
+        headers: { Authorization: `Bearer ${token.trim()}` }
+      }).then(r => r.json())
+    ])
+
+    const totalLimit = rLimit.value || 300
+    const currentUsage = rUsage.totalUsage || 0
+    const isExceeded = currentUsage >= totalLimit
+
+    return {
+      success: true,
+      limit: totalLimit,
+      usage: currentUsage,
+      remaining: Math.max(0, totalLimit - currentUsage),
+      isExceeded
+    }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}
+
+/**
+ * Resend LINE notification for an existing Work Order
+ */
+export async function resendWorkOrderLineAlert(workOrderId: string) {
+  try {
+    const supabase = createAdminClient()
+    const { data: wo, error } = await supabase
+      .from('maintenance_work_orders')
+      .select('*, machine:maintenance_machines(*)')
+      .eq('id', workOrderId)
+      .single()
+
+    if (error || !wo) {
+      return { success: false, error: 'ไม่พบใบแจ้งซ่อม' }
+    }
+
+    const eventType = wo.status === 'NEW' 
+      ? 'NEW_REPORT' 
+      : wo.status === 'CLOSED' 
+      ? 'CLOSED' 
+      : 'STATUS_CHANGED'
+
+    const res = await dispatchWorkOrderLineAlert({
+      eventType,
+      workOrder: wo,
+      machine: wo.machine,
+      changedByName: wo.assigned_technician_name || wo.requester_name
+    })
+
+    return res
+  } catch (err: any) {
+    return { success: false, error: err.message || 'ส่งข้อความไม่สำเร็จ' }
   }
 }

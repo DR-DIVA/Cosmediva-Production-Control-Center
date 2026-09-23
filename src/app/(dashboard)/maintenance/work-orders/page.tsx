@@ -33,7 +33,9 @@ import {
   FileSpreadsheet,
   PenLine,
   UserCheck,
-  X
+  X,
+  Send,
+  Share2
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
@@ -42,6 +44,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { getWorkOrders, transitionWorkOrderStatus, updateWorkOrderRequester } from '@/app/actions/maintenance'
+import { resendWorkOrderLineAlert } from '@/app/actions/line'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
@@ -342,6 +345,32 @@ export default function WorkOrdersKanbanPage() {
   const [waitingPartModalWO, setWaitingPartModalWO] = useState<MaintenanceWorkOrder | null>(null)
   const [prNumber, setPrNumber] = useState('')
   const [prReason, setPrReason] = useState('')
+
+  // LINE alert states & handlers
+  const [isResendingLine, setIsResendingLine] = useState(false)
+
+  const handleResendLineAlert = async (woId: string) => {
+    setIsResendingLine(true)
+    try {
+      const res = await resendWorkOrderLineAlert(woId)
+      if (res?.success) {
+        toast.success('ส่งแจ้งเตือนเข้า LINE กลุ่มเรียบร้อยแล้ว!')
+      } else {
+        toast.error(res?.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ LINE')
+    } finally {
+      setIsResendingLine(false)
+    }
+  }
+
+  const getLineShareText = (wo: MaintenanceWorkOrder) => {
+    const isEmergency = wo.priority === 'P1_CRITICAL' || wo.is_emergency_breakdown
+    const prefix = isEmergency ? '🚨 [แจ้งหยุดเครื่องฉุกเฉิน BREAKDOWN]' : '🛠️ [ใบแจ้งซ่อมเครื่องจักร CosmeFlow]'
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    return `${prefix}\n📋 เลขที่ใบแจ้ง: ${wo.wo_number}\n🏭 เครื่องจักร: ${wo.machine_code} - ${wo.machine_name}\n🏢 สังกัด/แผนก: ${wo.requester_department_name || '-'}\n⚠️ อาการเสีย: ${wo.symptom_category || '-'}\n📝 รายละเอียด: ${wo.symptom_description || '-'}\n👤 ผู้แจ้ง: ${wo.requester_name || '-'}\nสถานะ: ${formatWorkOrderStatus(wo.status)}\n🔗 ดูหน้างาน: ${origin ? `${origin}/maintenance/work-orders` : ''}`
+  }
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1415,6 +1444,42 @@ export default function WorkOrdersKanbanPage() {
                 )}
               </div>
             )}
+
+            {/* LINE Notification & Share Actions */}
+            <div className="bg-stone-50 p-3 rounded-2xl border border-stone-200 space-y-2">
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="font-bold text-stone-700 flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
+                  การแจ้งเตือน LINE กลุ่ม (LINE Maintenance Alert)
+                </span>
+                <span className="text-[10px] text-stone-500 font-mono">Channel: CMD Maintenance</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleResendLineAlert(detailWO.id)}
+                  disabled={isResendingLine}
+                  className="flex-1 min-w-[140px] text-xs h-9 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                  title="สั่งให้ระบบส่งการ์ดแจ้งเตือน Flex Message เข้ากลุ่ม LINE Maintenance อีกครั้ง"
+                >
+                  <Send className={`w-3.5 h-3.5 ${isResendingLine ? 'animate-spin' : 'text-emerald-600'}`} />
+                  <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
+                </Button>
+
+                <a
+                  href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(detailWO))}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl transition shadow-2xs h-9 cursor-pointer"
+                  title="แชร์ข้อความสรุปเข้าห้องแชต/กลุ่ม LINE ด้วยตนเอง (ใช้ได้ทันทีไม่มีติดโควตา)"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>🟢 แชร์สรุปเข้า LINE</span>
+                </a>
+              </div>
+            </div>
 
             {/* Modal Bottom Footer Actions */}
             <div className="flex gap-2 pt-2 border-t border-stone-100">
