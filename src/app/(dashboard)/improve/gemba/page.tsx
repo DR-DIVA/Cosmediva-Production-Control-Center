@@ -52,8 +52,10 @@ export default function GembaCapturePage() {
   // Media handling
   const [mediaFiles, setMediaFiles] = useState<{ file?: File; url: string; name: string; type: 'PHOTO' | 'VIDEO' }[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const baseTextRef = useRef<string>('');
   
-  // Voice Recording simulation state
+  // Voice Recording state
   const [isRecording, setIsRecording] = useState(false);
 
   // Dynamic creation state for Department, Line, Station
@@ -127,18 +129,83 @@ export default function GembaCapturePage() {
   };
 
   const toggleVoiceRecording = () => {
-    if (!isRecording) {
-      setIsRecording(true);
-      toast.info('กำลังบันทึกเสียง... (กำลังแปลงเสียงเป็นข้อความ)');
-      // Simulate real-time speech recognition
-      setTimeout(() => {
-        setIsRecording(false);
-        const voiceText = "พนักงานแพ็กกิ้งต้องเดินไปหยิบกล่องบรรจุภัณฑ์ประมาณ 6 เมตร ทุกครั้งที่แพ็กครบ 12 ชิ้น เสียเวลาก้าวเดินไปกลับสะสม";
-        setDescription(prev => prev ? `${prev} ${voiceText}` : voiceText);
-        toast.success('แปลงเสียงเป็นข้อความสำเร็จ!');
-      }, 3500);
-    } else {
+    const SpeechRecognition = typeof window !== 'undefined' 
+      ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) 
+      : null;
+
+    if (!SpeechRecognition) {
+      toast.error('เบราว์เซอร์นี้ไม่รองรับระบบแปลงเสียงเป็นข้อความ กรุณาพิมพ์ในช่องข้อความแทนค่ะ');
+      return;
+    }
+
+    if (isRecording) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
       setIsRecording(false);
+      toast.success('บันทึกเสียงเสร็จสิ้น');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'th-TH';
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 1;
+
+      baseTextRef.current = description.trim();
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        toast.info('🎙️ กำลังฟังเสียงพูดภาษาไทย... (พูดเสร็จแล้วกดปุ่มเดิมเพื่อหยุด)');
+      };
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = '';
+        let interimTranscript = '';
+
+        for (let i = 0; i < event.results.length; i++) {
+          const item = event.results[i];
+          const chunk = item[0]?.transcript || '';
+          if (item.isFinal) {
+            finalTranscript += chunk;
+          } else {
+            interimTranscript += chunk;
+          }
+        }
+
+        const currentSpeech = (finalTranscript || interimTranscript).trim();
+        if (currentSpeech) {
+          const base = baseTextRef.current;
+          setDescription(base ? `${base} ${currentSpeech}` : currentSpeech);
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed') {
+          toast.error('กรุณาอนุญาตให้เบราว์เซอร์เข้าถึงไมโครโฟน');
+          setIsRecording(false);
+        } else if (event.error === 'no-speech') {
+          // Waiting for user speech
+        } else {
+          setIsRecording(false);
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err: any) {
+      console.error('Failed to start speech recognition:', err);
+      setIsRecording(false);
+      toast.error('ไม่สามารถเปิดใช้งานไมโครโฟนได้: ' + (err.message || ''));
     }
   };
 

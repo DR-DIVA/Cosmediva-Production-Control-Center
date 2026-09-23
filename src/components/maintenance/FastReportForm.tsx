@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo, useEffect } from 'react'
+import React, { useState, useMemo, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
@@ -110,6 +110,19 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
+  const recognitionRef = useRef<any>(null)
+  const baseTextRef = useRef<string>('')
+
+  // Cleanup speech recognition on unmount
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort()
+        } catch {}
+      }
+    }
+  }, [])
 
   // Listen to URL query params (e.g. ?type=EMERGENCY | GENERAL | SERVICE)
   useEffect(() => {
@@ -200,20 +213,85 @@ export default function FastReportForm({ initialMachine, machines, initialType }
     }
   }
 
-  // Handle Voice Input simulation
+  // Handle Real Voice Input with Web Speech API (Speech to Text ภาษาไทย)
   const handleToggleVoice = () => {
+    const SpeechRecognition = typeof window !== 'undefined' 
+      ? ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) 
+      : null
+
+    if (!SpeechRecognition) {
+      toast.error('เบราว์เซอร์นี้ไม่รองรับระบบแปลงเสียงเป็นข้อความ กรุณาพิมพ์ในช่องข้อความแทนค่ะ')
+      return
+    }
+
     if (isRecording) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop()
+        } catch {}
+      }
       setIsRecording(false)
       toast.success('บันทึกเสียงเสร็จสิ้น')
-    } else {
-      setIsRecording(true)
-      toast.info('🎙️ กำลังฟังเสียงพูด... (กดอีกครั้งเพื่อหยุด)')
-      setTimeout(() => {
-        if (!description) {
-          setDescription('เครื่องมีเสียงดังผิดปกติและมีกลิ่นไหม้ตรงมอเตอร์หลัก')
+      return
+    }
+
+    try {
+      const recognition = new SpeechRecognition()
+      recognition.lang = 'th-TH'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognition.maxAlternatives = 1
+
+      baseTextRef.current = description.trim()
+
+      recognition.onstart = () => {
+        setIsRecording(true)
+        toast.info('🎙️ กำลังฟังเสียงพูดภาษาไทย... (พูดเสร็จแล้วกดปุ่มเดิมอีกครั้งเพื่อหยุด)')
+      }
+
+      recognition.onresult = (event: any) => {
+        let finalTranscript = ''
+        let interimTranscript = ''
+
+        for (let i = 0; i < event.results.length; i++) {
+          const item = event.results[i]
+          const chunk = item[0]?.transcript || ''
+          if (item.isFinal) {
+            finalTranscript += chunk
+          } else {
+            interimTranscript += chunk
+          }
         }
+
+        const currentSpeech = (finalTranscript || interimTranscript).trim()
+        if (currentSpeech) {
+          const base = baseTextRef.current
+          setDescription(base ? `${base} ${currentSpeech}` : currentSpeech)
+        }
+      }
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error)
+        if (event.error === 'not-allowed') {
+          toast.error('กรุณาอนุญาตให้เบราว์เซอร์เข้าถึงไมโครโฟน')
+          setIsRecording(false)
+        } else if (event.error === 'no-speech') {
+          // Waiting for user speech
+        } else {
+          setIsRecording(false)
+        }
+      }
+
+      recognition.onend = () => {
         setIsRecording(false)
-      }, 3000)
+      }
+
+      recognitionRef.current = recognition
+      recognition.start()
+    } catch (err: any) {
+      console.error('Failed to start speech recognition:', err)
+      setIsRecording(false)
+      toast.error('ไม่สามารถเปิดใช้งานไมโครโฟนได้: ' + (err.message || ''))
     }
   }
 
