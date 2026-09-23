@@ -35,6 +35,8 @@ import { toast } from 'sonner'
 import { MaintenanceMachine, SymptomCategory, ProductionImpact } from '@/types/maintenance'
 import { createRepairRequest } from '@/app/actions/maintenance'
 import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { getSavedUserName, saveUserName } from '@/lib/userMemory'
 
 interface FastReportFormProps {
   initialMachine?: MaintenanceMachine | null
@@ -99,7 +101,9 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   )
   const [isEmergency, setIsEmergency] = useState(defaultType === 'EMERGENCY')
   const [description, setDescription] = useState('')
-  const [requesterName, setRequesterName] = useState('พนักงานหน้างาน (Operator)')
+  const [requesterName, setRequesterName] = useState(() => {
+    return getSavedUserName('พนักงานหน้างาน (Operator)')
+  })
   const [photoPreview, setPhotoPreview] = useState<string | null>(null)
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
@@ -265,6 +269,10 @@ export default function FastReportForm({ initialMachine, machines, initialType }
       const validPhotoUrls: string[] = []
       if (finalPhotoUrl && finalPhotoUrl.startsWith('http')) {
         validPhotoUrls.push(finalPhotoUrl)
+      }
+
+      if (requesterName && requesterName.trim()) {
+        saveUserName(requesterName.trim())
       }
 
       const payload = {
@@ -1008,13 +1016,16 @@ export default function FastReportForm({ initialMachine, machines, initialType }
       {/* 6. REQUESTER IDENTITY */}
       <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-sm flex items-center gap-3">
         <span className="text-xs font-bold text-stone-500 whitespace-nowrap">ผู้แจ้งซ่อม:</span>
-        <Input
-          value={requesterName}
-          onChange={e => setRequesterName(e.target.value)}
-          placeholder="ชื่อผู้แจ้ง"
-          className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200"
-          required
-        />
+        <div className="flex-1">
+          <NameAutocompleteInput
+            id="fast-report-requester"
+            value={requesterName}
+            onChange={setRequesterName}
+            placeholder="พิมพ์ชื่อผู้แจ้ง เช่น เบ็ญจพร พูลสวัสดิ์..."
+            className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200 font-medium"
+            required
+          />
+        </div>
       </div>
 
       {/* 7. BIG SUBMIT BUTTON */}

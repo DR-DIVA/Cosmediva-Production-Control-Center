@@ -1468,6 +1468,7 @@ export default function WorkOrdersKanbanPage() {
           workOrderId={selectedWOForVerify.id}
           machineCode={selectedWOForVerify.machine_code}
           machineName={selectedWOForVerify.machine_name}
+          defaultVerifierName={selectedWOForVerify.requester_name}
           onSuccess={fetchWOs}
         />
       )}

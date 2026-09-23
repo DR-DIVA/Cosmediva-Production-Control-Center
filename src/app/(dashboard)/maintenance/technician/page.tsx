@@ -1345,6 +1345,7 @@ export default function TechnicianCockpitPage() {
           workOrderId={verifyModalWO.id}
           machineCode={verifyModalWO.machine_code}
           machineName={verifyModalWO.machine_name}
+          defaultVerifierName={verifyModalWO.requester_name}
           onSuccess={loadJobs}
         />
       )}

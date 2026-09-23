@@ -19,6 +19,8 @@ import {
   ArrowRight
 } from 'lucide-react'
 import Link from 'next/link'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { getSavedUserName, saveUserName } from '@/lib/userMemory'
 
 interface QuickSparePartRequisitionProps {
   machine: MaintenanceMachine
@@ -44,12 +46,7 @@ export default function QuickSparePartRequisition({
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedPartId, setSelectedPartId] = useState<string>('')
   const [quantity, setQuantity] = useState<number>(1)
-  const [requesterName, setRequesterName] = useState<string>(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('last_requester_name') || ''
-    }
-    return ''
-  })
+  const [requesterName, setRequesterName] = useState<string>(() => getSavedUserName(''))
   const [reason, setReason] = useState<string>('เปลี่ยนถ่ายน้ำมันหล่อลื่นตามรอบ')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [lastIssuedSuccess, setLastIssuedSuccess] = useState<any>(null)
@@ -315,11 +312,11 @@ export default function QuickSparePartRequisition({
                 <User className="w-3.5 h-3.5 text-stone-600" />
                 <span>3. ชื่อพนักงานผู้เบิก / ช่างผู้ดำเนินการ <span className="text-red-500">*</span></span>
               </label>
-              <Input
-                type="text"
-                placeholder="ระบุชื่อผู้เบิก เช่น ช่างยะ, ช่างคิม, สมศักดิ์ ผลิต 1"
+              <NameAutocompleteInput
+                id="quick-part-requester"
+                placeholder="ระบุชื่อผู้เบิก เช่น เบ็ญจพร พูลสวัสดิ์, ช่างคิม..."
                 value={requesterName}
-                onChange={e => setRequesterName(e.target.value)}
+                onChange={setRequesterName}
                 className="text-xs"
                 required
               />

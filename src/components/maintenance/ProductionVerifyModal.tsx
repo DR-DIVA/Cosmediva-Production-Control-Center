@@ -1,12 +1,14 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CheckCircle2, XCircle, ShieldCheck, AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { transitionWorkOrderStatus } from '@/app/actions/maintenance'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { getSavedUserName, saveUserName, isGenericPlaceholder } from '@/lib/userMemory'
 
 interface ProductionVerifyModalProps {
   isOpen: boolean
@@ -14,6 +16,7 @@ interface ProductionVerifyModalProps {
   workOrderId: string
   machineCode: string
   machineName: string
+  defaultVerifierName?: string
   onSuccess?: () => void
 }
 
@@ -23,20 +26,40 @@ export default function ProductionVerifyModal({
   workOrderId,
   machineCode,
   machineName,
+  defaultVerifierName,
   onSuccess
 }: ProductionVerifyModalProps) {
   const [decision, setDecision] = useState<'PASS' | 'FAIL'>('PASS')
-  const [verifierName, setVerifierName] = useState('หัวหน้าฝ่ายผลิต (Supervisor)')
+  const [verifierName, setVerifierName] = useState(() => {
+    return getSavedUserName(defaultVerifierName || 'เบ็ญจพร พูลสวัสดิ์')
+  })
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Sync saved user name if state is empty or generic
+  useEffect(() => {
+    if (isOpen) {
+      const saved = getSavedUserName(defaultVerifierName || '')
+      if (saved && (!verifierName || isGenericPlaceholder(verifierName))) {
+        setVerifierName(saved)
+      }
+    }
+  }, [isOpen, defaultVerifierName])
+
   const handleVerify = async () => {
+    if (!verifierName.trim() || isGenericPlaceholder(verifierName)) {
+      toast.error('กรุณาระบุชื่อ-นามสกุลของผู้ทดสอบและยืนยัน')
+      return
+    }
+
     setIsSubmitting(true)
     try {
+      saveUserName(verifierName)
+
       const res = await transitionWorkOrderStatus({
         work_order_id: workOrderId,
         to_status: decision === 'PASS' ? 'VERIFIED' : 'IN_PROGRESS',
-        changed_by_name: verifierName,
+        changed_by_name: verifierName.trim(),
         verification_status: decision,
         notes: decision === 'PASS' 
           ? (notes || 'ทดสอบเดินเครื่องเรียบร้อย ทำงานได้ตามสเปกปกติ') 
@@ -110,11 +133,16 @@ export default function ProductionVerifyModal({
 
           {/* Verifier Name */}
           <div className="space-y-1">
-            <label className="text-xs font-bold text-stone-700">ชื่อผู้ทดสอบและยืนยัน:</label>
-            <Input
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-stone-700">ชื่อผู้ทดสอบและยืนยัน:</label>
+              <span className="text-[10px] text-stone-400">จำชื่อให้อัตโนมัติ • พิมพ์เพื่อค้นหา</span>
+            </div>
+            <NameAutocompleteInput
+              id="verifier-name-input"
               value={verifierName}
-              onChange={e => setVerifierName(e.target.value)}
-              className="h-10 text-xs rounded-xl bg-stone-50 border-stone-300"
+              onChange={setVerifierName}
+              placeholder="พิมพ์ชื่อ-นามสกุล เช่น เบ็ญจพร พูลสวัสดิ์..."
+              className="h-10 text-xs rounded-xl bg-stone-50 border-stone-300 font-medium"
               required
             />
           </div>

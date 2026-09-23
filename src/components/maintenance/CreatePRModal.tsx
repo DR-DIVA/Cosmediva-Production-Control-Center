@@ -20,6 +20,8 @@ import {
 import { toast } from 'sonner'
 import { MaintenanceSparePart } from '@/types/maintenance'
 import { createSparePartPR } from '@/app/actions/maintenance'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { getSavedUserName, saveUserName } from '@/lib/userMemory'
 
 interface CreatePRModalProps {
   part: MaintenanceSparePart | null
@@ -38,7 +40,7 @@ export default function CreatePRModal({
   const [quantity, setQuantity] = useState('')
   const [supplier, setSupplier] = useState('')
   const [reason, setReason] = useState('')
-  const [requesterName, setRequesterName] = useState('')
+  const [requesterName, setRequesterName] = useState(() => getSavedUserName(''))
   const [departmentName, setDepartmentName] = useState('ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)')
   const [dccFormCode, setDccFormCode] = useState('FM-PUR-001 (แบบฟอร์มขอซื้อวัสดุ/อะไหล่)')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -449,10 +451,11 @@ export default function CreatePRModal({
                 <label className="text-xs font-bold text-stone-700 block mb-1">
                   ชื่อผู้ขอซื้อ (Requester) *
                 </label>
-                <Input
+                <NameAutocompleteInput
+                  id="pr-requester-name"
                   value={requesterName}
-                  onChange={e => setRequesterName(e.target.value)}
-                  placeholder="ชื่อ-นามสกุล ผู้ขอซื้อ"
+                  onChange={setRequesterName}
+                  placeholder="พิมพ์ชื่อผู้ขอซื้อ เช่น เบ็ญจพร พูลสวัสดิ์..."
                   className="h-10 text-xs rounded-xl bg-stone-50 border-stone-300 font-bold"
                   required
                 />
