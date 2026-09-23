@@ -29,9 +29,11 @@ import EditMachineModal from '@/components/maintenance/EditMachineModal'
 import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
 import MachineRequestsListModal from '@/components/maintenance/MachineRequestsListModal'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
+import { DEPARTMENTS_LIST, CATEGORIES_LIST } from '@/lib/maintenanceHelpers'
 
 export default function MachinesMasterPage() {
   const [machines, setMachines] = useState<MaintenanceMachine[]>([])
+  const [departmentFilter, setDepartmentFilter] = useState('all')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [statusFilter, setStatusFilter] = useState('all')
   const [criticalityFilter, setCriticalityFilter] = useState('all')
@@ -48,6 +50,7 @@ export default function MachinesMasterPage() {
     setIsLoading(true)
     try {
       const res = await getMachines({
+        department: departmentFilter,
         category: categoryFilter,
         status: statusFilter,
         criticality: criticalityFilter,
@@ -61,7 +64,7 @@ export default function MachinesMasterPage() {
 
   useEffect(() => {
     fetchMachines()
-  }, [categoryFilter, statusFilter, criticalityFilter])
+  }, [departmentFilter, categoryFilter, statusFilter, criticalityFilter])
 
   const handleBulkPrint = () => {
     if (machines.length === 0) return
@@ -118,8 +121,6 @@ export default function MachinesMasterPage() {
     printWindow.document.close()
   }
 
-  const categories = ['all', 'Mixing', 'Filling', 'Capping', 'Labeling', 'Utility']
-
   return (
     <div className="p-3 sm:p-5 md:p-6 max-w-[1600px] w-full mx-auto space-y-6 min-w-0">
       <MaintenanceHeader />
@@ -145,13 +146,29 @@ export default function MachinesMasterPage() {
             />
           </div>
 
+          {/* Department Filter (สังกัด/แผนก ยึดจากรหัสเครื่องจักร เช่น MM -> RM) */}
+          <select
+            value={departmentFilter}
+            onChange={e => setDepartmentFilter(e.target.value)}
+            className="h-10 px-3 rounded-xl text-xs font-bold bg-amber-50/80 border border-amber-300 text-stone-900 focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+            title="กรองตามสังกัด/แผนก (ยึดตามรหัสเครื่องจักร เช่น MM = แผนก RM Warehouse)"
+          >
+            {DEPARTMENTS_LIST.map(d => (
+              <option key={d.key} value={d.key}>
+                {d.icon} {d.label}
+              </option>
+            ))}
+          </select>
+
+          {/* Operation Category Filter */}
           <select
             value={categoryFilter}
             onChange={e => setCategoryFilter(e.target.value)}
             className="h-10 px-3 rounded-xl text-xs font-bold bg-stone-50 border border-stone-200 text-stone-700"
+            title="กรองตามหมวดประเภทการทำงาน (Category)"
           >
-            <option value="all">ทุกหมวดหมู่</option>
-            {categories.filter(c => c !== 'all').map(c => (
+            <option value="all">ทุกหมวดการทำงาน</option>
+            {CATEGORIES_LIST.filter(c => c !== 'all').map(c => (
               <option key={c} value={c}>{c}</option>
             ))}
           </select>
@@ -184,6 +201,35 @@ export default function MachinesMasterPage() {
             <span>+ ขอขึ้นทะเบียนเครื่องใหม่</span>
           </Button>
         </div>
+      </div>
+
+      {/* Department Quick Filter Tabs (ยึดตามรหัสเครื่องจักร เช่น MM -> แผนก RM / Warehouse) */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+        {DEPARTMENTS_LIST.map(dept => {
+          const isSelected = departmentFilter === dept.key
+          return (
+            <button
+              key={dept.key}
+              type="button"
+              onClick={() => setDepartmentFilter(dept.key)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+                isSelected
+                  ? 'bg-[#2A2521] text-[#D4AF37] shadow-sm ring-2 ring-[#D4AF37]/30'
+                  : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-200'
+              }`}
+            >
+              <span>{dept.icon}</span>
+              <span>{dept.shortLabel}</span>
+              {dept.codePattern && (
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-black ${
+                  isSelected ? 'bg-[#D4AF37] text-stone-900' : 'bg-stone-100 text-stone-600'
+                }`}>
+                  {dept.codePattern}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Special Category Filter Pills: All vs Subcontract PM vs Calibration */}

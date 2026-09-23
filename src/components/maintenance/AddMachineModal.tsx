@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Plus, Wrench, Building, Cpu, Layers, Building2, Target, CalendarDays } from 'lucide-react'
 import { toast } from 'sonner'
 import { createMachine } from '@/app/actions/maintenance'
+import { resolveDepartmentAndAreaFromCode, DEPARTMENTS } from '@/lib/maintenanceHelpers'
 
 interface AddMachineModalProps {
   isOpen: boolean
@@ -46,6 +47,18 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
   const [calibrationCertNo, setCalibrationCertNo] = useState('')
 
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  const handleMachineCodeChange = (val: string) => {
+    const code = val.toUpperCase()
+    setMachineCode(code)
+    const resolved = resolveDepartmentAndAreaFromCode(code)
+    if (resolved) {
+      setDepartmentName(resolved.department)
+      if (!productionArea || productionArea === 'Warehouse' || productionArea === 'Mixing Area' || productionArea === 'Packing Area' || productionArea === 'QC LAB' || productionArea === 'RD LAB' || productionArea === 'Utility Building' || productionArea === 'Production Area') {
+        setProductionArea(resolved.area)
+      }
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -123,8 +136,8 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
               <label className="text-xs font-bold text-stone-700 block mb-1">รหัสเครื่อง *</label>
               <Input
                 value={machineCode}
-                onChange={e => setMachineCode(e.target.value.toUpperCase())}
-                placeholder="เช่น MX-05, FL-03"
+                onChange={e => handleMachineCodeChange(e.target.value)}
+                placeholder="เช่น MX-05, BLA-MM-002"
                 className="h-10 text-xs font-mono font-bold rounded-xl bg-stone-50 border-stone-300"
                 required
               />
@@ -173,13 +186,23 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
           {/* Department & Area */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-bold text-stone-700 block mb-1">แผนกที่รับผิดชอบ</label>
-              <Input
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-bold text-stone-700">สังกัด / แผนก</label>
+                {machineCode && (
+                  <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-1.5 py-0.5 rounded">
+                    ⚡ Auto
+                  </span>
+                )}
+              </div>
+              <select
                 value={departmentName}
                 onChange={e => setDepartmentName(e.target.value)}
-                placeholder="เช่น แผนกผสม, แผนกบรรจุ"
-                className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200"
-              />
+                className="w-full h-10 px-3 rounded-xl text-xs font-bold bg-stone-50 border border-stone-200 text-stone-800"
+              >
+                {DEPARTMENTS.map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
             </div>
 
             <div>

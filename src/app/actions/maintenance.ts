@@ -54,6 +54,7 @@ async function generateWONumber(supabase: any): Promise<string> {
  * Get list of all machines with optional filtering
  */
 export async function getMachines(filters?: {
+  department?: string
   category?: string
   status?: string
   criticality?: string
@@ -65,6 +66,27 @@ export async function getMachines(filters?: {
     .select('*')
     .eq('is_deleted', false)
     .order('machine_code', { ascending: true })
+
+  if (filters?.department && filters.department !== 'all') {
+    const d = filters.department
+    if (d === 'RM') {
+      query = query.or('department_name.ilike.%RM%,department_name.ilike.%Raw Material%,department_name.ilike.%MM%,machine_code.ilike.%-MM-%')
+    } else if (d === 'Mixing') {
+      query = query.or('department_name.ilike.%Mixing%,machine_code.ilike.%-MX-%,machine_code.ilike.HG-%,machine_code.ilike.VACH-%')
+    } else if (d === 'Packing') {
+      query = query.or('department_name.ilike.%Packing%,machine_code.ilike.%-PK-%,machine_code.ilike.FL-%,machine_code.ilike.CP-%,machine_code.ilike.LB-%')
+    } else if (d === 'QC') {
+      query = query.or('department_name.ilike.%QC%,department_name.ilike.%Quality Control%,machine_code.ilike.%-QC-%')
+    } else if (d === 'RD') {
+      query = query.or('department_name.ilike.%R&D%,department_name.ilike.%RD%,machine_code.ilike.%-RD-%')
+    } else if (d === 'Utility') {
+      query = query.or('department_name.ilike.%Facilities%,department_name.ilike.%Utility%,department_name.ilike.%Engineering%,department_name.ilike.%CMD%,machine_code.ilike.%-CMD-%,machine_code.ilike.AC-%,machine_code.ilike.CH-%,machine_code.ilike.RO-%')
+    } else if (d === 'Production') {
+      query = query.or('department_name.ilike.%Production%,machine_code.ilike.%-PD-%')
+    } else {
+      query = query.ilike('department_name', `%${d}%`)
+    }
+  }
 
   if (filters?.category && filters.category !== 'all') {
     query = query.eq('category', filters.category)

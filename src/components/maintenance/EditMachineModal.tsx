@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import { updateMachine, getMachineAuditLogs } from '@/app/actions/maintenance'
 import { MaintenanceMachine, MaintenanceMachineAuditLog } from '@/types/maintenance'
 import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
+import { resolveDepartmentAndAreaFromCode, DEPARTMENTS } from '@/lib/maintenanceHelpers'
 
 interface EditMachineModalProps {
   machine: MaintenanceMachine | null
@@ -48,16 +49,6 @@ const CATEGORIES = [
   'Material Handling',
   'General Machinery',
   'Other'
-]
-
-const DEPARTMENTS = [
-  'แผนกบรรจุและแพ็กกิ้ง (Packing Department)',
-  'แผนกผสม (Mixing Department)',
-  'คลังสินค้าและวัตถุดิบ (Raw Materials / Warehouse)',
-  'ฝ่ายควบคุมคุณภาพ (Quality Control - QC)',
-  'ฝ่ายวิจัยและพัฒนา (R&D)',
-  'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)',
-  'ฝ่ายผลิตทั่วไป (Production)'
 ]
 
 export default function EditMachineModal({
@@ -340,7 +331,26 @@ export default function EditMachineModal({
             {/* Department & Area */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
-                <label className="text-xs font-bold text-stone-700 block mb-1">ฝ่าย / แผนก</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-stone-700">ฝ่าย / แผนก</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const resolved = resolveDepartmentAndAreaFromCode(machineCode)
+                      if (resolved) {
+                        setDepartmentName(resolved.department)
+                        setProductionArea(resolved.area)
+                        toast.success(`ตรวจพบ: ${resolved.shortLabel} (${resolved.area})`)
+                      } else {
+                        toast.info('ไม่พบรูปแบบรหัสที่ตรงกัน')
+                      }
+                    }}
+                    className="text-[10px] text-blue-600 hover:text-blue-800 font-bold flex items-center gap-0.5 cursor-pointer bg-blue-50 hover:bg-blue-100 px-1.5 py-0.5 rounded transition"
+                    title="ระบุสังกัดและพื้นที่อัตโนมัติตามรหัสเครื่องจักร (เช่น MM -> แผนก RM Warehouse)"
+                  >
+                    ⚡ ดึงตามรหัสเครื่อง
+                  </button>
+                </div>
                 <select
                   value={departmentName}
                   onChange={e => setDepartmentName(e.target.value)}
