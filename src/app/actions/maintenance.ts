@@ -882,6 +882,63 @@ export async function createRepairRequest(payload: {
 }
 
 /**
+ * Update the requester / operator who opened the work order (Step 1: NEW)
+ */
+export async function updateWorkOrderRequester(
+  woId: string,
+  payload: {
+    requester_name: string
+    requester_department_name?: string
+  }
+) {
+  try {
+    const supabase = createAdminClient()
+    const cleanName = payload.requester_name.trim()
+    const cleanDept = payload.requester_department_name?.trim()
+
+    if (!cleanName) {
+      return { success: false, error: 'กรุณาระบุชื่อ-สกุล (รหัสพนักงาน) ของผู้ดำเนินการ' }
+    }
+
+    const updateFields: any = {
+      requester_name: cleanName,
+      updated_at: new Date().toISOString()
+    }
+    if (cleanDept !== undefined) {
+      updateFields.requester_department_name = cleanDept
+    }
+
+    const { data: updatedWO, error: updateErr } = await supabase
+      .from('maintenance_work_orders')
+      .update(updateFields)
+      .eq('id', woId)
+      .select()
+      .single()
+
+    if (updateErr) {
+      console.error('Error updating work order requester:', updateErr)
+      return { success: false, error: updateErr.message }
+    }
+
+    // Also update initial status log (to_status = 'NEW') so the audit trail matches
+    await supabase
+      .from('maintenance_wo_status_logs')
+      .update({ changed_by_name: cleanName })
+      .eq('work_order_id', woId)
+      .eq('to_status', 'NEW')
+
+    try { revalidatePath('/maintenance') } catch {}
+    try { revalidatePath('/maintenance/work-orders') } catch {}
+    try { revalidatePath('/maintenance/technician') } catch {}
+
+    return { success: true, data: updatedWO }
+  } catch (err: any) {
+    console.error('Unexpected error in updateWorkOrderRequester:', err)
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดในการอัปเดตผู้ดำเนินการ' }
+  }
+}
+
+/**
  * Get Work Orders for Kanban or List
  */
 export async function getWorkOrders(filters?: {

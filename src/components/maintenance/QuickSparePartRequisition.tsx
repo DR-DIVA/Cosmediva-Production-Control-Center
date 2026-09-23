@@ -314,7 +314,7 @@ export default function QuickSparePartRequisition({
               </label>
               <NameAutocompleteInput
                 id="quick-part-requester"
-                placeholder="ระบุชื่อผู้เบิก เช่น เบ็ญจพร พูลสวัสดิ์, ช่างคิม..."
+                placeholder="ระบุชื่อหรือรหัสพนักงาน เช่น เบ็ญจพร, pkbjp518, MTANR1898..."
                 value={requesterName}
                 onChange={setRequesterName}
                 className="text-xs"

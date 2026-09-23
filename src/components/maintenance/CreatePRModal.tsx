@@ -455,7 +455,7 @@ export default function CreatePRModal({
                   id="pr-requester-name"
                   value={requesterName}
                   onChange={setRequesterName}
-                  placeholder="พิมพ์ชื่อผู้ขอซื้อ เช่น เบ็ญจพร พูลสวัสดิ์..."
+                  placeholder="พิมพ์ชื่อหรือรหัสพนักงาน เช่น เบ็ญจพร, pkbjp518..."
                   className="h-10 text-xs rounded-xl bg-stone-50 border-stone-300 font-bold"
                   required
                 />

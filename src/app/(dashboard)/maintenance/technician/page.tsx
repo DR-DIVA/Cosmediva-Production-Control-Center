@@ -43,6 +43,7 @@ import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewer'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
 
 /**
@@ -392,14 +393,16 @@ export default function TechnicianCockpitPage() {
                 </select>
 
                 {isCustomTech && (
-                  <input
-                    type="text"
-                    autoFocus
-                    placeholder="พิมพ์ชื่อช่างของคุณ..."
-                    value={technicianName}
-                    onChange={e => handleTechnicianChange(e.target.value)}
-                    className="font-bold text-stone-800 bg-white px-2.5 py-1.5 rounded-xl border border-amber-400 text-xs w-44 transition focus:outline-none focus:ring-2 focus:ring-amber-500/20 shadow-2xs"
-                  />
+                  <div className="w-56">
+                    <NameAutocompleteInput
+                      id="custom-tech-input-header"
+                      autoFocus
+                      placeholder="พิมพ์ชื่อหรือรหัสพนักงาน..."
+                      value={technicianName}
+                      onChange={val => handleTechnicianChange(val)}
+                      className="font-bold text-stone-800 bg-white h-9 text-xs rounded-xl border border-amber-400"
+                    />
+                  </div>
                 )}
               </div>
               <span className="text-[11px] text-stone-500">

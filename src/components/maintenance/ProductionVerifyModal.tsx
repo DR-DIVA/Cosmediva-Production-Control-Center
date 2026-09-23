@@ -134,14 +134,16 @@ export default function ProductionVerifyModal({
           {/* Verifier Name */}
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-bold text-stone-700">ชื่อผู้ทดสอบและยืนยัน:</label>
-              <span className="text-[10px] text-stone-400">จำชื่อให้อัตโนมัติ • พิมพ์เพื่อค้นหา</span>
+              <label className="text-xs font-bold text-stone-700">ชื่อผู้ทดสอบและยืนยัน (ฝ่ายผลิต):</label>
+              <span className="text-[10px] text-amber-700 font-bold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+                ดึงจาก Master Data
+              </span>
             </div>
             <NameAutocompleteInput
               id="verifier-name-input"
               value={verifierName}
               onChange={setVerifierName}
-              placeholder="พิมพ์ชื่อ-นามสกุล เช่น เบ็ญจพร พูลสวัสดิ์..."
+              placeholder="พิมพ์ชื่อหรือรหัสพนักงาน เช่น เบ็ญจพร, pkbjp518..."
               className="h-10 text-xs rounded-xl bg-stone-50 border-stone-300 font-medium"
               required
             />

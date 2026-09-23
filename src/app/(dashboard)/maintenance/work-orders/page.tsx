@@ -30,7 +30,10 @@ import {
   ChevronUp,
   ShieldCheck,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  PenLine,
+  UserCheck,
+  X
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { Button } from '@/components/ui/button'
@@ -38,10 +41,11 @@ import { Input } from '@/components/ui/input'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP, FACTORY_TECHNICIANS } from '@/types/maintenance'
-import { getWorkOrders, transitionWorkOrderStatus } from '@/app/actions/maintenance'
+import { getWorkOrders, transitionWorkOrderStatus, updateWorkOrderRequester } from '@/app/actions/maintenance'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 
 /**
  * Format live elapsed duration in Thai
@@ -267,6 +271,49 @@ export default function WorkOrdersKanbanPage() {
   const [assignTechName, setAssignTechName] = useState('')
   const [isCustomTech, setIsCustomTech] = useState(false)
   
+  // Edit Operator / Requester (Step 1: NEW) state
+  const [editingRequesterWO, setEditingRequesterWO] = useState<MaintenanceWorkOrder | null>(null)
+  const [editRequesterName, setEditRequesterName] = useState('')
+  const [editRequesterDept, setEditRequesterDept] = useState('')
+  const [isSavingRequester, setIsSavingRequester] = useState(false)
+
+  const handleOpenEditRequester = (wo: MaintenanceWorkOrder) => {
+    setEditingRequesterWO(wo)
+    setEditRequesterName(wo.requester_name || '')
+    setEditRequesterDept(wo.requester_department_name || '')
+  }
+
+  const handleSaveRequester = async () => {
+    if (!editingRequesterWO) return
+    if (!editRequesterName.trim()) {
+      toast.error('กรุณาระบุชื่อ-สกุล (รหัสพนักงาน) ของผู้ดำเนินการ')
+      return
+    }
+    setIsSavingRequester(true)
+    try {
+      const res = await updateWorkOrderRequester(editingRequesterWO.id, {
+        requester_name: editRequesterName.trim(),
+        requester_department_name: editRequesterDept.trim() || undefined
+      })
+      if (res.success && res.data) {
+        toast.success('อัปเดตผู้ดำเนินการเปิดใบแจ้งซ่อมเรียบร้อยแล้ว')
+        const updatedName = editRequesterName.trim()
+        const updatedDept = editRequesterDept.trim()
+        setWorkOrders(prev => prev.map(w => w.id === editingRequesterWO.id ? { ...w, requester_name: updatedName, requester_department_name: updatedDept } : w))
+        if (detailWO && detailWO.id === editingRequesterWO.id) {
+          setDetailWO(prev => prev ? { ...prev, requester_name: updatedName, requester_department_name: updatedDept } : null)
+        }
+        setEditingRequesterWO(null)
+      } else {
+        toast.error(res.error || 'เกิดข้อผิดพลาดในการบันทึก')
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'บันทึกไม่สำเร็จ')
+    } finally {
+      setIsSavingRequester(false)
+    }
+  }
+
   // Collapsible time control (Default is collapsed to keep cards clean and prevent pressure for technicians)
   const [showAllTimes, setShowAllTimes] = useState(false)
   const [expandedTimeCardIds, setExpandedTimeCardIds] = useState<Set<string>>(new Set())
@@ -899,8 +946,22 @@ export default function WorkOrdersKanbanPage() {
               <div>
                 <span className="font-mono text-xs font-bold text-stone-400">{detailWO.wo_number}</span>
                 <h3 className="text-xl font-black text-stone-900">{detailWO.machine_code} - {detailWO.machine_name}</h3>
-                <div className="text-xs text-stone-500 mt-0.5">
-                  ผู้แจ้ง: <span className="font-bold text-stone-800">{detailWO.requester_name}</span> ({detailWO.requester_department_name})
+                <div className="text-xs text-stone-500 mt-1 flex flex-wrap items-center gap-2">
+                  <span>
+                    ผู้แจ้ง: <span className="font-bold text-stone-900">{detailWO.requester_name}</span>{' '}
+                    {detailWO.requester_department_name ? (
+                      <span className="text-stone-500">({detailWO.requester_department_name})</span>
+                    ) : ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleOpenEditRequester(detailWO)}
+                    className="inline-flex items-center gap-1 text-[11px] text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 px-2.5 py-0.5 rounded-lg font-bold transition cursor-pointer shadow-2xs"
+                    title="คลิกเพื่อกำหนด/แก้ไขผู้ดำเนินการเปิดใบแจ้งซ่อม"
+                  >
+                    <PenLine className="w-3 h-3 text-blue-600" />
+                    <span>แก้ไขผู้ดำเนินการ (New)</span>
+                  </button>
                 </div>
               </div>
               <span className={`px-3 py-1 rounded-full text-xs font-black shrink-0 ${
@@ -1046,14 +1107,17 @@ export default function WorkOrdersKanbanPage() {
                   </div>
 
                   {isCustomTech && (
-                    <div className="flex items-center gap-1.5 bg-white px-2.5 py-1.5 rounded-xl border border-amber-300 shadow-2xs">
-                      <input
-                        type="text"
-                        autoFocus
-                        placeholder="พิมพ์ชื่อช่างผู้รับผิดชอบ..."
+                    <div className="bg-white p-2.5 rounded-xl border border-amber-300 shadow-2xs space-y-1">
+                      <span className="text-[10px] text-amber-900 font-bold block">
+                        ระบุชื่อช่าง หรือเลือกจาก Master Data:
+                      </span>
+                      <NameAutocompleteInput
+                        id="custom-assign-tech-input"
+                        placeholder="พิมพ์ชื่อช่างหรือรหัสพนักงาน..."
                         value={assignTechName}
-                        onChange={e => setAssignTechName(e.target.value)}
-                        className="text-xs w-full bg-transparent border-none outline-none font-medium text-stone-800"
+                        onChange={setAssignTechName}
+                        className="text-xs h-9 bg-stone-50 border-stone-200"
+                        autoFocus
                       />
                     </div>
                   )}
@@ -1319,9 +1383,21 @@ export default function WorkOrdersKanbanPage() {
                         </div>
                       )}
 
-                      <div className="text-[11px] text-stone-500">
-                        ผู้ดำเนินการ: <span className="font-semibold text-stone-700">{step.actor}</span>
-                        {step.notes && <span className="text-stone-600 ml-1">({step.notes})</span>}
+                      <div className="text-[11px] text-stone-500 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          ผู้ดำเนินการ: <span className="font-semibold text-stone-700">{step.actor}</span>
+                          {step.notes && <span className="text-stone-600 ml-1">({step.notes})</span>}
+                        </div>
+                        {step.status === 'NEW' && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEditRequester(detailWO)}
+                            className="inline-flex items-center gap-1 text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline cursor-pointer"
+                          >
+                            <PenLine className="w-2.5 h-2.5" />
+                            <span>แก้ไขผู้ดำเนินการ</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -1471,6 +1547,87 @@ export default function WorkOrdersKanbanPage() {
           defaultVerifierName={selectedWOForVerify.requester_name}
           onSuccess={fetchWOs}
         />
+      )}
+
+      {/* Edit Operator / Requester Modal (Step 1: NEW) */}
+      {editingRequesterWO && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-start justify-between">
+              <div>
+                <span className="font-mono text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200">
+                  {editingRequesterWO.wo_number}
+                </span>
+                <h3 className="text-base font-black text-stone-900 mt-1">
+                  กำหนดผู้ดำเนินการเปิดใบแจ้งซ่อมเข้าระบบ (New)
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  ดึงข้อมูล ชื่อ-สกุล (รหัสพนักงาน) จาก Master Data ผู้ใช้งานอัตโนมัติ
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEditingRequesterWO(null)}
+                className="text-stone-400 hover:text-stone-600 p-1 rounded-lg"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 pt-1">
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  ชื่อ-สกุล (รหัสพนักงาน) ผู้ดำเนินการ *
+                </label>
+                <NameAutocompleteInput
+                  id="edit-operator-modal"
+                  value={editRequesterName}
+                  onChange={setEditRequesterName}
+                  onSelectUser={(u) => {
+                    setEditRequesterDept(u.department)
+                  }}
+                  placeholder="พิมพ์ชื่อหรือรหัสพนักงาน เช่น เบ็ญจพร, pkbjp518, ปิยะราช..."
+                  autoFocus
+                  required
+                />
+                <span className="text-[10px] text-stone-400 mt-1 block">
+                  💡 พิมพ์ชื่อหรือรหัสพนักงาน ระบบจะค้นหาและดึงจาก Master Data ทันที
+                </span>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-stone-700 block mb-1">
+                  สังกัด / แผนกผู้แจ้ง
+                </label>
+                <Input
+                  value={editRequesterDept}
+                  onChange={e => setEditRequesterDept(e.target.value)}
+                  placeholder="เช่น แผนกบรรจุและแพ็กกิ้ง (Packing Department)"
+                  className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200 font-medium"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-2 border-t border-stone-100">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditingRequesterWO(null)}
+                className="flex-1 rounded-xl text-xs h-10 border-stone-200"
+              >
+                ยกเลิก
+              </Button>
+              <Button
+                type="button"
+                disabled={isSavingRequester || !editRequesterName.trim()}
+                onClick={handleSaveRequester}
+                className="flex-1 rounded-xl text-xs h-10 bg-stone-900 hover:bg-stone-800 text-white font-bold"
+              >
+                {isSavingRequester ? 'กำลังบันทึก...' : '💾 บันทึกผู้ดำเนินการ'}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

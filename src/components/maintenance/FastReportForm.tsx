@@ -1014,14 +1014,21 @@ export default function FastReportForm({ initialMachine, machines, initialType }
       </div>
 
       {/* 6. REQUESTER IDENTITY */}
-      <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-sm flex items-center gap-3">
-        <span className="text-xs font-bold text-stone-500 whitespace-nowrap">ผู้แจ้งซ่อม:</span>
-        <div className="flex-1">
+      <div className="bg-white rounded-3xl p-4 border border-stone-200 shadow-sm space-y-1.5">
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-bold text-stone-700 flex items-center gap-1.5">
+            <span>👤 ผู้ดำเนินการแจ้งซ่อม (Requester Name) *</span>
+          </label>
+          <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full font-bold border border-amber-200">
+            ดึงจาก Master Data (รหัสพนักงาน)
+          </span>
+        </div>
+        <div>
           <NameAutocompleteInput
             id="fast-report-requester"
             value={requesterName}
             onChange={setRequesterName}
-            placeholder="พิมพ์ชื่อผู้แจ้ง เช่น เบ็ญจพร พูลสวัสดิ์..."
+            placeholder="พิมพ์ชื่อหรือรหัสพนักงาน เช่น เบ็ญจพร, pkbjp518..."
             className="h-10 text-xs rounded-xl bg-stone-50 border-stone-200 font-medium"
             required
           />
