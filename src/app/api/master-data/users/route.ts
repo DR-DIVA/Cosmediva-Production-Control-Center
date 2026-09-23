@@ -9,8 +9,8 @@ export async function GET() {
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, employee_id, full_name, role')
-      .order('created_at', { ascending: false })
+      .select('id, employee_id, full_name, role, department')
+      .order('full_name', { ascending: true })
 
     if (error) {
       console.error('Error fetching profiles in /api/master-data/users:', error)
@@ -25,7 +25,7 @@ export async function GET() {
         employeeId: cleanId,
         fullName: cleanName,
         displayName: formatUserMasterDisplayName(cleanName, cleanId),
-        department: resolveDepartmentFromEmployeeId(cleanId, u.role),
+        department: u.department || resolveDepartmentFromEmployeeId(cleanId, u.role),
         role: u.role
       }
     })

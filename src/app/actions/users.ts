@@ -24,6 +24,7 @@ export async function createUser(formData: {
   employee_id: string
   full_name: string
   role: string
+  department?: string
   password?: string
 }) {
   try {
@@ -39,7 +40,8 @@ export async function createUser(formData: {
       user_metadata: {
         employee_id: formData.employee_id,
         full_name: formData.full_name,
-        role: formData.role
+        role: formData.role,
+        department: formData.department
       }
     })
 
@@ -57,7 +59,8 @@ export async function createUser(formData: {
         id: userId,
         employee_id: formData.employee_id,
         full_name: formData.full_name,
-        role: formData.role
+        role: formData.role,
+        department: formData.department
       })
 
     if (profileError) {
@@ -78,6 +81,7 @@ export async function createUser(formData: {
 export async function updateUser(userId: string, formData: {
   full_name: string
   role: string
+  department?: string
   password?: string
 }) {
   try {
@@ -89,7 +93,8 @@ export async function updateUser(userId: string, formData: {
         password: formData.password,
         user_metadata: {
           full_name: formData.full_name,
-          role: formData.role
+          role: formData.role,
+          department: formData.department
         }
       })
       if (authError) {
@@ -101,7 +106,8 @@ export async function updateUser(userId: string, formData: {
       const { error: authError } = await adminClient.auth.admin.updateUserById(userId, {
         user_metadata: {
           full_name: formData.full_name,
-          role: formData.role
+          role: formData.role,
+          department: formData.department
         }
       })
       if (authError) {
@@ -111,12 +117,17 @@ export async function updateUser(userId: string, formData: {
     }
 
     // 2. Update profiles table
+    const updatePayload: Record<string, any> = {
+      full_name: formData.full_name,
+      role: formData.role
+    }
+    if (formData.department !== undefined) {
+      updatePayload.department = formData.department
+    }
+
     const { error: profileError } = await adminClient
       .from('profiles')
-      .update({
-        full_name: formData.full_name,
-        role: formData.role
-      })
+      .update(updatePayload)
       .eq('id', userId)
 
     if (profileError) {

@@ -51,9 +51,23 @@ export function formatUserMasterDisplayName(fullName: string, employeeId: string
   return `${cleanName} (${cleanId})`
 }
 
-/**
- * Master Data Users seeded from Supabase profiles
- */
+export const STANDARD_DEPARTMENTS: string[] = [
+  'แผนกบรรจุและแพ็กกิ้ง (Packing Department)',
+  'แผนกผสม (Mixing Department)',
+  'แผนก RM (Raw Materials / Warehouse)',
+  'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)',
+  'ฝ่ายควบคุมคุณภาพ (Quality Control - QC)',
+  'ฝ่ายประกันคุณภาพ (QA)',
+  'ฝ่ายวิจัยและพัฒนา (R&D)',
+  'ฝ่ายทรัพยากรบุคคล (HR)',
+  'ฝ่ายบัญชีและการเงิน (Accounting)',
+  'ฝ่ายวางแผนการผลิต (Planning)',
+  'ฝ่ายจัดซื้อ (Purchasing)',
+  'ฝ่ายบริหาร / ผู้บริหาร (Executive)',
+  'ฝ่ายผลิตทั่วไป (Production)',
+  'ฝ่ายบริการทั่วไป & อาคารสถานที่ (Facilities & Service)'
+]
+
 export const INITIAL_MASTER_USERS: MasterUserOption[] = [
   { employeeId: 'pkbjp518', fullName: 'คุณเบ็ญจพร พูลสวัสดิ์', displayName: 'คุณเบ็ญจพร พูลสวัสดิ์ (pkbjp518)', department: 'แผนกบรรจุและแพ็กกิ้ง (Packing Department)' },
   { employeeId: 'PDSIF1932', fullName: 'คุณศิรินภา แฝงกระโทก', displayName: 'คุณศิรินภา แฝงกระโทก (PDSIF1932)', department: 'ฝ่ายผลิตทั่วไป (Production)' },
@@ -79,7 +93,7 @@ export const INITIAL_MASTER_USERS: MasterUserOption[] = [
   { employeeId: 'QABUP1677', fullName: 'คุณบรรเจิด พึ่งกระจ่าง', displayName: 'คุณบรรเจิด พึ่งกระจ่าง (QABUP1677)', department: 'ฝ่ายประกันคุณภาพ (QA)' },
   { employeeId: 'mxktj620', fullName: 'คุณกิตติศักดิ์ จิระพนาวัลย์', displayName: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620)', department: 'แผนกผสม (Mixing Department)' },
   { employeeId: 'mmcys026', fullName: 'คุณชญาดา สังข์สำรวม', displayName: 'คุณชญาดา สังข์สำรวม (mmcys026)', department: 'แผนก RM (Raw Materials / Warehouse)' }
-]
+].sort((a, b) => a.fullName.localeCompare(b.fullName, 'th'))
 
 export function isGenericPlaceholder(val: string): boolean {
   if (!val) return true

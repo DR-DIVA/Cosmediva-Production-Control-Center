@@ -132,7 +132,7 @@ export default function NameAutocompleteInput({
 
     // Combine: Master Data users take priority
     const combined = [...matchedMaster, ...matchedRecent]
-    return combined.slice(0, 12)
+    return combined
   }, [value, masterUsers, recentNames])
 
   const handleSelect = (item: EnrichedSuggestion) => {
@@ -242,7 +242,7 @@ export default function NameAutocompleteInput({
             <span className="text-[10px] text-stone-400">พบ {suggestions.length} คน</span>
           </div>
 
-          <div className="max-h-60 overflow-y-auto divide-y divide-stone-50 py-1">
+          <div className="max-h-72 overflow-y-auto divide-y divide-stone-50 py-1">
             {suggestions.map((item, index) => {
               const isSelected = item.displayName.toLowerCase() === (value || '').trim().toLowerCase()
               const isHighlighted = index === highlightedIndex

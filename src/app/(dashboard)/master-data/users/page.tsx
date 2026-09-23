@@ -38,6 +38,7 @@ import {
   getRoleDisplay,
   AccessLevel 
 } from '@/lib/permissions'
+import { STANDARD_DEPARTMENTS, resolveDepartmentFromEmployeeId } from '@/lib/userMemory'
 
 // Module groups for organized display
 const MODULE_GROUPS = [
@@ -95,6 +96,7 @@ export default function UsersPage() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [newUserId, setNewUserId] = useState('')
   const [newUserName, setNewUserName] = useState('')
+  const [newDepartment, setNewDepartment] = useState('')
   const [newUserPassword, setNewUserPassword] = useState('123456')
   const [newUserPerms, setNewUserPerms] = useState<Record<string, 'VIEW' | 'EDIT'>>({})
   const [newUserTemplate, setNewUserTemplate] = useState<string>('custom')
@@ -103,6 +105,7 @@ export default function UsersPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<any>(null)
   const [editUserName, setEditUserName] = useState('')
+  const [editDepartment, setEditDepartment] = useState('')
   const [editUserPassword, setEditUserPassword] = useState('')
   const [editUserPerms, setEditUserPerms] = useState<Record<string, 'VIEW' | 'EDIT'>>({})
   const [editUserTemplate, setEditUserTemplate] = useState<string>('custom')
@@ -218,6 +221,7 @@ export default function UsersPage() {
   const handleOpenAddModal = () => {
     setNewUserId('')
     setNewUserName('')
+    setNewDepartment('')
     setNewUserPassword('123456')
     setNewUserPerms({})
     setNewUserTemplate('custom')
@@ -246,6 +250,7 @@ export default function UsersPage() {
         employee_id: newUserId,
         full_name: newUserName,
         role: finalRole,
+        department: newDepartment.trim() || undefined,
         password: newUserPassword
       })
 
@@ -267,6 +272,7 @@ export default function UsersPage() {
   const handleEditClick = (user: any) => {
     setEditingUser(user)
     setEditUserName(user.full_name || '')
+    setEditDepartment(user.department || '')
     setEditUserPassword('')
     
     const parsedPerms = parseRolePermissions(user.role)
@@ -301,9 +307,10 @@ export default function UsersPage() {
       const res = await updateUser(editingUser.id, {
         full_name: editUserName,
         role: finalRole,
+        department: editDepartment.trim() || undefined,
         password: editUserPassword || undefined
       })
-      
+
       if (res.success) {
         toast.success('อัปเดตข้อมูลและสิทธิ์พนักงานสำเร็จเรียบร้อย', { id: toastId })
         setIsEditModalOpen(false)
@@ -602,6 +609,27 @@ export default function UsersPage() {
                   </div>
                 </div>
 
+                <div className="grid gap-1.5">
+                  <Label htmlFor="new_dept" className="text-xs font-bold flex items-center justify-between">
+                    <span>ฝ่าย / แผนกที่สังกัด</span>
+                    <span className="text-[10px] text-slate-400 font-normal">เลือกจากรายการหรือพิมพ์ระบุเอง</span>
+                  </Label>
+                  <Input 
+                    id="new_dept" 
+                    placeholder="เช่น แผนกบรรจุและแพ็กกิ้ง (Packing Department)" 
+                    value={newDepartment}
+                    onChange={(e) => setNewDepartment(e.target.value)}
+                    disabled={isSubmitting}
+                    className="h-9"
+                    list="new-dept-list"
+                  />
+                  <datalist id="new-dept-list">
+                    {STANDARD_DEPARTMENTS.map(d => (
+                      <option key={d} value={d} />
+                    ))}
+                  </datalist>
+                </div>
+
                 <div className="grid gap-1.5 p-2.5 bg-slate-50 border rounded-xl">
                   <Label className="text-slate-500 text-xs flex items-center gap-1.5">
                     <KeyRound className="w-3.5 h-3.5" /> 
@@ -657,6 +685,27 @@ export default function UsersPage() {
                   className="h-9"
                 />
               </div>
+            </div>
+
+            <div className="grid gap-1.5">
+              <Label htmlFor="edit_dept" className="text-xs font-bold flex items-center justify-between">
+                <span>ฝ่าย / แผนกที่สังกัด</span>
+                <span className="text-[10px] text-slate-400 font-normal">เลือกจากรายการหรือพิมพ์ระบุเอง</span>
+              </Label>
+              <Input 
+                id="edit_dept" 
+                placeholder="เช่น แผนกบรรจุและแพ็กกิ้ง (Packing Department)" 
+                value={editDepartment}
+                onChange={(e) => setEditDepartment(e.target.value)}
+                disabled={isSubmitting}
+                className="h-9"
+                list="edit-dept-list"
+              />
+              <datalist id="edit-dept-list">
+                {STANDARD_DEPARTMENTS.map(d => (
+                  <option key={d} value={d} />
+                ))}
+              </datalist>
             </div>
 
             {/* Reset password */}
@@ -722,6 +771,7 @@ export default function UsersPage() {
                 <tr>
                   <th className="px-4 py-3 font-bold">รหัสพนักงาน</th>
                   <th className="px-4 py-3 font-bold">ชื่อ-สกุล</th>
+                  <th className="px-4 py-3 font-bold">ฝ่าย/แผนก</th>
                   <th className="px-4 py-3 font-bold">สิทธิ์โมดูลที่เข้าถึงได้</th>
                   <th className="px-4 py-3 font-bold">วันที่สร้าง</th>
                   <th className="px-4 py-3 font-bold text-right">จัดการ</th>
@@ -730,14 +780,14 @@ export default function UsersPage() {
               <tbody className="divide-y divide-slate-100">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-slate-400">
+                    <td colSpan={6} className="text-center py-10 text-slate-400">
                       <RefreshCw className="w-5 h-5 mx-auto mb-2 animate-spin text-[#D4AF37]" />
                       กำลังโหลดข้อมูลพนักงาน...
                     </td>
                   </tr>
                 ) : filteredUsers.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-slate-500">
+                    <td colSpan={6} className="text-center py-10 text-slate-500">
                       ไม่พบข้อมูลพนักงานที่ค้นหา
                     </td>
                   </tr>
@@ -746,6 +796,7 @@ export default function UsersPage() {
                     const roleInfo = getRoleDisplay(user.role)
                     const userPerms = parseRolePermissions(user.role)
                     const entries = Object.entries(userPerms)
+                    const dept = user.department || resolveDepartmentFromEmployeeId(user.employee_id, user.role)
 
                     return (
                       <tr key={user.id} className="hover:bg-[#F8F6F0]/80 transition-colors">
@@ -754,6 +805,11 @@ export default function UsersPage() {
                         </td>
                         <td className="px-4 py-3 font-medium text-slate-800">
                           {user.full_name || '-'}
+                        </td>
+                        <td className="px-4 py-3 text-slate-700">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-stone-700 bg-stone-100 px-2 py-0.5 rounded-lg border border-stone-200">
+                            🏢 {dept}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
