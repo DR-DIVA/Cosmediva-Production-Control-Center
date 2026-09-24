@@ -30,11 +30,14 @@ interface MaintenanceHeaderProps {
 
 interface NavItem {
   label: string
-  href: string
+  href?: string
+  onClick?: () => void
   icon: any
   badge?: string
   frameClass: string
   iconClass: string
+  iconFill?: boolean
+  title?: string
 }
 
 export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [] }: MaintenanceHeaderProps) {
@@ -42,7 +45,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
   const [isLineOpen, setIsLineOpen] = useState(false)
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false)
 
-  const row1Items: NavItem[] = [
+  const subMenuItems: NavItem[] = [
     { 
       label: 'ภาพรวมระบบ', 
       href: '/maintenance', 
@@ -92,9 +95,6 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       frameClass: 'bg-rose-50 hover:bg-rose-100 text-rose-950 border border-rose-300 hover:border-rose-400',
       iconClass: 'border border-rose-400 bg-rose-600 text-white' 
     },
-  ]
-
-  const row2NavItems: NavItem[] = [
     { 
       label: 'คลังอะไหล่', 
       href: '/maintenance/spare-parts', 
@@ -116,6 +116,26 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       badge: 'MTEX AI',
       frameClass: 'bg-teal-50 hover:bg-teal-100 text-teal-950 border border-teal-300 hover:border-teal-400',
       iconClass: 'border border-teal-400 bg-teal-600 text-white' 
+    },
+    { 
+      label: 'ตั้งค่า LINE', 
+      onClick: () => setIsLineOpen(true),
+      icon: MessageSquare,
+      iconFill: true,
+      title: 'ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)',
+      frameClass: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400',
+      iconClass: 'border border-emerald-400 bg-[#06C755] text-white' 
+    },
+    { 
+      label: 'สแกน QR หน้าเครื่อง', 
+      onClick: () => {
+        if (onOpenQR) onOpenQR()
+        else setIsQRScannerOpen(true)
+      },
+      icon: QrCode,
+      title: 'สแกน QR Code หน้าเครื่อง เพื่อแจ้งซ่อมหรือดูประวัติ 360°',
+      frameClass: 'bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400',
+      iconClass: 'border border-amber-300 bg-amber-500 text-white' 
     },
   ]
 
@@ -209,63 +229,21 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
         </div>
       </div>
 
-      {/* 11 Sub-Menu Buttons Structured into Exactly 2 Rows */}
-      <div className="bg-white p-2.5 sm:p-3 rounded-3xl border border-stone-200 shadow-sm space-y-2">
-        {/* Row 1: 6 Functional Modules */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
-          {row1Items.map(item => {
-            const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
+      {/* 12 Sub-Menu Buttons Structured into a Seamless Gap-Free Responsive Grid */}
+      <div className="bg-white p-2 sm:p-2.5 md:p-3 rounded-3xl border border-stone-200 shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
+          {subMenuItems.map(item => {
+            const isActive = !!item.href && (pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href)))
             const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
-                  isActive
-                    ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
-                    : `${item.frameClass} shadow-2xs hover:shadow-xs`
-                }`}
-              >
-                {/* Large Icon Container */}
+            const content = (
+              <>
+                {/* Icon Container */}
                 <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
                   isActive
                     ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
                     : `${item.iconClass} shadow-xs`
                 }`}>
-                  <Icon className="w-4 h-4 stroke-[2.2]" />
-                </div>
-
-                {/* Text Label */}
-                <span className={`text-xs font-extrabold truncate ${isActive ? 'text-white' : 'text-inherit'}`}>
-                  {item.label}
-                </span>
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Row 2: 5 Management & Quick Tool Modules */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
-          {row2NavItems.map(item => {
-            const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
-            const Icon = item.icon
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 ${
-                  isActive
-                    ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
-                    : `${item.frameClass} shadow-2xs hover:shadow-xs`
-                }`}
-              >
-                {/* Large Icon Container */}
-                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border transition-transform group-hover:scale-105 ${
-                  isActive
-                    ? 'bg-[#D4AF37] text-stone-950 border-[#D4AF37] shadow-xs'
-                    : `${item.iconClass} shadow-xs`
-                }`}>
-                  <Icon className="w-4 h-4 stroke-[2.2]" />
+                  <Icon className={`w-4 h-4 ${item.iconFill ? 'fill-white stroke-none' : 'stroke-[2.2]'}`} />
                 </div>
 
                 {/* Text Label */}
@@ -278,42 +256,40 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
                     {item.badge}
                   </span>
                 )}
-              </Link>
+              </>
+            )
+
+            const buttonClass = `group flex items-center gap-1.5 sm:gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all w-full min-w-0 justify-start active:scale-95 cursor-pointer ${
+              isActive
+                ? 'bg-[#2A2521] text-white shadow-md border-2 border-[#D4AF37] ring-2 ring-[#D4AF37]/20'
+                : `${item.frameClass} shadow-2xs hover:shadow-xs`
+            }`
+
+            if (item.href) {
+              return (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={buttonClass}
+                  title={item.title || item.label}
+                >
+                  {content}
+                </Link>
+              )
+            }
+
+            return (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.onClick}
+                className={buttonClass}
+                title={item.title || item.label}
+              >
+                {content}
+              </button>
             )
           })}
-
-          {/* LINE Notification Settings Button */}
-          <button
-            type="button"
-            onClick={() => setIsLineOpen(true)}
-            className="group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all active:scale-95 bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400 shadow-2xs hover:shadow-xs cursor-pointer w-full min-w-0 justify-start"
-            title="ตั้งค่า LINE แจ้งเตือนอัจฉริยะ (Multi-Channel Gateway)"
-          >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-emerald-400 bg-[#06C755] text-white shadow-xs transition-transform group-hover:scale-105">
-              <MessageSquare className="w-4 h-4 fill-white stroke-none" />
-            </div>
-            <span className="text-xs font-extrabold text-emerald-950 truncate">
-              ตั้งค่า LINE
-            </span>
-          </button>
-
-          {/* Quick QR Scanner Modal Trigger */}
-          <button
-            type="button"
-            onClick={() => {
-              if (onOpenQR) onOpenQR()
-              else setIsQRScannerOpen(true)
-            }}
-            className="group flex items-center gap-2 px-2.5 py-2 sm:px-3 sm:py-2 rounded-2xl font-bold transition-all active:scale-95 bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400 shadow-2xs hover:shadow-xs cursor-pointer w-full min-w-0 justify-start"
-            title="สแกน QR Code หน้าเครื่อง เพื่อแจ้งซ่อมหรือดูประวัติ 360°"
-          >
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 border border-amber-300 bg-amber-500 text-white shadow-xs transition-transform group-hover:scale-105">
-              <QrCode className="w-4 h-4 stroke-[2.2]" />
-            </div>
-            <span className="text-xs font-extrabold text-amber-950 truncate">
-              สแกน QR หน้าเครื่อง
-            </span>
-          </button>
         </div>
       </div>
 
