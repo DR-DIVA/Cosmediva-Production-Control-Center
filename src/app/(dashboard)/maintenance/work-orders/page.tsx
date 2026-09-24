@@ -49,6 +49,7 @@ import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModa
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { shareToLine } from '@/lib/lineShare'
 
 /**
  * Format live elapsed duration in Thai
@@ -940,17 +941,18 @@ export default function WorkOrdersKanbanPage() {
                               <Send className="w-2.5 h-2.5 text-emerald-600" />
                               <span>📲 LINE</span>
                             </button>
-                            <a
-                              href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(wo))}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
+                            <button
+                              type="button"
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                await shareToLine(getLineShareText(wo))
+                              }}
                               className="flex-1 h-6 rounded-md bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
                               title="แชร์สรุปเข้า LINE ทันที (ไม่มีปัญหาโควตาเต็ม)"
                             >
                               <Share2 className="w-2.5 h-2.5" />
                               <span>🟢 แชร์</span>
-                            </a>
+                            </button>
                           </div>
 
                           {/* Quick Verify button for Test Run & Completed */}
@@ -1495,16 +1497,17 @@ export default function WorkOrdersKanbanPage() {
                   <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
                 </Button>
 
-                <a
-                  href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(detailWO))}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await shareToLine(getLineShareText(detailWO))
+                  }}
                   className="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl transition shadow-2xs h-9 cursor-pointer"
                   title="แชร์ข้อความสรุปเข้าห้องแชต/กลุ่ม LINE ด้วยตนเอง (ใช้ได้ทันทีไม่มีติดโควตา)"
                 >
                   <Share2 className="w-3.5 h-3.5" />
                   <span>🟢 แชร์สรุปเข้า LINE</span>
-                </a>
+                </button>
               </div>
             </div>
 

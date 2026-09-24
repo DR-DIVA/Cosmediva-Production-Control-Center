@@ -38,6 +38,7 @@ import { resendWorkOrderLineAlert } from '@/app/actions/line'
 import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import { getSavedUserName, saveUserName } from '@/lib/userMemory'
+import { shareToLine } from '@/lib/lineShare'
 
 interface FastReportFormProps {
   initialMachine?: MaintenanceMachine | null
@@ -549,16 +550,17 @@ export default function FastReportForm({ initialMachine, machines, initialType }
               <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
             </button>
 
-            <a
-              href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(submittedWO))}`}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={async () => {
+                await shareToLine(getLineShareText(submittedWO))
+              }}
               className="flex-1 py-2.5 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs cursor-pointer"
               title="แชร์ข้อความสรุปเข้าแชต LINE ทันที (ไม่มีปัญหาโควตาเต็ม 100%)"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span>🟢 ส่งต่อเข้า LINE</span>
-            </a>
+            </button>
           </div>
         </div>
 
