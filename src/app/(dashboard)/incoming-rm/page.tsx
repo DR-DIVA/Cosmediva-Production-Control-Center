@@ -19,7 +19,7 @@ import {
   LayoutDashboard, ShoppingCart, Box, Activity, Calendar, Trash2, Edit, 
   Truck, Package, AlertTriangle, Filter, ArrowUp, ArrowDown, ArrowUpDown, 
   Scissors, Plus, X, TrendingUp, Layers, RefreshCw, ShieldCheck, CheckSquare, 
-  Sparkles, Clock, ArrowUpRight, Printer, FileSpreadsheet, History
+  Sparkles, Clock, ArrowUpRight, Printer, FileSpreadsheet, History, CalendarPlus
 } from 'lucide-react';
 import { QuarantineTagModal, QuarantineTagData } from "@/components/warehouse/QuarantineTagModal";
 import { 
@@ -281,6 +281,7 @@ export default function RMControlCenterPage() {
   // Customer Supplied PM State & Quick Search Selector
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
   const [cmd2Form, setCmd2Form] = useState({ 
+    poNo: '',
     pmCode: '', 
     pmName: '', 
     quantity: '', 
@@ -294,7 +295,10 @@ export default function RMControlCenterPage() {
     qtyPerBox: '',
     oddBoxCount: '0',
     oddQtyPerBox: '',
-    mfgLot: '-'
+    mfgLot: '-',
+    etaDate: new Date().toISOString().split('T')[0],
+    remark: '',
+    receiveImmediately: false
   });
   const [cmd2SearchQuery, setCmd2SearchQuery] = useState('');
   const [isCmd2SearchOpen, setIsCmd2SearchOpen] = useState(false);
@@ -303,6 +307,7 @@ export default function RMControlCenterPage() {
   // Customer Supplied RM (R4) State & Quick Search Selector
   const [isR4ModalOpen, setIsR4ModalOpen] = useState(false);
   const [r4Form, setR4Form] = useState({ 
+    poNo: '',
     rmCode: '', 
     rmName: '', 
     quantity: '', 
@@ -317,7 +322,10 @@ export default function RMControlCenterPage() {
     qtyPerBox: '',
     oddBoxCount: '0',
     oddQtyPerBox: '',
-    mfgLot: '-'
+    mfgLot: '-',
+    etaDate: new Date().toISOString().split('T')[0],
+    remark: '',
+    receiveImmediately: false
   });
   const [r4SearchQuery, setR4SearchQuery] = useState('');
   const [isR4SearchOpen, setIsR4SearchOpen] = useState(false);
@@ -1368,29 +1376,9 @@ export default function RMControlCenterPage() {
     }
   };
 
-  const openCmd2Modal = async () => {
-    setIsCmd2ModalOpen(true);
-    setCmd2SearchQuery('');
-    setIsCmd2SearchOpen(false);
-    setCmd2Form({ 
-      pmCode: '', 
-      pmName: '', 
-      quantity: '', 
-      customerName: '', 
-      lotProduct: '', 
-      warehouse: 'MMPM', 
-      controlNo: '',
-      packageType: 'ลัง',
-      customPackageType: '',
-      boxCount: '1',
-      qtyPerBox: '',
-      oddBoxCount: '0',
-      oddQtyPerBox: '',
-      mfgLot: '-'
-    });
-    
+  const generateDailyControlNo = async (warehouse: 'MMRM' | 'MMPM') => {
     try {
-      const prefix = 'P';
+      const prefix = warehouse === 'MMRM' ? 'R' : 'P';
       const d = new Date();
       const yy = d.getFullYear().toString().slice(2);
       const mm = String(d.getMonth() + 1).padStart(2, '0');
@@ -1422,11 +1410,37 @@ export default function RMControlCenterPage() {
         }
       }
 
-      const generatedControlNo = `${prefix}${dateString}-${String(nextIndex).padStart(2, '0')}`;
-      setCmd2Form(prev => ({ ...prev, controlNo: generatedControlNo }));
+      return `${prefix}${dateString}-${String(nextIndex).padStart(2, '0')}`;
     } catch (err) {
-      console.error('Error generating CMD2 control_no:', err);
+      console.error('Error generating control_no:', err);
+      return '';
     }
+  };
+
+  const openCmd2Modal = async () => {
+    setIsCmd2ModalOpen(true);
+    setCmd2SearchQuery('');
+    setIsCmd2SearchOpen(false);
+    setCmd2Form({ 
+      poNo: '',
+      pmCode: '', 
+      pmName: '', 
+      quantity: '', 
+      customerName: '', 
+      lotProduct: '', 
+      warehouse: 'MMPM', 
+      controlNo: '',
+      packageType: 'ลัง',
+      customPackageType: '',
+      boxCount: '1',
+      qtyPerBox: '',
+      oddBoxCount: '0',
+      oddQtyPerBox: '',
+      mfgLot: '-',
+      etaDate: new Date().toISOString().split('T')[0],
+      remark: '',
+      receiveImmediately: false
+    });
   };
 
   const handleCmd2Submit = async (e: React.FormEvent) => {
@@ -1436,7 +1450,7 @@ export default function RMControlCenterPage() {
       return;
     }
 
-    if (cmd2Form.controlNo.trim()) {
+    if (cmd2Form.receiveImmediately && cmd2Form.controlNo.trim()) {
       const { data: duplicateData } = await supabase
         .from('production_lot_rms')
         .select('id')
@@ -1451,110 +1465,138 @@ export default function RMControlCenterPage() {
 
     setUploading(true);
     
-    // Generate pseudo PO/PR number: CMD2-YYMMAAA
-    const d = new Date();
-    const yy = d.getFullYear().toString().slice(2);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const monthPrefix = `CMD2-${yy}${mm}`;
+    // Generate pseudo PO/PR number if not provided: PMYYMMAAA or CMD2-YYMMAAA
+    let finalPo = cmd2Form.poNo?.trim();
+    if (!finalPo) {
+      const d = new Date();
+      const yy = d.getFullYear().toString().slice(2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const monthPrefix = `PM${yy}${mm}`;
 
-    const { data: poList } = await supabase
-      .from('production_lot_rms')
-      .select('po_no')
-      .like('po_no', `${monthPrefix}%`);
+      const { data: poList } = await supabase
+        .from('production_lot_rms')
+        .select('po_no')
+        .like('po_no', `${monthPrefix}%`);
 
-    let nextSeq = 1;
-    if (poList && poList.length > 0) {
-      const seqs = poList
-        .map((p: any) => {
-          if (!p.po_no) return 0;
-          const numPart = p.po_no.replace(monthPrefix, '');
-          return parseInt(numPart, 10);
-        })
-        .filter((n: number) => !isNaN(n) && n > 0);
-      if (seqs.length > 0) {
-        nextSeq = Math.max(...seqs) + 1;
+      let nextSeq = 1;
+      if (poList && poList.length > 0) {
+        const seqs = poList
+          .map((p: any) => {
+            if (!p.po_no) return 0;
+            const numPart = p.po_no.replace(monthPrefix, '');
+            return parseInt(numPart, 10);
+          })
+          .filter((n: number) => !isNaN(n) && n > 0);
+        if (seqs.length > 0) {
+          nextSeq = Math.max(...seqs) + 1;
+        }
       }
+      finalPo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     }
-    const fakePo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     
     // If no code is provided, generate a pseudo one
     const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
-    
     const qtyVal = parseFloat(cmd2Form.quantity) || 0;
-    const bCount = parseInt(cmd2Form.boxCount, 10) || 1;
-    const pBox = parseFloat(cmd2Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
-    const oddBCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
-    const oddPBox = parseFloat(cmd2Form.oddQtyPerBox) || 0;
-    const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
-      ? (cmd2Form.customPackageType.trim() || 'ลัง') 
-      : (cmd2Form.packageType || 'ลัง');
-    const mfgLotStr = cmd2Form.mfgLot && cmd2Form.mfgLot.trim() ? cmd2Form.mfgLot.trim() : '-';
 
-    const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ชิ้น${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ชิ้น` : ''}`;
-    const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+    if (cmd2Form.receiveImmediately) {
+      // Immediate receiving mode
+      const bCount = parseInt(cmd2Form.boxCount, 10) || 1;
+      const pBox = parseFloat(cmd2Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+      const oddBCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+      const oddPBox = parseFloat(cmd2Form.oddQtyPerBox) || 0;
+      const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
+        ? (cmd2Form.customPackageType.trim() || 'ลัง') 
+        : (cmd2Form.packageType || 'ลัง');
+      const mfgLotStr = cmd2Form.mfgLot && cmd2Form.mfgLot.trim() ? cmd2Form.mfgLot.trim() : '-';
 
-    const { error } = await supabase.from('production_lot_rms').insert({
-      po_no: fakePo,
-      pr_no: fakePo,
-      supplier: cmd2Form.customerName,
-      rm_code: fakeCode,
-      rm_name: cmd2Form.pmName,
-      quantity: qtyVal,
-      received_qty: qtyVal,
-      unit: 'pcs',
-      warehouse: cmd2Form.warehouse || 'MMPM',
-      lot_product: cmd2Form.lotProduct,
-      control_no: cmd2Form.controlNo.trim() || undefined,
-      status: 'RECEIVED',
-      receive_date: new Date().toISOString(),
-      remark: pkgStr
-    });
+      const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ชิ้น${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ชิ้น` : ''}`;
+      const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+      const combinedRemark = cmd2Form.remark?.trim() 
+        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()} • ${pkgStr}` 
+        : `[บรรจุภัณฑ์ลูกค้า CMD2] ${pkgStr}`;
 
-    setUploading(false);
-
-    if (error) {
-      toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ: ' + error.message);
-    } else {
-      toast.success(`รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${fakePo})`);
-      setIsCmd2ModalOpen(false);
-
-      // Auto open Quarantine Tag Modal with full packaging & barcode
-      setQuarantineTagData({
-        name: cmd2Form.pmName,
-        code: fakeCode,
-        controlNo: cmd2Form.controlNo.trim() || '',
+      const { error } = await supabase.from('production_lot_rms').insert({
+        po_no: finalPo,
+        pr_no: finalPo,
         supplier: cmd2Form.customerName,
-        totalQty: qtyVal,
-        unit: 'ชิ้น',
-        boxCount: bCount,
-        qtyPerBox: pBox,
-        packageType: effectivePkg,
-        oddBoxCount: oddBCount,
-        oddQtyPerBox: oddPBox,
-        mfgLot: mfgLotStr,
-        receivedBy: currentUser || 'คลังสินค้า',
-        receivedDate: new Date().toISOString(),
-        docRev: 'PM-WT-001A Rev.02'
+        rm_code: fakeCode,
+        rm_name: cmd2Form.pmName,
+        quantity: qtyVal,
+        received_qty: qtyVal,
+        unit: 'pcs',
+        warehouse: cmd2Form.warehouse || 'MMPM',
+        lot_product: cmd2Form.lotProduct || null,
+        control_no: cmd2Form.controlNo.trim() || undefined,
+        status: 'RECEIVED',
+        receive_date: new Date().toISOString(),
+        po_date: new Date().toISOString(),
+        eta_date: cmd2Form.etaDate ? new Date(`${cmd2Form.etaDate}T12:00:00Z`).toISOString() : new Date().toISOString(),
+        remark: combinedRemark
       });
-      setIsQuarantineTagOpen(true);
 
-      setCmd2Form({ 
-        pmCode: '', 
-        pmName: '', 
-        quantity: '', 
-        customerName: '', 
-        lotProduct: '', 
-        warehouse: 'MMPM', 
-        controlNo: '',
-        packageType: 'ลัง',
-        customPackageType: '',
-        boxCount: '1',
-        qtyPerBox: '',
-        oddBoxCount: '0',
-        oddQtyPerBox: '',
-        mfgLot: '-'
+      setUploading(false);
+
+      if (error) {
+        toast.error('บันทึกข้อมูลบรรจุภัณฑ์ลูกค้าไม่สำเร็จ: ' + error.message);
+      } else {
+        toast.success(`รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${finalPo})`);
+        setIsCmd2ModalOpen(false);
+
+        // Auto open Quarantine Tag Modal with full packaging & barcode
+        setQuarantineTagData({
+          name: cmd2Form.pmName,
+          code: fakeCode,
+          controlNo: cmd2Form.controlNo.trim() || '',
+          supplier: cmd2Form.customerName,
+          totalQty: qtyVal,
+          unit: 'ชิ้น',
+          boxCount: bCount,
+          qtyPerBox: pBox,
+          packageType: effectivePkg,
+          oddBoxCount: oddBCount,
+          oddQtyPerBox: oddPBox,
+          mfgLot: mfgLotStr,
+          receivedBy: currentUser || 'คลังสินค้า',
+          receivedDate: new Date().toISOString(),
+          docRev: 'PM-WT-001A Rev.02'
+        });
+        setIsQuarantineTagOpen(true);
+        fetchItems();
+      }
+    } else {
+      // Pending Delivery mode (Default for Sales Admin: awaiting physical delivery)
+      const combinedRemark = cmd2Form.remark?.trim() 
+        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()}` 
+        : '[บรรจุภัณฑ์ลูกค้า CMD2]';
+
+      const { error } = await supabase.from('production_lot_rms').insert({
+        po_no: finalPo,
+        pr_no: finalPo,
+        supplier: cmd2Form.customerName,
+        rm_code: fakeCode,
+        rm_name: cmd2Form.pmName,
+        quantity: qtyVal,
+        received_qty: null,
+        unit: 'ชิ้น',
+        warehouse: cmd2Form.warehouse || 'MMPM',
+        lot_product: cmd2Form.lotProduct || null,
+        control_no: null,
+        status: 'PENDING_DELIVERY',
+        receive_date: null,
+        po_date: new Date().toISOString(),
+        eta_date: cmd2Form.etaDate ? new Date(`${cmd2Form.etaDate}T12:00:00Z`).toISOString() : new Date().toISOString(),
+        remark: combinedRemark
       });
-      fetchItems();
+
+      setUploading(false);
+
+      if (error) {
+        toast.error('บันทึกแจ้งรอรับเข้าไม่สำเร็จ: ' + error.message);
+      } else {
+        toast.success(`บันทึกแจ้งรอรับเข้าบรรจุภัณฑ์ลูกค้า (CMD2) สำเร็จ! (เลขที่ ${finalPo}) รายการเข้าคิวใน Purchasing View & แผนกคลังแล้ว`);
+        setIsCmd2ModalOpen(false);
+        fetchItems();
+      }
     }
   };
 
@@ -1563,6 +1605,7 @@ export default function RMControlCenterPage() {
     setR4SearchQuery('');
     setIsR4SearchOpen(false);
     setR4Form({ 
+      poNo: '',
       rmCode: '', 
       rmName: '', 
       quantity: '', 
@@ -1577,46 +1620,21 @@ export default function RMControlCenterPage() {
       qtyPerBox: '',
       oddBoxCount: '0',
       oddQtyPerBox: '',
-      mfgLot: '-'
+      mfgLot: '-',
+      etaDate: new Date().toISOString().split('T')[0],
+      remark: '',
+      receiveImmediately: false
     });
-    
-    try {
-      const prefix = 'R';
-      const d = new Date();
-      const yy = d.getFullYear().toString().slice(2);
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const dateString = `${yy}${mm}${dd}`;
-      const searchPattern = `${prefix}${dateString}-%`;
-
-      const { data, error } = await supabase
-        .from('production_lot_rms')
-        .select('control_no')
-        .like('control_no', searchPattern);
-
-      let nextNum = 1;
-      if (!error && data && data.length > 0) {
-        const nums = data
-          .map((d: any) => {
-            if (!d.control_no) return 0;
-            const parts = d.control_no.split('-');
-            return parts.length === 2 ? parseInt(parts[1], 10) : 0;
-          })
-          .filter((n: number) => !isNaN(n) && n > 0);
-        if (nums.length > 0) {
-          nextNum = Math.max(...nums) + 1;
-        }
-      }
-      setR4Form(prev => ({ ...prev, controlNo: `${prefix}${dateString}-${String(nextNum).padStart(2, '0')}` }));
-    } catch (error) {
-      console.error("Error generating control no for R4:", error);
-    }
   };
 
   const handleR4Submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!r4Form.rmName || !r4Form.quantity || !r4Form.customerName) {
+      toast.error('กรุณากรอกข้อมูลที่จำเป็น (*) ให้ครบถ้วน');
+      return;
+    }
 
-    if (r4Form.controlNo.trim()) {
+    if (r4Form.receiveImmediately && r4Form.controlNo.trim()) {
       const { data: duplicateData } = await supabase
         .from('production_lot_rms')
         .select('id')
@@ -1631,111 +1649,139 @@ export default function RMControlCenterPage() {
 
     setUploading(true);
     
-    // Generate pseudo PO/PR number: RMYYMMAAA
-    const d = new Date();
-    const yy = d.getFullYear().toString().slice(2);
-    const mm = String(d.getMonth() + 1).padStart(2, '0');
-    const monthPrefix = `RM${yy}${mm}`;
+    // Generate pseudo PO/PR number if not provided: RMYYMMAAA
+    let finalPo = r4Form.poNo?.trim();
+    if (!finalPo) {
+      const d = new Date();
+      const yy = d.getFullYear().toString().slice(2);
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const monthPrefix = `RM${yy}${mm}`;
 
-    const { data: poList } = await supabase
-      .from('production_lot_rms')
-      .select('po_no')
-      .like('po_no', `${monthPrefix}%`);
+      const { data: poList } = await supabase
+        .from('production_lot_rms')
+        .select('po_no')
+        .like('po_no', `${monthPrefix}%`);
 
-    let nextSeq = 1;
-    if (poList && poList.length > 0) {
-      const seqs = poList
-        .map((p: any) => {
-          if (!p.po_no) return 0;
-          const numPart = p.po_no.replace(monthPrefix, '');
-          return parseInt(numPart, 10);
-        })
-        .filter((n: number) => !isNaN(n) && n > 0);
-      if (seqs.length > 0) {
-        nextSeq = Math.max(...seqs) + 1;
+      let nextSeq = 1;
+      if (poList && poList.length > 0) {
+        const seqs = poList
+          .map((p: any) => {
+            if (!p.po_no) return 0;
+            const numPart = p.po_no.replace(monthPrefix, '');
+            return parseInt(numPart, 10);
+          })
+          .filter((n: number) => !isNaN(n) && n > 0);
+        if (seqs.length > 0) {
+          nextSeq = Math.max(...seqs) + 1;
+        }
       }
+      finalPo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     }
-    const fakePo = `${monthPrefix}${String(nextSeq).padStart(3, '0')}`;
     
     // If no code is provided, generate a pseudo one
     const cleanCustomer = r4Form.customerName.replace(/[^a-zA-Z0-9]/g, '').substring(0,3).toUpperCase() || 'CUS';
     const fakeCode = r4Form.rmCode.trim() || `R4-${cleanCustomer}-${Date.now().toString().slice(-4)}`;
     const qtyVal = parseFloat(r4Form.quantity) || 0;
-    const bCount = parseInt(r4Form.boxCount, 10) || 1;
-    const pBox = parseFloat(r4Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
-    const oddBCount = parseInt(r4Form.oddBoxCount, 10) || 0;
-    const oddPBox = parseFloat(r4Form.oddQtyPerBox) || 0;
-    const effectivePkg = r4Form.packageType === 'อื่นๆ' 
-      ? (r4Form.customPackageType.trim() || 'ถัง') 
-      : (r4Form.packageType || 'ถัง');
-    const mfgLotStr = r4Form.mfgLot && r4Form.mfgLot.trim() ? r4Form.mfgLot.trim() : '-';
 
-    const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ${r4Form.unit || 'KG'}${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ${r4Form.unit || 'KG'}` : ''}`;
-    const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+    if (r4Form.receiveImmediately) {
+      // Immediate receiving mode
+      const bCount = parseInt(r4Form.boxCount, 10) || 1;
+      const pBox = parseFloat(r4Form.qtyPerBox) || (qtyVal > 0 && bCount > 0 ? Math.ceil(qtyVal / bCount) : 0);
+      const oddBCount = parseInt(r4Form.oddBoxCount, 10) || 0;
+      const oddPBox = parseFloat(r4Form.oddQtyPerBox) || 0;
+      const effectivePkg = r4Form.packageType === 'อื่นๆ' 
+        ? (r4Form.customPackageType.trim() || 'ถัง') 
+        : (r4Form.packageType || 'ถัง');
+      const mfgLotStr = r4Form.mfgLot && r4Form.mfgLot.trim() ? r4Form.mfgLot.trim() : '-';
 
-    const { error } = await supabase.from('production_lot_rms').insert({
-      po_no: fakePo,
-      pr_no: fakePo,
-      supplier: r4Form.customerName,
-      rm_code: fakeCode,
-      rm_name: r4Form.rmName,
-      quantity: qtyVal,
-      received_qty: qtyVal,
-      unit: r4Form.unit || 'KG',
-      warehouse: r4Form.warehouse || 'MMRM',
-      lot_product: r4Form.lotProduct,
-      control_no: r4Form.controlNo.trim() || undefined,
-      status: 'RECEIVED',
-      receive_date: new Date().toISOString(),
-      remark: pkgStr
-    });
+      const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ${r4Form.unit || 'KG'}${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ${r4Form.unit || 'KG'}` : ''}`;
+      const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
+      const combinedRemark = r4Form.remark?.trim() 
+        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()} • ${pkgStr}` 
+        : `[วัตถุดิบลูกค้า R4] ${pkgStr}`;
 
-    setUploading(false);
-
-    if (error) {
-      toast.error('บันทึกข้อมูลวัตถุดิบลูกค้าไม่สำเร็จ: ' + error.message);
-    } else {
-      toast.success(`รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${fakePo})`);
-      setIsR4ModalOpen(false);
-
-      // Auto open Quarantine Tag Modal with container type and odd boxes
-      setQuarantineTagData({
-        name: r4Form.rmName,
-        code: fakeCode,
-        controlNo: r4Form.controlNo.trim() || '',
+      const { error } = await supabase.from('production_lot_rms').insert({
+        po_no: finalPo,
+        pr_no: finalPo,
         supplier: r4Form.customerName,
-        totalQty: qtyVal,
+        rm_code: fakeCode,
+        rm_name: r4Form.rmName,
+        quantity: qtyVal,
+        received_qty: qtyVal,
         unit: r4Form.unit || 'KG',
-        packageType: effectivePkg,
-        boxCount: bCount,
-        qtyPerBox: pBox,
-        oddBoxCount: oddBCount,
-        oddQtyPerBox: oddPBox,
-        mfgLot: mfgLotStr,
-        receivedBy: currentUser || 'คลังสินค้า',
-        receivedDate: new Date().toISOString(),
-        docRev: 'RM-WT-001A Rev.02'
+        warehouse: r4Form.warehouse || 'MMRM',
+        lot_product: r4Form.lotProduct || null,
+        control_no: r4Form.controlNo.trim() || undefined,
+        status: 'RECEIVED',
+        receive_date: new Date().toISOString(),
+        po_date: new Date().toISOString(),
+        eta_date: r4Form.etaDate ? new Date(`${r4Form.etaDate}T12:00:00Z`).toISOString() : new Date().toISOString(),
+        remark: combinedRemark
       });
-      setIsQuarantineTagOpen(true);
 
-      setR4Form({ 
-        rmCode: '', 
-        rmName: '', 
-        quantity: '', 
-        unit: 'KG', 
-        customerName: '', 
-        lotProduct: '', 
-        warehouse: 'MMRM', 
-        controlNo: '',
-        packageType: 'ถัง',
-        customPackageType: '',
-        boxCount: '1',
-        qtyPerBox: '',
-        oddBoxCount: '0',
-        oddQtyPerBox: '',
-        mfgLot: '-'
+      setUploading(false);
+
+      if (error) {
+        toast.error('บันทึกข้อมูลวัตถุดิบลูกค้าไม่สำเร็จ: ' + error.message);
+      } else {
+        toast.success(`รับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${finalPo})`);
+        setIsR4ModalOpen(false);
+
+        // Auto open Quarantine Tag Modal with container type and odd boxes
+        setQuarantineTagData({
+          name: r4Form.rmName,
+          code: fakeCode,
+          controlNo: r4Form.controlNo.trim() || '',
+          supplier: r4Form.customerName,
+          totalQty: qtyVal,
+          unit: r4Form.unit || 'KG',
+          packageType: effectivePkg,
+          boxCount: bCount,
+          qtyPerBox: pBox,
+          oddBoxCount: oddBCount,
+          oddQtyPerBox: oddPBox,
+          mfgLot: mfgLotStr,
+          receivedBy: currentUser || 'คลังสินค้า',
+          receivedDate: new Date().toISOString(),
+          docRev: 'RM-WT-001A Rev.02'
+        });
+        setIsQuarantineTagOpen(true);
+        fetchItems();
+      }
+    } else {
+      // Pending Delivery mode (Default for Sales Admin: awaiting physical delivery)
+      const combinedRemark = r4Form.remark?.trim() 
+        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()}` 
+        : '[วัตถุดิบลูกค้า R4]';
+
+      const { error } = await supabase.from('production_lot_rms').insert({
+        po_no: finalPo,
+        pr_no: finalPo,
+        supplier: r4Form.customerName,
+        rm_code: fakeCode,
+        rm_name: r4Form.rmName,
+        quantity: qtyVal,
+        received_qty: null,
+        unit: r4Form.unit || 'KG',
+        warehouse: r4Form.warehouse || 'MMRM',
+        lot_product: r4Form.lotProduct || null,
+        control_no: null,
+        status: 'PENDING_DELIVERY',
+        receive_date: null,
+        po_date: new Date().toISOString(),
+        eta_date: r4Form.etaDate ? new Date(`${r4Form.etaDate}T12:00:00Z`).toISOString() : new Date().toISOString(),
+        remark: combinedRemark
       });
-      fetchItems();
+
+      setUploading(false);
+
+      if (error) {
+        toast.error('บันทึกแจ้งรอรับเข้าไม่สำเร็จ: ' + error.message);
+      } else {
+        toast.success(`บันทึกแจ้งรอรับเข้าวัตถุดิบลูกค้า (R4) สำเร็จ! (เลขที่ ${finalPo}) รายการเข้าคิวใน Purchasing View & แผนกคลังแล้ว`);
+        setIsR4ModalOpen(false);
+        fetchItems();
+      }
     }
   };
 
@@ -2445,13 +2491,15 @@ export default function RMControlCenterPage() {
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
           {mainTab === 'rm' && (
-            <Button onClick={openR4Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0">
-              + รับเข้าวัตถุดิบลูกค้า (R4)
+            <Button onClick={openR4Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm">
+              <CalendarPlus className="w-4 h-4" />
+              + แจ้งรอรับเข้าวัตถุดิบลูกค้า (R4)
             </Button>
           )}
           {mainTab === 'pm' && (
-            <Button onClick={openCmd2Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0">
-              + รับเข้าวัสดุลูกค้า (CMD2)
+            <Button onClick={openCmd2Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm">
+              <CalendarPlus className="w-4 h-4" />
+              + แจ้งรอรับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
             </Button>
           )}
         </div>
@@ -3198,6 +3246,19 @@ export default function RMControlCenterPage() {
                           </TableCell>
                           <TableCell>
                             <div className="flex items-center justify-end gap-1">
+                              {(item.status === 'PENDING_DELIVERY' || item.status === 'ORDERED' || item.status === 'DELAYED' || item.status === 'REVISED') && (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  onClick={() => openReceiveModal(item)} 
+                                  disabled={!(currentUser?.toUpperCase().startsWith('PU') || currentUser?.toUpperCase().startsWith('ADMIN') || currentUser?.toUpperCase().startsWith('WH') || currentUser?.toUpperCase().startsWith('MM') || userRole === 'admin')}
+                                  className="h-7 px-2 text-xs font-bold text-emerald-700 bg-emerald-50 border-emerald-300 hover:bg-emerald-100 hover:border-emerald-400 flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                                  title="รับของเข้าคลัง (ออก Control No. และพิมพ์ Quarantine Tag)"
+                                >
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                                  <span className="hidden sm:inline">รับของ</span>
+                                </Button>
+                              )}
                               <Button 
                                 variant="ghost" 
                                 size="icon" 
@@ -3559,18 +3620,29 @@ export default function RMControlCenterPage() {
                               const currentLabel = item.status === 'DELAYED' ? 'Delayed เข้าล่าช้า' : (item.status === 'REVISED' ? 'Revised รอรับเข้ารอบใหม่' : 'Ordered รอรับเข้า');
 
                               return (
-                                <Select 
-                                  value={currentVal} 
-                                  onValueChange={(val) => val && handleStatusChange(item, val)}
-                                >
-                                  <SelectTrigger className="w-[155px] h-8 text-xs font-medium">
-                                    <SelectValue>{currentLabel}</SelectValue>
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value={currentVal}>{currentLabel}</SelectItem>
-                                    <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                                <div className="flex items-center gap-1.5">
+                                  <Select 
+                                    value={currentVal} 
+                                    onValueChange={(val) => val && handleStatusChange(item, val)}
+                                  >
+                                    <SelectTrigger className="w-[145px] h-8 text-xs font-medium">
+                                      <SelectValue>{currentLabel}</SelectValue>
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value={currentVal}>{currentLabel}</SelectItem>
+                                      <SelectItem value="RECEIVED">Received รับของแล้ว</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  <Button
+                                    size="sm"
+                                    onClick={() => openReceiveModal(item)}
+                                    className="h-8 px-2.5 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1 shadow-2xs shrink-0 cursor-pointer"
+                                    title="รับของเข้าคลัง (ออก Control No. และพิมพ์ Quarantine Tag)"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                    <span>รับเข้า</span>
+                                  </Button>
+                                </div>
                               );
                             })()}
                           </TableCell>
@@ -4272,16 +4344,67 @@ export default function RMControlCenterPage() {
 
       {/* Customer Supplied PM Modal */}
       <Dialog open={isCmd2ModalOpen} onOpenChange={setIsCmd2ModalOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-xl w-full">
+        <DialogContent className="sm:max-w-md md:max-w-xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[#4A4238] flex items-center gap-2">
-              <Package className="w-5 h-5 text-[#D4AF37]" />
-              รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
+            <DialogTitle className="text-[#4A4238] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Package className="w-5 h-5 text-[#D4AF37]" />
+                <span>
+                  {cmd2Form.receiveImmediately ? 'รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)' : 'แจ้งรอรับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)'}
+                </span>
+              </div>
+              <Badge variant="outline" className={!cmd2Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs"}>
+                {!cmd2Form.receiveImmediately ? "รอรับเข้า (Pending)" : "รับเข้าทันที (Immediate)"}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleCmd2Submit} className="space-y-4 py-3">
+
+          {/* Mode Switcher */}
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 mt-1">
+            <button
+              type="button"
+              onClick={() => setCmd2Form(prev => ({ ...prev, receiveImmediately: false, controlNo: '' }))}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                !cmd2Form.receiveImmediately 
+                  ? 'bg-white text-emerald-800 shadow-xs border border-emerald-300' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>📅 แจ้งรอรับเข้าล่วงหน้า (ยังไม่ได้รับของ)</span>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                let cNo = cmd2Form.controlNo;
+                if (!cNo) {
+                  cNo = await generateDailyControlNo('MMPM');
+                }
+                setCmd2Form(prev => ({ ...prev, receiveImmediately: true, controlNo: cNo }));
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                cmd2Form.receiveImmediately 
+                  ? 'bg-[#D4AF37] text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>⚡ ของมาถึงแล้ว (รับเข้าคลังทันที)</span>
+            </button>
+          </div>
+
+          {!cmd2Form.receiveImmediately && (
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+              <CalendarPlus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า:</span> รายการจะถูกบันทึกเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงโรงงานจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ป้าย Quarantine Tag ตามขั้นตอนปกติ
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleCmd2Submit} className="space-y-4 py-2">
             {/* Quick Part Selector Dropdown */}
-            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-sm space-y-2">
+            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#D4AF37]" />
@@ -4365,14 +4488,15 @@ export default function RMControlCenterPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>ชื่อลูกค้า (Customer Name) <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">ชื่อลูกค้า (Customer Name) <span className="text-red-500">*</span></Label>
               <Input 
                 required 
                 list="cmd2-customer-datalist"
                 value={cmd2Form.customerName} 
                 onChange={e => setCmd2Form({...cmd2Form, customerName: e.target.value})} 
                 placeholder="เช่น บริษัท เอบีซี จำกัด หรือเลือกจากตัวช่วยด้านบน" 
+                className="text-xs bg-white"
               />
               <datalist id="cmd2-customer-datalist">
                 {uniqueCustomerList.map((c, i) => (
@@ -4380,19 +4504,57 @@ export default function RMControlCenterPage() {
                 ))}
               </datalist>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>รหัสบรรจุภัณฑ์ (PM Code)</Label>
-                <Input value={cmd2Form.pmCode} onChange={e => setCmd2Form({...cmd2Form, pmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (CMD2-xxx)" />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">เลขที่ PO / เอกสารอ้างอิง</Label>
+                <Input 
+                  value={cmd2Form.poNo} 
+                  onChange={e => setCmd2Form({...cmd2Form, poNo: e.target.value})} 
+                  placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (PM-YYMMxxx)" 
+                  className="text-xs bg-white font-mono"
+                />
               </div>
-              <div className="space-y-2">
-                <Label>ชื่อบรรจุภัณฑ์ (PM Name) <span className="text-red-500">*</span></Label>
-                <Input required value={cmd2Form.pmName} onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} placeholder="เช่น กล่องใส่ครีม 50g" />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                  <span>กำหนดส่งเข้า (ETA Date)</span>
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input 
+                  type="date"
+                  required
+                  value={cmd2Form.etaDate} 
+                  onChange={e => setCmd2Form({...cmd2Form, etaDate: e.target.value})} 
+                  className="text-xs bg-white font-mono border-amber-300"
+                />
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>จำนวนรับเข้าทั้งหมด (ชิ้น) <span className="text-red-500">*</span></Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">รหัสบรรจุภัณฑ์ (PM Code)</Label>
+                <Input 
+                  value={cmd2Form.pmCode} 
+                  onChange={e => setCmd2Form({...cmd2Form, pmCode: e.target.value})} 
+                  placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (CMD2-xxx)" 
+                  className="text-xs bg-white font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">ชื่อบรรจุภัณฑ์ (PM Name) <span className="text-red-500">*</span></Label>
+                <Input 
+                  required 
+                  value={cmd2Form.pmName} 
+                  onChange={e => setCmd2Form({...cmd2Form, pmName: e.target.value})} 
+                  placeholder="เช่น กล่องใส่ครีม 50g" 
+                  className="text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ (ชิ้น) <span className="text-red-500">*</span></Label>
                 <Input 
                   ref={cmd2QtyInputRef}
                   required 
@@ -4401,228 +4563,263 @@ export default function RMControlCenterPage() {
                   value={cmd2Form.quantity} 
                   onChange={e => handleCmd2QuantityChange(e.target.value)} 
                   placeholder="เช่น 10552"
-                  className="font-bold text-slate-800"
+                  className="font-bold text-slate-800 text-xs bg-white"
                 />
               </div>
-              <div className="space-y-2">
-                <Label>LOT งานผลิตอ้างอิง</Label>
-                <Input value={cmd2Form.lotProduct} onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
-              </div>
-            </div>
-
-            {/* Packaging Breakdown for Quarantine Tag */}
-            {(() => {
-              const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
-                ? (cmd2Form.customPackageType.trim() || 'ภาชนะ') 
-                : (cmd2Form.packageType || 'ลัง');
-              const fullCount = parseInt(cmd2Form.boxCount, 10) || 0;
-              const fullQty = parseFloat(cmd2Form.qtyPerBox) || 0;
-              const oddCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
-              const oddQty = parseFloat(cmd2Form.oddQtyPerBox) || 0;
-              const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
-              const targetTotal = parseFloat(cmd2Form.quantity) || 0;
-              const isMatch = targetTotal > 0 && calcTotal === targetTotal;
-              const totalUnits = fullCount + oddCount;
-
-              return (
-                <div className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200/90 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-amber-200/60">
-                    <Label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                      <Package className="w-4 h-4 text-amber-600" />
-                      ข้อมูลภาชนะบรรจุ & ยอดแบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
-                    </Label>
-                    <div className="flex items-center gap-1.5">
-                      {targetTotal > 0 && fullQty > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleCmd2AutoSplitRemainder}
-                          className="text-[10px] bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
-                          title="คำนวณจำนวนกล่องเต็มและเศษอัตโนมัติจากยอดรับเข้าและยอดต่อภาชนะเต็ม"
-                        >
-                          ⚡ คำนวณเศษอัตโนมัติ
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Container / Packaging Type Selector */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-amber-950">
-                        ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
-                      </Label>
-                      <select
-                        value={cmd2Form.packageType}
-                        onChange={e => setCmd2Form({ ...cmd2Form, packageType: e.target.value })}
-                        className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-amber-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                      >
-                        <option value="ลัง">ลัง (Box/Carton)</option>
-                        <option value="กล่อง">กล่อง (Box)</option>
-                        <option value="ถัง">ถัง (Drum/Pail)</option>
-                        <option value="ถุง">ถุง (Bag)</option>
-                        <option value="หีบ">หีบ (Chest)</option>
-                        <option value="ห่อ">ห่อ (Pack/Bundle)</option>
-                        <option value="พาเลท">พาเลท (Pallet)</option>
-                        <option value="กระป๋อง">กระป๋อง (Can)</option>
-                        <option value="ม้วน">ม้วน (Roll)</option>
-                        <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
-                      </select>
-                    </div>
-
-                    {cmd2Form.packageType === 'อื่นๆ' ? (
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-amber-950">
-                          ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          value={cmd2Form.customPackageType}
-                          onChange={e => setCmd2Form({ ...cmd2Form, customPackageType: e.target.value })}
-                          placeholder="เช่น ฟอยล์, ซอง, กระสอบ, แกลลอน"
-                          className="h-8 text-xs font-bold bg-white border-amber-300"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                        <Input 
-                          value={cmd2Form.mfgLot} 
-                          onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
-                          placeholder="เช่น 2609A หรือ -"
-                          className="h-8 text-xs bg-white font-mono" 
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {cmd2Form.packageType === 'อื่นๆ' && (
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                      <Input 
-                        value={cmd2Form.mfgLot} 
-                        onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
-                        placeholder="เช่น 2609A หรือ -"
-                        className="h-8 text-xs bg-white font-mono" 
-                      />
-                    </div>
-                  )}
-
-                  {/* Full & Odd Packaging Breakdown Inputs */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    {/* Full Container Group */}
-                    <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200/80 space-y-2">
-                      <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
-                        <span>📦 {effectivePkg}เต็ม</span>
-                        <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-600">
-                          จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          value={cmd2Form.boxCount} 
-                          onChange={e => handleCmd2BoxCountChange(e.target.value)} 
-                          placeholder="เช่น 7"
-                          className="h-8 text-xs bg-white font-bold text-center" 
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-600">
-                          จำนวนชิ้น/{effectivePkg}เต็ม <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          value={cmd2Form.qtyPerBox} 
-                          onChange={e => setCmd2Form({ ...cmd2Form, qtyPerBox: e.target.value })} 
-                          placeholder="เช่น 1300"
-                          className="h-8 text-xs bg-white font-bold text-center" 
-                        />
-                      </div>
-                    </div>
-
-                    {/* Odd Container Group */}
-                    <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
-                      <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
-                        <span>🟠 {effectivePkg}เศษ (Odd)</span>
-                        <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-amber-900">
-                          จำนวน{effectivePkg}เศษ
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          value={cmd2Form.oddBoxCount} 
-                          onChange={e => setCmd2Form({ ...cmd2Form, oddBoxCount: e.target.value })} 
-                          placeholder="0"
-                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-amber-900">
-                          จำนวนชิ้น/{effectivePkg}เศษ
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          value={cmd2Form.oddQtyPerBox} 
-                          onChange={e => setCmd2Form({ ...cmd2Form, oddQtyPerBox: e.target.value })} 
-                          placeholder="0"
-                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Summary and Validation */}
-                  <div className="text-xs pt-1">
-                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
-                      <span className="text-slate-700">
-                        🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
-                      </span>
-                      {targetTotal > 0 && (
-                        isMatch ? (
-                          <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
-                            ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} ชิ้น ตรงกับยอดรับเข้า
-                          </span>
-                        ) : (
-                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                            ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} ชิ้น (ยอดรับเข้า {targetTotal.toLocaleString()} ชิ้น)
-                          </span>
-                        )
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono pt-1">
-                      รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} ชิ้น{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ชิ้น` : ''}){cmd2Form.mfgLot && cmd2Form.mfgLot !== '-' ? ` Lot.${cmd2Form.mfgLot}` : ''}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>คลังสินค้า (Warehouse)</Label>
-                <Input value={cmd2Form.warehouse} onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} placeholder="MMPM" />
-              </div>
-              <div className="space-y-2">
-                <Label>Control No. (เลขคุมรับเข้า)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">LOT งานผลิตอ้างอิง</Label>
                 <Input 
-                  value={cmd2Form.controlNo} 
-                  onChange={e => setCmd2Form({...cmd2Form, controlNo: e.target.value})} 
-                  placeholder="P260915-01" 
-                  className="font-mono font-bold text-purple-700 bg-purple-50"
+                  value={cmd2Form.lotProduct} 
+                  onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} 
+                  placeholder="L.XXXX (ถ้ามี)" 
+                  className="text-xs bg-white font-mono"
                 />
               </div>
             </div>
-            <DialogFooter className="pt-4 flex items-center justify-between">
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">หมายเหตุจากเซลล์ / รายละเอียดเพิ่มเติม</Label>
+              <Textarea 
+                value={cmd2Form.remark} 
+                onChange={e => setCmd2Form({...cmd2Form, remark: e.target.value})} 
+                placeholder="เช่น ลูกค้าจัดส่งเองผ่านขนส่ง, จัดส่งรอบแรก, ติดต่อคุณ..." 
+                rows={2}
+                className="text-xs bg-white resize-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">คลังสินค้า (Warehouse)</Label>
+              <Input 
+                value={cmd2Form.warehouse} 
+                onChange={e => setCmd2Form({...cmd2Form, warehouse: e.target.value})} 
+                placeholder="MMPM" 
+                className="text-xs bg-white font-mono"
+              />
+            </div>
+
+            {/* Packaging Breakdown & Control No (Only shown when receiving immediately) */}
+            {cmd2Form.receiveImmediately && (
+              <>
+                {(() => {
+                  const effectivePkg = cmd2Form.packageType === 'อื่นๆ' 
+                    ? (cmd2Form.customPackageType.trim() || 'ภาชนะ') 
+                    : (cmd2Form.packageType || 'ลัง');
+                  const fullCount = parseInt(cmd2Form.boxCount, 10) || 0;
+                  const fullQty = parseFloat(cmd2Form.qtyPerBox) || 0;
+                  const oddCount = parseInt(cmd2Form.oddBoxCount, 10) || 0;
+                  const oddQty = parseFloat(cmd2Form.oddQtyPerBox) || 0;
+                  const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
+                  const targetTotal = parseFloat(cmd2Form.quantity) || 0;
+                  const isMatch = targetTotal > 0 && calcTotal === targetTotal;
+                  const totalUnits = fullCount + oddCount;
+
+                  return (
+                    <div className="bg-amber-50/80 p-3.5 rounded-xl border border-amber-200/90 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-amber-200/60">
+                        <Label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                          <Package className="w-4 h-4 text-amber-600" />
+                          ข้อมูลภาชนะบรรจุ & ยอดแบ่งกล่อง (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                        </Label>
+                        <div className="flex items-center gap-1.5">
+                          {targetTotal > 0 && fullQty > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleCmd2AutoSplitRemainder}
+                              className="text-[10px] bg-amber-200 hover:bg-amber-300 text-amber-900 font-bold px-2 py-0.5 rounded-md transition-colors flex items-center gap-1 shadow-2xs cursor-pointer"
+                              title="คำนวณจำนวนกล่องเต็มและเศษอัตโนมัติจากยอดรับเข้าและยอดต่อภาชนะเต็ม"
+                            >
+                              ⚡ คำนวณเศษอัตโนมัติ
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Container / Packaging Type Selector */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-amber-950">
+                            ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            value={cmd2Form.packageType}
+                            onChange={e => setCmd2Form({ ...cmd2Form, packageType: e.target.value })}
+                            className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-amber-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                          >
+                            <option value="ลัง">ลัง (Box/Carton)</option>
+                            <option value="กล่อง">กล่อง (Box)</option>
+                            <option value="ถัง">ถัง (Drum/Pail)</option>
+                            <option value="ถุง">ถุง (Bag)</option>
+                            <option value="หีบ">หีบ (Chest)</option>
+                            <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                            <option value="พาเลท">พาเลท (Pallet)</option>
+                            <option value="กระป๋อง">กระป๋อง (Can)</option>
+                            <option value="ม้วน">ม้วน (Roll)</option>
+                            <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
+                          </select>
+                        </div>
+
+                        {cmd2Form.packageType === 'อื่นๆ' ? (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-amber-950">
+                              ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              value={cmd2Form.customPackageType}
+                              onChange={e => setCmd2Form({ ...cmd2Form, customPackageType: e.target.value })}
+                              placeholder="เช่น ฟอยล์, ซอง, กระสอบ, แกลลอน"
+                              className="h-8 text-xs font-bold bg-white border-amber-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                            <Input 
+                              value={cmd2Form.mfgLot} 
+                              onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
+                              placeholder="เช่น 2609A หรือ -"
+                              className="h-8 text-xs bg-white font-mono" 
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {cmd2Form.packageType === 'อื่นๆ' && (
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                          <Input 
+                            value={cmd2Form.mfgLot} 
+                            onChange={e => setCmd2Form({ ...cmd2Form, mfgLot: e.target.value })} 
+                            placeholder="เช่น 2609A หรือ -"
+                            className="h-8 text-xs bg-white font-mono" 
+                          />
+                        </div>
+                      )}
+
+                      {/* Full & Odd Packaging Breakdown Inputs */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        {/* Full Container Group */}
+                        <div className="bg-white/90 p-2.5 rounded-lg border border-amber-200/80 space-y-2">
+                          <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                            <span>📦 {effectivePkg}เต็ม</span>
+                            <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-slate-600">
+                              จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              value={cmd2Form.boxCount} 
+                              onChange={e => handleCmd2BoxCountChange(e.target.value)} 
+                              placeholder="เช่น 7"
+                              className="h-8 text-xs bg-white font-bold text-center" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-slate-600">
+                              จำนวนชิ้น/{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              value={cmd2Form.qtyPerBox} 
+                              onChange={e => setCmd2Form({ ...cmd2Form, qtyPerBox: e.target.value })} 
+                              placeholder="เช่น 1300"
+                              className="h-8 text-xs bg-white font-bold text-center" 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Odd Container Group */}
+                        <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
+                          <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                            <span>🟠 {effectivePkg}เศษ (Odd)</span>
+                            <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-amber-900">
+                              จำนวน{effectivePkg}เศษ
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              value={cmd2Form.oddBoxCount} 
+                              onChange={e => setCmd2Form({ ...cmd2Form, oddBoxCount: e.target.value })} 
+                              placeholder="0"
+                              className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-amber-900">
+                              จำนวนชิ้น/{effectivePkg}เศษ
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              value={cmd2Form.oddQtyPerBox} 
+                              onChange={e => setCmd2Form({ ...cmd2Form, oddQtyPerBox: e.target.value })} 
+                              placeholder="0"
+                              className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Summary and Validation */}
+                      <div className="text-xs pt-1">
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
+                          <span className="text-slate-700">
+                            🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
+                          </span>
+                          {targetTotal > 0 && (
+                            isMatch ? (
+                              <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                                ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} ชิ้น ตรงกับยอดรับเข้า
+                              </span>
+                            ) : (
+                              <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} ชิ้น (ยอดรับเข้า {targetTotal.toLocaleString()} ชิ้น)
+                              </span>
+                            )
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono pt-1">
+                          รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} ชิ้น{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ชิ้น` : ''}){cmd2Form.mfgLot && cmd2Form.mfgLot !== '-' ? ` Lot.${cmd2Form.mfgLot}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Control No. (เลขคุมรับเข้า) <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={cmd2Form.controlNo} 
+                    onChange={e => setCmd2Form({...cmd2Form, controlNo: e.target.value})} 
+                    placeholder="P260915-01" 
+                    className="font-mono font-bold text-purple-700 bg-purple-50 text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            <DialogFooter className="pt-4 flex items-center justify-between border-t">
               <Button type="button" variant="outline" onClick={() => setIsCmd2ModalOpen(false)}>ยกเลิก</Button>
-              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />} 
-                รับเข้า PM & พิมพ์ Quarantine Tag 🏷️
+              <Button 
+                type="submit" 
+                disabled={uploading} 
+                className={!cmd2Form.receiveImmediately ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer" : "bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold cursor-pointer"}
+              >
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : !cmd2Form.receiveImmediately ? (
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-2" />
+                )} 
+                {!cmd2Form.receiveImmediately ? "💾 บันทึกแจ้งรอรับเข้า (เข้าคิว Purchasing View)" : "รับเข้า PM & พิมพ์ Quarantine Tag 🏷️"}
               </Button>
             </DialogFooter>
           </form>
@@ -4631,16 +4828,67 @@ export default function RMControlCenterPage() {
 
       {/* Customer Supplied RM (R4) Modal */}
       <Dialog open={isR4ModalOpen} onOpenChange={setIsR4ModalOpen}>
-        <DialogContent className="sm:max-w-md md:max-w-xl w-full">
+        <DialogContent className="sm:max-w-md md:max-w-xl w-full max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[#4A4238] flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-[#D4AF37]" />
-              รับเข้าวัตถุดิบลูกค้า (R4)
+            <DialogTitle className="text-[#4A4238] flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[#D4AF37]" />
+                <span>
+                  {r4Form.receiveImmediately ? 'รับเข้าวัตถุดิบลูกค้า (R4)' : 'แจ้งรอรับเข้าวัตถุดิบลูกค้า (R4)'}
+                </span>
+              </div>
+              <Badge variant="outline" className={!r4Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs"}>
+                {!r4Form.receiveImmediately ? "รอรับเข้า (Pending)" : "รับเข้าทันที (Immediate)"}
+              </Badge>
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleR4Submit} className="space-y-4 py-3">
+
+          {/* Mode Switcher */}
+          <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 mt-1">
+            <button
+              type="button"
+              onClick={() => setR4Form(prev => ({ ...prev, receiveImmediately: false, controlNo: '' }))}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                !r4Form.receiveImmediately 
+                  ? 'bg-white text-emerald-800 shadow-xs border border-emerald-300' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>📅 แจ้งรอรับเข้าล่วงหน้า (ยังไม่ได้รับของ)</span>
+            </button>
+            <button
+              type="button"
+              onClick={async () => {
+                let cNo = r4Form.controlNo;
+                if (!cNo) {
+                  cNo = await generateDailyControlNo('MMRM');
+                }
+                setR4Form(prev => ({ ...prev, receiveImmediately: true, controlNo: cNo }));
+              }}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                r4Form.receiveImmediately 
+                  ? 'bg-[#D4AF37] text-white shadow-xs' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Printer className="w-3.5 h-3.5" />
+              <span>⚡ ของมาถึงแล้ว (รับเข้าคลังทันที)</span>
+            </button>
+          </div>
+
+          {!r4Form.receiveImmediately && (
+            <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
+              <CalendarPlus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า:</span> รายการจะถูกบันทึกเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงโรงงานจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ป้าย Quarantine Tag ตามขั้นตอนปกติ
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleR4Submit} className="space-y-4 py-2">
             {/* Quick RM Selector Dropdown */}
-            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-sm space-y-2">
+            <div className="bg-gradient-to-r from-amber-50/90 via-orange-50/50 to-amber-50/90 p-3 rounded-xl border border-[#D4AF37]/40 shadow-xs space-y-2">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="w-4 h-4 text-[#D4AF37]" />
@@ -4722,29 +4970,68 @@ export default function RMControlCenterPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label>ชื่อลูกค้า (Customer / Supplier Name) <span className="text-red-500">*</span></Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">ชื่อลูกค้า (Customer / Supplier Name) <span className="text-red-500">*</span></Label>
               <Input 
                 required 
                 list="cmd2-customer-datalist"
                 value={r4Form.customerName} 
                 onChange={e => setR4Form({...r4Form, customerName: e.target.value})} 
                 placeholder="เช่น บริษัท เอบีซี จำกัด หรือเลือกจากตัวช่วยด้านบน" 
+                className="text-xs bg-white"
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>รหัสวัตถุดิบ (RM Code)</Label>
-                <Input value={r4Form.rmCode} onChange={e => setR4Form({...r4Form, rmCode: e.target.value})} placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (R4-xxx)" />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">เลขที่ PO / เอกสารอ้างอิง</Label>
+                <Input 
+                  value={r4Form.poNo} 
+                  onChange={e => setR4Form({...r4Form, poNo: e.target.value})} 
+                  placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (RM-YYMMxxx)" 
+                  className="text-xs bg-white font-mono"
+                />
               </div>
-              <div className="space-y-2">
-                <Label>ชื่อวัตถุดิบ (RM Name) <span className="text-red-500">*</span></Label>
-                <Input required value={r4Form.rmName} onChange={e => setR4Form({...r4Form, rmName: e.target.value})} placeholder="เช่น สารสกัดชาเขียวเข้มข้น 100%" />
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1">
+                  <span>กำหนดส่งเข้า (ETA Date)</span>
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Input 
+                  type="date"
+                  required
+                  value={r4Form.etaDate} 
+                  onChange={e => setR4Form({...r4Form, etaDate: e.target.value})} 
+                  className="text-xs bg-white font-mono border-amber-300"
+                />
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>จำนวนรับเข้าทั้งหมด <span className="text-red-500">*</span></Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">รหัสวัตถุดิบ (RM Code)</Label>
+                <Input 
+                  value={r4Form.rmCode} 
+                  onChange={e => setR4Form({...r4Form, rmCode: e.target.value})} 
+                  placeholder="ปล่อยว่างเพื่อให้ระบบสร้างให้ (R4-xxx)" 
+                  className="text-xs bg-white font-mono"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">ชื่อวัตถุดิบ (RM Name) <span className="text-red-500">*</span></Label>
+                <Input 
+                  required 
+                  value={r4Form.rmName} 
+                  onChange={e => setR4Form({...r4Form, rmName: e.target.value})} 
+                  placeholder="เช่น สารสกัดชาเขียวเข้มข้น 100%" 
+                  className="text-xs bg-white"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ <span className="text-red-500">*</span></Label>
                 <div className="flex items-center gap-2">
                   <Input 
                     ref={r4QtyInputRef}
@@ -4755,232 +5042,272 @@ export default function RMControlCenterPage() {
                     value={r4Form.quantity} 
                     onChange={e => handleR4QuantityChange(e.target.value)} 
                     placeholder="0.00" 
-                    className="font-bold text-slate-800"
+                    className="font-bold text-slate-800 text-xs bg-white"
                   />
-                  <Input value={r4Form.unit} onChange={e => setR4Form({...r4Form, unit: e.target.value})} className="w-20 text-center uppercase font-bold" placeholder="KG" />
+                  <Input 
+                    value={r4Form.unit} 
+                    onChange={e => setR4Form({...r4Form, unit: e.target.value})} 
+                    className="w-20 text-center uppercase font-bold text-xs bg-white" 
+                    placeholder="KG" 
+                  />
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>LOT งานผลิตอ้างอิง</Label>
-                <Input value={r4Form.lotProduct} onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} placeholder="L.XXXX (ถ้ามี)" />
-              </div>
-            </div>
-
-            {/* Packaging Breakdown for Quarantine Tag */}
-            {(() => {
-              const effectivePkg = r4Form.packageType === 'อื่นๆ' 
-                ? (r4Form.customPackageType.trim() || 'ภาชนะ') 
-                : (r4Form.packageType || 'ถัง');
-              const fullCount = parseInt(r4Form.boxCount, 10) || 0;
-              const fullQty = parseFloat(r4Form.qtyPerBox) || 0;
-              const oddCount = parseInt(r4Form.oddBoxCount, 10) || 0;
-              const oddQty = parseFloat(r4Form.oddQtyPerBox) || 0;
-              const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
-              const targetTotal = parseFloat(r4Form.quantity) || 0;
-              const isMatch = targetTotal > 0 && Math.abs(calcTotal - targetTotal) < 0.001;
-              const totalUnits = fullCount + oddCount;
-
-              return (
-                <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/90 space-y-3">
-                  <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-emerald-200/60">
-                    <Label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                      <Package className="w-4 h-4 text-emerald-600" />
-                      ข้อมูลภาชนะบรรจุ & ยอดแบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
-                    </Label>
-                    <div className="flex items-center gap-1.5">
-                      {targetTotal > 0 && fullQty > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleR4AutoSplitRemainder}
-                          className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-xs transition flex items-center gap-1"
-                          title="คำนวณแยกภาชนะเต็มและภาชนะเศษให้อัตโนมัติ"
-                        >
-                          ⚡ คำนวณแบ่งเศษอัตโนมัติ
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Container / Packaging Type Selector */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-emerald-950">
-                        ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
-                      </Label>
-                      <select
-                        value={r4Form.packageType}
-                        onChange={e => setR4Form({ ...r4Form, packageType: e.target.value })}
-                        className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-emerald-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                      >
-                        <option value="ถัง">ถัง (Drum/Pail - แนะนำสำหรับ RM)</option>
-                        <option value="ถุง">ถุง (Bag)</option>
-                        <option value="กล่อง">กล่อง (Box)</option>
-                        <option value="ลัง">ลัง (Box/Carton)</option>
-                        <option value="หีบ">หีบ (Chest)</option>
-                        <option value="ห่อ">ห่อ (Pack/Bundle)</option>
-                        <option value="พาเลท">พาเลท (Pallet)</option>
-                        <option value="กระป๋อง">กระป๋อง (Can)</option>
-                        <option value="ม้วน">ม้วน (Roll)</option>
-                        <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
-                      </select>
-                    </div>
-
-                    {r4Form.packageType === 'อื่นๆ' ? (
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-emerald-950">
-                          ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          value={r4Form.customPackageType}
-                          onChange={e => setR4Form({ ...r4Form, customPackageType: e.target.value })}
-                          placeholder="เช่น แกลลอน, กระสอบ, บาร์เรล, ปี๊บ"
-                          className="h-8 text-xs font-bold bg-white border-emerald-300"
-                        />
-                      </div>
-                    ) : (
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                        <Input 
-                          value={r4Form.mfgLot} 
-                          onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
-                          placeholder="เช่น 2609A หรือ -"
-                          className="h-8 text-xs bg-white font-mono" 
-                        />
-                      </div>
-                    )}
-                  </div>
-
-                  {r4Form.packageType === 'อื่นๆ' && (
-                    <div className="space-y-1">
-                      <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
-                      <Input 
-                        value={r4Form.mfgLot} 
-                        onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
-                        placeholder="เช่น 2609A หรือ -"
-                        className="h-8 text-xs bg-white font-mono" 
-                      />
-                    </div>
-                  )}
-
-                  {/* Full & Odd Packaging Breakdown Inputs */}
-                  <div className="grid grid-cols-2 gap-3 pt-1">
-                    {/* Full Container Group */}
-                    <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-200/80 space-y-2">
-                      <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
-                        <span>📦 {effectivePkg}เต็ม</span>
-                        <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-600">
-                          จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="1" 
-                          value={r4Form.boxCount} 
-                          onChange={e => handleR4BoxCountChange(e.target.value)} 
-                          placeholder="เช่น 7"
-                          className="h-8 text-xs bg-white font-bold text-center" 
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-slate-600">
-                          จำนวน/{effectivePkg}เต็ม ({r4Form.unit || 'KG'}) <span className="text-red-500">*</span>
-                        </Label>
-                        <Input 
-                          type="number" 
-                          step="any"
-                          min="0.001" 
-                          value={r4Form.qtyPerBox} 
-                          onChange={e => setR4Form({ ...r4Form, qtyPerBox: e.target.value })} 
-                          placeholder="เช่น 25"
-                          className="h-8 text-xs bg-white font-bold text-center" 
-                        />
-                      </div>
-                    </div>
-
-                    {/* Odd Container Group */}
-                    <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
-                      <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
-                        <span>🟠 {effectivePkg}เศษ (Odd)</span>
-                        <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-amber-900">
-                          จำนวน{effectivePkg}เศษ
-                        </Label>
-                        <Input 
-                          type="number" 
-                          min="0" 
-                          value={r4Form.oddBoxCount} 
-                          onChange={e => setR4Form({ ...r4Form, oddBoxCount: e.target.value })} 
-                          placeholder="0"
-                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <Label className="text-[10px] font-semibold text-amber-900">
-                          จำนวน/{effectivePkg}เศษ ({r4Form.unit || 'KG'})
-                        </Label>
-                        <Input 
-                          type="number" 
-                          step="any"
-                          min="0" 
-                          value={r4Form.oddQtyPerBox} 
-                          onChange={e => setR4Form({ ...r4Form, oddQtyPerBox: e.target.value })} 
-                          placeholder="0"
-                          className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Summary and Validation */}
-                  <div className="text-xs pt-1">
-                    <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
-                      <span className="text-slate-700">
-                        🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
-                      </span>
-                      {targetTotal > 0 && (
-                        isMatch ? (
-                          <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
-                            ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} {r4Form.unit || 'KG'} ตรงกับยอดรับเข้า
-                          </span>
-                        ) : (
-                          <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
-                            ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} (ยอดรับเข้า {targetTotal.toLocaleString()} {r4Form.unit || 'KG'})
-                          </span>
-                        )
-                      )}
-                    </div>
-                    <div className="text-[11px] text-slate-500 font-mono pt-1">
-                      รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} {r4Form.unit || 'KG'}{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ${r4Form.unit || 'KG'}` : ''}){r4Form.mfgLot && r4Form.mfgLot !== '-' ? ` Lot.${r4Form.mfgLot}` : ''}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>คลังสินค้า (Warehouse)</Label>
-                <Input value={r4Form.warehouse} onChange={e => setR4Form({...r4Form, warehouse: e.target.value})} placeholder="MMRM" />
-              </div>
-              <div className="space-y-2">
-                <Label>Control No. (เลขคุมรับเข้า)</Label>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold">LOT งานผลิตอ้างอิง</Label>
                 <Input 
-                  value={r4Form.controlNo} 
-                  onChange={e => setR4Form({...r4Form, controlNo: e.target.value})} 
-                  placeholder="R260915-01" 
-                  className="font-mono font-bold text-purple-700 bg-purple-50"
+                  value={r4Form.lotProduct} 
+                  onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} 
+                  placeholder="L.XXXX (ถ้ามี)" 
+                  className="text-xs bg-white font-mono"
                 />
               </div>
             </div>
-            <DialogFooter className="pt-4 flex items-center justify-between">
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">หมายเหตุจากเซลล์ / รายละเอียดเพิ่มเติม</Label>
+              <Textarea 
+                value={r4Form.remark} 
+                onChange={e => setR4Form({...r4Form, remark: e.target.value})} 
+                placeholder="เช่น ลูกค้าจัดส่งเองผ่านขนส่ง Kerry, จัดส่งรอบแรก, แจ้งล่วงหน้าจากคุณ..." 
+                rows={2}
+                className="text-xs bg-white resize-none"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">คลังสินค้า (Warehouse)</Label>
+              <Input 
+                value={r4Form.warehouse} 
+                onChange={e => setR4Form({...r4Form, warehouse: e.target.value})} 
+                placeholder="MMRM" 
+                className="text-xs bg-white font-mono"
+              />
+            </div>
+
+            {/* Packaging Breakdown & Control No (Only shown when receiving immediately) */}
+            {r4Form.receiveImmediately && (
+              <>
+                {(() => {
+                  const effectivePkg = r4Form.packageType === 'อื่นๆ' 
+                    ? (r4Form.customPackageType.trim() || 'ภาชนะ') 
+                    : (r4Form.packageType || 'ถัง');
+                  const fullCount = parseInt(r4Form.boxCount, 10) || 0;
+                  const fullQty = parseFloat(r4Form.qtyPerBox) || 0;
+                  const oddCount = parseInt(r4Form.oddBoxCount, 10) || 0;
+                  const oddQty = parseFloat(r4Form.oddQtyPerBox) || 0;
+                  const calcTotal = (fullCount * fullQty) + (oddCount * oddQty);
+                  const targetTotal = parseFloat(r4Form.quantity) || 0;
+                  const isMatch = targetTotal > 0 && Math.abs(calcTotal - targetTotal) < 0.001;
+                  const totalUnits = fullCount + oddCount;
+
+                  return (
+                    <div className="bg-emerald-50/80 p-3.5 rounded-xl border border-emerald-200/90 space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-1.5 pb-2 border-b border-emerald-200/60">
+                        <Label className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                          <Package className="w-4 h-4 text-emerald-600" />
+                          ข้อมูลภาชนะบรรจุ & ยอดแบ่งบรรจุ (สำหรับพิมพ์ Quarantine Tag 100x80 มม.)
+                        </Label>
+                        <div className="flex items-center gap-1.5">
+                          {targetTotal > 0 && fullQty > 0 && (
+                            <button
+                              type="button"
+                              onClick={handleR4AutoSplitRemainder}
+                              className="text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-2 py-0.5 rounded shadow-xs transition flex items-center gap-1"
+                              title="คำนวณแยกภาชนะเต็มและภาชนะเศษให้อัตโนมัติ"
+                            >
+                              ⚡ คำนวณแบ่งเศษอัตโนมัติ
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Container / Packaging Type Selector */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-emerald-950">
+                            ประเภทภาชนะบรรจุ <span className="text-red-500">*</span>
+                          </Label>
+                          <select
+                            value={r4Form.packageType}
+                            onChange={e => setR4Form({ ...r4Form, packageType: e.target.value })}
+                            className="w-full h-8 text-xs font-bold bg-white text-slate-800 border border-emerald-300 rounded-lg px-2.5 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                          >
+                            <option value="ถัง">ถัง (Drum/Pail - แนะนำสำหรับ RM)</option>
+                            <option value="ถุง">ถุง (Bag)</option>
+                            <option value="กล่อง">กล่อง (Box)</option>
+                            <option value="ลัง">ลัง (Box/Carton)</option>
+                            <option value="หีบ">หีบ (Chest)</option>
+                            <option value="ห่อ">ห่อ (Pack/Bundle)</option>
+                            <option value="พาเลท">พาเลท (Pallet)</option>
+                            <option value="กระป๋อง">กระป๋อง (Can)</option>
+                            <option value="ม้วน">ม้วน (Roll)</option>
+                            <option value="อื่นๆ">อื่นๆ (เว้นว่างไว้พิมพ์ระบุเอง)</option>
+                          </select>
+                        </div>
+
+                        {r4Form.packageType === 'อื่นๆ' ? (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-emerald-950">
+                              ระบุประเภทภาชนะเอง <span className="text-red-500">*</span>
+                            </Label>
+                            <Input
+                              value={r4Form.customPackageType}
+                              onChange={e => setR4Form({ ...r4Form, customPackageType: e.target.value })}
+                              placeholder="เช่น แกลลอน, กระสอบ, บาร์เรล, ปี๊บ"
+                              className="h-8 text-xs font-bold bg-white border-emerald-300"
+                            />
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                            <Input 
+                              value={r4Form.mfgLot} 
+                              onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
+                              placeholder="เช่น 2609A หรือ -"
+                              className="h-8 text-xs bg-white font-mono" 
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {r4Form.packageType === 'อื่นๆ' && (
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-semibold text-slate-700">LOT ผู้ผลิต (Supplier Lot)</Label>
+                          <Input 
+                            value={r4Form.mfgLot} 
+                            onChange={e => setR4Form({ ...r4Form, mfgLot: e.target.value })} 
+                            placeholder="เช่น 2609A หรือ -"
+                            className="h-8 text-xs bg-white font-mono" 
+                          />
+                        </div>
+                      )}
+
+                      {/* Full & Odd Packaging Breakdown Inputs */}
+                      <div className="grid grid-cols-2 gap-3 pt-1">
+                        {/* Full Container Group */}
+                        <div className="bg-white/90 p-2.5 rounded-lg border border-emerald-200/80 space-y-2">
+                          <div className="text-[11px] font-bold text-slate-800 flex items-center justify-between">
+                            <span>📦 {effectivePkg}เต็ม</span>
+                            <span className="text-[10px] font-semibold text-slate-500">ยอดปกติ</span>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-slate-600">
+                              จำนวน{effectivePkg}เต็ม <span className="text-red-500">*</span>
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="1" 
+                              value={r4Form.boxCount} 
+                              onChange={e => handleR4BoxCountChange(e.target.value)} 
+                              placeholder="เช่น 7"
+                              className="h-8 text-xs bg-white font-bold text-center" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-slate-600">
+                              จำนวน/{effectivePkg}เต็ม ({r4Form.unit || 'KG'}) <span className="text-red-500">*</span>
+                            </Label>
+                            <Input 
+                              type="number" 
+                              step="any"
+                              min="0.001" 
+                              value={r4Form.qtyPerBox} 
+                              onChange={e => setR4Form({ ...r4Form, qtyPerBox: e.target.value })} 
+                              placeholder="เช่น 25"
+                              className="h-8 text-xs bg-white font-bold text-center" 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Odd Container Group */}
+                        <div className="bg-amber-100/50 p-2.5 rounded-lg border border-amber-300/80 space-y-2">
+                          <div className="text-[11px] font-bold text-amber-950 flex items-center justify-between">
+                            <span>🟠 {effectivePkg}เศษ (Odd)</span>
+                            <span className="text-[10px] font-normal text-amber-800">ใส่ 0 หากไม่มีเศษ</span>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-amber-900">
+                              จำนวน{effectivePkg}เศษ
+                            </Label>
+                            <Input 
+                              type="number" 
+                              min="0" 
+                              value={r4Form.oddBoxCount} 
+                              onChange={e => setR4Form({ ...r4Form, oddBoxCount: e.target.value })} 
+                              placeholder="0"
+                              className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-[10px] font-semibold text-amber-900">
+                              จำนวน/{effectivePkg}เศษ ({r4Form.unit || 'KG'})
+                            </Label>
+                            <Input 
+                              type="number" 
+                              step="any"
+                              min="0.001" 
+                              value={r4Form.oddQtyPerBox} 
+                              onChange={e => setR4Form({ ...r4Form, oddQtyPerBox: e.target.value })} 
+                              placeholder="0"
+                              className="h-8 text-xs bg-white font-bold text-center text-amber-950 border-amber-300" 
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Live Summary and Validation */}
+                      <div className="text-xs pt-1">
+                        <div className="flex flex-wrap items-center justify-between gap-1 text-[11px] font-medium">
+                          <span className="text-slate-700">
+                            🏷️ <strong>พิมพ์สติกเกอร์รวม:</strong> {totalUnits} ใบ ({fullCount} {effectivePkg}เต็ม{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ` : ''})
+                          </span>
+                          {targetTotal > 0 && (
+                            isMatch ? (
+                              <span className="font-bold text-emerald-700 bg-emerald-100/90 px-2 py-0.5 rounded border border-emerald-300">
+                                ✓ ยอดแบ่งครบ {calcTotal.toLocaleString()} {r4Form.unit || 'KG'} ตรงกับยอดรับเข้า
+                              </span>
+                            ) : (
+                              <span className="font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded border border-amber-300">
+                                ⚠️ ยอดแบ่งรวม {calcTotal.toLocaleString()} (ยอดรับเข้า {targetTotal.toLocaleString()} {r4Form.unit || 'KG'})
+                              </span>
+                            )
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-mono pt-1">
+                          รูปแบบบันทึก: ({fullCount} {effectivePkg} x {fullQty.toLocaleString()} {r4Form.unit || 'KG'}{oddCount > 0 ? ` + ${oddCount} ${effectivePkg}เศษ x ${oddQty.toLocaleString()} ${r4Form.unit || 'KG'}` : ''}){r4Form.mfgLot && r4Form.mfgLot !== '-' ? ` Lot.${r4Form.mfgLot}` : ''}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Control No. (เลขคุมรับเข้า) <span className="text-red-500">*</span></Label>
+                  <Input 
+                    value={r4Form.controlNo} 
+                    onChange={e => setR4Form({...r4Form, controlNo: e.target.value})} 
+                    placeholder="R260915-01" 
+                    className="font-mono font-bold text-purple-700 bg-purple-50 text-xs"
+                  />
+                </div>
+              </>
+            )}
+
+            <DialogFooter className="pt-4 flex items-center justify-between border-t">
               <Button type="button" variant="outline" onClick={() => setIsR4ModalOpen(false)}>ยกเลิก</Button>
-              <Button type="submit" disabled={uploading} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
-                {uploading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Printer className="w-4 h-4 mr-2" />} 
-                รับเข้า RM & พิมพ์ Quarantine Tag 🏷️
+              <Button 
+                type="submit" 
+                disabled={uploading} 
+                className={!r4Form.receiveImmediately ? "bg-emerald-600 hover:bg-emerald-700 text-white font-bold cursor-pointer" : "bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold cursor-pointer"}
+              >
+                {uploading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : !r4Form.receiveImmediately ? (
+                  <CalendarPlus className="w-4 h-4 mr-2" />
+                ) : (
+                  <Printer className="w-4 h-4 mr-2" />
+                )} 
+                {!r4Form.receiveImmediately ? "💾 บันทึกแจ้งรอรับเข้า (เข้าคิว Purchasing View)" : "รับเข้า RM & พิมพ์ Quarantine Tag 🏷️"}
               </Button>
             </DialogFooter>
           </form>

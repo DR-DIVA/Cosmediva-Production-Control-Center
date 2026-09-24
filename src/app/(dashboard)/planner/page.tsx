@@ -2614,15 +2614,13 @@ const fetchAllProductionLots = async (client: any) => {
                               const totalScheduled = schedule.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
                               return (
                                 <Popover>
-                                  <PopoverTrigger asChild>
-                                    <button
-                                      type="button"
-                                      className="text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
-                                      title="คลิกดูรายละเอียดงวดส่งมอบทั้งหมด"
-                                    >
-                                      <Gift className="w-3.5 h-3.5 text-indigo-600" />
-                                      <span>ส่ง {schedule.length} งวด</span>
-                                    </button>
+                                  <PopoverTrigger
+                                    type="button"
+                                    className="text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                    title="คลิกดูรายละเอียดงวดส่งมอบทั้งหมด"
+                                  >
+                                    <Gift className="w-3.5 h-3.5 text-indigo-600" />
+                                    <span>ส่ง {schedule.length} งวด</span>
                                   </PopoverTrigger>
                                   <PopoverContent className="w-80 p-3 text-xs bg-white shadow-xl rounded-xl border border-indigo-100" align="start">
                                     <div className="font-bold text-slate-900 border-b pb-1.5 mb-2 flex items-center justify-between">

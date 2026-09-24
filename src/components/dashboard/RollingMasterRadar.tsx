@@ -45,7 +45,7 @@ import { th } from 'date-fns/locale'
 import { parseDelayInfo } from '@/lib/delayTracking'
 import { parsePlanChangeInfo, cleanDisplayNote, extractUserComment, PlanChangeInfo } from '@/lib/planTracking'
 import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvisory'
-import { getBaseOrderType } from '@/lib/utils'
+import { getBaseOrderType, parseDeliverySchedule, type DeliveryInstallment } from '@/lib/utils'
 
 export interface RollingMasterRadarProps {
   startDateStr?: string
@@ -1303,7 +1303,7 @@ export function RollingMasterRadar({
         // 3. FG Due Date & Planned Deliveries (Active lots + Lots with due dates in horizon)
         supabase.from('production_lots')
           .select(`
-            id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks, qc_fg_passed_carton_ranges,
+            id, lot_no, fg_due_date, planned_start_date, planned_quantity, order_quantity, order_type, current_status, total_tanks, qc_fg_passed_carton_ranges, delivery_schedule,
             products:sku_id (sku, product_name)
           `)
           .or(`current_status.neq.DONE,and(fg_due_date.gte.${horizonStartStr},fg_due_date.lte.${horizonEndStr})`)
@@ -1759,41 +1759,43 @@ export function RollingMasterRadar({
       }
     })
 
-    // 4. Process FG Due & MTS Daily Delivery Ranges
+    // 4. Process FG Due (Installment-based or Single Due Date)
     radarData.fgDueLots.forEach(lot => {
       const sku = lot.products?.sku || 'SKU'
-      const qty = lot.planned_quantity || lot.order_quantity || 0
+      const totalQty = lot.planned_quantity || lot.order_quantity || 0
       const isMTS = getBaseOrderType(lot.order_type) === 'MTS'
-      const startStr = lot.planned_start_date || lot.fg_due_date
-      const endStr = lot.fg_due_date || lot.planned_start_date
+      const installments = parseDeliverySchedule(lot.delivery_schedule)
 
-      if (isMTS && (startStr || endStr)) {
-        // MTS Range: Delivery occurs on every day within [startStr, endStr]
-        const effectiveStart = startStr || endStr
-        const effectiveEnd = endStr || startStr
-
-        horizonDates.forEach(hd => {
-          if (hd.dateStr >= effectiveStart && hd.dateStr <= effectiveEnd) {
+      if (installments.length > 0) {
+        // Multi-installment delivery schedule
+        installments.forEach(inst => {
+          if (inst.date && map[inst.date]) {
             totalFgDue++
-            const opStatus = computeOperationalStatus(lot, 'FG_DUE', hd.dateStr, todayDateStr)
-            map[hd.dateStr].FG_DUE.push({
-              id: `${lot.id}-${hd.dateStr}`,
+            const opStatus = computeOperationalStatus(lot, 'FG_DUE', inst.date, todayDateStr)
+            const instQty = inst.quantity || 0
+            map[inst.date].FG_DUE.push({
+              id: `${lot.id}-inst-${inst.installment}-${inst.date}`,
               streamType: 'FG_DUE',
-              date: hd.dateStr,
+              date: inst.date,
               title: `${sku} • LOT ${lot.lot_no}`,
-              subtitle: lot.products?.product_name || 'ส่งมอบ FG ประจำวัน (MTS Rolling)',
-              tag: `MTS (${Number(qty).toLocaleString()} ชิ้น)`,
-              quantity: qty,
+              subtitle: inst.note ? `งวดที่ ${inst.installment}: ${inst.note}` : `งวดที่ ${inst.installment} จาก ${installments.length} งวด`,
+              tag: `งวด ${inst.installment}/${installments.length} (${instQty > 0 ? instQty.toLocaleString() : 'ตามแผน'} ชิ้น)`,
+              quantity: instQty > 0 ? instQty : totalQty,
               lotNo: lot.lot_no,
               sku,
               lotId: lot.id,
-              meta: { ...lot, isMtsRange: true },
+              meta: {
+                ...lot,
+                isInstallment: true,
+                currentInstallment: inst,
+                allInstallments: installments
+              },
               opStatus
             })
           }
         })
       } else if (lot.fg_due_date && map[lot.fg_due_date]) {
-        // MTO / Single Due Date
+        // Single Due Date (MTO or MTS single delivery)
         totalFgDue++
         const opStatus = computeOperationalStatus(lot, 'FG_DUE', lot.fg_due_date, todayDateStr)
         map[lot.fg_due_date].FG_DUE.push({
@@ -1801,9 +1803,9 @@ export function RollingMasterRadar({
           streamType: 'FG_DUE',
           date: lot.fg_due_date,
           title: `${sku} • LOT ${lot.lot_no}`,
-          subtitle: lot.products?.product_name || 'กำหนดส่งมอบ FG ปิดออเดอร์',
-          tag: `${Number(qty).toLocaleString()} ชิ้น`,
-          quantity: qty,
+          subtitle: lot.products?.product_name || (isMTS ? 'กำหนดส่งมอบสินค้า FG (MTS)' : 'กำหนดส่งมอบ FG ปิดออเดอร์'),
+          tag: `${Number(totalQty).toLocaleString()} ชิ้น`,
+          quantity: totalQty,
           lotNo: lot.lot_no,
           sku,
           lotId: lot.id,
@@ -2974,6 +2976,42 @@ export function RollingMasterRadar({
                                                         &ldquo;{cleanDisplayNote(it.opStatus.note)}&rdquo;
                                                       </div>
                                                     )}
+                                                  </div>
+                                                )}
+
+                                                {/* Installment Delivery Schedule Breakdown Box */}
+                                                {it.streamType === 'FG_DUE' && it.meta?.allInstallments && it.meta.allInstallments.length > 0 && (
+                                                  <div className="p-2 rounded-lg bg-indigo-50/90 border border-indigo-200/90 text-indigo-950 text-[10px] space-y-1.5 mt-1 shadow-2xs">
+                                                    <div className="font-bold flex items-center justify-between text-indigo-900">
+                                                      <span className="flex items-center gap-1.5">
+                                                        <Gift className="w-3.5 h-3.5 text-indigo-600" />
+                                                        <span>แผนส่งมอบสินค้า ({it.meta.allInstallments.length} งวด)</span>
+                                                      </span>
+                                                      <span className="text-[9px] bg-indigo-100 text-indigo-800 font-semibold px-1.5 py-0.5 rounded border border-indigo-200">
+                                                        งวดนี้: งวดที่ {it.meta.currentInstallment?.installment || 1}
+                                                      </span>
+                                                    </div>
+                                                    <div className="space-y-1 pt-0.5">
+                                                      {it.meta.allInstallments.map((inst: any, idx: number) => {
+                                                        const isCurrent = inst.installment === it.meta.currentInstallment?.installment
+                                                        return (
+                                                          <div 
+                                                            key={idx} 
+                                                            className={`flex items-center justify-between px-2 py-1 rounded text-[9.5px] ${
+                                                              isCurrent 
+                                                                ? 'bg-indigo-600 text-white font-bold shadow-2xs' 
+                                                                : 'bg-white/90 text-slate-700 border border-indigo-100'
+                                                            }`}
+                                                          >
+                                                            <span>
+                                                              งวด {inst.installment}: {format(parseISO(inst.date), 'dd/MM/yyyy')}
+                                                              {inst.note && <span className={isCurrent ? 'text-indigo-100 ml-1' : 'text-slate-500 ml-1'}>({inst.note})</span>}
+                                                            </span>
+                                                            <span>{Number(inst.quantity || 0).toLocaleString()} ชิ้น</span>
+                                                          </div>
+                                                        )
+                                                      })}
+                                                    </div>
                                                   </div>
                                                 )}
 
