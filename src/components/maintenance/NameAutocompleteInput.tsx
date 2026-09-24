@@ -2,10 +2,9 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { Input } from '@/components/ui/input'
-import { User, Clock, ChevronDown, Check, Building2, Sparkles } from 'lucide-react'
+import { User, ChevronDown, Check, Building2, Sparkles } from 'lucide-react'
 import {
   getSavedUserName,
-  getRecentNamesList,
   saveUserName,
   isGenericPlaceholder,
   getMasterUsersList,
@@ -50,10 +49,8 @@ export default function NameAutocompleteInput({
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
   const [masterUsers, setMasterUsers] = useState<MasterUserOption[]>(() => getMasterUsersList())
-  const [recentNames, setRecentNames] = useState<string[]>([])
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
-  const listId = useMemo(() => id ? `${id}-datalist` : `name-list-${Math.random().toString(36).substring(2, 9)}`, [id])
 
   const lastFetchTimeRef = useRef<number>(0)
 
@@ -72,7 +69,6 @@ export default function NameAutocompleteInput({
 
   // Fetch updated master users in background
   useEffect(() => {
-    setRecentNames(getRecentNamesList())
     setMasterUsers(getMasterUsersList())
 
     const saved = getSavedUserName(defaultFallback)
@@ -99,12 +95,14 @@ export default function NameAutocompleteInput({
     }
   }, [])
 
-  // Filter enriched suggestions based on current query
+  // Filter enriched suggestions: ONLY include users WITH verified department (no duplicates, no department-less entries)
   const suggestions: EnrichedSuggestion[] = useMemo(() => {
     const q = (value || '').trim().toLowerCase()
 
-    // 1. Filter Master Data Users
-    const matchedMaster: EnrichedSuggestion[] = masterUsers
+    // 1. Filter Master Data Users who have a department
+    const validMasterUsers = masterUsers.filter(u => u.department && u.department.trim() !== '')
+
+    const matchedMaster: EnrichedSuggestion[] = validMasterUsers
       .filter(u => {
         if (!q) return true
         return (
@@ -123,24 +121,20 @@ export default function NameAutocompleteInput({
         userObject: u
       }))
 
-    // 2. Filter Recent / Custom Stored Names (deduplicating those already in master)
-    const masterDisplayNamesSet = new Set(masterUsers.map(u => u.displayName.toLowerCase()))
-    const matchedRecent: EnrichedSuggestion[] = recentNames
-      .filter(name => {
-        if (!name || isGenericPlaceholder(name)) return false
-        if (masterDisplayNamesSet.has(name.toLowerCase())) return false
-        if (!q) return true
-        return name.toLowerCase().includes(q)
-      })
-      .map(name => ({
-        displayName: name,
-        isMaster: false
-      }))
+    // Deduplicate strictly by displayName and employeeId
+    const seenKeys = new Set<string>()
+    const uniqueList: EnrichedSuggestion[] = []
 
-    // Combine: Master Data users take priority
-    const combined = [...matchedMaster, ...matchedRecent]
-    return combined
-  }, [value, masterUsers, recentNames])
+    for (const item of matchedMaster) {
+      const key = `${item.displayName.trim().toLowerCase()}__${(item.employeeId || '').toLowerCase()}`
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key)
+        uniqueList.push(item)
+      }
+    }
+
+    return uniqueList
+  }, [value, masterUsers])
 
   const handleSelect = (item: EnrichedSuggestion) => {
     onChange(item.displayName)
@@ -199,7 +193,6 @@ export default function NameAutocompleteInput({
           }}
           onFocus={() => {
             setIsOpen(true)
-            setRecentNames(getRecentNamesList())
             if (Date.now() - lastFetchTimeRef.current > 4000) {
               refreshMasterUsers()
             }
@@ -210,21 +203,9 @@ export default function NameAutocompleteInput({
           required={required}
           autoFocus={autoFocus}
           autoComplete="off"
-          list={listId}
+          spellCheck={false}
           className={`pr-9 ${className}`}
         />
-
-        {/* Native datalist fallback */}
-        <datalist id={listId}>
-          {masterUsers.map(u => (
-            <option key={u.employeeId} value={u.displayName}>
-              {u.department}
-            </option>
-          ))}
-          {recentNames.map(n => (
-            <option key={n} value={n} />
-          ))}
-        </datalist>
 
         {/* Dropdown toggle button */}
         <button
