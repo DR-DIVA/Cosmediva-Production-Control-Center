@@ -1417,10 +1417,14 @@ export default function RMControlCenterPage() {
     }
   };
 
-  const openCmd2Modal = async () => {
+  const openCmd2Modal = async (immediate: boolean = true) => {
     setIsCmd2ModalOpen(true);
     setCmd2SearchQuery('');
     setIsCmd2SearchOpen(false);
+    let initialControlNo = '';
+    if (immediate) {
+      initialControlNo = await generateDailyControlNo('MMPM');
+    }
     setCmd2Form({ 
       poNo: '',
       pmCode: '', 
@@ -1429,7 +1433,7 @@ export default function RMControlCenterPage() {
       customerName: '', 
       lotProduct: '', 
       warehouse: 'MMPM', 
-      controlNo: '',
+      controlNo: initialControlNo,
       packageType: 'ลัง',
       customPackageType: '',
       boxCount: '1',
@@ -1439,7 +1443,7 @@ export default function RMControlCenterPage() {
       mfgLot: '-',
       etaDate: new Date().toISOString().split('T')[0],
       remark: '',
-      receiveImmediately: false
+      receiveImmediately: immediate
     });
   };
 
@@ -1600,10 +1604,14 @@ export default function RMControlCenterPage() {
     }
   };
 
-  const openR4Modal = async () => {
+  const openR4Modal = async (immediate: boolean = false) => {
     setIsR4ModalOpen(true);
     setR4SearchQuery('');
     setIsR4SearchOpen(false);
+    let initialControlNo = '';
+    if (immediate) {
+      initialControlNo = await generateDailyControlNo('MMRM');
+    }
     setR4Form({ 
       poNo: '',
       rmCode: '', 
@@ -1613,7 +1621,7 @@ export default function RMControlCenterPage() {
       customerName: '', 
       lotProduct: '', 
       warehouse: 'MMRM', 
-      controlNo: '',
+      controlNo: initialControlNo,
       packageType: 'ถัง',
       customPackageType: '',
       boxCount: '1',
@@ -1623,7 +1631,7 @@ export default function RMControlCenterPage() {
       mfgLot: '-',
       etaDate: new Date().toISOString().split('T')[0],
       remark: '',
-      receiveImmediately: false
+      receiveImmediately: immediate
     });
   };
 
@@ -2491,16 +2499,46 @@ export default function RMControlCenterPage() {
             <Download className="w-4 h-4 mr-2" /> Export
           </Button>
           {mainTab === 'rm' && (
-            <Button onClick={openR4Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm">
-              <CalendarPlus className="w-4 h-4" />
-              + แจ้งรอรับเข้าวัตถุดิบลูกค้า (R4)
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button 
+                onClick={() => openR4Modal(false)} 
+                className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="โหมดแอดมินเซลล์: แจ้งรอรับเข้าวัตถุดิบลูกค้าล่วงหน้า (เข้า Purchasing View รอรับของ)"
+              >
+                <CalendarPlus className="w-4 h-4" />
+                + แจ้งรอรับเข้าวัตถุดิบลูกค้า (R4)
+              </Button>
+              <Button 
+                onClick={() => openR4Modal(true)} 
+                variant="outline" 
+                className="bg-white hover:bg-amber-50 text-amber-900 border-amber-300 font-bold flex-shrink-0 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="โหมดคลังสินค้า: ของมาถึงแล้ว รับเข้าวัตถุดิบลูกค้าทันที ออก Control No. และพิมพ์ Quarantine Tag"
+              >
+                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
+                + รับเข้า R4 ทันที (คลัง)
+              </Button>
+            </div>
           )}
           {mainTab === 'pm' && (
-            <Button onClick={openCmd2Modal} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm">
-              <CalendarPlus className="w-4 h-4" />
-              + แจ้งรอรับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button 
+                onClick={() => openCmd2Modal(true)} 
+                className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold flex-shrink-0 flex items-center gap-1.5 shadow-sm cursor-pointer"
+                title="โหมดคลังสินค้า (โหมดเดิม): บรรจุภัณฑ์มาถึงแล้ว รับเข้าคลังทันที ออก Control No. และพิมพ์ Quarantine Tag"
+              >
+                <Package className="w-4 h-4" />
+                + รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)
+              </Button>
+              <Button 
+                onClick={() => openCmd2Modal(false)} 
+                variant="outline" 
+                className="bg-white hover:bg-emerald-50 text-emerald-700 border-emerald-300 font-bold flex-shrink-0 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                title="โหมดแอดมินเซลล์ (โหมดใหม่): แจ้งรอรับเข้าล่วงหน้าเมื่อลูกค้าแจ้งส่งของ ส่งเข้า Purchasing View รอรับของ"
+              >
+                <CalendarPlus className="w-4 h-4 text-emerald-600" />
+                + แจ้งรอรับเข้า CMD2 (ล่วงหน้า)
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -4353,26 +4391,14 @@ export default function RMControlCenterPage() {
                   {cmd2Form.receiveImmediately ? 'รับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)' : 'แจ้งรอรับเข้าบรรจุภัณฑ์ลูกค้า (CMD2)'}
                 </span>
               </div>
-              <Badge variant="outline" className={!cmd2Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs"}>
-                {!cmd2Form.receiveImmediately ? "รอรับเข้า (Pending)" : "รับเข้าทันที (Immediate)"}
+              <Badge variant="outline" className={!cmd2Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs font-bold" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs font-bold"}>
+                {!cmd2Form.receiveImmediately ? "รอรับเข้า (โหมดเซลล์)" : "รับเข้าทันที (โหมดคลัง)"}
               </Badge>
             </DialogTitle>
           </DialogHeader>
 
           {/* Mode Switcher */}
           <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 border border-slate-200 mt-1">
-            <button
-              type="button"
-              onClick={() => setCmd2Form(prev => ({ ...prev, receiveImmediately: false, controlNo: '' }))}
-              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
-                !cmd2Form.receiveImmediately 
-                  ? 'bg-white text-emerald-800 shadow-xs border border-emerald-300' 
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
-              <span>📅 แจ้งรอรับเข้าล่วงหน้า (ยังไม่ได้รับของ)</span>
-            </button>
             <button
               type="button"
               onClick={async () => {
@@ -4389,15 +4415,34 @@ export default function RMControlCenterPage() {
               }`}
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>⚡ ของมาถึงแล้ว (รับเข้าคลังทันที)</span>
+              <span>⚡ รับเข้าคลังทันที (โหมดคลัง - โหมดเดิม)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setCmd2Form(prev => ({ ...prev, receiveImmediately: false, controlNo: '' }))}
+              className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                !cmd2Form.receiveImmediately 
+                  ? 'bg-white text-emerald-800 shadow-xs border border-emerald-300' 
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
+              <span>📅 แจ้งรอรับเข้าล่วงหน้า (โหมดเซลล์ - โหมดใหม่)</span>
             </button>
           </div>
 
-          {!cmd2Form.receiveImmediately && (
+          {cmd2Form.receiveImmediately ? (
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+              <Package className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">โหมดคลังสินค้ารับเข้าทันที (โหมดเดิม):</span> สำหรับหน้างานคลังบันทึกรับของจริงทันที โดยระบบจะออกเลขคุม Control No. ให้อัตโนมัติ และเปิดป้าย <strong className="text-purple-700">Quarantine Tag (100x80 มม.)</strong> ให้พิมพ์ติดข้างกล่องได้ทันที
+              </div>
+            </div>
+          ) : (
             <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
               <CalendarPlus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า:</span> รายการจะถูกบันทึกเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงโรงงานจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ป้าย Quarantine Tag ตามขั้นตอนปกติ
+                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า (โหมดเซลล์):</span> สำหรับแอดมินเซลล์บันทึกเมื่อลูกค้าแจ้งกำหนดส่งล่วงหน้า รายการจะเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ Quarantine Tag
               </div>
             </div>
           )}
@@ -4837,8 +4882,8 @@ export default function RMControlCenterPage() {
                   {r4Form.receiveImmediately ? 'รับเข้าวัตถุดิบลูกค้า (R4)' : 'แจ้งรอรับเข้าวัตถุดิบลูกค้า (R4)'}
                 </span>
               </div>
-              <Badge variant="outline" className={!r4Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs"}>
-                {!r4Form.receiveImmediately ? "รอรับเข้า (Pending)" : "รับเข้าทันที (Immediate)"}
+              <Badge variant="outline" className={!r4Form.receiveImmediately ? "bg-blue-50 text-blue-700 border-blue-200 text-xs font-bold" : "bg-emerald-50 text-emerald-700 border-emerald-300 text-xs font-bold"}>
+                {!r4Form.receiveImmediately ? "รอรับเข้า (โหมดเซลล์)" : "รับเข้าทันที (โหมดคลัง)"}
               </Badge>
             </DialogTitle>
           </DialogHeader>
@@ -4855,7 +4900,7 @@ export default function RMControlCenterPage() {
               }`}
             >
               <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
-              <span>📅 แจ้งรอรับเข้าล่วงหน้า (ยังไม่ได้รับของ)</span>
+              <span>📅 แจ้งรอรับเข้าล่วงหน้า (โหมดเซลล์)</span>
             </button>
             <button
               type="button"
@@ -4873,15 +4918,22 @@ export default function RMControlCenterPage() {
               }`}
             >
               <Printer className="w-3.5 h-3.5" />
-              <span>⚡ ของมาถึงแล้ว (รับเข้าคลังทันที)</span>
+              <span>⚡ รับเข้าคลังทันที (โหมดคลัง)</span>
             </button>
           </div>
 
-          {!r4Form.receiveImmediately && (
+          {!r4Form.receiveImmediately ? (
             <div className="p-3 bg-emerald-50/80 border border-emerald-200 rounded-xl text-xs text-emerald-900 flex items-start gap-2">
               <CalendarPlus className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
-                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า:</span> รายการจะถูกบันทึกเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงโรงงานจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ป้าย Quarantine Tag ตามขั้นตอนปกติ
+                <span className="font-bold">โหมดแจ้งรอรับเข้าล่วงหน้า (โหมดเซลล์):</span> สำหรับแอดมินเซลล์บันทึกเมื่อลูกค้าแจ้งส่งวัตถุดิบล่วงหน้า รายการจะถูกบันทึกเข้าสู่ Purchasing View และคลังสินค้าเป็นสถานะ <strong className="text-blue-700">"Ordered รอรับเข้า"</strong> พร้อมกำหนดส่ง (ETA) โดยยังไม่ออก Control No. เมื่อของมาถึงโรงงานจริง ทางคลังจะกดรับเข้าเพื่อออกเลขคุมและพิมพ์ป้าย Quarantine Tag ตามขั้นตอนปกติ
+              </div>
+            </div>
+          ) : (
+            <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2">
+              <Sparkles className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold">โหมดคลังสินค้ารับเข้าทันที:</span> สำหรับหน้างานคลังบันทึกรับวัตถุดิบทันที โดยระบบจะออกเลขคุม Control No. ให้อัตโนมัติ และเปิดป้าย <strong className="text-purple-700">Quarantine Tag (100x80 มม.)</strong> ให้พิมพ์ติดภาชนะได้ทันที
               </div>
             </div>
           )}
