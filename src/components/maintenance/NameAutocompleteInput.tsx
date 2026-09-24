@@ -55,6 +55,21 @@ export default function NameAutocompleteInput({
   const inputRef = useRef<HTMLInputElement>(null)
   const listId = useMemo(() => id ? `${id}-datalist` : `name-list-${Math.random().toString(36).substring(2, 9)}`, [id])
 
+  const lastFetchTimeRef = useRef<number>(0)
+
+  const refreshMasterUsers = () => {
+    lastFetchTimeRef.current = Date.now()
+    fetch(`/api/master-data/users?t=${Date.now()}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          cacheMasterUsersList(res.data)
+          setMasterUsers(res.data)
+        }
+      })
+      .catch(() => {})
+  }
+
   // Fetch updated master users in background
   useEffect(() => {
     setRecentNames(getRecentNamesList())
@@ -65,16 +80,8 @@ export default function NameAutocompleteInput({
       onChange(saved)
     }
 
-    // Refresh master users from backend API
-    fetch('/api/master-data/users')
-      .then(res => res.json())
-      .then(res => {
-        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
-          cacheMasterUsersList(res.data)
-          setMasterUsers(res.data)
-        }
-      })
-      .catch(() => {})
+    // Refresh master users from backend API immediately
+    refreshMasterUsers()
   }, [])
 
   // Close dropdown on outside click
@@ -193,6 +200,9 @@ export default function NameAutocompleteInput({
           onFocus={() => {
             setIsOpen(true)
             setRecentNames(getRecentNamesList())
+            if (Date.now() - lastFetchTimeRef.current > 4000) {
+              refreshMasterUsers()
+            }
           }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}

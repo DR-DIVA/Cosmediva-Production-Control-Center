@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { MaintenanceMachine, SymptomCategory, ProductionImpact } from '@/types/maintenance'
 import { createRepairRequest } from '@/app/actions/maintenance'
+import { resendWorkOrderLineAlert } from '@/app/actions/line'
 import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import { getSavedUserName, saveUserName } from '@/lib/userMemory'
@@ -87,7 +88,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   const router = useRouter()
   const defaultType: RepairTypeCategory = initialType || 'EMERGENCY'
 
-  const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || machines[0] || null)
+  const [selectedMachine, setSelectedMachine] = useState<MaintenanceMachine | null>(initialMachine || null)
   const [machineSearchQuery, setMachineSearchQuery] = useState('')
   const [isSearchingMachine, setIsSearchingMachine] = useState(false)
   const [repairType, setRepairType] = useState<RepairTypeCategory>(defaultType)
@@ -108,6 +109,8 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isResendingLine, setIsResendingLine] = useState(false)
+  const [showEmergencyConfirmModal, setShowEmergencyConfirmModal] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
   const recognitionRef = useRef<any>(null)
@@ -295,11 +298,24 @@ export default function FastReportForm({ initialMachine, machines, initialType }
     }
   }
 
-  // Submit Handler (< 60s Flow)
-  const handleSubmit = async (e: React.FormEvent) => {
+  const getLineShareText = (wo: any) => {
+    const origin = typeof window !== 'undefined' ? window.location.origin : ''
+    if (wo.machine_code === 'FACILITY') {
+      return `💡 [แจ้งซ่อมบริการ & อาคาร] (CosmeFlow)\n📋 เลขที่: ${wo.wo_number}\n📍 จุดบริการ: ${wo.requester_department_name || 'งานบริการอาคาร'}\n⚠️ อาการ: ${wo.symptom_category}\n👤 ผู้แจ้ง: ${wo.requester_name}\nสถานะ: ส่งเรื่องให้ทีมช่างแล้ว\n🔗 ติดตามงาน: ${origin ? `${origin}/maintenance/work-orders` : ''}`
+    }
+    const isEm = wo.priority === 'P1_CRITICAL' || wo.is_emergency_breakdown
+    const prefix = isEm ? '🚨 [แจ้งหยุดเครื่องฉุกเฉิน BREAKDOWN]' : '🛠️ [ใบแจ้งซ่อมเครื่องจักร CosmeFlow]'
+    return `${prefix}\n📋 เลขที่ใบแจ้ง: ${wo.wo_number}\n🏭 เครื่องจักร: ${wo.machine_code} - ${wo.machine_name}\n🏢 สังกัด/แผนก: ${wo.requester_department_name || '-'}\n⚠️ อาการเสีย: ${wo.symptom_category}\n👤 ผู้แจ้ง: ${wo.requester_name}\nระดับ: ${wo.priority}\nสถานะ: ช่างกำลังเข้าตรวจสอบ\n🔗 ติดตามงาน: ${origin ? `${origin}/maintenance/work-orders` : ''}`
+  }
+
+  // Intercept submit for validation and emergency confirmation
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
     if (repairType !== 'SERVICE' && !selectedMachine) {
-      toast.error('กรุณาเลือกเครื่องจักร')
+      toast.error('กรุณาเลือกเครื่องจักรที่ต้องการแจ้งซ่อมก่อนส่งข้อมูลค่ะ')
+      const el = document.getElementById('machine-selection-section')
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
 
@@ -308,6 +324,23 @@ export default function FastReportForm({ initialMachine, machines, initialType }
       return
     }
 
+    if (!requesterName || !requesterName.trim()) {
+      toast.error('กรุณาระบุชื่อผู้ดำเนินการแจ้งซ่อม')
+      return
+    }
+
+    // Safeguard: If emergency breakdown, require confirmation before opening ticket
+    if (repairType === 'EMERGENCY' || isEmergency) {
+      setShowEmergencyConfirmModal(true)
+      return
+    }
+
+    executeSubmit()
+  }
+
+  // Actual submit execution
+  const executeSubmit = async () => {
+    setShowEmergencyConfirmModal(false)
     const finalSymptom = customSymptom.trim() || symptom
     const fullDescription = [
       facilityLocation.trim() ? `📍 จุดเกิดเหตุ/สถานที่: ${facilityLocation.trim()}` : null,
@@ -451,7 +484,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
           <span>ระบบบันทึกเวลาและแจ้งเตือนไปยังทีมช่างแล้ว</span>
         </div>
 
-        {/* Photo attached preview & Share to LINE / Download */}
+        {/* Photo attached preview & Download if present */}
         {photoPreview && (
           <div className="space-y-2 p-3.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs text-left">
             <span className="font-bold text-stone-700 block">รูปภาพ/วิดีโอที่แนบส่งทีมช่าง:</span>
@@ -459,7 +492,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={photoPreview} alt="Attached symptom" className="max-h-44 object-contain" />
             </div>
-            <div className="flex gap-2 pt-1">
+            <div className="pt-1">
               <button
                 type="button"
                 onClick={() => {
@@ -471,41 +504,63 @@ export default function FastReportForm({ initialMachine, machines, initialType }
                   document.body.removeChild(a)
                   toast.success('ดาวน์โหลดรูปภาพลงมือถือเรียบร้อยแล้ว')
                 }}
-                className="flex-1 py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
+                className="w-full py-2 px-3 rounded-xl bg-stone-200 hover:bg-stone-300 text-stone-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5" />
-                <span>โหลดเก็บไว้</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  const shareText = submittedWO.machine_code === 'FACILITY'
-                    ? `💡 แจ้งซ่อมบริการ & อาคาร (CosmeFlow)\nเลขที่: ${submittedWO.wo_number}\nสถานที่: ${submittedWO.requester_department_name || 'งานบริการอาคาร'}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ส่งเรื่องให้ทีมช่างแล้ว`
-                    : `🚨 แจ้งเครื่องเสียด่วน (CosmeFlow Maintenance)\nเลขที่: ${submittedWO.wo_number}\nเครื่องจักร: ${submittedWO.machine_code} - ${submittedWO.machine_name}\nระดับ: ${submittedWO.priority}\nอาการ: ${submittedWO.symptom_category}\nผู้แจ้ง: ${submittedWO.requester_name}\nสถานะ: ช่างกำลังเข้าตรวจสอบ`
-                  if (navigator.share) {
-                    try {
-                      await navigator.share({
-                        title: 'แจ้งซ่อมเครื่องจักร CosmeFlow',
-                        text: shareText
-                      })
-                      toast.success('เปิดเมนูแชร์ส่งต่อเรียบร้อยแล้ว')
-                    } catch (err: any) {
-                      if (err.name !== 'AbortError') console.error(err)
-                    }
-                  } else {
-                    navigator.clipboard.writeText(shareText)
-                    toast.success('คัดลอกข้อความแจ้งซ่อมแล้ว นำไปวางใน LINE ได้เลยค่ะ')
-                  }
-                }}
-                className="flex-1 py-2 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition active:scale-95"
-              >
-                <Share2 className="w-3.5 h-3.5" />
-                <span>ส่งต่อเข้า LINE</span>
+                <span>โหลดรูปภาพเก็บไว้</span>
               </button>
             </div>
           </div>
         )}
+
+        {/* LINE Notification & Share Section (Always Visible) */}
+        <div className="space-y-2.5 p-4 bg-stone-50 rounded-2xl border border-stone-200 text-xs text-left shadow-2xs">
+          <div className="flex items-center justify-between text-stone-700 font-bold">
+            <span className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse inline-block" />
+              การแจ้งเตือน LINE กลุ่ม (LINE Maintenance Alert):
+            </span>
+            <span className="text-[10px] text-stone-500 font-mono">Channel: CMD</span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2 pt-1">
+            <button
+              type="button"
+              disabled={isResendingLine}
+              onClick={async () => {
+                setIsResendingLine(true)
+                try {
+                  const res = await resendWorkOrderLineAlert(submittedWO.id)
+                  if (res?.success) {
+                    toast.success('ส่งการ์ดแจ้งเตือนเข้าห้อง LINE กลุ่มสำเร็จ!')
+                  } else {
+                    toast.error(res?.error || 'โควตาส่งข้อความของ LINE Bot ครบกำหนดรายเดือนแล้ว (300/300 ข้อความ Free Tier)')
+                  }
+                } catch (err: any) {
+                  toast.error(err.message || 'ส่งแจ้งเตือนไม่สำเร็จ')
+                } finally {
+                  setIsResendingLine(false)
+                }
+              }}
+              className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs"
+              title="สั่งให้ระบบส่งการ์ด Flex Message เข้าห้อง LINE Maintenance อีกครั้ง"
+            >
+              <Send className={`w-3.5 h-3.5 ${isResendingLine ? 'animate-spin' : 'text-emerald-600'}`} />
+              <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
+            </button>
+
+            <a
+              href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(submittedWO))}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-2.5 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs cursor-pointer"
+              title="แชร์ข้อความสรุปเข้าแชต LINE ทันที (ไม่มีปัญหาโควตาเต็ม 100%)"
+            >
+              <Share2 className="w-3.5 h-3.5" />
+              <span>🟢 ส่งต่อเข้า LINE</span>
+            </a>
+          </div>
+        </div>
 
         <div className="flex flex-col gap-2 pt-2">
           <Button
@@ -540,7 +595,16 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-xl mx-auto space-y-5 pb-10">
+    <form 
+      onSubmit={handleSubmit}
+      onKeyDown={(e) => {
+        // Prevent accidental form submission when pressing Enter in text inputs
+        if (e.key === 'Enter' && (e.target as HTMLElement).tagName !== 'TEXTAREA') {
+          e.preventDefault()
+        }
+      }}
+      className="max-w-xl mx-auto space-y-5 pb-10"
+    >
       {/* 0. REPAIR TYPE SELECTOR (3 CASES) */}
       <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
         <label className="text-xs font-bold text-stone-700 uppercase tracking-wider block">
@@ -670,7 +734,7 @@ export default function FastReportForm({ initialMachine, machines, initialType }
           </div>
         </div>
       ) : (
-        <div className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
+        <div id="machine-selection-section" className="bg-white rounded-3xl p-5 border border-stone-200 shadow-sm space-y-3">
           <div className="flex items-center justify-between">
             <div className="text-xs font-bold text-[#8B7355] uppercase tracking-wider flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#D4AF37]"></span>
@@ -1144,6 +1208,81 @@ export default function FastReportForm({ initialMachine, machines, initialType }
       <p className="text-[11px] text-center text-stone-400">
         แจ้งได้ใน ≤ 60 วินาที • ระบบจะสร้าง Ticket และจับเวลาการตอบสนองอัตโนมัติ
       </p>
+
+      {/* Emergency Breakdown Confirmation Safeguard Modal */}
+      {showEmergencyConfirmModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-in fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border-2 border-red-500 space-y-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center text-red-600 shrink-0">
+                <AlertOctagon className="w-7 h-7" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-stone-900">
+                  ยืนยันแจ้งซ่อมด่วนฉุกเฉิน (P1)?
+                </h3>
+                <p className="text-xs text-red-600 font-bold">
+                  โหมด BREAKDOWN • จับเวลา Downtime ทันที
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-stone-50 rounded-2xl p-3.5 border border-stone-200 text-xs space-y-2">
+              <div className="flex justify-between">
+                <span className="text-stone-500">ประเภทงาน:</span>
+                <span className="font-bold text-red-700">🚨 แจ้งซ่อมด่วนฉุกเฉิน (Breakdown)</span>
+              </div>
+              {selectedMachine && (
+                <div className="flex justify-between">
+                  <span className="text-stone-500">เครื่องจักร:</span>
+                  <span className="font-bold text-stone-900 font-mono">
+                    {selectedMachine.machine_code} - {selectedMachine.machine_name}
+                  </span>
+                </div>
+              )}
+              {facilityLocation.trim() && (
+                <div className="flex justify-between">
+                  <span className="text-stone-500">จุดบริการ/สถานที่:</span>
+                  <span className="font-bold text-stone-900">
+                    {facilityLocation.trim()}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-stone-500">อาการเสีย:</span>
+                <span className="font-bold text-red-700">{customSymptom.trim() || symptom}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-stone-500">ผู้ดำเนินการแจ้ง:</span>
+                <span className="font-bold text-stone-900">{requesterName}</span>
+              </div>
+            </div>
+
+            <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-900 font-medium">
+              ⚠️ การกดยืนยันจะเปิดใบแจ้งซ่อมด่วน P1 และส่งสัญญาณแจ้งเตือนไปยังช่างซ่อมบำรุงทันที
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setShowEmergencyConfirmModal(false)}
+                className="flex-1 h-11 rounded-xl text-xs font-bold text-stone-700 border-stone-300"
+              >
+                ยกเลิก / แก้ไขข้อมูล
+              </Button>
+              <Button
+                type="button"
+                onClick={executeSubmit}
+                disabled={isSubmitting}
+                className="flex-1 h-11 rounded-xl text-xs font-black bg-red-600 hover:bg-red-700 text-white shadow-md shadow-red-600/20"
+              >
+                {isSubmitting ? 'กำลังส่งข้อมูล...' : '🚨 ยืนยันแจ้งซ่อม P1'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </form>
   )
 }

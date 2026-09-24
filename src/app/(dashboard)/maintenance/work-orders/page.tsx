@@ -926,6 +926,33 @@ export default function WorkOrdersKanbanPage() {
                             <span>{new Date(wo.reported_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
                           </div>
 
+                          {/* Quick LINE Alert & Share actions */}
+                          <div className="flex items-center gap-1.5 pt-1">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleResendLineAlert(wo.id)
+                              }}
+                              className="flex-1 h-6 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
+                              title="ส่งแจ้งเตือนบอท LINE อีกครั้ง"
+                            >
+                              <Send className="w-2.5 h-2.5 text-emerald-600" />
+                              <span>📲 LINE</span>
+                            </button>
+                            <a
+                              href={`https://line.me/R/share?text=${encodeURIComponent(getLineShareText(wo))}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex-1 h-6 rounded-md bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
+                              title="แชร์สรุปเข้า LINE ทันที (ไม่มีปัญหาโควตาเต็ม)"
+                            >
+                              <Share2 className="w-2.5 h-2.5" />
+                              <span>🟢 แชร์</span>
+                            </a>
+                          </div>
+
                           {/* Quick Verify button for Test Run & Completed */}
                           {(wo.status === 'COMPLETED' || wo.status === 'TEST_RUN') && (
                             <Button

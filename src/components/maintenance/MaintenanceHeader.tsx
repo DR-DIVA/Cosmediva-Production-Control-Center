@@ -15,7 +15,8 @@ import {
   Calendar,
   QrCode,
   MessageSquare,
-  Zap
+  Zap,
+  Scale,
 } from 'lucide-react'
 import LineSettingsModal from '@/components/maintenance/LineSettingsModal'
 import MachineQRScannerModal from '@/components/maintenance/MachineQRScannerModal'
@@ -69,6 +70,13 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       icon: Calendar, 
       frameClass: 'bg-cyan-50 hover:bg-cyan-100 text-cyan-950 border border-cyan-300 hover:border-cyan-400',
       iconClass: 'border border-cyan-400 bg-cyan-600 text-white' 
+    },
+    { 
+      label: 'แผน CAL 2026', 
+      href: '/maintenance/cal', 
+      icon: Scale, 
+      frameClass: 'bg-teal-50 hover:bg-teal-100 text-teal-950 border border-teal-300 hover:border-teal-400',
+      iconClass: 'border border-teal-400 bg-teal-600 text-white' 
     },
     { 
       label: 'ทะเบียนเครื่องจักร', 
@@ -204,7 +212,7 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       {/* 11 Sub-Menu Buttons Structured into Exactly 2 Rows */}
       <div className="bg-white p-2.5 sm:p-3 rounded-3xl border border-stone-200 shadow-sm space-y-2">
         {/* Row 1: 6 Functional Modules */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2">
           {row1Items.map(item => {
             const isActive = pathname === item.href || (item.href !== '/maintenance' && pathname.startsWith(item.href))
             const Icon = item.icon

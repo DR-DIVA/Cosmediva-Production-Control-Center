@@ -70,6 +70,10 @@ export async function createUser(formData: {
     }
 
     revalidatePath('/master-data/users')
+    revalidatePath('/maintenance')
+    revalidatePath('/maintenance/report')
+    revalidatePath('/maintenance/work-orders')
+    revalidatePath('/maintenance/gemba')
     return { success: true, data: authData.user }
     
   } catch (err: any) {
@@ -136,6 +140,10 @@ export async function updateUser(userId: string, formData: {
     }
 
     revalidatePath('/master-data/users')
+    revalidatePath('/maintenance')
+    revalidatePath('/maintenance/report')
+    revalidatePath('/maintenance/work-orders')
+    revalidatePath('/maintenance/gemba')
     return { success: true }
     
   } catch (err: any) {
@@ -169,6 +177,10 @@ export async function deleteUser(userId: string) {
     }
 
     revalidatePath('/master-data/users')
+    revalidatePath('/maintenance')
+    revalidatePath('/maintenance/report')
+    revalidatePath('/maintenance/work-orders')
+    revalidatePath('/maintenance/gemba')
     return { success: true }
   } catch (err: any) {
     console.error('Unexpected error in deleteUser:', err)
