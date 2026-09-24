@@ -7,7 +7,7 @@ import {
   AlertOctagon, 
   Camera, 
   Mic, 
-  Send, 
+  Send,
   CheckCircle2, 
   Flame, 
   Wrench,
@@ -34,7 +34,6 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { MaintenanceMachine, SymptomCategory, ProductionImpact } from '@/types/maintenance'
 import { createRepairRequest } from '@/app/actions/maintenance'
-import { resendWorkOrderLineAlert } from '@/app/actions/line'
 import { uploadMaintenancePhoto, compressImage } from '@/lib/maintenanceMedia'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import { getSavedUserName, saveUserName } from '@/lib/userMemory'
@@ -110,7 +109,6 @@ export default function FastReportForm({ initialMachine, machines, initialType }
   const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isResendingLine, setIsResendingLine] = useState(false)
   const [showEmergencyConfirmModal, setShowEmergencyConfirmModal] = useState(false)
   const [submittedWO, setSubmittedWO] = useState<any>(null)
   const [isRecording, setIsRecording] = useState(false)
@@ -524,38 +522,13 @@ export default function FastReportForm({ initialMachine, machines, initialType }
             <span className="text-[10px] text-stone-500 font-mono">Channel: CMD</span>
           </div>
 
-          <div className="flex flex-col sm:flex-row gap-2 pt-1">
-            <button
-              type="button"
-              disabled={isResendingLine}
-              onClick={async () => {
-                setIsResendingLine(true)
-                try {
-                  const res = await resendWorkOrderLineAlert(submittedWO.id)
-                  if (res?.success) {
-                    toast.success('ส่งการ์ดแจ้งเตือนเข้าห้อง LINE กลุ่มสำเร็จ!')
-                  } else {
-                    toast.error(res?.error || 'โควตาส่งข้อความของ LINE Bot ครบกำหนดรายเดือนแล้ว (300/300 ข้อความ Free Tier)')
-                  }
-                } catch (err: any) {
-                  toast.error(err.message || 'ส่งแจ้งเตือนไม่สำเร็จ')
-                } finally {
-                  setIsResendingLine(false)
-                }
-              }}
-              className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-emerald-300 hover:bg-emerald-50 text-emerald-800 font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 cursor-pointer shadow-2xs"
-              title="สั่งให้ระบบส่งการ์ด Flex Message เข้าห้อง LINE Maintenance อีกครั้ง"
-            >
-              <Send className={`w-3.5 h-3.5 ${isResendingLine ? 'animate-spin' : 'text-emerald-600'}`} />
-              <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
-            </button>
-
+          <div className="pt-1">
             <button
               type="button"
               onClick={async () => {
                 await shareToLine(getLineShareText(submittedWO))
               }}
-              className="flex-1 py-2.5 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs cursor-pointer"
+              className="w-full py-2.5 px-3 rounded-xl bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-xs flex items-center justify-center gap-1.5 transition active:scale-95 shadow-2xs cursor-pointer"
               title="แชร์ข้อความสรุปเข้าแชต LINE ทันที (ไม่มีปัญหาโควตาเต็ม 100%)"
             >
               <Share2 className="w-3.5 h-3.5" />

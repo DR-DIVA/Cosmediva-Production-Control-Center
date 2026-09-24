@@ -34,7 +34,6 @@ import {
   PenLine,
   UserCheck,
   X,
-  Send,
   Share2
 } from 'lucide-react'
 import * as XLSX from 'xlsx'
@@ -44,7 +43,6 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { MaintenanceWorkOrder, WorkOrderStatus, formatWorkOrderStatus, WORK_ORDER_STATUS_MAP, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { getWorkOrders, transitionWorkOrderStatus, updateWorkOrderRequester } from '@/app/actions/maintenance'
-import { resendWorkOrderLineAlert } from '@/app/actions/line'
 import ProductionVerifyModal from '@/components/maintenance/ProductionVerifyModal'
 import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
@@ -346,28 +344,6 @@ export default function WorkOrdersKanbanPage() {
   const [waitingPartModalWO, setWaitingPartModalWO] = useState<MaintenanceWorkOrder | null>(null)
   const [prNumber, setPrNumber] = useState('')
   const [prReason, setPrReason] = useState('')
-
-  // LINE alert states & handlers
-  const [isResendingLine, setIsResendingLine] = useState(false)
-
-  const handleResendLineAlert = async (woId: string) => {
-    setIsResendingLine(true)
-    try {
-      const res = await resendWorkOrderLineAlert(woId)
-      if (res?.success) {
-        toast.success('ส่งแจ้งเตือนเข้า LINE กลุ่มเรียบร้อยแล้ว!')
-      } else {
-        toast.error(res?.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ', {
-          duration: 7000,
-          description: '💡 แนะนำ: กดปุ่ม [🟢 แชร์] เพื่อคัดลอกสรุปใบแจ้งซ่อมแล้ววาง (Ctrl+V) ใน LINE ได้ทันที ไม่จำกัดโควตาค่ะ'
-        })
-      }
-    } catch (err: any) {
-      toast.error(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ LINE')
-    } finally {
-      setIsResendingLine(false)
-    }
-  }
 
   const getLineShareText = (wo: MaintenanceWorkOrder) => {
     const isEmergency = wo.priority === 'P1_CRITICAL' || wo.is_emergency_breakdown
@@ -930,31 +906,19 @@ export default function WorkOrdersKanbanPage() {
                             <span>{new Date(wo.reported_at).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })} น.</span>
                           </div>
 
-                          {/* Quick LINE Alert & Share actions */}
-                          <div className="flex items-center gap-1.5 pt-1">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                handleResendLineAlert(wo.id)
-                              }}
-                              className="flex-1 h-6 rounded-md bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
-                              title="ส่งแจ้งเตือนบอท LINE อีกครั้ง"
-                            >
-                              <Send className="w-2.5 h-2.5 text-emerald-600" />
-                              <span>📲 LINE</span>
-                            </button>
+                          {/* Quick LINE Share action */}
+                          <div className="pt-1">
                             <button
                               type="button"
                               onClick={async (e) => {
                                 e.stopPropagation()
                                 await shareToLine(getLineShareText(wo))
                               }}
-                              className="flex-1 h-6 rounded-md bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
-                              title="แชร์สรุปเข้า LINE ทันที (ไม่มีปัญหาโควตาเต็ม)"
+                              className="w-full h-6 rounded-md bg-[#06C755] hover:bg-[#05b34c] text-white font-bold text-[10px] flex items-center justify-center gap-1 transition active:scale-95 cursor-pointer shadow-2xs"
+                              title="แชร์สรุปเข้า LINE ทันที (คัดลอกข้อความลงคลิปบอร์ด)"
                             >
                               <Share2 className="w-2.5 h-2.5" />
-                              <span>🟢 แชร์</span>
+                              <span>🟢 แชร์สรุปเข้า LINE</span>
                             </button>
                           </div>
 
@@ -1486,26 +1450,13 @@ export default function WorkOrdersKanbanPage() {
                 </span>
                 <span className="text-[10px] text-stone-500 font-mono">Channel: CMD Maintenance</span>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleResendLineAlert(detailWO.id)}
-                  disabled={isResendingLine}
-                  className="flex-1 min-w-[140px] text-xs h-9 rounded-xl border-emerald-300 text-emerald-800 hover:bg-emerald-50 font-bold flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                  title="สั่งให้ระบบส่งการ์ดแจ้งเตือน Flex Message เข้ากลุ่ม LINE Maintenance อีกครั้ง"
-                >
-                  <Send className={`w-3.5 h-3.5 ${isResendingLine ? 'animate-spin' : 'text-emerald-600'}`} />
-                  <span>{isResendingLine ? 'กำลังส่งแจ้งเตือน...' : '📲 ส่งเตือนบอท LINE อีกครั้ง'}</span>
-                </Button>
-
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={async () => {
                     await shareToLine(getLineShareText(detailWO))
                   }}
-                  className="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl transition shadow-2xs h-9 cursor-pointer"
+                  className="w-full inline-flex items-center justify-center gap-1.5 text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white rounded-xl transition shadow-2xs h-9 cursor-pointer active:scale-95"
                   title="แชร์ข้อความสรุปเข้าห้องแชต/กลุ่ม LINE ด้วยตนเอง (ใช้ได้ทันทีไม่มีติดโควตา)"
                 >
                   <Share2 className="w-3.5 h-3.5" />
