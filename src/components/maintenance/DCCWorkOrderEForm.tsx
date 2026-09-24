@@ -16,6 +16,19 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
   const machine = wo.machine || {}
   const parts = wo.parts || []
 
+  const isRepairDone = Boolean(
+    wo.repair_completed_at ||
+    ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(wo.status)
+  )
+  const isVerified = Boolean(
+    wo.status === 'VERIFIED' ||
+    wo.status === 'CLOSED' ||
+    wo.verification_status === 'PASS' ||
+    wo.verification_status === 'PASSED' ||
+    (Boolean(wo.verified_at) && Boolean(wo.verified_by_name))
+  )
+  const isClosed = Boolean(wo.status === 'CLOSED' || wo.closed_at)
+
   const handlePrint = () => {
     window.print()
   }
@@ -380,9 +393,18 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
             SECTION 5: SIGN-OFF & ACCEPTANCE (GMP / DCC COMPLIANT)
         ========================================================================= */}
         <div className="border-2 border-t-0 border-black p-3 print:p-2 space-y-3 print:space-y-1.5 text-xs">
-          <div className="font-bold text-stone-900 uppercase tracking-wider text-[11px] bg-stone-200 print:bg-stone-200 px-2 py-1 print:py-0.5 flex justify-between">
+          <div className="font-bold text-stone-900 uppercase tracking-wider text-[11px] bg-stone-200 print:bg-stone-200 px-2 py-1 print:py-0.5 flex justify-between items-center">
             <span>ส่วนที่ 5: การตรวจรับมอบงานและการลงนาม (Inspection & Acceptance Sign-off)</span>
-            <span>ผลทดสอบรันเครื่อง (Test Run): <b className="text-emerald-800">[ ✓ ผ่านมาตรฐาน ]</b></span>
+            <span>
+              ผลทดสอบรันเครื่อง (Test Run):{' '}
+              {isVerified ? (
+                <b className="text-emerald-800">[ ✓ ผ่านมาตรฐาน ]</b>
+              ) : wo.verification_status === 'FAIL' ? (
+                <b className="text-rose-700">[ ✗ ไม่ผ่านมาตรฐาน ]</b>
+              ) : (
+                <span className="text-stone-600 font-normal">[ &nbsp; ] ผ่านมาตรฐาน &nbsp;&nbsp; [ &nbsp; ] ไม่ผ่าน</span>
+              )}
+            </span>
           </div>
 
           {/* 3 Signatures Columns */}
@@ -393,15 +415,28 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
                 1. ช่างผู้ดำเนินการซ่อม
               </span>
               <div className="h-10 print:h-9 flex flex-col items-center justify-center">
-                <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
-                  {wo.assigned_technician_name || 'ช่างซ่อมบำรุง'}
-                </span>
-                <span className="text-[9px] text-stone-500">
-                  (ระบบยืนยันตัวตนดิจิทัล)
-                </span>
+                {isRepairDone ? (
+                  <>
+                    <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
+                      {wo.assigned_technician_name || 'ช่างซ่อมบำรุง'}
+                    </span>
+                    <span className="text-[9px] text-stone-500">
+                      (ระบบยืนยันตัวตนดิจิทัล)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-mono text-xs text-stone-400 font-normal">
+                      ( ........................................ )
+                    </span>
+                    <span className="text-[9px] text-stone-400">
+                      {wo.assigned_technician_name ? `ช่างผู้รับผิดชอบ: ${wo.assigned_technician_name}` : '(ลงชื่อช่างผู้ดำเนินการซ่อม)'}
+                    </span>
+                  </>
+                )}
               </div>
               <div className="text-[10px] text-stone-600 border-t border-stone-200 pt-1 print:pt-0.5">
-                วันที่: {wo.repair_completed_at ? new Date(wo.repair_completed_at).toLocaleDateString('th-TH') : '___/___/______'}
+                วันที่: {isRepairDone && wo.repair_completed_at ? new Date(wo.repair_completed_at).toLocaleDateString('th-TH') : '___/___/______'}
               </div>
             </div>
 
@@ -411,15 +446,28 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
                 2. หัวหน้าแผนกซ่อมบำรุง
               </span>
               <div className="h-10 print:h-9 flex flex-col items-center justify-center">
-                <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
-                  {wo.supervisor_name || 'ปิยะราช รามมา'}
-                </span>
-                <span className="text-[9px] text-stone-500">
-                  (ตรวจสอบความถูกต้อง)
-                </span>
+                {isClosed ? (
+                  <>
+                    <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
+                      {wo.supervisor_name || 'ปิยะราช รามมา'}
+                    </span>
+                    <span className="text-[9px] text-stone-500">
+                      (ตรวจสอบความถูกต้องและปิดงาน)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-mono text-xs text-stone-400 font-normal">
+                      ( ........................................ )
+                    </span>
+                    <span className="text-[9px] text-stone-400">
+                      (รออนุมัติปิดงานซ่อมบำรุง)
+                    </span>
+                  </>
+                )}
               </div>
               <div className="text-[10px] text-stone-600 border-t border-stone-200 pt-1 print:pt-0.5">
-                วันที่: {wo.closed_at ? new Date(wo.closed_at).toLocaleDateString('th-TH') : '___/___/______'}
+                วันที่: {isClosed && wo.closed_at ? new Date(wo.closed_at).toLocaleDateString('th-TH') : '___/___/______'}
               </div>
             </div>
 
@@ -429,15 +477,28 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
                 3. ผู้ตรวจรับมอบงานฝ่ายผลิต
               </span>
               <div className="h-10 print:h-9 flex flex-col items-center justify-center">
-                <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
-                  {wo.verified_by_name || wo.requester_name || 'หัวหน้ากะฝ่ายผลิต'}
-                </span>
-                <span className="text-[9px] text-stone-500">
-                  (เครื่องจักรพร้อมเดินงาน 100%)
-                </span>
+                {isVerified ? (
+                  <>
+                    <span className="font-mono font-bold text-xs text-emerald-950 underline decoration-dotted">
+                      {wo.verified_by_name || wo.requester_name || 'ผู้ตรวจรับมอบงานฝ่ายผลิต'}
+                    </span>
+                    <span className="text-[9px] text-emerald-700 font-semibold">
+                      (เครื่องจักรพร้อมเดินงาน 100%)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-mono text-xs text-stone-400 font-normal">
+                      ( ........................................ )
+                    </span>
+                    <span className="text-[9px] text-stone-400">
+                      (ลงชื่อตรวจรับมอบงานฝ่ายผลิต)
+                    </span>
+                  </>
+                )}
               </div>
               <div className="text-[10px] text-stone-600 border-t border-stone-200 pt-1 print:pt-0.5">
-                วันที่: {wo.verified_at ? new Date(wo.verified_at).toLocaleDateString('th-TH') : '___/___/______'}
+                วันที่: {isVerified && wo.verified_at ? new Date(wo.verified_at).toLocaleDateString('th-TH') : '___/___/______'}
               </div>
             </div>
           </div>
