@@ -8,6 +8,13 @@ import { ShieldCheck, FileCheck, ArrowRight, CheckCircle2, AlertCircle, Layers }
 import { toast } from 'sonner'
 import { createMachineRequest } from '@/app/actions/maintenance'
 import { MachineRequestType, MaintenanceMachine } from '@/types/maintenance'
+import {
+  getMasterUsersList,
+  cacheMasterUsersList,
+  formatUserMasterDisplayName,
+  MasterUserOption,
+  STANDARD_DEPARTMENTS
+} from '@/lib/userMemory'
 
 interface Props {
   isOpen: boolean
@@ -59,15 +66,23 @@ const REQUEST_CASES: {
   }
 ]
 
-const DEPARTMENTS = [
-  'แผนกบรรจุและแพ็กกิ้ง (Packing Department)',
-  'แผนกผสม (Mixing Department)',
-  'คลังสินค้าและวัตถุดิบ (Raw Materials / Warehouse)',
-  'ฝ่ายควบคุมคุณภาพ (Quality Control - QC)',
-  'ฝ่ายวิจัยและพัฒนา (R&D)',
-  'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)',
-  'ฝ่ายผลิตทั่วไป (Production)'
+const STANDARD_REQUESTER_ROLES = [
+  { name: 'หัวหน้าแผนก (Supervisor)', dept: 'ฝ่ายผลิต (Production)' },
+  { name: 'ผู้จัดการฝ่ายผลิต (Production Manager)', dept: 'ฝ่ายผลิต (Production)' },
+  { name: 'หัวหน้ากะฝ่ายผลิต (Production Shift Supervisor)', dept: 'ฝ่ายผลิต (Production)' },
+  { name: 'วิศวกรซ่อมบำรุง (Maintenance Engineer)', dept: 'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)' },
+  { name: 'หัวหน้าแผนกซ่อมบำรุง (Maintenance Supervisor)', dept: 'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)' },
+  { name: 'เจ้าหน้าที่ควบคุมคุณภาพ (QC Supervisor)', dept: 'ฝ่ายควบคุมคุณภาพ (Quality Control - QC)' },
+  { name: 'หัวหน้าคลังสินค้า (Warehouse Supervisor)', dept: 'แผนก RM (Raw Materials / Warehouse)' }
 ]
+
+const ALL_DEPARTMENTS = [
+  'ฝ่ายผลิต (Production)',
+  'ฝ่ายผลิตทั่วไป (Production)',
+  ...STANDARD_DEPARTMENTS.filter(d => d !== 'ฝ่ายผลิตทั่วไป (Production)')
+]
+
+const DEPARTMENTS = ALL_DEPARTMENTS
 
 export default function MachineActionRequestModal({
   isOpen,
@@ -89,6 +104,45 @@ export default function MachineActionRequestModal({
   const [requestedByName, setRequestedByName] = useState('หัวหน้าแผนก (Supervisor)')
   const [requestedByDept, setRequestedByDept] = useState('ฝ่ายผลิต (Production)')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [masterUsers, setMasterUsers] = useState<MasterUserOption[]>(() => getMasterUsersList())
+  const [isCustomRequester, setIsCustomRequester] = useState(false)
+
+  useEffect(() => {
+    setMasterUsers(getMasterUsersList())
+    fetch(`/api/master-data/users?t=${Date.now()}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          cacheMasterUsersList(res.data)
+          setMasterUsers(res.data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const handleRequesterSelect = (val: string) => {
+    if (val === '__CUSTOM__') {
+      setIsCustomRequester(true)
+      return
+    }
+    setRequestedByName(val)
+
+    const standardRole = STANDARD_REQUESTER_ROLES.find(r => r.name === val)
+    if (standardRole) {
+      setRequestedByDept(standardRole.dept)
+      return
+    }
+
+    const found = masterUsers.find(u =>
+      u.displayName === val ||
+      u.fullName === val ||
+      `${u.fullName} (${u.employeeId})` === val ||
+      formatUserMasterDisplayName(u.fullName, u.employeeId) === val
+    )
+    if (found && found.department) {
+      setRequestedByDept(found.department)
+    }
+  }
 
   // Populate data when modal opens or machine changes
   useEffect(() => {
@@ -370,22 +424,82 @@ export default function MachineActionRequestModal({
                     ขั้นตอนที่ 1
                   </span>
                 </div>
+                {/* Field 1: Requester Name / Role dropdown */}
                 <div>
-                  <label className="text-[10px] text-stone-500 block mb-0.5">ชื่อ-นามสกุล / ตำแหน่ง *</label>
-                  <Input
-                    value={requestedByName}
-                    onChange={e => setRequestedByName(e.target.value)}
-                    className="h-8 text-xs bg-stone-50 border-stone-300 font-medium"
-                    required
-                  />
+                  <div className="flex items-center justify-between mb-0.5">
+                    <label className="text-[10px] text-stone-500 block">ชื่อ-นามสกุล / ตำแหน่ง *</label>
+                    {isCustomRequester ? (
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomRequester(false)}
+                        className="text-[10px] text-blue-600 hover:underline font-bold"
+                      >
+                        ← เลือกจาก Dropdown List
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomRequester(true)}
+                        className="text-[10px] text-stone-400 hover:text-stone-600"
+                        title="พิมพ์ชื่อหรือตำแหน่งด้วยตนเอง"
+                      >
+                        พิมพ์เอง
+                      </button>
+                    )}
+                  </div>
+
+                  {isCustomRequester ? (
+                    <Input
+                      value={requestedByName}
+                      onChange={e => setRequestedByName(e.target.value)}
+                      placeholder="ระบุชื่อ-นามสกุล หรือตำแหน่ง"
+                      className="h-8 text-xs bg-stone-50 border-stone-300 font-medium"
+                      required
+                      autoFocus
+                    />
+                  ) : (
+                    <select
+                      value={requestedByName}
+                      onChange={e => handleRequesterSelect(e.target.value)}
+                      className="w-full h-8 px-2 text-xs rounded-lg bg-stone-50 border border-stone-300 font-medium text-stone-800 focus:bg-white focus:outline-none"
+                      required
+                    >
+                      <optgroup label="📋 บทบาท / ตำแหน่ง">
+                        {STANDARD_REQUESTER_ROLES.map(r => (
+                          <option key={r.name} value={r.name}>{r.name}</option>
+                        ))}
+                      </optgroup>
+                      {masterUsers.length > 0 && (
+                        <optgroup label="👤 รายชื่อพนักงาน (Master Data)">
+                          {masterUsers.map(u => {
+                            const label = formatUserMasterDisplayName(u.fullName, u.employeeId)
+                            return (
+                              <option key={u.employeeId || u.fullName} value={label}>
+                                {label} {u.department ? `[${u.department.split(' ')[0]}]` : ''}
+                              </option>
+                            )
+                          })}
+                        </optgroup>
+                      )}
+                      <option value="__CUSTOM__">✍️ พิมพ์ชื่อ-ตำแหน่งอื่นๆ ด้วยตนเอง...</option>
+                    </select>
+                  )}
                 </div>
+
+                {/* Field 2: Department dropdown */}
                 <div>
                   <label className="text-[10px] text-stone-500 block mb-0.5">แผนกที่สังกัด</label>
-                  <Input
+                  <select
                     value={requestedByDept}
                     onChange={e => setRequestedByDept(e.target.value)}
-                    className="h-8 text-xs bg-stone-50 border-stone-300"
-                  />
+                    className="w-full h-8 px-2 text-xs rounded-lg bg-stone-50 border border-stone-300 font-medium text-stone-800 focus:bg-white focus:outline-none"
+                    required
+                  >
+                    <option value="">-- เลือกแผนกที่สังกัด --</option>
+                    {ALL_DEPARTMENTS.map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
 

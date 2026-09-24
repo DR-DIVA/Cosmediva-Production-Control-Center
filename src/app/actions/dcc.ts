@@ -254,6 +254,23 @@ const SEED_MASTER_TEMPLATES: DCCMasterTemplate[] = [
     description: 'บันทึกตรวจสอบ COA ซัพพลายเออร์ สภาพภายนอก และการติดสติกเกอร์ Pass/Quarantine'
   },
   {
+    id: 'form-mt-002',
+    docCode: 'MT-PF-002',
+    titleTh: 'ใบคำร้องขอดำเนินการเกี่ยวกับเครื่องจักร (ขอเพิ่ม/ขอยกเลิกใช้/โอนย้าย)',
+    titleEn: 'Machine Action Request Form (Add / Decommission / Relocate)',
+    tier: 'TIER_4_FORM',
+    departmentCode: 'MT',
+    streamCode: 'OMS',
+    revisionNo: '00',
+    effectiveDate: '2026-01-10',
+    status: 'EFFECTIVE',
+    controlledCopyNo: '04 (CONTROLLED)',
+    ownerName: 'หัวหน้าแผนก / ผู้ขอดำเนินการ',
+    approvedBy: 'Plant Director (PDT)',
+    isoStandardRef: ['ISO 22716 Clause 5 (Equipment Control)', 'GMP Scrap & Asset Disposal'],
+    description: 'ควบคุมการขอเพิ่มเครื่องจักรใหม่, ปลดระวาง/ขอยกเลิกใช้, โอนย้ายสังกัด และดัดแปลงสเปกเครื่องจักร'
+  },
+  {
     id: 'form-old-001',
     docCode: 'MT-PF-001D',
     titleTh: 'ใบแจ้งซ่อมเครื่องจักร (ฉบับกระดาษเดิม - ยกเลิกแล้ว)',
@@ -409,9 +426,9 @@ export async function getDCCExecutedRecords(filters?: {
   const supabase = getSupabase()
   const records: DCCExecutedRecord[] = []
 
-  // Run maintenance work orders and production lots queries in parallel
+  // Run maintenance work orders, production lots, and machine action requests queries in parallel
   try {
-    const [woRes, lotRes] = await Promise.all([
+    const [woRes, lotRes, mrRes] = await Promise.all([
       supabase
         .from('maintenance_work_orders')
         .select('id, wo_number, machine_code, machine_name, status, reported_at, closed_at, requester_name, assigned_technician_name, verified_by_name')
@@ -420,6 +437,11 @@ export async function getDCCExecutedRecords(filters?: {
       supabase
         .from('production_lots')
         .select('id, lot_no, current_status, order_quantity, planned_quantity, created_at, products:sku_id(sku, product_name)')
+        .order('created_at', { ascending: false })
+        .limit(50),
+      supabase
+        .from('maintenance_machine_requests')
+        .select('id, request_number, request_type, machine_code, machine_name, status, requested_by_name, requested_by_dept, approved_by_name, approved_at, created_at, reason')
         .order('created_at', { ascending: false })
         .limit(50)
     ])
@@ -445,6 +467,43 @@ export async function getDCCExecutedRecords(filters?: {
           meta: {
             machineName: wo.machine_name,
             rawStatus: wo.status
+          }
+        })
+      })
+    }
+
+    // Machine Action Requests (MT-PF-002)
+    const mrData = mrRes.data
+    if (mrData && mrData.length > 0) {
+      mrData.forEach(mr => {
+        const typeTitle = mr.request_type === 'DECOMMISSION'
+          ? 'ใบคำร้องขอยกเลิกใช้ / ปลดระวางเครื่องจักร'
+          : mr.request_type === 'NEW_MACHINE'
+          ? 'ใบคำร้องขอขึ้นทะเบียนเครื่องจักรใหม่'
+          : mr.request_type === 'RELOCATE'
+          ? 'ใบคำร้องขอโอนย้ายสังกัดเครื่องจักร'
+          : 'ใบคำร้องขอดำเนินการเกี่ยวกับเครื่องจักร'
+
+        records.push({
+          id: `mr-${mr.id}`,
+          recordNumber: mr.request_number,
+          docCode: 'MT-PF-002',
+          formTitle: typeTitle,
+          departmentCode: 'MT',
+          streamCode: 'OMS',
+          revisionNo: '00',
+          status: mr.status === 'APPROVED' ? 'APPROVED' : mr.status === 'REJECTED' ? 'QUARANTINE' : 'IN_PROGRESS',
+          executedDate: (mr.approved_at || mr.created_at || new Date().toISOString()).slice(0, 16).replace('T', ' '),
+          operatorName: mr.requested_by_name || 'ผู้ขอดำเนินการ',
+          verifiedByName: mr.requested_by_dept || 'ฝ่ายผลิต',
+          approvedByName: (mr as any).approved_by_name || 'Plant Director (PDT)',
+          machineCode: mr.machine_code,
+          viewEFormUrl: `/maintenance/machines`,
+          meta: {
+            machineName: mr.machine_name,
+            requestType: mr.request_type,
+            rawStatus: mr.status,
+            reason: mr.reason
           }
         })
       })

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import MaintenanceHeader from '@/components/maintenance/MaintenanceHeader'
 import { 
   Wrench, 
@@ -30,6 +30,22 @@ import MachineActionRequestModal from '@/components/maintenance/MachineActionReq
 import MachineRequestsListModal from '@/components/maintenance/MachineRequestsListModal'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { DEPARTMENTS_LIST, CATEGORIES_LIST } from '@/lib/maintenanceHelpers'
+import { CALIBRATION_ITEMS, CalibrationItem } from '@/lib/calibrationData'
+
+const MONTH_THAI: Record<string, string> = {
+  JAN: 'ม.ค. 2026',
+  FEB: 'ก.พ. 2026',
+  MAR: 'มี.ค. 2026',
+  APR: 'เม.ย. 2026',
+  MAY: 'พ.ค. 2026',
+  JUN: 'มิ.ย. 2026',
+  JUL: 'ก.ค. 2026',
+  AUG: 'ส.ค. 2026',
+  SEP: 'ก.ย. 2026',
+  OCT: 'ต.ค. 2026',
+  NOV: 'พ.ย. 2026',
+  DEC: 'ธ.ค. 2026'
+}
 
 export default function MachinesMasterPage() {
   const [machines, setMachines] = useState<MaintenanceMachine[]>([])
@@ -43,6 +59,30 @@ export default function MachinesMasterPage() {
   const [qrMachine, setQrMachine] = useState<MaintenanceMachine | null>(null)
   const [editingMachine, setEditingMachine] = useState<MaintenanceMachine | null>(null)
   const [isAddMachineOpen, setIsAddMachineOpen] = useState(false)
+
+  // Filter CAL 2026 items based on departmentFilter and search
+  const filteredCalItems = useMemo(() => {
+    return CALIBRATION_ITEMS.filter(item => {
+      if (departmentFilter !== 'all') {
+        const deptObj = DEPARTMENTS_LIST.find(d => d.key === departmentFilter)
+        if (deptObj && deptObj.codePattern && item.owner !== deptObj.codePattern) {
+          return false
+        }
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        return (
+          item.equipment_id.toLowerCase().includes(q) ||
+          item.equipment_name.toLowerCase().includes(q) ||
+          item.brand.toLowerCase().includes(q) ||
+          item.model.toLowerCase().includes(q) ||
+          item.serial_number.toLowerCase().includes(q) ||
+          item.owner_name.toLowerCase().includes(q)
+        )
+      }
+      return true
+    })
+  }, [departmentFilter, search])
   const [isRequestsListOpen, setIsRequestsListOpen] = useState(false)
   const [isActionRequestOpen, setIsActionRequestOpen] = useState(false)
 
@@ -204,7 +244,7 @@ export default function MachinesMasterPage() {
       </div>
 
       {/* Department Quick Filter Tabs (ยึดตามรหัสเครื่องจักร เช่น MM -> แผนก RM / Warehouse) */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+      <div className="flex flex-wrap items-center gap-1.5">
         {DEPARTMENTS_LIST.map(dept => {
           const isSelected = departmentFilter === dept.key
           return (
@@ -212,7 +252,7 @@ export default function MachinesMasterPage() {
               key={dept.key}
               type="button"
               onClick={() => setDepartmentFilter(dept.key)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shrink-0 whitespace-nowrap cursor-pointer ${
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
                 isSelected
                   ? 'bg-[#2A2521] text-[#D4AF37] shadow-sm ring-2 ring-[#D4AF37]/30'
                   : 'bg-white hover:bg-stone-100 text-stone-700 border border-stone-200'
@@ -281,20 +321,133 @@ export default function MachinesMasterPage() {
           <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
             specialFilter === 'calibration' ? 'bg-cyan-900 text-white' : 'bg-cyan-100 text-cyan-900'
           }`}>
-            {machines.filter(m => m.requires_calibration).length}
+            {filteredCalItems.length}
           </span>
         </button>
       </div>
 
+      {/* Calibration Banner when specialFilter is calibration */}
+      {specialFilter === 'calibration' && (
+        <div className="bg-cyan-50/90 border border-cyan-300 rounded-3xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-3">
+            <span className="text-3xl p-2.5 bg-white rounded-2xl border border-cyan-200 shadow-xs">⚖️</span>
+            <div>
+              <div className="text-sm font-black text-cyan-950 flex items-center gap-2">
+                <span>สรุปรายการเครื่องมือวัดที่ต้องสอบเทียบ (CAL 2026 • DCC QC-PF-004B)</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-cyan-200 text-cyan-900 font-mono text-xs font-bold">
+                  {filteredCalItems.length} รายการ
+                </span>
+              </div>
+              <p className="text-xs text-cyan-800 mt-1">
+                รวบรวมเครื่องมือวัดทุกแผนก (PK, MX, MM, QC, RD) พร้อมกำหนดเดือนสอบเทียบประจำปี 2026
+              </p>
+            </div>
+          </div>
+
+          <Link
+            href="/maintenance/cal"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-cyan-800 hover:bg-cyan-900 text-white text-xs font-black transition shadow-sm shrink-0 self-start sm:self-auto"
+          >
+            <span>📅 เปิดดูตารางไทม์ไลน์รายปี CAL 2026 (12 เดือน)</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+        </div>
+      )}
+
       {/* Machine Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {machines
-          .filter(m => {
-            if (specialFilter === 'subcontract') return m.is_subcontract_pm
-            if (specialFilter === 'calibration') return m.requires_calibration
-            return true
-          })
-          .map(m => {
+        {specialFilter === 'calibration' ? (
+          filteredCalItems.length === 0 ? (
+            <div className="col-span-full bg-white p-12 text-center rounded-3xl border border-stone-200 text-stone-500 font-medium">
+              ไม่พบเครื่องมือวัดที่ต้องสอบเทียบตามเงื่อนไขที่เลือก
+            </div>
+          ) : (
+            filteredCalItems.map(item => (
+              <div
+                key={item.equipment_id}
+                className="bg-white rounded-3xl p-5 border border-cyan-200 hover:border-cyan-400 transition-all flex flex-col justify-between shadow-sm hover:shadow-md"
+              >
+                <div>
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-mono text-base font-black text-stone-900">{item.equipment_id}</span>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-black bg-cyan-100 text-cyan-900 border border-cyan-300">
+                        {item.owner}
+                      </span>
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-900 border border-amber-200">
+                        รอบ: {MONTH_THAI[item.scheduled_month] || item.scheduled_month}
+                      </span>
+                    </div>
+
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-100 text-teal-800">
+                      {item.cal_type}
+                    </span>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-stone-900 leading-snug line-clamp-2">{item.equipment_name}</h3>
+                  <div className="text-xs text-stone-500 mt-1 flex items-center gap-1.5">
+                    <span>{item.owner_name}</span>
+                  </div>
+
+                  {/* Calibration Specs snapshot */}
+                  <div className="mt-3 p-2.5 bg-stone-50 rounded-2xl text-[11px] text-stone-600 space-y-1.5 border border-stone-200">
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">ยี่ห้อ / รุ่น:</span>
+                      <span className="font-medium text-stone-800 text-right truncate max-w-[170px]">
+                        {[item.brand, item.model].filter(Boolean).join(' ') || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">หมายเลข S/N:</span>
+                      <span className="font-mono text-stone-700 text-right truncate max-w-[170px]">
+                        {item.serial_number || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">ช่วงการใช้งาน:</span>
+                      <span className="font-medium text-stone-800 text-right truncate max-w-[170px]">
+                        {item.operation_range || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">เกณฑ์การยอมรับ:</span>
+                      <span className="font-medium text-stone-800 text-right truncate max-w-[170px]">
+                        {item.acceptance_criteria || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center gap-2">
+                      <span className="text-stone-400 shrink-0">หน่วยงานสอบเทียบ:</span>
+                      <span className="font-bold text-cyan-800 text-right truncate max-w-[170px]">
+                        {item.cal_provider || '-'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-stone-200/60">
+                      <span className="text-stone-400">ความถี่สอบเทียบ:</span>
+                      <span className="font-bold text-emerald-800">ทุก {item.interval_months} เดือน ({item.scheduled_month})</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-1.5 pt-4 border-t border-stone-100 mt-4">
+                  <Link
+                    href="/maintenance/cal"
+                    className="flex-1 text-xs border border-stone-200 hover:border-cyan-400 bg-stone-50 hover:bg-cyan-50 rounded-xl px-2 h-9 flex items-center justify-center gap-1.5 font-bold text-cyan-900 transition"
+                  >
+                    <span>📅 เปิดดูในตารางผัง CAL 2026</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
+                  </Link>
+                </div>
+              </div>
+            ))
+          )
+        ) : (
+          machines
+            .filter(m => {
+              if (specialFilter === 'subcontract') return m.is_subcontract_pm
+              return true
+            })
+            .map(m => {
           const isBreakdown = m.status === 'Breakdown' || m.status === 'Under Repair'
           const pmFreq = m.pm_frequency_type ? getPmFrequencyInfo(m.pm_frequency_type, m.pm_frequency_interval) : null
 
@@ -459,7 +612,8 @@ export default function MachinesMasterPage() {
               </div>
             </div>
           )
-        })}
+        })
+      )}
       </div>
 
       {/* Floating Action Buttons for MT-PF-002 Governance */}

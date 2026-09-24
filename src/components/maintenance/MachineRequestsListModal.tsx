@@ -14,8 +14,10 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertTriangle,
-  UserCheck
+  UserCheck,
+  Download
 } from 'lucide-react'
+import * as XLSX from 'xlsx'
 import { toast } from 'sonner'
 import { getMachineRequests, approveMachineRequest, rejectMachineRequest } from '@/app/actions/maintenance'
 import { MaintenanceMachineRequest, MachineRequestType } from '@/types/maintenance'
@@ -112,6 +114,38 @@ export default function MachineRequestsListModal({ isOpen, onClose, onSuccess }:
     } finally {
       setActionLoadingId(null)
     }
+  }
+
+  const handleExportExcel = () => {
+    if (requests.length === 0) {
+      toast.error('ไม่มีรายการคำร้องสำหรับส่งออก')
+      return
+    }
+
+    const dataToExport = requests.map((r, index) => ({
+      'ลำดับ': index + 1,
+      'เลขที่คำร้อง': r.request_number,
+      'รหัสเอกสาร DCC': 'MT-PF-002',
+      'วันที่ยื่นคำร้อง': r.created_at ? new Date(r.created_at).toLocaleDateString('th-TH') : '-',
+      'ประเภทคำร้อง': getTypeLabel(r.request_type),
+      'รหัสเครื่องจักร': r.machine_code,
+      'ชื่อเครื่องจักร': r.machine_name,
+      'แผนก/สังกัด': r.target_department || r.current_department || '-',
+      'ห้อง/พื้นที่': r.target_location || r.current_location || '-',
+      'ผู้ขอดำเนินการ': r.requested_by_name || '-',
+      'แผนกผู้ขอ': r.requested_by_dept || '-',
+      'เหตุผลความจำเป็น': r.reason || '-',
+      'สถานะการอนุมัติ': r.status === 'APPROVED' ? 'อนุมัติแล้ว (Approved)' : r.status === 'REJECTED' ? 'ไม่อนุมัติ (Rejected)' : 'รออนุมัติ (Pending)',
+      'ผู้อนุมัติ': r.approved_by_name || (r.status === 'APPROVED' ? 'Plant Director (PDT)' : '-'),
+      'วันที่อนุมัติ/ปฏิเสธ': r.approved_at ? new Date(r.approved_at).toLocaleDateString('th-TH') : '-'
+    }))
+
+    const ws = XLSX.utils.json_to_sheet(dataToExport)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Machine_Requests_Log')
+    const fileName = `MT-PF-002_Machine_Action_Requests_Log_${new Date().toISOString().slice(0, 10)}.xlsx`
+    XLSX.writeFile(wb, fileName)
+    toast.success(`ส่งออก Log ทะเบียนคำร้องเป็นไฟล์ Excel เรียบร้อยแล้ว (${requests.length} รายการ)`)
   }
 
   function getTypeLabel(type: MachineRequestType) {
@@ -216,16 +250,28 @@ export default function MachineRequestsListModal({ isOpen, onClose, onSuccess }:
               </button>
             </div>
 
-            {/* Search Input */}
-            <div className="relative w-full sm:w-64">
-              <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
-              <input
-                type="text"
-                placeholder="ค้นเลขที่คำร้อง, รหัสเครื่อง..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white border border-stone-200 focus:outline-none focus:border-[#D4AF37]"
-              />
+            {/* Search Input & Export Button */}
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="relative flex-1 sm:w-64">
+                <Search className="w-3.5 h-3.5 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="ค้นเลขที่คำร้อง, รหัสเครื่อง..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-white border border-stone-200 focus:outline-none focus:border-[#D4AF37]"
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={handleExportExcel}
+                className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#06C755] hover:bg-[#05b34c] text-white flex items-center gap-1.5 transition shadow-xs shrink-0 cursor-pointer"
+                title="ส่งออกบันทึก Log ทะเบียนคำร้องทั้งหมดเป็นไฟล์ Excel (.xlsx)"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Export Excel (.xlsx)</span>
+              </button>
             </div>
           </div>
         </div>
