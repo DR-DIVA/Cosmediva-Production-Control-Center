@@ -67,23 +67,14 @@ export async function shareToLine(text: string, title: string = 'แจ้งซ
     }
   } else {
     // Desktop PC:
-    // Try launching the installed desktop LINE application without opening a new browser tab
-    try {
-      const iframe = document.createElement('iframe')
-      iframe.style.display = 'none'
-      iframe.src = `line://msg/text/${encodeURIComponent(text)}`
-      document.body.appendChild(iframe)
-      setTimeout(() => {
-        try {
-          document.body.removeChild(iframe)
-        } catch {}
-      }, 1500)
-    } catch (e) {}
+    // IMPORTANT: On Desktop (Windows / Mac), NEVER invoke `line://` protocol or `line.me/R/`!
+    // 1) `line.me/R/share` causes LINE server to redirect desktop browser to `line.me/en/` (Download page).
+    // 2) `line://msg/text/` causes Chrome to show "Open LINE?" dialog and LINE Desktop to show "คุณได้เปิด LINE เวอร์ชั่นอื่นแล้ว" (multiple instance error).
+    // Therefore, on Desktop we copy text directly to clipboard (100% reliable) and instruct the user to press Ctrl + V in their LINE chat.
 
-    // Show prominent confirmation toast
-    toast.success('📋 คัดลอกข้อความแจ้งซ่อมเรียบร้อยแล้ว! เปิดแชต LINE แล้วกด Ctrl + V วางได้ทันทีค่ะ', {
-      duration: 6000,
-      description: 'ระบบคัดลอกข้อความทั้งหมดลง Clipboard ให้แล้ว สามารถนำไปส่งในห้องกลุ่มช่างได้ทันที'
+    toast.success('📋 คัดลอกข้อความแจ้งซ่อมเรียบร้อยแล้ว!', {
+      duration: 7000,
+      description: 'เปิดห้องแชต/กลุ่ม LINE แล้วกด Ctrl + V (หรือคลิกขวาแล้ววาง) เพื่อส่งได้ทันทีค่ะ'
     })
     return true
   }

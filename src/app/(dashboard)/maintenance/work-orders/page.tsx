@@ -357,7 +357,10 @@ export default function WorkOrdersKanbanPage() {
       if (res?.success) {
         toast.success('ส่งแจ้งเตือนเข้า LINE กลุ่มเรียบร้อยแล้ว!')
       } else {
-        toast.error(res?.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ')
+        toast.error(res?.error || 'ส่งข้อความเข้า LINE ไม่สำเร็จ', {
+          duration: 7000,
+          description: '💡 แนะนำ: กดปุ่ม [🟢 แชร์] เพื่อคัดลอกสรุปใบแจ้งซ่อมแล้ววาง (Ctrl+V) ใน LINE ได้ทันที ไม่จำกัดโควตาค่ะ'
+        })
       }
     } catch (err: any) {
       toast.error(err.message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ LINE')
