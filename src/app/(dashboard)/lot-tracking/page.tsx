@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table'
 import { createClient } from '@/utils/supabase/client'
 import { Package, Activity } from 'lucide-react'
+import { getBaseOrderType } from '@/lib/utils'
 
 const supabase = createClient()
 
@@ -114,7 +115,7 @@ export default function LotTrackingPage() {
                       <TableCell className="text-right">{lot.kg_per_tank || '-'}</TableCell>
                       <TableCell className="text-right">{lot.g_per_piece || '-'}</TableCell>
                       <TableCell>
-                        {lot.order_type === 'MTS' ? (
+                        {getBaseOrderType(lot.order_type) === 'MTS' ? (
                           <span className="text-slate-500 font-medium">MTS</span>
                         ) : (
                           lot.fg_due_date ? new Date(lot.fg_due_date).toLocaleDateString('th-TH') : '-'

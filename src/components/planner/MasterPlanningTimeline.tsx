@@ -25,7 +25,7 @@ import {
 import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { cn } from '@/lib/utils'
+import { cn, getBaseOrderType } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -244,10 +244,13 @@ export function MasterPlanningTimeline({
         const { data: { user } } = await supabase.auth.getUser()
         if (user) {
           setActiveUserId(user.id)
-          const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single()
-          if (profile) {
-            setActiveUserIdentifier((profile.employee_id || profile.username || 'USER').toUpperCase())
-          }
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .maybeSingle()
+          const empId = profile?.employee_id || user.user_metadata?.employee_id || user.email?.split('@')[0] || 'USER'
+          setActiveUserIdentifier(empId.toUpperCase())
         }
       } catch (e) {
         console.error('Error fetching user in MasterPlanningTimeline:', e)
@@ -520,7 +523,7 @@ export function MasterPlanningTimeline({
   // Filtered Lots for Gantt Display
   const filteredLots = useMemo(() => {
     return lots.filter(lot => {
-      if (filterOrderType !== 'ALL' && lot.order_type !== filterOrderType) return false
+      if (filterOrderType !== 'ALL' && getBaseOrderType(lot.order_type) !== filterOrderType) return false
       const q = searchQuery.toLowerCase().trim()
       if (q) {
         const matchesPo = (lot.po_no || '').toLowerCase().includes(q)

@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Scale, Beaker, ShieldCheck, Container, ScanBarcode, Box, CheckCircle2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { format } from 'date-fns'
+import { getBaseOrderType } from '@/lib/utils'
 
 const PROCESS_STAGES = [
   { key: 'weigh', label: 'ชั่งสาร', icon: Scale, keywords: ['ชั่ง', 'mm-rm'] },
@@ -456,7 +457,7 @@ export default function ProductionLine({
                             {info.status === 'error' && <span className="text-red-500 font-bold animate-bounce">▲ ติดปัญหา</span>}
                             {stage.key === 'delivered' && (
                               <div className={`mt-1 text-[9px] font-medium leading-tight ${isNight ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {(!lot.order_type || lot.order_type === 'MTS') ? (
+                                {getBaseOrderType(lot.order_type) === 'MTS' ? (
                                   <div className="flex flex-col gap-0.5">
                                     <span>S: {lot.planned_start_date ? format(new Date(lot.planned_start_date), "dd MMM") : '-'}</span>
                                     <span>E: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM") : '-'}</span>

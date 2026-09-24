@@ -33,7 +33,7 @@ import {
 import { format, addDays, startOfDay, differenceInDays, isSameDay } from 'date-fns'
 import { toast } from 'sonner'
 import { parsePlanChangeInfo } from '@/lib/planTracking'
-import { cn } from '@/lib/utils'
+import { cn, getBaseOrderType } from '@/lib/utils'
 import { isProcessInDept, ProductionDept } from './MasterPlanningTimeline'
 
 interface TimelinePrintModalProps {
@@ -147,7 +147,7 @@ export function TimelinePrintModal({
       .filter(lot => {
         // Order type filter
         if (orderTypeFilter !== 'ALL') {
-          const currentType = (lot.order_type || 'MTS').toUpperCase()
+          const currentType = getBaseOrderType(lot.order_type)
           if (currentType !== orderTypeFilter) return false
         }
 
@@ -1297,7 +1297,7 @@ export function TimelinePrintModal({
                       const sku = lot.products?.sku || 'Unknown SKU'
                       const lotNo = lot.lot_no || '-'
                       const poNo = lot.po_no || '-'
-                      const orderType = lot.order_type || 'MTS'
+                      const orderType = getBaseOrderType(lot.order_type)
                       const orderQty = lot.order_quantity ? Number(lot.order_quantity).toLocaleString() : '-'
 
                       return (

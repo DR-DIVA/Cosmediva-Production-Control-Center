@@ -22,7 +22,7 @@ import {
   User, ChevronDown, ChevronUp, ChevronRight, FlaskConical, History, 
   ClipboardCheck, PackageOpen, Boxes, XCircle, AlertTriangle, CheckCircle2, 
   ShieldCheck, ArrowUp, ArrowDown, ArrowUpDown, TrendingUp, Layers, 
-  RefreshCw, Sparkles, Clock, ArrowUpRight 
+  RefreshCw, Sparkles, Clock, ArrowUpRight, RotateCcw 
 } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -66,6 +66,14 @@ export default function QCQueuePage() {
   const [reasonText, setReasonText] = useState('')
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
   const [userRole, setUserRole] = useState('user')
+
+  // Audit Correction State (for RM / PM / FG History)
+  const [isCorrectionDialogOpen, setIsCorrectionDialogOpen] = useState(false)
+  const [correctionItem, setCorrectionItem] = useState<any | null>(null)
+  const [correctionType, setCorrectionType] = useState<'RM' | 'PM' | 'FG'>('PM')
+  const [newTargetStatus, setNewTargetStatus] = useState<string>('PASSED')
+  const [correctionReason, setCorrectionReason] = useState('')
+  const [isSubmittingCorrection, setIsSubmittingCorrection] = useState(false)
 
   // --- Sorting & Filtering State ---
   const [dateSort, setDateSort] = useState<'asc' | 'desc' | null>(null)
@@ -275,6 +283,230 @@ export default function QCQueuePage() {
     }
   }
 
+  // ---- AUDIT CORRECTION LOGIC ----
+  const renderQcNoteWithAudit = (rawNote?: string | null, remark?: string | null) => {
+    const note = rawNote || remark || ''
+    if (!note) return <span className="text-slate-400">-</span>
+
+    if (note.includes('[แก้ไขผล QC:')) {
+      const parts = note.split(/\s*\|\s*\[แก้ไขผล QC:\s*/)
+      const originalPart = parts[0]?.trim()
+      const auditPart = parts[1] ? parts[1].replace(/\]\s*$/, '').trim() : ''
+
+      return (
+        <div className="space-y-1.5 py-0.5">
+          {originalPart && (
+            <div className="text-slate-700 font-medium break-words whitespace-normal leading-snug">
+              {cleanDisplayNote(originalPart)}
+            </div>
+          )}
+          {auditPart && (
+            <div className="bg-amber-50/90 border border-amber-200/90 rounded px-2.5 py-1.5 text-[11px] text-amber-950 space-y-0.5 shadow-sm">
+              <div className="font-semibold flex items-center gap-1 text-amber-800">
+                <RotateCcw className="w-3 h-3 text-amber-600 shrink-0" />
+                <span>ประวัติการแก้ไขผล QC (Audit Trail)</span>
+              </div>
+              <div className="text-slate-600 break-words whitespace-normal leading-relaxed pl-3 border-l-2 border-amber-300 my-0.5">
+                {auditPart}
+              </div>
+            </div>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div className="text-slate-600 break-words whitespace-normal leading-snug">
+        {cleanDisplayNote(note)}
+      </div>
+    )
+  }
+
+  const openCorrectionDialog = (item: any, type: 'RM' | 'PM' | 'FG') => {
+    setCorrectionItem(item)
+    setCorrectionType(type)
+    const curr = item.qc_status || item.status
+    if (curr === 'REJECTED' || curr === 'HOLD' || curr === 'FAILED' || curr === 'PAUSED' || curr === 'QUARANTINE') {
+      setNewTargetStatus('PASSED')
+    } else {
+      setNewTargetStatus('HOLD')
+    }
+    setCorrectionReason('')
+    setIsCorrectionDialogOpen(true)
+  }
+
+  const confirmCorrection = async () => {
+    if (!correctionItem || !newTargetStatus) {
+      toast.error('กรุณาเลือกสถานะใหม่')
+      return
+    }
+    if (!correctionReason.trim()) {
+      toast.error('กรุณาระบุเหตุผลการแก้ไข (Audit Reason)')
+      return
+    }
+
+    setIsSubmittingCorrection(true)
+    try {
+      const now = new Date()
+      const dateStr = now.toLocaleDateString('th-TH')
+      const timeStr = now.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+      const prevStatus = correctionItem.qc_status || correctionItem.status || 'UNKNOWN'
+      const inspector = currentUser || 'QC'
+
+      const auditEntry = `[แก้ไขผล QC: ${prevStatus} ➔ ${newTargetStatus} เมื่อ ${dateStr} ${timeStr} โดย ${inspector}: ${correctionReason.trim()}]`
+
+      if (correctionType === 'RM' || correctionType === 'PM') {
+        const currentNote = correctionItem.qc_note || correctionItem.remark || ''
+        const updatedNote = currentNote ? `${currentNote} | ${auditEntry}` : auditEntry
+
+        const updates: any = {
+          qc_status: newTargetStatus,
+          qc_inspector: inspector,
+          qc_note: updatedNote,
+          updated_at: now.toISOString()
+        }
+        if (newTargetStatus === 'PASSED') {
+          updates.status = 'READY'
+          updates.released_date = now.toISOString()
+        } else if (newTargetStatus === 'REJECTED') {
+          updates.status = 'REJECTED'
+          updates.released_date = null
+        } else if (newTargetStatus === 'HOLD') {
+          updates.status = 'RECEIVED'
+          updates.released_date = null
+        }
+
+        const { error: rmErr } = await supabase
+          .from('production_lot_rms')
+          .update(updates)
+          .eq('id', correctionItem.id)
+
+        if (rmErr) throw rmErr
+
+        // If resolving from REJECTED/HOLD to PASSED, resolve any linked QA issues in production_logs
+        if (newTargetStatus === 'PASSED' && (prevStatus === 'REJECTED' || prevStatus === 'HOLD')) {
+          const { data: logs } = await supabase
+            .from('production_logs')
+            .select('id, note')
+            .or(`note.ilike.%${correctionItem.rm_code}%,note.ilike.%${correctionItem.control_no || '---'}%`)
+
+          if (logs && logs.length > 0) {
+            for (const log of logs) {
+              if (log.note && (log.note.includes('[QC REJECT]') || log.note.includes('[QC HOLD]')) && !log.note.includes('> [QA Approved]')) {
+                const lines = log.note.split('\n')
+                const updatedLines = lines.map((line: string) => {
+                  if ((line.includes('[QC REJECT]') || line.includes('[QC HOLD]')) && !line.includes('> [QA Approved]')) {
+                    return `${line} > [QA Approved] แก้ไขสถานะเป็น PASSED โดย ${inspector} (${dateStr}): ${correctionReason.trim()}`
+                  }
+                  return line
+                })
+                await supabase
+                  .from('production_logs')
+                  .update({ note: updatedLines.join('\n'), updated_at: now.toISOString() })
+                  .eq('id', log.id)
+              }
+            }
+          }
+        }
+
+        // If changed to REJECTED from PASSED, insert a QA issue log
+        if (newTargetStatus === 'REJECTED' && prevStatus !== 'REJECTED') {
+          const isPM = correctionItem.rm_code?.toLowerCase().startsWith('p') || correctionItem.rm_code?.startsWith('CMD1') || correctionItem.rm_code?.startsWith('CMD2')
+          const issueNote = `[QC REJECT] ${isPM ? 'PM' : 'RM'} [${correctionItem.rm_code} - ${correctionItem.rm_name}]: ${correctionReason.trim()} (แก้ไขจาก ${prevStatus})`
+          const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
+          if (qcProc) {
+            await supabase.from('production_logs').insert({
+              activity_date: now.toISOString().split('T')[0],
+              production_lot_id: correctionItem.production_lot_id || null,
+              process_id: qcProc.id,
+              status: 'COMPLETED',
+              note: issueNote,
+              tank_details: {}
+            })
+          }
+        }
+
+        toast.success(`แก้ไขผล QC และบันทึก Audit Trail เรียบร้อยแล้ว`)
+        setIsCorrectionDialogOpen(false)
+        fetchRmTasks()
+        fetchRmTodayHistory()
+        fetchGlobalStats()
+      } else if (correctionType === 'FG') {
+        let finalStatus = 'QUARANTINE'
+        if (newTargetStatus === 'PASSED') finalStatus = 'RELEASED'
+        if (newTargetStatus === 'REJECTED') finalStatus = 'REJECTED'
+
+        const currentNote = correctionItem.note || ''
+        const updatedNote = currentNote ? `${currentNote} | ${auditEntry}` : auditEntry
+
+        const { error: fgError } = await supabase
+          .from('fg_inventory')
+          .update({
+            qc_status: finalStatus,
+            qc_inspector: inspector,
+            note: updatedNote,
+            updated_at: now.toISOString()
+          })
+          .eq('id', correctionItem.id)
+
+        if (fgError) throw fgError
+
+        if (newTargetStatus === 'PASSED') {
+          const { data: fgTasks } = await supabase.from('production_logs')
+            .select('id, tank_details')
+            .eq('status', 'DONE')
+          if (fgTasks) {
+            for (const t of fgTasks) {
+              const d = typeof t.tank_details === 'object' && t.tank_details !== null ? { ...t.tank_details } : {}
+              if (correctionItem.lot_no && (JSON.stringify(d).includes(correctionItem.lot_no) || (correctionItem.box_lot_no && JSON.stringify(d).includes(correctionItem.box_lot_no)))) {
+                d.qc_release_info = {
+                  user: inspector,
+                  timestamp: now.toISOString(),
+                  correction: true,
+                  reason: correctionReason.trim()
+                }
+                await supabase.from('production_logs').update({ tank_details: d }).eq('id', t.id)
+              }
+            }
+          }
+        }
+
+        if (newTargetStatus === 'PASSED' && (prevStatus === 'REJECTED' || prevStatus === 'HOLD' || prevStatus === 'QUARANTINE')) {
+          const { data: logs } = await supabase.from('production_logs')
+            .select('id, note')
+            .or(`note.ilike.%${correctionItem.lot_no || '---'}%,note.ilike.%${correctionItem.box_lot_no || '---'}%`)
+          if (logs && logs.length > 0) {
+            for (const log of logs) {
+              if (log.note && (log.note.includes('[QC REJECT]') || log.note.includes('[QC HOLD]')) && !log.note.includes('> [QA Approved]')) {
+                const lines = log.note.split('\n')
+                const updatedLines = lines.map((line: string) => {
+                  if ((line.includes('[QC REJECT]') || line.includes('[QC HOLD]')) && !line.includes('> [QA Approved]')) {
+                    return `${line} > [QA Approved] แก้ไขสถานะเป็น RELEASED โดย ${inspector} (${dateStr}): ${correctionReason.trim()}`
+                  }
+                  return line
+                })
+                await supabase.from('production_logs')
+                  .update({ note: updatedLines.join('\n'), updated_at: now.toISOString() })
+                  .eq('id', log.id)
+              }
+            }
+          }
+        }
+
+        toast.success(`แก้ไขผล QC สินค้าสำเร็จรูป และบันทึก Audit Trail เรียบร้อย`)
+        setIsCorrectionDialogOpen(false)
+        fetchFgInventory()
+        fetchFgTodayHistory()
+        fetchGlobalStats()
+      }
+    } catch (err: any) {
+      console.error('Correction error:', err)
+      toast.error('เกิดข้อผิดพลาดในการบันทึก: ' + err.message)
+    } finally {
+      setIsSubmittingCorrection(false)
+    }
+  }
+
   // ---- BULK LOGIC ----
   const fetchTasks = async () => {
     const { data } = await supabase.from('production_logs')
@@ -350,19 +582,11 @@ export default function QCQueuePage() {
   }
 
   const handleTankClick = (task: any, tankNum: number, currentStatus: string) => {
-    if (userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC')) {
+    if (userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC') && userRole !== 'qc') {
       toast.error('สิทธิ์ของคุณไม่สามารถแก้ไขสถานะ QC ได้');
       return;
     }
     if (currentStatus === 'LOCKED' || !currentStatus) return
-    if (currentStatus === 'FAILED') {
-      toast.error('ถังที่ถูก REJECT จะไม่สามารถแก้ไขได้อีก')
-      return
-    }
-    if (currentStatus === 'QC_PASS') {
-      toast.error('ถังที่ผ่าน QC แล้ว จะไม่สามารถแก้ไขได้อีก')
-      return
-    }
     setActiveTank({ task, tankNum })
     setStatusAction(null)
     setReasonText('')
@@ -374,10 +598,11 @@ export default function QCQueuePage() {
 
     const { task, tankNum } = activeTank
     const currentStatus = task.tank_details?.[tankNum]
-    const isReturningToPass = statusAction === 'QC_PASS' && (currentStatus === 'PAUSED' || currentStatus === 'REPROCESS')
+    const isReturningToPass = statusAction === 'QC_PASS' && (currentStatus === 'PAUSED' || currentStatus === 'REPROCESS' || currentStatus === 'FAILED')
+    const isChangingFromPassOrFailed = (currentStatus === 'QC_PASS' || currentStatus === 'FAILED') && statusAction !== currentStatus
 
-    if ((statusAction !== 'QC_PASS' || isReturningToPass) && !reasonText.trim()) {
-      toast.error(isReturningToPass ? 'กรุณาระบุผลการตรวจสอบซ้ำ / วิธีแก้ไข' : 'กรุณาระบุเหตุผล')
+    if ((statusAction !== 'QC_PASS' || isReturningToPass || isChangingFromPassOrFailed) && !reasonText.trim()) {
+      toast.error(isReturningToPass || isChangingFromPassOrFailed ? 'กรุณาระบุผลการตรวจสอบซ้ำ / เหตุผลการแก้ไข' : 'กรุณาระบุเหตุผล')
       return
     }
 
@@ -1458,16 +1683,17 @@ export default function QCQueuePage() {
                       ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <table className="w-full text-sm text-left table-fixed">
+                    <div className="rounded-md border overflow-x-auto">
+                      <table className="w-full text-sm text-left min-w-[950px]">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">เวลา</th>
-                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
-                            <th className="px-4 py-3 font-medium">Control No. / วัตถุดิบ</th>
-                            <th className="px-4 py-3 font-medium">สถานะ</th>
-                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium w-36">เวลา</th>
+                            <th className="px-4 py-3 font-medium w-28">ผู้ตรวจสอบ</th>
+                            <th className="px-4 py-3 font-medium w-36">LOT No.</th>
+                            <th className="px-4 py-3 font-medium w-64">Control No. / วัตถุดิบ</th>
+                            <th className="px-4 py-3 font-medium w-28">สถานะ</th>
+                            <th className="px-4 py-3 font-medium min-w-[280px]">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium text-right w-28">จัดการ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1506,8 +1732,20 @@ export default function QCQueuePage() {
                                   {item.qc_status || item.status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
-                                {cleanDisplayNote(item.qc_note || item.remark) || '-'}
+                              <td className="px-4 py-3 text-slate-600 text-xs">
+                                {renderQcNoteWithAudit(item.qc_note, item.remark)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-7 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800 border-amber-300 gap-1 px-2.5"
+                                  disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC') && userRole !== 'qc'}
+                                  onClick={() => openCorrectionDialog(item, 'RM')}
+                                >
+                                  <RotateCcw className="w-3 h-3 text-amber-600" />
+                                  แก้ไขผล
+                                </Button>
                               </td>
                             </tr>
                             );
@@ -1752,16 +1990,17 @@ export default function QCQueuePage() {
                       ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <table className="w-full text-sm text-left table-fixed">
+                    <div className="rounded-md border overflow-x-auto">
+                      <table className="w-full text-sm text-left min-w-[950px]">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">เวลา</th>
-                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
-                            <th className="px-4 py-3 font-medium">Control No. / บรรจุภัณฑ์</th>
-                            <th className="px-4 py-3 font-medium">สถานะ</th>
-                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium w-36">เวลา</th>
+                            <th className="px-4 py-3 font-medium w-28">ผู้ตรวจสอบ</th>
+                            <th className="px-4 py-3 font-medium w-36">LOT No.</th>
+                            <th className="px-4 py-3 font-medium w-64">Control No. / บรรจุภัณฑ์</th>
+                            <th className="px-4 py-3 font-medium w-28">สถานะ</th>
+                            <th className="px-4 py-3 font-medium min-w-[280px]">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium text-right w-28">จัดการ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1807,8 +2046,20 @@ export default function QCQueuePage() {
                                   {item.qc_status || item.status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
-                                {cleanDisplayNote(item.qc_note || item.remark) || '-'}
+                              <td className="px-4 py-3 text-slate-600 text-xs">
+                                {renderQcNoteWithAudit(item.qc_note, item.remark)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-7 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800 border-amber-300 gap-1 px-2.5"
+                                  disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC') && userRole !== 'qc'}
+                                  onClick={() => openCorrectionDialog(item, 'PM')}
+                                >
+                                  <RotateCcw className="w-3 h-3 text-amber-600" />
+                                  แก้ไขผล
+                                </Button>
                               </td>
                             </tr>
                             );
@@ -2345,16 +2596,17 @@ export default function QCQueuePage() {
                       ไม่มีประวัติการตรวจสอบ
                     </div>
                   ) : (
-                    <div className="rounded-md border">
-                      <table className="w-full text-sm text-left table-fixed">
+                    <div className="rounded-md border overflow-x-auto">
+                      <table className="w-full text-sm text-left min-w-[950px]">
                         <thead className="bg-[#F8F6F0] text-slate-700">
                           <tr>
-                            <th className="px-4 py-3 font-medium">เวลา</th>
-                            <th className="px-4 py-3 font-medium">ผู้ตรวจสอบ</th>
-                            <th className="px-4 py-3 font-medium">LOT No.</th>
-                            <th className="px-4 py-3 font-medium">Box Lot / จำนวน</th>
-                            <th className="px-4 py-3 font-medium">สถานะ</th>
-                            <th className="px-4 py-3 font-medium">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium w-36">เวลา</th>
+                            <th className="px-4 py-3 font-medium w-28">ผู้ตรวจสอบ</th>
+                            <th className="px-4 py-3 font-medium w-36">LOT No.</th>
+                            <th className="px-4 py-3 font-medium w-52">Box Lot / จำนวน</th>
+                            <th className="px-4 py-3 font-medium w-28">สถานะ</th>
+                            <th className="px-4 py-3 font-medium min-w-[280px]">หมายเหตุ</th>
+                            <th className="px-4 py-3 font-medium text-right w-28">จัดการ</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -2389,8 +2641,20 @@ export default function QCQueuePage() {
                                   {item.qc_status}
                                 </Badge>
                               </td>
-                              <td className="px-4 py-3 text-slate-600 line-clamp-2 break-words text-wrap max-w-xs">
-                                {cleanDisplayNote(item.note) || '-'}
+                              <td className="px-4 py-3 text-slate-600 text-xs">
+                                {renderQcNoteWithAudit(item.note)}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button 
+                                  variant="outline" 
+                                  size="sm" 
+                                  className="h-7 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 hover:text-amber-800 border-amber-300 gap-1 px-2.5"
+                                  disabled={userRole !== 'admin' && !currentUser.toUpperCase().startsWith('QC') && userRole !== 'qc'}
+                                  onClick={() => openCorrectionDialog(item, 'FG')}
+                                >
+                                  <RotateCcw className="w-3 h-3 text-amber-600" />
+                                  แก้ไขผล
+                                </Button>
                               </td>
                             </tr>
                             );
@@ -2550,6 +2814,155 @@ export default function QCQueuePage() {
             <Button variant="outline" onClick={() => setIsRmStatusDialogOpen(false)}>ยกเลิก</Button>
             <Button onClick={confirmRmStatus} disabled={!rmStatusAction || ((rmStatusAction !== 'PASSED' || (activeRm?.qc_status === 'HOLD' && rmStatusAction === 'PASSED')) && !reasonText)} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
               ยืนยัน ({rmStatusAction})
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Audit Trail Correction Dialog */}
+      <Dialog open={isCorrectionDialogOpen} onOpenChange={setIsCorrectionDialogOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base font-bold text-slate-800">
+              <RotateCcw className="w-5 h-5 text-amber-600" />
+              ขอแก้ไขผล QC (พร้อมบันทึก Audit Trail)
+            </DialogTitle>
+          </DialogHeader>
+
+          {correctionItem && (
+            <div className="py-2 space-y-4 text-sm">
+              {/* Item Details Box */}
+              <div className="p-3 bg-slate-50 border rounded-lg space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-500">ประเภทรายการ:</span>
+                  <Badge variant="outline" className="font-bold">
+                    {correctionType === 'RM' ? 'วัตถุดิบ (RM)' : correctionType === 'PM' ? 'บรรจุภัณฑ์ (PM)' : 'สินค้าสำเร็จรูป (FG)'}
+                  </Badge>
+                </div>
+                <div className="text-xs">
+                  <span className="font-semibold text-slate-500">รหัส / ชื่อ: </span>
+                  <span className="font-medium text-slate-800">
+                    {correctionItem.rm_code || correctionItem.products?.sku || '-'} - {correctionItem.rm_name || correctionItem.products?.product_name || '-'}
+                  </span>
+                </div>
+                {(correctionItem.control_no || correctionItem.lot_no || correctionItem.box_lot_no) && (
+                  <div className="flex items-center justify-between text-xs">
+                    {correctionItem.control_no && (
+                      <div>
+                        <span className="font-semibold text-slate-500">Control No.: </span>
+                        <span className="font-bold text-purple-700">{correctionItem.control_no}</span>
+                      </div>
+                    )}
+                    {(correctionItem.production_lots?.lot_no || correctionItem.lot_no) && (
+                      <div>
+                        <span className="font-semibold text-slate-500">Lot No.: </span>
+                        <span className="font-bold text-[#D4AF37]">{correctionItem.production_lots?.lot_no || correctionItem.lot_no}</span>
+                      </div>
+                    )}
+                    {correctionItem.box_lot_no && (
+                      <div>
+                        <span className="font-semibold text-slate-500">Box: </span>
+                        <span className="font-bold text-slate-700">{correctionItem.box_lot_no}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-200">
+                  <div>
+                    <span className="font-semibold text-slate-500">สถานะปัจจุบัน: </span>
+                    <Badge variant="secondary" className="ml-1">
+                      {correctionItem.qc_status || correctionItem.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-slate-500">ผู้ตรวจเดิม: </span>
+                    <span className="text-slate-700 font-medium">{correctionItem.qc_inspector || '-'}</span>
+                  </div>
+                </div>
+                {(correctionItem.qc_note || correctionItem.remark || correctionItem.note) && (
+                  <div className="text-xs bg-white p-2 rounded border border-slate-200 text-slate-600">
+                    <span className="font-semibold text-slate-500 block mb-0.5">บันทึกเดิม:</span>
+                    {cleanDisplayNote(correctionItem.qc_note || correctionItem.remark || correctionItem.note)}
+                  </div>
+                )}
+              </div>
+
+              {/* New Status Selection */}
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-slate-700">
+                  เลือกสถานะใหม่ที่ต้องการแก้ไข <span className="text-red-500">*</span>
+                </Label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setNewTargetStatus('PASSED')}
+                    className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+                      newTargetStatus === 'PASSED'
+                        ? 'border-green-500 bg-green-50 text-green-700 ring-2 ring-green-200'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <span>ปล่อยผ่าน (PASS)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewTargetStatus('HOLD')}
+                    className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+                      newTargetStatus === 'HOLD'
+                        ? 'border-orange-500 bg-orange-50 text-orange-700 ring-2 ring-orange-200'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    <span>กักกัน (HOLD)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setNewTargetStatus('REJECTED')}
+                    className={`p-2.5 rounded-lg border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all ${
+                      newTargetStatus === 'REJECTED'
+                        ? 'border-red-500 bg-red-50 text-red-700 ring-2 ring-red-200'
+                        : 'border-slate-200 hover:bg-slate-50 text-slate-600'
+                    }`}
+                  >
+                    <XCircle className="w-4 h-4 text-red-600" />
+                    <span>ไม่อนุมัติ (REJECT)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mandatory Reason */}
+              <div className="space-y-1.5">
+                <Label className="font-semibold text-slate-700">
+                  ระบุเหตุผลในการแก้ไข (Audit Reason) <span className="text-red-500">* (บังคับกรอก)</span>
+                </Label>
+                <Textarea
+                  placeholder="ตัวอย่าง: QC บันทึกผลผิดพลาด ต้องการปล่อยผ่านเนื่องจากผลแล็บและขนาดชิ้นงานผ่านเกณฑ์พร้อมใช้งาน"
+                  value={correctionReason}
+                  onChange={(e) => setCorrectionReason(e.target.value)}
+                  className="min-h-[85px] text-xs"
+                />
+                <p className="text-[11px] text-slate-500">
+                  * ข้อมูลนี้จะถูกบันทึกเป็นประวัติถาวร (Audit Trail) พร้อมระบุชื่อผู้แก้ไข ({currentUser}) และเวลาที่แก้ไข
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" size="sm" onClick={() => setIsCorrectionDialogOpen(false)} disabled={isSubmittingCorrection}>
+              ยกเลิก
+            </Button>
+            <Button
+              size="sm"
+              onClick={confirmCorrection}
+              disabled={isSubmittingCorrection || !newTargetStatus || !correctionReason.trim()}
+              className="bg-[#D4AF37] hover:bg-[#c49f27] text-white"
+            >
+              {isSubmittingCorrection ? 'กำลังบันทึก...' : 'ยืนยันการแก้ไข (Audit Trail)'}
             </Button>
           </DialogFooter>
         </DialogContent>

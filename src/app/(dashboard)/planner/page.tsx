@@ -7,11 +7,11 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { 
   Plus, Download, Upload, Trash2, Pencil, Check, X, ChevronDown, ChevronUp, ChevronRight, ChevronLeft,
-  Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, CheckCircle2, 
+  Filter, ListTodo, CalendarDays, Calendar as CalendarIcon, Calendar, CheckCircle2, AlertCircle,
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
   ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User,
-  Printer, Lock
+  Printer, Lock, Gift
 } from 'lucide-react'
 import {
   Table,
@@ -29,6 +29,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
@@ -38,7 +39,7 @@ import { createClient } from "@/utils/supabase/client"
 import { toast } from "sonner"
 import { getUsers } from '@/app/actions/users'
 import * as XLSX from "xlsx"
-import { cn } from "@/lib/utils"
+import { cn, getBaseOrderType, isLotFirstBatch, parseDeliverySchedule, type DeliveryInstallment } from "@/lib/utils"
 import { canEditRoute } from "@/lib/permissions"
 import { TaskCalendar } from "@/components/ui/TaskCalendar"
 import { TimelinePrintModal } from "@/components/planner/TimelinePrintModal"
@@ -121,9 +122,11 @@ export default function PlannerPage() {
     total_tanks: "", kg_per_tank: "", g_per_piece: "",
     capacity_min: "", capacity_max: "", pcs_per_carton: "",
     order_quantity: "", po_no: "", order_type: "MTS",
-    fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
+    fg_due_date: "", fg_due_date_start: "", due_date: "", new_sku_name: "", unit: "pc",
     mfg_date: "", exp_date: "", product_name: "",
-    is_first_batch: false
+    is_first_batch: false,
+    delivery_mode: "single" as "single" | "multiple",
+    delivery_schedule: [] as DeliveryInstallment[]
   })
 
   const [currentUser, setCurrentUser] = useState<string>('Unknown User')
@@ -350,10 +353,10 @@ const fetchAllProductionLots = async (client: any) => {
   }
 
   const handleEditLot = (lot: any) => {
-    const rawOrderType = lot.order_type || "MTS"
-    const isFirstBatch = rawOrderType.includes('[1ST_BATCH]') || 
-      (lot.products?.sku || '').includes('PAMH-008')
-    const cleanOrderType = rawOrderType.replace(/\[1ST_BATCH\]/g, '').trim() || 'MTS'
+    const cleanOrderType = getBaseOrderType(lot.order_type)
+    const isFirstBatch = isLotFirstBatch(lot)
+    const existingSchedule = parseDeliverySchedule(lot.delivery_schedule)
+    const hasMultiple = existingSchedule.length > 0
 
     setNewLot({
       id: lot.id,
@@ -371,14 +374,57 @@ const fetchAllProductionLots = async (client: any) => {
       order_type: cleanOrderType,
       fg_due_date: lot.fg_due_date || "",
       fg_due_date_start: lot.planned_start_date || "",
+      due_date: lot.due_date || lot.fg_due_date || "",
       new_sku_name: "",
       unit: "pc",
       mfg_date: "",
       exp_date: "",
       product_name: lot.products?.product_name || "",
-      is_first_batch: isFirstBatch
+      is_first_batch: isFirstBatch,
+      delivery_mode: hasMultiple ? "multiple" : "single",
+      delivery_schedule: hasMultiple ? existingSchedule : []
     })
     setIsDialogOpen(true)
+  }
+
+  const handleAddInstallment = () => {
+    const current = newLot.delivery_schedule || []
+    const nextNum = current.length + 1
+    const orderQty = parseFloat(newLot.order_quantity || "0")
+    const allocated = current.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+    const remaining = Math.max(0, orderQty - allocated)
+    
+    setNewLot(prev => ({
+      ...prev,
+      delivery_schedule: [
+        ...(prev.delivery_schedule || []),
+        {
+          installment: nextNum,
+          date: prev.due_date || prev.fg_due_date || format(new Date(), "yyyy-MM-dd"),
+          quantity: remaining > 0 ? remaining : 0,
+          note: `งวดที่ ${nextNum}`
+        }
+      ]
+    }))
+  }
+
+  const handleUpdateInstallment = (index: number, field: keyof DeliveryInstallment, value: any) => {
+    setNewLot(prev => {
+      const updated = [...(prev.delivery_schedule || [])]
+      if (updated[index]) {
+        updated[index] = { ...updated[index], [field]: value }
+      }
+      return { ...prev, delivery_schedule: updated }
+    })
+  }
+
+  const handleRemoveInstallment = (index: number) => {
+    setNewLot(prev => {
+      const filtered = (prev.delivery_schedule || [])
+        .filter((_, idx) => idx !== index)
+        .map((item, idx) => ({ ...item, installment: idx + 1 }))
+      return { ...prev, delivery_schedule: filtered }
+    })
   }
 
   const handleMarkAsDoneClick = (lotId: string) => {
@@ -460,6 +506,25 @@ const fetchAllProductionLots = async (client: any) => {
         }
       }
 
+      const cleanOrderType = getBaseOrderType(newLot.order_type)
+      const cleanedSchedule: DeliveryInstallment[] = (newLot.delivery_mode === 'multiple' && Array.isArray(newLot.delivery_schedule))
+        ? newLot.delivery_schedule
+            .filter((item: any) => item && item.date)
+            .map((item: any, idx: number) => ({
+              installment: idx + 1,
+              date: String(item.date).substring(0, 10),
+              quantity: Number(item.quantity) || 0,
+              note: item.note ? String(item.note).trim() : ''
+            }))
+            .sort((a, b) => a.date.localeCompare(b.date))
+        : []
+
+      const finalFgDueDate = cleanedSchedule.length > 0 
+        ? cleanedSchedule[cleanedSchedule.length - 1].date 
+        : (newLot.fg_due_date || null)
+
+      const finalEndDate = newLot.due_date || finalFgDueDate || null
+
       const lotData: any = {
         sku_id: finalProductId,
         lot_no: newLot.lot_number,
@@ -473,10 +538,12 @@ const fetchAllProductionLots = async (client: any) => {
         order_quantity: parseFloat(newLot.order_quantity),
         po_no: newLot.po_no,
         order_type: newLot.is_first_batch 
-          ? `${(newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim()} [1ST_BATCH]`
-          : (newLot.order_type || 'MTS').replace(/\[1ST_BATCH\]/g, '').trim(),
-        fg_due_date: newLot.fg_due_date || null,
-        planned_start_date: newLot.order_type === 'MTS' ? (newLot.fg_due_date_start || null) : null,
+          ? `${cleanOrderType} [1ST_BATCH]`
+          : cleanOrderType,
+        fg_due_date: finalFgDueDate,
+        planned_start_date: newLot.fg_due_date_start || null,
+        due_date: finalEndDate,
+        delivery_schedule: cleanedSchedule,
         updated_at: new Date().toISOString(),
         updated_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
       }
@@ -1327,7 +1394,7 @@ const fetchAllProductionLots = async (client: any) => {
   const filteredLots = lots.filter(lot => {
     if (activeTab === "completed" && lot.current_status !== "DONE") return false;
     if (activeTab !== "completed" && lot.current_status === "DONE") return false;
-    if (filterOrderType !== "ALL" && lot.order_type !== filterOrderType) return false;
+    if (filterOrderType !== "ALL" && getBaseOrderType(lot.order_type) !== filterOrderType) return false;
 
     if (syncTableWithPeriod && kpiDateRange.start && kpiDateRange.end) {
       if (!kpiPeriodLotIds.has(lot.id)) return false;
@@ -1378,12 +1445,16 @@ const fetchAllProductionLots = async (client: any) => {
         bVal = Number(b.pcs_per_carton) || 0
         return sortDirection === "asc" ? aVal - bVal : bVal - aVal
       case "order_type":
-        aVal = (a.order_type || "").toLowerCase()
-        bVal = (b.order_type || "").toLowerCase()
+        aVal = getBaseOrderType(a.order_type)
+        bVal = getBaseOrderType(b.order_type)
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       case "planned_start_date":
         aVal = a.planned_start_date || a.fg_due_date_start || ""
         bVal = b.planned_start_date || b.fg_due_date_start || ""
+        return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
+      case "due_date":
+        aVal = a.due_date || a.fg_due_date || ""
+        bVal = b.due_date || b.fg_due_date || ""
         return sortDirection === "asc" ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal)
       case "fg_due_date":
         aVal = a.fg_due_date || ""
@@ -1439,8 +1510,8 @@ const fetchAllProductionLots = async (client: any) => {
   const totalBulksKg = filteredKpiLots.reduce((acc, l) => acc + ((Number(l.total_tanks) || 0) * (Number(l.kg_per_tank) || 0)), 0)
   const totalTanksCount = filteredKpiLots.reduce((acc, l) => acc + (Number(l.total_tanks) || 0), 0)
 
-  const mtsLots = filteredKpiLots.filter(l => l.order_type === 'MTS')
-  const mtoLots = filteredKpiLots.filter(l => l.order_type !== 'MTS')
+  const mtsLots = filteredKpiLots.filter(l => getBaseOrderType(l.order_type) === 'MTS')
+  const mtoLots = filteredKpiLots.filter(l => getBaseOrderType(l.order_type) === 'MTO')
   const lotsWithDueDate = filteredKpiLots.filter(l => l.fg_due_date || l.fg_due_date_start)
 
   // Accurate task progression & on-time stats (Scoped to Selected KPI Reporting Period)
@@ -1731,9 +1802,11 @@ const fetchAllProductionLots = async (client: any) => {
                 total_tanks: "", kg_per_tank: "", g_per_piece: "",
                 capacity_min: "", capacity_max: "", pcs_per_carton: "",
                 order_quantity: "", po_no: "", order_type: "MTS",
-                fg_due_date: "", fg_due_date_start: "", new_sku_name: "", unit: "pc",
+                fg_due_date: "", fg_due_date_start: "", due_date: "", new_sku_name: "", unit: "pc",
                 mfg_date: "", exp_date: "", product_name: "",
-                is_first_batch: false
+                is_first_batch: false,
+                delivery_mode: "single",
+                delivery_schedule: []
               })
               setIsDialogOpen(true)
             }} className="bg-[#D4AF37] hover:bg-[#B8962A] text-white font-bold">
@@ -2428,7 +2501,7 @@ const fetchAllProductionLots = async (client: any) => {
                     className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>วันที่เริ่มส่งมอบ FG (MTS)</span>
+                      <span>เริ่มผลิต (Start)</span>
                       {sortColumn === "planned_start_date" ? (
                         sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
                       ) : (
@@ -2438,12 +2511,12 @@ const fetchAllProductionLots = async (client: any) => {
                   </TableHead>
 
                   <TableHead 
-                    onClick={() => handleSort("fg_due_date")} 
+                    onClick={() => handleSort("due_date")} 
                     className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</span>
-                      {sortColumn === "fg_due_date" ? (
+                      <span>ผลิตเสร็จ (End)</span>
+                      {sortColumn === "due_date" ? (
                         sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
                       ) : (
                         <ArrowUpDown className="w-3.5 h-3.5 text-slate-400 opacity-40 group-hover:opacity-100 shrink-0" />
@@ -2456,7 +2529,7 @@ const fetchAllProductionLots = async (client: any) => {
                     className="cursor-pointer select-none hover:bg-slate-200/70 transition-colors font-bold group"
                   >
                     <div className="flex items-center gap-1.5">
-                      <span>กำหนดส่งมอบ FG (MTO)</span>
+                      <span>กำหนดส่งมอบ FG (Delivery)</span>
                       {sortColumn === "fg_due_date" ? (
                         sortDirection === "asc" ? <ArrowUp className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" /> : <ArrowDown className="w-3.5 h-3.5 text-blue-600 font-black shrink-0" />
                       ) : (
@@ -2504,32 +2577,101 @@ const fetchAllProductionLots = async (client: any) => {
                         <TableCell>{lot.g_per_piece || "-"}</TableCell>
                         <TableCell>{lot.pcs_per_carton || "-"}</TableCell>
                         <TableCell>
-                          {lot.order_type === 'MTO' ? (
-                            <span className="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded-full font-medium">MTO</span>
+                          {getBaseOrderType(lot.order_type) === 'MTO' ? (
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2.5 py-1 rounded-full font-bold">MTO</span>
+                              {isLotFirstBatch(lot) && (
+                                <span className="text-[10px] bg-purple-600 text-white px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5 shadow-sm" title="ออเดอร์ผลิตครั้งแรก (1st Batch)">
+                                  <span>🔬 1st Batch</span>
+                                </span>
+                              )}
+                            </div>
                           ) : (
-                            <span className="text-xs bg-[#D4AF37]/ text-[#D4AF37] px-2 py-1 rounded-full font-medium">MTS</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="text-xs bg-[#D4AF37]/20 text-[#6D5A1A] px-2.5 py-1 rounded-full font-bold">MTS</span>
+                              {isLotFirstBatch(lot) && (
+                                <span className="text-[10px] bg-amber-600 text-white px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5 shadow-sm" title="ออเดอร์ผลิตครั้งแรก (1st Batch)">
+                                  <span>🔬 1st Batch</span>
+                                </span>
+                              )}
+                            </div>
                           )}
                         </TableCell>
                         <TableCell>
-                          {(!lot.order_type || lot.order_type === 'MTS') ? (
-                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
-                              Start: {lot.planned_start_date ? format(new Date(lot.planned_start_date), "dd MMM yyyy") : "-"}
-                            </div>
-                          ) : "-"}
+                          <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full w-max">
+                            {lot.planned_start_date ? format(new Date(lot.planned_start_date), "dd MMM yyyy") : "-"}
+                          </div>
                         </TableCell>
                         <TableCell>
-                          {(!lot.order_type || lot.order_type === 'MTS') ? (
-                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
-                              End: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
-                            </div>
-                          ) : "-"}
+                          <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full w-max">
+                            {(lot.due_date || lot.fg_due_date) ? format(new Date(lot.due_date || lot.fg_due_date), "dd MMM yyyy") : "-"}
+                          </div>
                         </TableCell>
                         <TableCell>
-                          {lot.order_type === 'MTO' ? (
-                            <div className="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-1 rounded-full w-max">
-                              Due: {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
-                            </div>
-                          ) : "-"}
+                          {(() => {
+                            const schedule = parseDeliverySchedule(lot.delivery_schedule)
+                            if (schedule.length > 1) {
+                              const totalScheduled = schedule.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+                              return (
+                                <Popover>
+                                  <PopoverTrigger asChild>
+                                    <button
+                                      type="button"
+                                      className="text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs transition-colors cursor-pointer"
+                                      title="คลิกดูรายละเอียดงวดส่งมอบทั้งหมด"
+                                    >
+                                      <Gift className="w-3.5 h-3.5 text-indigo-600" />
+                                      <span>ส่ง {schedule.length} งวด</span>
+                                    </button>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-80 p-3 text-xs bg-white shadow-xl rounded-xl border border-indigo-100" align="start">
+                                    <div className="font-bold text-slate-900 border-b pb-1.5 mb-2 flex items-center justify-between">
+                                      <div className="flex items-center gap-1.5">
+                                        <Gift className="w-4 h-4 text-indigo-600" />
+                                        <span>แผนส่งมอบ FG ({schedule.length} งวด)</span>
+                                      </div>
+                                      <span className="text-[10px] text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded font-mono">
+                                        รวม {totalScheduled.toLocaleString()} ชิ้น
+                                      </span>
+                                    </div>
+                                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                                      {schedule.map((item, idx) => (
+                                        <div key={idx} className="flex items-center justify-between p-1.5 rounded-lg bg-slate-50 border border-slate-100 text-[11px]">
+                                          <div>
+                                            <span className="font-bold text-slate-800">งวด {item.installment}:</span>{" "}
+                                            <span className="text-slate-600">{item.date ? format(new Date(item.date), "dd/MM/yyyy") : "-"}</span>
+                                            {item.note && <div className="text-[10px] text-slate-500 italic pl-1">&ldquo;{item.note}&rdquo;</div>}
+                                          </div>
+                                          <div className="font-mono font-bold text-indigo-600">
+                                            {Number(item.quantity || 0).toLocaleString()} pc
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {lot.fg_due_date && (
+                                      <div className="mt-2 pt-2 border-t text-[10px] text-slate-500 flex justify-between items-center">
+                                        <span>งวดสุดท้าย:</span>
+                                        <span className="font-bold text-slate-700">{format(new Date(lot.fg_due_date), "dd MMM yyyy")}</span>
+                                      </div>
+                                    )}
+                                  </PopoverContent>
+                                </Popover>
+                              )
+                            }
+                            if (schedule.length === 1) {
+                              return (
+                                <div className="text-xs font-semibold text-indigo-900 bg-indigo-50 border border-indigo-200 px-2.5 py-1 rounded-full w-max flex items-center gap-1">
+                                  <Gift className="w-3.5 h-3.5 text-indigo-600" />
+                                  <span>{format(new Date(schedule[0].date), "dd MMM yyyy")} ({schedule[0].quantity.toLocaleString()} pc)</span>
+                                </div>
+                              )
+                            }
+                            return (
+                              <div className="text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded-full w-max">
+                                {lot.fg_due_date ? format(new Date(lot.fg_due_date), "dd MMM yyyy") : "-"}
+                              </div>
+                            )
+                          })()}
                         </TableCell>
                         <TableCell className="text-right">
                           {canEdit ? (
@@ -3069,17 +3211,33 @@ const fetchAllProductionLots = async (client: any) => {
       ) : (
         <Card className="border-slate-200 shadow-sm overflow-hidden p-0 bg-white">
           <TaskCalendar 
-            tasks={filteredLots.map(lot => ({
-              id: lot.id,
-              activity_date: lot.fg_due_date,
-              status: 'IN_PROGRESS',
-              production_lots: {
-                lot_no: lot.lot_no,
-                products: lot.products,
-                sku_id: lot.sku_id
-              },
-              originalLot: lot
-            }))}
+            tasks={filteredLots.flatMap(lot => {
+              const schedule = parseDeliverySchedule(lot.delivery_schedule)
+              if (schedule.length > 0) {
+                return schedule.map((inst, idx) => ({
+                  id: `${lot.id}-inst-${idx}`,
+                  activity_date: inst.date,
+                  status: 'IN_PROGRESS',
+                  production_lots: {
+                    lot_no: `${lot.lot_no} (งวด ${inst.installment})`,
+                    products: lot.products,
+                    sku_id: lot.sku_id
+                  },
+                  originalLot: lot
+                }))
+              }
+              return [{
+                id: lot.id,
+                activity_date: lot.fg_due_date,
+                status: 'IN_PROGRESS',
+                production_lots: {
+                  lot_no: lot.lot_no,
+                  products: lot.products,
+                  sku_id: lot.sku_id
+                },
+                originalLot: lot
+              }]
+            })}
             dateField="activity_date"
             onTaskClick={(task) => handleEditLot(task.originalLot)}
           />
@@ -3144,7 +3302,7 @@ const fetchAllProductionLots = async (client: any) => {
 
             <div className="space-y-2">
               <Label>ประเภทออเดอร์</Label>
-              <Select value={newLot.order_type} onValueChange={val => setNewLot({...newLot, order_type: val || ''})}>
+              <Select value={getBaseOrderType(newLot.order_type)} onValueChange={val => setNewLot({...newLot, order_type: val || 'MTS'})}>
                 <SelectTrigger><SelectValue placeholder="เลือกประเภท" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="MTS">MTS (Make to Stock)</SelectItem>
@@ -3171,23 +3329,204 @@ const fetchAllProductionLots = async (client: any) => {
               </div>
             </div>
 
-            {(!newLot.order_type || newLot.order_type === 'MTS') ? (
-              <>
-                <div className="space-y-2">
-                  <Label>วันที่เริ่มส่งมอบ FG (MTS)</Label>
-                  <Input type="date" value={newLot.fg_due_date_start} onChange={e => setNewLot({...newLot, fg_due_date_start: e.target.value})} />
-                </div>
-                <div className="space-y-2">
-                  <Label>วันที่ส่งมอบ FG เสร็จสิ้น (MTS)</Label>
-                  <Input type="date" value={newLot.fg_due_date} onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} />
-                </div>
-              </>
-            ) : (
-              <div className="space-y-2">
-                <Label>กำหนดส่งมอบ FG (MTO)</Label>
-                <Input type="date" value={newLot.fg_due_date} onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} />
+            {/* 1. ช่วงเวลาแผนการผลิต (Production Window) */}
+            <div className="col-span-2 md:col-span-4 p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 space-y-2">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-amber-600" />
+                  <span>ช่วงเวลาแผนการผลิต (Production Window: เริ่มผลิต - ผลิตเสร็จ)</span>
+                </Label>
+                <span className="text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-medium">
+                  ใช้ประเมินรอบการผลิต
+                </span>
               </div>
-            )}
+              <p className="text-[11px] text-amber-800">
+                กำหนดกรอบเวลาเริ่มและเสร็จสิ้นกระบวนการผลิต สำหรับประเมินว่าใกล้ถึงเวลาวางแผนรอบถัดไปแล้วหรือยัง (รองรับทั้ง MTS และ MTO)
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-700 font-semibold">วันที่เริ่มผลิต (Plan Start)</Label>
+                  <Input 
+                    type="date" 
+                    value={newLot.fg_due_date_start} 
+                    onChange={e => setNewLot({...newLot, fg_due_date_start: e.target.value})} 
+                    className="bg-white"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-slate-700 font-semibold">วันที่ผลิตเสร็จ (Plan End)</Label>
+                  <Input 
+                    type="date" 
+                    value={newLot.due_date} 
+                    onChange={e => setNewLot({...newLot, due_date: e.target.value})} 
+                    className="bg-white"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* 2. แผนการส่งมอบสินค้า FG (Delivery Schedule) */}
+            <div className="col-span-2 md:col-span-4 p-3.5 rounded-xl border border-indigo-200 bg-indigo-50/50 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <Label className="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                    <Gift className="w-4 h-4 text-indigo-600" />
+                    <span>แผนการส่งมอบสินค้า (FG Delivery Schedule)</span>
+                  </Label>
+                  <span className="text-[11px] text-indigo-800">
+                    เลือกรูปแบบการส่งมอบสินค้าสำเร็จรูป (FG) สำหรับออเดอร์นี้
+                  </span>
+                </div>
+                <div className="flex items-center gap-1 bg-white p-1 rounded-lg border border-indigo-200 self-start sm:self-auto shadow-2xs">
+                  <button
+                    type="button"
+                    onClick={() => setNewLot({ ...newLot, delivery_mode: 'single' })}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      newLot.delivery_mode === 'single'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    ส่งงวดเดียว (Single)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current = newLot.delivery_schedule || []
+                      const orderQty = parseFloat(newLot.order_quantity || "0")
+                      const initialSchedule = current.length > 0 
+                        ? current 
+                        : [
+                            { 
+                              installment: 1, 
+                              date: newLot.due_date || newLot.fg_due_date || format(new Date(), "yyyy-MM-dd"), 
+                              quantity: orderQty > 0 ? orderQty : 0, 
+                              note: "งวดที่ 1" 
+                            }
+                          ]
+                      setNewLot({ ...newLot, delivery_mode: 'multiple', delivery_schedule: initialSchedule })
+                    }}
+                    className={`px-2.5 py-1 text-xs font-bold rounded-md transition-all cursor-pointer ${
+                      newLot.delivery_mode === 'multiple'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                    }`}
+                  >
+                    แบ่งส่งหลายงวด (Multiple)
+                  </button>
+                </div>
+              </div>
+
+              {newLot.delivery_mode === 'single' ? (
+                <div className="space-y-1.5 bg-white p-3 rounded-lg border border-indigo-100">
+                  <Label className="text-xs font-semibold text-slate-700">กำหนดส่งมอบ FG (Single Due Date)</Label>
+                  <Input 
+                    type="date" 
+                    value={newLot.fg_due_date} 
+                    onChange={e => setNewLot({...newLot, fg_due_date: e.target.value})} 
+                    className="max-w-xs bg-slate-50"
+                  />
+                  <p className="text-[10.5px] text-slate-500">
+                    ออเดอร์นี้จะปรากฏบนเรดาร์ 21 วัน ในช่อง &quot;กำหนดส่งมอบ FG&quot; ตรงกับวันที่ระบุนี้
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2.5 bg-white p-3 rounded-lg border border-indigo-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-800">
+                      ตารางงวดส่งมอบ FG ({(newLot.delivery_schedule || []).length} งวด)
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleAddInstallment}
+                      className="h-7 text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50 font-bold"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" /> เพิ่มงวดส่งมอบ
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(newLot.delivery_schedule || []).map((inst, idx) => (
+                      <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-200">
+                        <div className="w-16 shrink-0">
+                          <span className="text-xs font-bold text-indigo-700 bg-indigo-100 px-2 py-1 rounded">
+                            งวด {inst.installment}
+                          </span>
+                        </div>
+                        <div className="flex-1 w-full sm:w-auto grid grid-cols-1 sm:grid-cols-3 gap-2">
+                          <Input
+                            type="date"
+                            value={inst.date || ""}
+                            onChange={e => handleUpdateInstallment(idx, "date", e.target.value)}
+                            className="h-8 text-xs bg-white"
+                          />
+                          <Input
+                            type="number"
+                            placeholder="จำนวน (ชิ้น)"
+                            value={inst.quantity || ""}
+                            onChange={e => handleUpdateInstallment(idx, "quantity", parseFloat(e.target.value) || 0)}
+                            className="h-8 text-xs bg-white"
+                          />
+                          <Input
+                            type="text"
+                            placeholder="หมายเหตุ (เช่น ล็อตแรก, ลูกค้า A)"
+                            value={inst.note || ""}
+                            onChange={e => handleUpdateInstallment(idx, "note", e.target.value)}
+                            className="h-8 text-xs bg-white"
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRemoveInstallment(idx)}
+                          className="h-8 w-8 text-slate-400 hover:text-rose-600 hover:bg-rose-50 shrink-0 self-end sm:self-auto cursor-pointer"
+                          title="ลบงวดนี้"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Summary Bar */}
+                  {(() => {
+                    const orderQty = parseFloat(newLot.order_quantity || "0")
+                    const totalAllocated = (newLot.delivery_schedule || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)
+                    const diff = totalAllocated - orderQty
+                    const isMatched = orderQty > 0 && diff === 0
+                    const isUnder = diff < 0
+                    return (
+                      <div className={`flex flex-wrap items-center justify-between p-2 rounded-lg text-xs font-medium ${
+                        isMatched
+                          ? "bg-emerald-50 text-emerald-900 border border-emerald-200"
+                          : isUnder
+                          ? "bg-amber-50 text-amber-900 border border-amber-200"
+                          : "bg-blue-50 text-blue-900 border border-blue-200"
+                      }`}>
+                        <div className="flex items-center gap-1.5">
+                          {isMatched ? (
+                            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                          ) : (
+                            <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                          )}
+                          <span>
+                            รวมยอดจัดสรรส่งมอบ: <strong>{totalAllocated.toLocaleString()}</strong> / ยอดออเดอร์: <strong>{orderQty.toLocaleString()}</strong> ชิ้น
+                          </span>
+                        </div>
+                        <div className="font-bold">
+                          {isMatched && <span className="text-emerald-700">✓ ยอดส่งครบถ้วนพอดี</span>}
+                          {isUnder && <span className="text-amber-700">ขาดอีก {Math.abs(diff).toLocaleString()} ชิ้น</span>}
+                          {!isMatched && !isUnder && <span className="text-blue-700">เกิน {diff.toLocaleString()} ชิ้น</span>}
+                        </div>
+                      </div>
+                    )
+                  })()}
+                </div>
+              )}
+            </div>
 
             <div className="space-y-2">
               <Label>ยอดตามใบสั่งผลิต (pc)</Label>

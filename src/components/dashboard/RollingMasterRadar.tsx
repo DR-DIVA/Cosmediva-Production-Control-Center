@@ -45,6 +45,7 @@ import { th } from 'date-fns/locale'
 import { parseDelayInfo } from '@/lib/delayTracking'
 import { parsePlanChangeInfo, cleanDisplayNote, extractUserComment, PlanChangeInfo } from '@/lib/planTracking'
 import { PlantDirectorAdvisory } from '@/components/dashboard/PlantDirectorAdvisory'
+import { getBaseOrderType } from '@/lib/utils'
 
 export interface RollingMasterRadarProps {
   startDateStr?: string
@@ -1762,7 +1763,7 @@ export function RollingMasterRadar({
     radarData.fgDueLots.forEach(lot => {
       const sku = lot.products?.sku || 'SKU'
       const qty = lot.planned_quantity || lot.order_quantity || 0
-      const isMTS = lot.order_type === 'MTS'
+      const isMTS = getBaseOrderType(lot.order_type) === 'MTS'
       const startStr = lot.planned_start_date || lot.fg_due_date
       const endStr = lot.fg_due_date || lot.planned_start_date
 
