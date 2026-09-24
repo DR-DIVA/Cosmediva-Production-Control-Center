@@ -171,42 +171,75 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
       {/* Tabs & Search Filter Controls */}
       <div className="bg-white border border-stone-200 rounded-2xl p-4 shadow-xs space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-3 border-b border-stone-100">
-          {/* Tabs */}
-          <div className="flex items-center gap-1.5 p-1 bg-stone-100 rounded-xl border border-stone-200/60 text-xs sm:text-sm overflow-x-auto no-scrollbar max-w-full">
+          {/* Tabs with Distinct Vibrant Color Coding */}
+          <div className="flex items-center gap-2 p-1.5 bg-stone-100/90 rounded-2xl border border-stone-200/80 text-xs sm:text-sm overflow-x-auto no-scrollbar max-w-full">
+            {/* 1. รายการแผน PM */}
             <button
+              type="button"
               onClick={() => setActiveTab('list')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 ${
                 activeTab === 'list'
-                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md border border-blue-500 ring-2 ring-blue-400/40'
+                  : 'bg-white hover:bg-blue-50/80 text-blue-950 border border-blue-200/90 shadow-2xs hover:border-blue-300'
               }`}
             >
-              <span>📋</span>
-              <span>รายการแผน PM ({filteredPlans.length})</span>
+              <span className="text-base">📋</span>
+              <span className="font-extrabold">รายการแผน PM</span>
+              <span
+                className={`ml-1 px-2 py-0.5 rounded-full text-xs font-black transition-colors ${
+                  activeTab === 'list'
+                    ? 'bg-white/20 text-white border border-white/30'
+                    : 'bg-blue-100 text-blue-700 border border-blue-200'
+                }`}
+              >
+                {filteredPlans.length}
+              </span>
             </button>
 
+            {/* 2. ตารางไทม์ไลน์รายปี */}
             <button
+              type="button"
               onClick={() => setActiveTab('matrix')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 ${
                 activeTab === 'matrix'
-                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+                  ? 'bg-gradient-to-r from-purple-600 to-violet-600 text-white shadow-md border border-purple-500 ring-2 ring-purple-400/40'
+                  : 'bg-white hover:bg-purple-50/80 text-purple-950 border border-purple-200/90 shadow-2xs hover:border-purple-300'
               }`}
             >
-              <span>📅</span>
-              <span>ตารางไทม์ไลน์รายปี (Matrix 12 เดือน)</span>
+              <span className="text-base">📅</span>
+              <span className="font-extrabold">ตารางไทม์ไลน์รายปี</span>
+              <span
+                className={`ml-1 px-2 py-0.5 rounded-full text-xs font-black transition-colors ${
+                  activeTab === 'matrix'
+                    ? 'bg-white/20 text-white border border-white/30'
+                    : 'bg-purple-100 text-purple-700 border border-purple-200'
+                }`}
+              >
+                Matrix 12 เดือน
+              </span>
             </button>
 
+            {/* 3. ประวัติการปรับรอบ */}
             <button
+              type="button"
               onClick={() => setActiveTab('logs')}
-              className={`px-3.5 py-1.5 rounded-lg font-bold transition flex items-center gap-2 shrink-0 ${
+              className={`px-3.5 py-2 rounded-xl font-bold transition-all flex items-center gap-2 shrink-0 cursor-pointer active:scale-95 ${
                 activeTab === 'logs'
-                  ? 'bg-stone-900 text-[#D4AF37] shadow-xs'
-                  : 'text-stone-600 hover:text-stone-900 hover:bg-stone-200/60'
+                  ? 'bg-gradient-to-r from-amber-600 to-orange-600 text-white shadow-md border border-amber-500 ring-2 ring-amber-400/40'
+                  : 'bg-white hover:bg-amber-50/80 text-amber-950 border border-amber-200/90 shadow-2xs hover:border-amber-300'
               }`}
             >
-              <span>📜</span>
-              <span>ประวัติการปรับรอบ (Audit Logs: {logs.length})</span>
+              <span className="text-base">📜</span>
+              <span className="font-extrabold">ประวัติการปรับรอบ</span>
+              <span
+                className={`ml-1 px-2 py-0.5 rounded-full text-xs font-black transition-colors ${
+                  activeTab === 'logs'
+                    ? 'bg-white/20 text-white border border-white/30'
+                    : 'bg-amber-100 text-amber-800 border border-amber-200'
+                }`}
+              >
+                Audit Logs: {logs.length}
+              </span>
             </button>
           </div>
 
