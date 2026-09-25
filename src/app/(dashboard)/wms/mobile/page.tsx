@@ -95,6 +95,43 @@ export default function WmsMobileOperatorPage() {
     return () => clearTimeout(timer);
   }, [activeMode, putawayStep]);
 
+  // Auto-scan if URL contains query parameter (e.g. scanned from LINE, iPhone Camera, or direct link)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const lotParam = params.get("lot");
+    const dataParam = params.get("data") || params.get("scan");
+    const locParam = params.get("loc");
+    const target = lotParam || dataParam || locParam;
+
+    if (target) {
+      setActiveMode("inquiry");
+      const autoInquire = async () => {
+        setInquiryLoading(true);
+        try {
+          const parsed = parseBarcode(target);
+          const queryTerm = parsed.lotNumber || parsed.id || target;
+          const res = await fetch(`/api/wms/trace?lot=${encodeURIComponent(queryTerm)}`);
+          const data = await res.json();
+          if (res.ok && (data.lot || data.location)) {
+            playSound("success");
+            setInquiryResult(data);
+            toast.success(`สแกนสำเร็จ: ${data.lot?.internal_lot_number || data.location?.location_barcode}`);
+          } else {
+            playSound("error");
+            toast.error("ไม่พบข้อมูลบาร์โค้ดนี้ในระบบ");
+          }
+        } catch (err: any) {
+          playSound("error");
+          toast.error(err.message);
+        } finally {
+          setInquiryLoading(false);
+        }
+      };
+      autoInquire();
+    }
+  }, []);
+
   // Load pick lists when entering pick mode
   useEffect(() => {
     if (activeMode === "picking") {
@@ -117,8 +154,15 @@ export default function WmsMobileOperatorPage() {
 
     const parsed = parseBarcode(raw);
 
+    // AUTO-ROUTE FROM MENU TO INQUIRY
+    let currentMode = activeMode;
+    if (currentMode === "menu") {
+      setActiveMode("inquiry");
+      currentMode = "inquiry";
+    }
+
     // MODE: INQUIRY
-    if (activeMode === "inquiry") {
+    if (currentMode === "inquiry") {
       setInquiryLoading(true);
       try {
         const queryTerm = parsed.lotNumber || parsed.id || raw;
@@ -512,6 +556,22 @@ export default function WmsMobileOperatorPage() {
 
             {inquiryResult && (
               <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                {/* WMS Header Badge */}
+                <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-lg p-2.5 flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-1.5 font-mono text-emerald-300 font-bold">
+                    <Package className="w-4 h-4 text-emerald-400" />
+                    <span>COSMEFLOW:PALLET</span>
+                  </div>
+                  <Badge variant="outline" className="border-emerald-400 text-emerald-300 text-[10px] font-mono">
+                    SCANNED & VERIFIED
+                  </Badge>
+                </div>
+
+                {/* Raw readable text line matching user's exact format */}
+                <div className="bg-slate-900/90 p-2.5 rounded border border-slate-800 font-mono text-[11px] text-slate-300 break-all select-all">
+                  <span className="text-emerald-400 font-bold">COSMEFLOW:PALLET</span> | Lot: <span className="text-white font-bold">{inquiryResult.lot.internal_lot_number}</span> | Item: <span className="text-white">{inquiryResult.lot.item_code}</span> | Qty: <span className="text-emerald-400 font-bold">{(inquiryResult.currentLocations?.reduce((s: number, l: any) => s + Number(l.physical_quantity || 0), 0) || Number(inquiryResult.lot.physical_quantity || 5000)).toLocaleString()}</span> | Exp: <span className="text-amber-300 font-bold">{inquiryResult.lot.expiry_date ? inquiryResult.lot.expiry_date.substring(0, 10) : "-"}</span>
+                </div>
+
                 <div className="flex justify-between items-start border-b border-slate-800 pb-2">
                   <div>
                     <div className="text-lg font-bold text-white">{inquiryResult.lot.item_code}</div>

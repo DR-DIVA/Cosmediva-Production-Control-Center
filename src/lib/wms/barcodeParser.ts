@@ -11,13 +11,55 @@ export interface ParsedBarcode {
 }
 
 /**
- * Standard Pipe-Delimited QR Code Parser:
- * Format: CFWMS|TYPE|ID|ITEM|LOT|QTY|EXP
- * Example: CFWMS|PALLET|018e3a24-3333-7000|PM-BOT-030ML-CLR|LOT-PM-202609-0012|5000|2028-09-25
+ * Standard Barcode / QR Code Parser:
+ * Supports:
+ * 1. Web Link QR (Scannable by LINE, iPhone Camera, Android Camera):
+ *    https://.../wms/mobile?lot=LOT-PM-202609-0002&data=CFWMS|PALLET|...
+ * 2. Pipe-Delimited WMS QR:
+ *    CFWMS|TYPE|ID|ITEM|LOT|QTY|EXP
+ * 3. Location Barcode:
+ *    WH-PM-A-R01-B01-L01-BN01
+ * 4. Lot Barcode:
+ *    LOT-PM-202609-0001
  */
 export function parseBarcode(rawInput: string): ParsedBarcode {
   const trimmed = (rawInput || '').trim();
 
+  // 1. Handle Web Link QR (from LINE, iPhone Camera, Google Lens, or browser URL)
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.includes('/wms/mobile?')) {
+    try {
+      const url = new URL(trimmed.startsWith('http') ? trimmed : `https://dummy.local${trimmed}`);
+      const dataParam = url.searchParams.get('data') || url.searchParams.get('scan');
+      if (dataParam && dataParam.startsWith('CFWMS|')) {
+        return parseBarcode(dataParam);
+      }
+      const lotParam = url.searchParams.get('lot');
+      if (lotParam) {
+        return {
+          raw: trimmed,
+          isStructured: true,
+          type: 'LOT',
+          lotNumber: lotParam,
+          itemCode: url.searchParams.get('item') || undefined,
+          quantity: url.searchParams.get('qty') ? parseFloat(url.searchParams.get('qty')!) : undefined,
+          expiryDate: url.searchParams.get('exp') || undefined,
+        };
+      }
+      const locParam = url.searchParams.get('loc');
+      if (locParam) {
+        return {
+          raw: trimmed,
+          isStructured: false,
+          type: 'LOCATION',
+          id: locParam,
+        };
+      }
+    } catch (e) {
+      // Fallback
+    }
+  }
+
+  // 2. Handle Structured Pipe-delimited WMS QR Code
   if (trimmed.startsWith('CFWMS|')) {
     const parts = trimmed.split('|');
     return {
@@ -33,7 +75,7 @@ export function parseBarcode(rawInput: string): ParsedBarcode {
     };
   }
 
-  // Location barcodes like WH-PM-A-R01-B01-L01-BN01
+  // 3. Location barcodes like WH-PM-A-R01-B01-L01-BN01
   if (trimmed.startsWith('WH-')) {
     return {
       raw: trimmed,
@@ -43,7 +85,7 @@ export function parseBarcode(rawInput: string): ParsedBarcode {
     };
   }
 
-  // Lot barcodes like LOT-PM-202609-0001
+  // 4. Lot barcodes like LOT-PM-202609-0001
   if (trimmed.startsWith('LOT-')) {
     return {
       raw: trimmed,
@@ -62,7 +104,9 @@ export function parseBarcode(rawInput: string): ParsedBarcode {
 }
 
 /**
- * Encodes payload into standard CFWMS QR payload
+ * Encodes payload into Smart Web Link QR payload
+ * - When scanned with LINE / iPhone Camera: Opens CosmeFlow WMS Mobile directly!
+ * - When scanned with PDA Scanner Gun: Decoded cleanly by parseBarcode().
  */
 export function formatQrPayload(params: {
   type: 'PALLET' | 'CARTON' | 'LOCATION' | 'ITEM';
@@ -71,8 +115,10 @@ export function formatQrPayload(params: {
   lotNumber?: string;
   quantity?: number;
   expiryDate?: string;
+  baseUrl?: string;
 }): string {
-  return [
+  const base = params.baseUrl || 'https://cosmediva-production-control-center-production.up.railway.app';
+  const pipeData = [
     'CFWMS',
     params.type,
     params.id,
@@ -81,4 +127,6 @@ export function formatQrPayload(params: {
     params.quantity !== undefined ? params.quantity.toString() : '',
     params.expiryDate || '',
   ].join('|');
+
+  return `${base}/wms/mobile?lot=${encodeURIComponent(params.lotNumber || '')}&data=${encodeURIComponent(pipeData)}`;
 }

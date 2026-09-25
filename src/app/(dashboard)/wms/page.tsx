@@ -40,6 +40,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import QRCode from "qrcode";
+import { formatQrPayload } from "@/lib/wms/barcodeParser";
 
 export default function WmsDashboardPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -233,7 +234,16 @@ export default function WmsDashboardPage() {
   const handleOpenPrintLot = async (item: any) => {
     try {
       const internalLot = item.internal_lot_number || item.lot_number;
-      const qrPayload = `CFWMS|PALLET|${item.lot_id || item.balance_id || "LOT"}|${item.item_code || ""}|${internalLot}|${item.physical_quantity || item.quantity || 0}|${item.expiry_date || ""}`;
+      const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://cosmediva-production-control-center-production.up.railway.app";
+      const qrPayload = formatQrPayload({
+        type: "PALLET",
+        id: item.lot_id || item.balance_id || "LOT",
+        itemCode: item.item_code,
+        lotNumber: internalLot,
+        quantity: item.physical_quantity || item.quantity || 0,
+        expiryDate: item.expiry_date,
+        baseUrl,
+      });
       const qrUrl = await QRCode.toDataURL(qrPayload, { width: 250, margin: 2 });
       setQrCodeDataUrl(qrUrl);
       setCurrentLabel({
