@@ -107,11 +107,27 @@ export default function QCQueuePage() {
     }
   };
 
+  // Check if item is PM
+  const isPM = (codeOrItem?: any, maybeWarehouse?: string): boolean => {
+    if (!codeOrItem) return false;
+    let code = '';
+    let wh = (maybeWarehouse || '').toUpperCase().trim();
+    if (typeof codeOrItem === 'string') {
+      code = codeOrItem.toUpperCase().trim();
+    } else if (typeof codeOrItem === 'object') {
+      code = (codeOrItem.rm_code || '').toUpperCase().trim();
+      if (!wh) wh = (codeOrItem.warehouse || '').toUpperCase().trim();
+    }
+    if (code.startsWith('CMD') || code.startsWith('PM') || code.toLowerCase().startsWith('p')) return true;
+    if ((wh === 'MMPM' || wh === 'WH-PM') && !code.startsWith('R')) return true;
+    return false;
+  };
+
   // --- Global Executive Quality Statistics (Scoped to KPI Period) ---
   const globalQcStats = useMemo(() => {
     const rms = kpiPeriod.filterByPeriod(rawQcData.rms, (i: any) => i.receive_date || i.created_at);
-    const rmOnly = rms.filter((i: any) => !i.rm_code?.startsWith('CMD1') && !i.rm_code?.startsWith('CMD2'));
-    const pmOnly = rms.filter((i: any) => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2'));
+    const rmOnly = rms.filter((i: any) => !isPM(i));
+    const pmOnly = rms.filter((i: any) => isPM(i));
     const bulkLogs = kpiPeriod.filterByPeriod(rawQcData.bulkLogs, (b: any) => b.activity_date || b.created_at);
     const fg = kpiPeriod.filterByPeriod(rawQcData.fg, (f: any) => f.created_at || f.updated_at);
 
@@ -244,8 +260,8 @@ export default function QCQueuePage() {
     // Create issue if rejected or hold
     if (rmStatusAction === 'REJECTED' || rmStatusAction === 'HOLD') {
       const issueType = rmStatusAction === 'HOLD' ? '[QC HOLD]' : '[QC REJECT]'
-      const isPM = activeRm.rm_code?.toLowerCase().startsWith('p') || activeRm.rm_code?.startsWith('CMD1') || activeRm.rm_code?.startsWith('CMD2')
-      const note = `${issueType} ${isPM ? 'PM' : 'RM'} [${activeRm.rm_code} - ${activeRm.rm_name}]: ${reasonText}`
+      const isPMItem = isPM(activeRm)
+      const note = `${issueType} ${isPMItem ? 'PM' : 'RM'} [${activeRm.rm_code} - ${activeRm.rm_name}]: ${reasonText}`
       
       const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
       if (qcProc) {
@@ -264,7 +280,7 @@ export default function QCQueuePage() {
       }
     }
     
-    const finalIsPM = activeRm.rm_code?.toLowerCase().startsWith('p') || activeRm.rm_code?.startsWith('CMD1') || activeRm.rm_code?.startsWith('CMD2')
+    const finalIsPM = isPM(activeRm)
     toast.success(`อัปเดตสถานะ QC ของ ${finalIsPM ? 'PM' : 'RM'} เรียบร้อย`)
     setIsRmStatusDialogOpen(false)
     fetchRmTasks()
@@ -411,8 +427,8 @@ export default function QCQueuePage() {
 
         // If changed to REJECTED from PASSED, insert a QA issue log
         if (newTargetStatus === 'REJECTED' && prevStatus !== 'REJECTED') {
-          const isPM = correctionItem.rm_code?.toLowerCase().startsWith('p') || correctionItem.rm_code?.startsWith('CMD1') || correctionItem.rm_code?.startsWith('CMD2')
-          const issueNote = `[QC REJECT] ${isPM ? 'PM' : 'RM'} [${correctionItem.rm_code} - ${correctionItem.rm_name}]: ${correctionReason.trim()} (แก้ไขจาก ${prevStatus})`
+          const isPMItem = isPM(correctionItem)
+          const issueNote = `[QC REJECT] ${isPMItem ? 'PM' : 'RM'} [${correctionItem.rm_code} - ${correctionItem.rm_name}]: ${correctionReason.trim()} (แก้ไขจาก ${prevStatus})`
           const { data: qcProc } = await supabase.from('processes').select('id').ilike('process_name', '%QC%').limit(1).single()
           if (qcProc) {
             await supabase.from('production_logs').insert({
@@ -1541,8 +1557,8 @@ export default function QCQueuePage() {
                     <tbody className="divide-y divide-slate-100">
                       {rmItems.filter(item => {
                         const term = searchQuery.toLowerCase()
-                        const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
-                        return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && !isPM
+                        const itemIsPM = isPM(item)
+                        return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && !itemIsPM
                       })
                       .filter(item => poSearch ? (item.po_no || '').toLowerCase().includes(poSearch.toLowerCase()) : true)
                       .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
@@ -1641,13 +1657,13 @@ export default function QCQueuePage() {
                         ...rmTodayHistory
                           .filter(item => {
                             const term = searchQuery.toLowerCase();
-                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const isPMItem = isPM(item);
                             const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                               (item.rm_name || "").toLowerCase().includes(term) || 
                                               (item.control_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                            return matchTerm && !isPM;
+                            return matchTerm && !isPMItem;
                           })
                           .map((h: any) => [
                             new Date(h.updated_at || h.released_date || h.created_at).toLocaleString('th-TH'),
@@ -1671,13 +1687,13 @@ export default function QCQueuePage() {
                 <CardContent>
                   {rmTodayHistory.filter(item => { 
                     const term = searchQuery.toLowerCase(); 
-                    const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                    const isPMItem = isPM(item);
                     const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                       (item.rm_name || "").toLowerCase().includes(term) || 
                                       (item.control_no || "").toLowerCase().includes(term) || 
                                       (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                       (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                    return matchTerm && !isPM; 
+                    return matchTerm && !isPMItem; 
                   }).length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                       ไม่มีประวัติการตรวจสอบ
@@ -1699,13 +1715,13 @@ export default function QCQueuePage() {
                         <tbody className="divide-y divide-slate-100">
                           {rmTodayHistory.filter(item => { 
                             const term = searchQuery.toLowerCase(); 
-                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const isPMItem = isPM(item);
                             const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                               (item.rm_name || "").toLowerCase().includes(term) || 
                                               (item.control_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                            return matchTerm && !isPM; 
+                            return matchTerm && !isPMItem; 
                           }).map((item, idx) => {
                             let statusColor = "bg-slate-100 text-slate-700"
                             const st = item.qc_status || item.status
@@ -1782,7 +1798,7 @@ export default function QCQueuePage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
-                  {rmItems.filter(i => i.rm_code?.startsWith('CMD1') || i.rm_code?.startsWith('CMD2')).length === 0 ? (
+                  {rmItems.filter(i => isPM(i)).length === 0 ? (
                     <div className="text-center py-12 text-slate-500">
                       ไม่มีรายการบรรจุภัณฑ์รอตรวจ
                     </div>
@@ -1843,8 +1859,8 @@ export default function QCQueuePage() {
                         <tbody className="divide-y divide-slate-100">
                           {rmItems.filter(item => {
                             const term = searchQuery.toLowerCase()
-                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
-                            return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && isPM
+                            const itemIsPM = isPM(item)
+                            return ((item.rm_code || '').toLowerCase().includes(term) || (item.rm_name || '').toLowerCase().includes(term) || (item.production_lots?.lot_no || '').toLowerCase().includes(term)) && itemIsPM
                           })
                           .filter(item => codeSearch ? (item.rm_code || '').toLowerCase().includes(codeSearch.toLowerCase()) : true)
                           .filter(item => pmQcStatusSearch !== 'ALL' ? (item.qc_status || 'PENDING') === pmQcStatusSearch : true)
@@ -1866,8 +1882,10 @@ export default function QCQueuePage() {
                               <td className="px-4 py-3">
                                 {item.rm_code?.startsWith('CMD2') ? (
                                   <Badge className="bg-pink-100 text-pink-700 border-pink-200" variant="outline">[CMD2]</Badge>
-                                ) : (
+                                ) : item.rm_code?.startsWith('CMD1') ? (
                                   <Badge className="bg-blue-100 text-blue-700 border-blue-200" variant="outline">[CMD1]</Badge>
+                                ) : (
+                                  <Badge className="bg-purple-100 text-purple-700 border-purple-200" variant="outline">[{item.rm_code?.split('-')[0] || 'PM'}]</Badge>
                                 )}
                               </td>
                               <td className="px-4 py-3">
@@ -1948,13 +1966,13 @@ export default function QCQueuePage() {
                         ...rmTodayHistory
                           .filter(item => {
                             const term = searchQuery.toLowerCase();
-                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const isPMItem = isPM(item);
                             const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                               (item.rm_name || "").toLowerCase().includes(term) || 
                                               (item.control_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                            return matchTerm && isPM;
+                            return matchTerm && isPMItem;
                           })
                           .map((h: any) => [
                             new Date(h.updated_at || h.released_date || h.created_at).toLocaleString('th-TH'),
@@ -1978,13 +1996,13 @@ export default function QCQueuePage() {
                 <CardContent>
                   {rmTodayHistory.filter(item => { 
                     const term = searchQuery.toLowerCase(); 
-                    const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                    const isPMItem = isPM(item);
                     const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                       (item.rm_name || "").toLowerCase().includes(term) || 
                                       (item.control_no || "").toLowerCase().includes(term) || 
                                       (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                       (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                    return matchTerm && isPM; 
+                    return matchTerm && isPMItem; 
                   }).length === 0 ? (
                     <div className="text-center py-12 text-slate-500 bg-white rounded-lg border border-slate-200">
                       ไม่มีประวัติการตรวจสอบ
@@ -2006,13 +2024,13 @@ export default function QCQueuePage() {
                         <tbody className="divide-y divide-slate-100">
                           {rmTodayHistory.filter(item => { 
                             const term = searchQuery.toLowerCase(); 
-                            const isPM = item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2');
+                            const isPMItem = isPM(item);
                             const matchTerm = (item.rm_code || "").toLowerCase().includes(term) || 
                                               (item.rm_name || "").toLowerCase().includes(term) || 
                                               (item.control_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.lot_no || "").toLowerCase().includes(term) || 
                                               (item.production_lots?.products?.sku || "").toLowerCase().includes(term);
-                            return matchTerm && isPM; 
+                            return matchTerm && isPMItem; 
                           }).map((item, idx) => {
                             let statusColor = "bg-slate-100 text-slate-700"
                             const st = item.qc_status || item.status
@@ -2035,7 +2053,9 @@ export default function QCQueuePage() {
                                     <Badge className="bg-pink-100 text-pink-700 border-pink-200 text-[10px] px-1 py-0" variant="outline">[CMD2]</Badge>
                                   ) : item.rm_code?.startsWith('CMD1') ? (
                                     <Badge className="bg-blue-100 text-blue-700 border-blue-200 text-[10px] px-1 py-0" variant="outline">[CMD1]</Badge>
-                                  ) : null}
+                                  ) : (
+                                    <Badge className="bg-purple-100 text-purple-700 border-purple-200 text-[10px] px-1 py-0" variant="outline">[{item.rm_code?.split('-')[0] || 'PM'}]</Badge>
+                                  )}
                                 </div>
                                 <div className="text-xs text-slate-500 line-clamp-1" title={item.rm_name}>
                                   <span className="font-medium text-slate-700">{item.rm_code}</span> - {item.rm_name}

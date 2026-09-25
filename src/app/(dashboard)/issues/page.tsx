@@ -119,7 +119,9 @@ export default function IssuesPage() {
     let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
 
     rmData.forEach((item: any) => {
-      const isPM = item.rm_code?.toLowerCase().startsWith('p') || item.rm_code?.startsWith('CMD1') || item.rm_code?.startsWith('CMD2')
+      const code = (item.rm_code || '').toUpperCase().trim()
+      const wh = (item.warehouse || '').toUpperCase().trim()
+      const isPM = code.startsWith('CMD') || code.startsWith('PM') || code.toLowerCase().startsWith('p') || ((wh === 'MMPM' || wh === 'WH-PM') && !code.startsWith('R'))
       const qc = item.qc_status?.toUpperCase()
       const isReceived = item.receive_date != null || item.status === 'RECEIVED' || item.status === 'READY' || item.status === 'REJECTED'
 

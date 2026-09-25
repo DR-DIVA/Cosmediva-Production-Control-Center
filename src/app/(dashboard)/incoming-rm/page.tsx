@@ -1924,9 +1924,22 @@ export default function RMControlCenterPage() {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   };
 
-  const isPM = (code: string) => code?.startsWith('CMD1') || code?.startsWith('CMD2');
+  const isPM = (codeOrItem?: any, maybeWarehouse?: string): boolean => {
+    if (!codeOrItem) return false;
+    let code = '';
+    let wh = (maybeWarehouse || '').toUpperCase().trim();
+    if (typeof codeOrItem === 'string') {
+      code = codeOrItem.toUpperCase().trim();
+    } else if (typeof codeOrItem === 'object') {
+      code = (codeOrItem.rm_code || '').toUpperCase().trim();
+      if (!wh) wh = (codeOrItem.warehouse || '').toUpperCase().trim();
+    }
+    if (code.startsWith('CMD') || code.startsWith('PM')) return true;
+    if ((wh === 'MMPM' || wh === 'WH-PM') && !code.startsWith('R')) return true;
+    return false;
+  };
   
-  const typeFilteredItems = items.filter(item => mainTab === 'pm' ? isPM(item.rm_code) : !isPM(item.rm_code));
+  const typeFilteredItems = items.filter(item => mainTab === 'pm' ? isPM(item) : !isPM(item));
 
   const kpiFilteredItems = useMemo(() => {
     return kpiPeriod.filterByPeriod(typeFilteredItems, i => i.receive_date || i.eta_date || i.po_date || i.created_at);
