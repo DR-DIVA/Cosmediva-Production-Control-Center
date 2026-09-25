@@ -164,6 +164,15 @@ export async function POST(req: NextRequest) {
         dock_location: dockLocation.location_barcode,
         qr_payload: qrPayload,
         zpl_code: zplCode,
+        item_code: item.item_code,
+        item_name_th: item.item_name_th,
+        quantity: parseFloat(quantity),
+        uom,
+        supplier_lot_number,
+        supplier_name,
+        manufacturing_date,
+        expiry_date,
+        qc_status: 'QUARANTINE',
       };
     });
 

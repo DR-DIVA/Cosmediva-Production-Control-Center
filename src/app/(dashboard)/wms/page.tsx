@@ -221,6 +221,208 @@ export default function WmsDashboardPage() {
     }
   };
 
+  // Dedicated Clean Label Printing (Only QR Tag, 1-page sticker / tag)
+  const handlePrintLabel = () => {
+    if (!currentLabel) return;
+    const printWindow = window.open("", "_blank", "width=550,height=750");
+    if (!printWindow) {
+      window.print();
+      return;
+    }
+    const html = `
+      <!DOCTYPE html>
+      <html lang="th">
+        <head>
+          <meta charset="utf-8" />
+          <title>ฉลากประจำพาเลท / กล่อง - ${currentLabel.internal_lot_number || "WMS"}</title>
+          <style>
+            @page {
+              size: 100mm 150mm;
+              margin: 4mm;
+            }
+            @media print {
+              html, body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .no-print { display: none !important; }
+            }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+              margin: 0;
+              padding: 10px;
+              background: #fff;
+              color: #000;
+              box-sizing: border-box;
+            }
+            .tag-box {
+              border: 3px solid #000;
+              border-radius: 8px;
+              padding: 12px;
+              max-width: 380px;
+              margin: 0 auto;
+              text-align: center;
+              box-sizing: border-box;
+            }
+            .org-header {
+              font-size: 12px;
+              font-weight: 800;
+              letter-spacing: 0.5px;
+              border-bottom: 2px solid #000;
+              padding-bottom: 5px;
+              margin-bottom: 6px;
+              text-transform: uppercase;
+            }
+            .lot-badge {
+              font-size: 18px;
+              font-weight: 900;
+              font-family: monospace;
+              letter-spacing: 1px;
+              margin: 4px 0;
+              color: #000;
+              background: #f1f5f9;
+              padding: 4px 8px;
+              border-radius: 4px;
+              display: inline-block;
+            }
+            .qr-container {
+              margin: 6px auto;
+              display: inline-block;
+              border: 1px solid #ddd;
+              padding: 4px;
+              border-radius: 6px;
+              background: #fff;
+            }
+            .qr-img {
+              width: 160px;
+              height: 160px;
+              display: block;
+            }
+            .info-table {
+              width: 100%;
+              text-align: left;
+              font-size: 11px;
+              font-family: monospace;
+              border-top: 2px solid #000;
+              margin-top: 6px;
+              padding-top: 6px;
+              border-collapse: collapse;
+            }
+            .info-table td {
+              padding: 2px 0;
+              vertical-align: top;
+            }
+            .info-lbl {
+              font-weight: bold;
+              width: 95px;
+              color: #333;
+            }
+            .info-val {
+              font-weight: 600;
+              color: #000;
+            }
+            .qc-status {
+              margin-top: 8px;
+              padding: 5px;
+              border: 2px solid #b45309;
+              background-color: #fef3c7;
+              color: #92400e;
+              font-size: 11px;
+              font-weight: 800;
+              border-radius: 4px;
+              text-align: center;
+            }
+            .qc-status.released {
+              border-color: #059669;
+              background-color: #d1fae5;
+              color: #065f46;
+            }
+            .gmp-note {
+              font-size: 8px;
+              color: #64748b;
+              margin-top: 6px;
+              text-align: center;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="tag-box">
+            <div class="org-header">COSMEFLOW WMS — PALLET / BOX IDENTIFICATION TAG</div>
+            <div class="lot-badge">\${currentLabel.internal_lot_number || ""}</div>
+            <div class="qr-container">
+              <img class="qr-img" src="\${qrCodeDataUrl}" alt="QR Code" />
+            </div>
+            <table class="info-table">
+              <tr>
+                <td class="info-lbl">รหัสสินค้า:</td>
+                <td class="info-val">\${currentLabel.item_code || "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">ชื่อสินค้า:</td>
+                <td class="info-val">\${currentLabel.item_name_th || "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">จำนวนรับจริง:</td>
+                <td class="info-val">\${Number(currentLabel.quantity || 0).toLocaleString()} \${currentLabel.uom || "PCS"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">เลขที่ GRN:</td>
+                <td class="info-val">\${currentLabel.grn_number || "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">Lot ซัพพลาย:</td>
+                <td class="info-val">\${currentLabel.supplier_lot_number || "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">ซัพพลายเออร์:</td>
+                <td class="info-val">\${currentLabel.supplier_name || "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">วันผลิต (MFG):</td>
+                <td class="info-val">\${currentLabel.manufacturing_date ? new Date(currentLabel.manufacturing_date).toLocaleDateString("th-TH") : "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">วันหมดอายุ:</td>
+                <td class="info-val">\${currentLabel.expiry_date ? new Date(currentLabel.expiry_date).toLocaleDateString("th-TH") : "-"}</td>
+              </tr>
+              <tr>
+                <td class="info-lbl">พิกัดรับเข้า:</td>
+                <td class="info-val">\${currentLabel.dock_location || "-"}</td>
+              </tr>
+            </table>
+
+            <div class="qc-status \${currentLabel.qc_status === "RELEASED" ? "released" : ""}">
+              \${
+                currentLabel.qc_status === "RELEASED"
+                  ? "✅ ผ่านการรับรอง (RELEASED — สามารถเบิกจ่ายได้)"
+                  : "🛑 กักกัน (QUARANTINE — ห้ามเบิกจ่ายก่อนผ่าน QC)"
+              }
+            </div>
+
+            <div class="gmp-note">
+              GMP ISO 22716 & 21 CFR Part 11 Electronic Identification Tag
+            </div>
+          </div>
+          <script>
+            window.onload = function() {
+              window.print();
+              window.onafterprint = function() {
+                window.close();
+              };
+            };
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   // Handle QC Disposition
   const handleQcSubmit = async () => {
     if (!selectedQcLot) return;
@@ -1246,18 +1448,34 @@ export default function WmsDashboardPage() {
           </DialogHeader>
 
           {currentLabel && (
-            <div className="border-2 border-dashed border-slate-300 p-4 rounded-xl space-y-3 bg-white text-center">
-              <div className="text-sm font-bold tracking-tight text-slate-900 border-b pb-1">
-                [COSMEFLOW WMS] บรรจุภัณฑ์รอตรวจสอบ QC
+            <div id="wms-printable-tag" className="border-2 border-dashed border-slate-300 p-4 rounded-xl space-y-3 bg-white text-center">
+              <div className="text-xs font-bold tracking-tight text-slate-900 border-b pb-1 uppercase">
+                [COSMEFLOW WMS] ฉลากประจำพาเลท / กล่อง
+              </div>
+              <div className="font-mono font-bold text-lg text-slate-900 bg-slate-50 py-1 rounded border">
+                {currentLabel.internal_lot_number}
               </div>
               {qrCodeDataUrl && (
-                <img src={qrCodeDataUrl} alt="QR Code" className="mx-auto w-40 h-40 border p-1 rounded" />
+                <img src={qrCodeDataUrl} alt="QR Code" className="mx-auto w-36 h-36 border p-1 rounded bg-white shadow-sm" />
               )}
-              <div className="text-left text-xs space-y-1 bg-slate-50 p-2.5 rounded font-mono">
-                <div><b>Lot:</b> {currentLabel.internal_lot_number}</div>
+              <div className="text-left text-xs space-y-1 bg-slate-50 p-2.5 rounded font-mono border">
+                {currentLabel.item_code && (
+                  <div><b>รหัสสินค้า:</b> {currentLabel.item_code}</div>
+                )}
+                {currentLabel.item_name_th && (
+                  <div className="font-sans text-[11px] text-slate-600">{currentLabel.item_name_th}</div>
+                )}
                 <div><b>GRN:</b> {currentLabel.grn_number}</div>
                 <div><b>พิกัดรับเข้า:</b> {currentLabel.dock_location}</div>
-                <div className="text-[10px] text-amber-700 font-bold">สถานะ: QUARANTINE (ห้ามเบิกจ่ายจนกว่าจะผ่าน QC)</div>
+                {currentLabel.quantity && (
+                  <div><b>จำนวน:</b> {Number(currentLabel.quantity).toLocaleString()} {currentLabel.uom || "PCS"}</div>
+                )}
+                {currentLabel.expiry_date && (
+                  <div><b>วันหมดอายุ (EXP):</b> {new Date(currentLabel.expiry_date).toLocaleDateString("th-TH")}</div>
+                )}
+                <div className="text-[10px] text-amber-700 font-bold mt-1 pt-1 border-t">
+                  ⚠️ สถานะ: QUARANTINE (กักกัน — ห้ามเบิกจ่ายก่อนผ่าน QC)
+                </div>
               </div>
             </div>
           )}
@@ -1267,10 +1485,8 @@ export default function WmsDashboardPage() {
               ปิดหน้าต่าง
             </Button>
             <Button
-              className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              onClick={() => {
-                window.print();
-              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+              onClick={handlePrintLabel}
             >
               <Printer className="w-4 h-4 mr-1.5" />
               สั่งพิมพ์ฉลาก (Print Label)
