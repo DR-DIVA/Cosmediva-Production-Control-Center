@@ -26,6 +26,8 @@ import {
   Smartphone,
   Eye,
   SlidersHorizontal,
+  MapPin,
+  Navigation,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,6 +98,9 @@ export default function WmsDashboardPage() {
   const [traceSearchLot, setTraceSearchLot] = useState("");
   const [traceResult, setTraceResult] = useState<any>(null);
   const [searchingTrace, setSearchingTrace] = useState(false);
+
+  // Digital Twin Map State
+  const [mapSubView, setMapSubView] = useState<"floor" | "rack">("floor");
 
   // Fetch Core Data
   const fetchDashboardData = async () => {
@@ -720,6 +725,7 @@ export default function WmsDashboardPage() {
       <div className="bg-white p-1.5 border border-slate-200 shadow-sm rounded-xl flex flex-wrap items-center gap-1.5">
         {[
           { id: "overview", label: "ภาพรวมสต็อก & พิกัด (Balances)", icon: Boxes },
+          { id: "map", label: "แผนผังคลัง 2D (Visual Map)", icon: MapPin },
           { id: "receiving", label: "รับสินค้าเข้า (GRN)", icon: Truck },
           { id: "qc", label: "ตรวจรับ QC", icon: ShieldCheck, badge: pendingCounts.qc },
           { id: "putaway", label: "จัดเก็บเข้าที่ Put-away", icon: ArrowRightLeft, badge: pendingCounts.putaway },
@@ -850,6 +856,344 @@ export default function WmsDashboardPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      )}
+
+      {/* TAB: WAREHOUSE 2D DIGITAL TWIN MAP */}
+      {activeTab === "map" && (
+        <div className="space-y-4">
+          {/* Header & Sub-view Switcher */}
+          <div className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-lg font-bold text-slate-900">แผนผังคลังสินค้าดิจิทัล (WH-PM 2D Digital Twin)</h3>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-300 font-mono text-xs">
+                  SLOTTING MAPPING
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500">
+                ระบบระบุพิกัดจัดเก็บเสมือนจริง แสดงตำแหน่งชั้นวาง โซน และไฟกระพริบระบุตำแหน่งเป้าหมาย
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div className="inline-flex bg-slate-100 p-1 rounded-lg border">
+                <button
+                  type="button"
+                  onClick={() => setMapSubView("floor")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                    mapSubView === "floor"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  🗺️ ผังพื้นรวม (Floor Plan)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMapSubView("rack")}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition cursor-pointer ${
+                    mapSubView === "rack"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
+                >
+                  📦 หน้าตัดชั้นวางจริง (Rack R01)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Target Location Alert Banner */}
+          <div className="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-900 text-white p-4 rounded-xl border border-emerald-500/40 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative flex items-center justify-center p-2.5 bg-emerald-500/20 rounded-lg border border-emerald-500/40">
+                <span className="animate-ping absolute inline-flex h-5 w-5 rounded-full bg-emerald-400 opacity-75"></span>
+                <MapPin className="relative w-5 h-5 text-emerald-400" />
+              </div>
+              <div>
+                <div className="text-xs text-emerald-300 font-medium">📍 พิกัดแนะนำจัดเก็บ (Target Slot with Blinking Beacon):</div>
+                <div className="font-mono text-lg font-black text-white tracking-wide">
+                  WH-PM-A-R01-B01-L01-BN01
+                </div>
+              </div>
+            </div>
+            <div className="text-xs text-slate-300 font-mono bg-slate-800/80 px-3 py-2 rounded-lg border border-slate-700">
+              โซน A แถว 1 • ช่วงเสา 1 • ชั้น 1 (ล่างสุด) • ช่อง 1 (ซ้าย)
+            </div>
+          </div>
+
+          {/* SUB-VIEW 1: FLOOR PLAN */}
+          {mapSubView === "floor" && (
+            <Card className="border shadow-sm overflow-hidden bg-slate-950 text-white">
+              <CardHeader className="bg-slate-900/80 border-b border-slate-800 p-4 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm text-slate-200">ผังพื้นที่ทางกายภาพคลังบรรจุภัณฑ์ (WH-PM Top-Down Layout)</CardTitle>
+                  <CardDescription className="text-xs text-slate-400">
+                    เส้นประนำทางจากท่ารับเข้า DOCK-QUAR-01 เข้าสู่ชั้นวางแร็คเป้าหมาย
+                  </CardDescription>
+                </div>
+                <Badge variant="outline" className="bg-emerald-950 text-emerald-400 border-emerald-800 text-[11px]">
+                  Real-time Slotting
+                </Badge>
+              </CardHeader>
+              <CardContent className="p-6 space-y-6">
+                {/* Top: Inbound Dock & QA */}
+                <div className="flex justify-between items-center">
+                  <div className="border-2 border-blue-500 bg-blue-950/40 rounded-xl p-3.5 w-64 text-center shadow-lg">
+                    <div className="text-[10px] text-blue-400 font-bold uppercase tracking-wider mb-0.5">🚪 จุดรับเข้ากักกัน (Inbound Dock)</div>
+                    <div className="font-mono text-sm font-bold text-white">WH-PM-DOCK-QUAR-01</div>
+                    <div className="text-[11px] text-blue-300/80 mt-1">จุดพักรับของและรอผลตรวจ QC</div>
+                  </div>
+
+                  <div className="border border-slate-800 bg-slate-900/70 rounded-xl p-3 text-center text-xs text-slate-400 w-52">
+                    <div>🧪 โต๊ะสุ่มตรวจตัวอย่าง QC</div>
+                    <div className="font-mono text-[11px] text-slate-500 mt-0.5">Sampling Inspection Bench</div>
+                  </div>
+                </div>
+
+                {/* Middle: Forklift Main Aisle */}
+                <div className="py-3 px-4 bg-slate-900/80 rounded-xl border border-slate-800 flex items-center justify-between text-xs font-mono text-slate-400">
+                  <span>◀ ทางออกสู่คลีนรูมผลิต (To Cleanroom)</span>
+                  <span className="text-amber-400 font-bold flex items-center gap-1.5">
+                    <span>🚜 ทางวิ่งรถยก / โฟล์คลิฟต์ (Forklift Main Thoroughfare)</span>
+                  </span>
+                  <span>ประตูคลังสินค้า (Main Gate) ▶</span>
+                </div>
+
+                {/* Bottom: Racks Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  {/* ZONE A RACK 1 (TARGET) */}
+                  <div className="border-2 border-emerald-500 bg-emerald-950/20 rounded-2xl p-4 relative shadow-2xl">
+                    <div className="absolute -top-3 right-4 bg-emerald-500 text-slate-950 font-black text-[10px] px-2.5 py-0.5 rounded-full flex items-center gap-1 shadow-lg animate-pulse">
+                      <span className="w-2 h-2 rounded-full bg-slate-950 animate-ping"></span>
+                      📍 มีไฟกระพริบที่แร็คนี้
+                    </div>
+
+                    <div className="text-xs font-bold text-emerald-400 mb-1">
+                      🗄️ โซน A — แร็คที่ 1 (Rack R01)
+                    </div>
+                    <div className="text-[11px] text-slate-400 mb-3">คลังขวดแก้ว, กระปุกครีม (Ambient 25-30°C)</div>
+
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono">
+                      {/* Bay 1 - Target */}
+                      <div className="border-2 border-emerald-400 bg-emerald-900/50 rounded-xl p-2.5 space-y-1 relative shadow-lg">
+                        <span className="absolute -top-2 -right-1 flex h-3 w-3">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+                        </span>
+                        <div className="text-[10px] text-emerald-300 font-bold">ช่วงเสาที่ 1 (Bay 01)</div>
+                        <div className="text-xs text-white font-black bg-emerald-600 rounded py-1">
+                          ⭐ L01-BN01
+                        </div>
+                        <div className="text-[9px] text-emerald-200">ไฟกระพริบจุดนี้</div>
+                      </div>
+
+                      {/* Bay 2 */}
+                      <div className="border border-slate-800 bg-slate-900/80 rounded-xl p-2.5 space-y-1 opacity-70">
+                        <div className="text-[10px] text-slate-400 font-bold">ช่วงเสาที่ 2 (Bay 02)</div>
+                        <div className="text-xs text-slate-300 py-1">L01..L03</div>
+                        <div className="text-[9px] text-slate-500">ว่าง 4 ช่อง</div>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setMapSubView("rack")}
+                      className="w-full mt-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold transition flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <span>สลับดูมุมมองหน้าตัดชั้นวาง (Rack Elevation)</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+
+                  {/* ZONE B RACK 1 */}
+                  <div className="border border-slate-800 bg-slate-900/60 rounded-2xl p-4">
+                    <div className="text-xs font-bold text-sky-400 mb-1">
+                      ❄️ โซน B — แร็คที่ 1 (Rack R01)
+                    </div>
+                    <div className="text-[11px] text-slate-400 mb-3">คลังสติกเกอร์ฉลาก, ยางดรอปเปอร์ (Air-con 20-25°C)</div>
+                    <div className="grid grid-cols-2 gap-2 text-center text-xs font-mono opacity-80">
+                      <div className="border border-slate-800 bg-slate-950 p-2 rounded-lg">
+                        <div className="text-[10px] text-slate-500">Bay 01</div>
+                        <div className="text-xs text-slate-300">L01..L02</div>
+                      </div>
+                      <div className="border border-slate-800 bg-slate-950 p-2 rounded-lg">
+                        <div className="text-[10px] text-slate-500">Bay 02</div>
+                        <div className="text-xs text-slate-300">L01..L02</div>
+                      </div>
+                    </div>
+                    <div className="text-[10px] text-slate-500 text-center mt-3">ควบคุมอุณหภูมิและความชื้น</div>
+                  </div>
+
+                  {/* STAGING OUTBOUND */}
+                  <div className="border border-purple-500/60 bg-purple-950/20 rounded-2xl p-4 text-center">
+                    <div className="text-xs font-bold text-purple-400 mb-1">📦 จุดส่งมอบผลิต (Outbound Staging)</div>
+                    <div className="font-mono text-sm font-bold text-white">WH-PM-STAGE-LINE-01</div>
+                    <div className="text-[11px] text-purple-300/80 mt-1">จุดจ่ายสินค้าเข้าคลีนรูมผสม/บรรจุ</div>
+                    <div className="mt-4 p-2.5 bg-purple-900/30 border border-purple-800/40 rounded-xl text-[10px] text-purple-200">
+                      รองรับไลน์บรรจุอัตโนมัติ Filling Line 1-3
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* SUB-VIEW 2: RACK ELEVATION */}
+          {mapSubView === "rack" && (
+            <Card className="border shadow-sm overflow-hidden bg-slate-950 text-white">
+              <CardHeader className="bg-slate-900/80 border-b border-slate-800 p-4 flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="text-sm text-slate-200">โครงสร้างชั้นวางหน้าตรง Zone A • Rack R01 (Rack Elevation)</CardTitle>
+                  <CardDescription className="text-xs text-slate-400">
+                    แสดงโครงสร้างเสา คาน ชั้นวาง (Levels) และช่องจัดเก็บ (Sub-Bins)
+                  </CardDescription>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMapSubView("floor")}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 underline font-semibold cursor-pointer"
+                >
+                  ◀ กลับไปผังพื้นรวม
+                </button>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="border-4 border-slate-700 bg-slate-900/40 rounded-2xl p-5">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* BAY 01 */}
+                    <div className="space-y-4 border-2 border-emerald-500/40 bg-emerald-950/10 p-4 rounded-xl">
+                      <div className="text-center font-mono font-bold text-sm text-emerald-400 border-b border-slate-800 pb-2">
+                        ช่วงเสาที่ 1 (BAY 01)
+                      </div>
+
+                      {/* Level 3 */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-slate-500 flex justify-between">
+                          <span>ชั้นที่ 3 (LEVEL 03 - บนสุด)</span>
+                          <span>Max 300 kg</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                          <div className="border border-slate-800 bg-slate-900 p-3 rounded-lg text-slate-400">BN01 (ว่าง)</div>
+                          <div className="border border-slate-800 bg-slate-900 p-3 rounded-lg text-slate-400">BN02 (ว่าง)</div>
+                        </div>
+                      </div>
+
+                      {/* Level 2 */}
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-slate-500 flex justify-between">
+                          <span>ชั้นที่ 2 (LEVEL 02 - กลาง)</span>
+                          <span>Max 450 kg</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                          <div className="border border-slate-800 bg-slate-900 p-3 rounded-lg text-slate-400">BN01 (ว่าง)</div>
+                          <div className="border border-slate-800 bg-slate-900 p-3 rounded-lg text-slate-400">BN02 (ว่าง)</div>
+                        </div>
+                      </div>
+
+                      {/* Level 1 (TARGET - BLINKING) */}
+                      <div className="space-y-1 bg-emerald-950/40 p-2.5 rounded-xl border-2 border-emerald-400/80">
+                        <div className="text-[10px] font-mono text-emerald-300 font-bold flex justify-between">
+                          <span>ชั้นที่ 1 (LEVEL 01 - พื้นดิน Ground)</span>
+                          <span className="text-emerald-300 font-bold">Max 500 kg (Heavy Duty)</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3 pt-1 text-center font-mono">
+                          {/* TARGET BN01 */}
+                          <div className="border-2 border-emerald-400 bg-emerald-900/80 p-3.5 rounded-xl relative shadow-xl animate-pulse">
+                            <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-emerald-400 text-slate-950 px-2 py-0.5 rounded-full text-[9px] font-black shadow-md">
+                              <span className="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
+                              📍 วางจุดนี้ (BN01)
+                            </span>
+                            <div className="text-xs font-black text-white mt-1">BN01 (ช่องซ้าย)</div>
+                            <div className="text-[10px] font-bold text-emerald-200 mt-1">
+                              WH-PM-A-R01-B01-L01-BN01
+                            </div>
+                            <div className="text-[9px] text-slate-300 mt-1">
+                              ขวดแก้ว 30ml (5,000 PCS)
+                            </div>
+                          </div>
+
+                          {/* BN02 */}
+                          <div className="border border-slate-800 bg-slate-900 p-3.5 rounded-xl text-slate-400 text-xs flex flex-col justify-center">
+                            <div>BN02 (ช่องขวา)</div>
+                            <div className="text-[10px] text-slate-500 mt-1">ว่าง (Available)</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* BAY 02 */}
+                    <div className="space-y-4 border border-slate-800 bg-slate-900/30 p-4 rounded-xl opacity-75">
+                      <div className="text-center font-mono font-bold text-sm text-slate-400 border-b border-slate-800 pb-2">
+                        ช่วงเสาที่ 2 (BAY 02)
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-slate-500">LEVEL 03</div>
+                        <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN01</div>
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN02</div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-slate-500">LEVEL 02</div>
+                        <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN01</div>
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN02</div>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-mono text-slate-500">LEVEL 01</div>
+                        <div className="grid grid-cols-2 gap-2 text-center font-mono text-xs">
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN01</div>
+                          <div className="border border-slate-800 bg-slate-900/50 p-3 rounded-lg text-slate-500">BN02</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Location Breakdown Specs */}
+          <div className="bg-white p-5 rounded-xl border shadow-sm">
+            <h4 className="text-sm font-bold text-slate-900 mb-3 flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+              <span>การถอดรหัสพิกัดจัดเก็บตามหลักสากล GMP (Location Hierarchy Breakdown)</span>
+            </h4>
+            <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-center text-xs">
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="text-[10px] text-slate-500 font-bold uppercase">1. คลัง</div>
+                <div className="font-mono text-sm font-bold text-slate-900 mt-1">WH-PM</div>
+                <div className="text-[10px] text-slate-400">คลังบรรจุภัณฑ์</div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="text-[10px] text-slate-500 font-bold uppercase">2. โซน</div>
+                <div className="font-mono text-sm font-bold text-slate-900 mt-1">A</div>
+                <div className="text-[10px] text-slate-400">Ambient ปกติ</div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="text-[10px] text-slate-500 font-bold uppercase">3. แถว/แร็ค</div>
+                <div className="font-mono text-sm font-bold text-slate-900 mt-1">R01</div>
+                <div className="text-[10px] text-slate-400">แร็คแถวที่ 1</div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="text-[10px] text-slate-500 font-bold uppercase">4. ช่วงเสา</div>
+                <div className="font-mono text-sm font-bold text-slate-900 mt-1">B01</div>
+                <div className="text-[10px] text-slate-400">ช่วงเสาที่ 1</div>
+              </div>
+              <div className="bg-slate-50 p-3 rounded-lg border">
+                <div className="text-[10px] text-slate-500 font-bold uppercase">5. ชั้นวาง</div>
+                <div className="font-mono text-sm font-bold text-slate-900 mt-1">L01</div>
+                <div className="text-[10px] text-slate-400">ชั้นล่างสุด (Ground)</div>
+              </div>
+              <div className="bg-emerald-50 p-3 rounded-lg border-2 border-emerald-500">
+                <div className="text-[10px] text-emerald-800 font-bold uppercase">6. ช่องย่อย</div>
+                <div className="font-mono text-sm font-black text-emerald-700 mt-1">BN01 ⭐</div>
+                <div className="text-[10px] text-emerald-600 font-bold">ช่องที่ 1 ซ้าย</div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1550,28 +1894,126 @@ export default function WmsDashboardPage() {
 
       {/* MODAL: DIRECTED PUT-AWAY */}
       <Dialog open={putawayModalOpen} onOpenChange={setPutawayModalOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
               <ArrowRightLeft className="w-5 h-5 text-blue-600" />
               จัดเก็บสินค้าขึ้นชั้นวาง (Directed Put-Away)
             </DialogTitle>
             <DialogDescription className="text-xs">
-              {selectedPutawayItem?.item_code} | Lot: {selectedPutawayItem?.internal_lot_number}
+              {selectedPutawayItem?.item_code} | Lot: {selectedPutawayItem?.internal_lot_number} | จำนวน {Number(selectedPutawayItem?.physical_quantity || 0).toLocaleString()} {selectedPutawayItem?.base_uom}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-2">
             {suggestedBin && (
-              <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg text-xs space-y-1">
-                <div className="font-semibold text-blue-900 flex items-center gap-1.5">
-                  <Sparkles className="w-4 h-4 text-blue-600" />
-                  ระบบแนะนำพิกัดจัดเก็บที่เหมาะสมที่สุด:
+              <div className="bg-gradient-to-r from-blue-900 via-slate-900 to-slate-900 text-white border border-blue-600/60 p-3.5 rounded-xl text-xs space-y-1 shadow-md">
+                <div className="font-semibold text-blue-300 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-amber-400" />
+                    AI แนะนำพิกัดจัดเก็บที่เหมาะสมที่สุด (Slotting Recommendation):
+                  </span>
+                  <span className="flex items-center gap-1.5 text-[10px] text-emerald-400 font-mono font-bold bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-500/40">
+                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                    BLINKING BEACON
+                  </span>
                 </div>
-                <div className="font-mono text-base font-bold text-blue-800">{suggestedBin.location_barcode}</div>
-                <div className="text-slate-500">{suggestedBin.location_name}</div>
+                <div className="font-mono text-base font-bold text-white tracking-wide">{suggestedBin.location_barcode}</div>
+                <div className="text-slate-300 text-[11px]">{suggestedBin.location_name}</div>
               </div>
             )}
+
+            {/* Visual Mini Rack Elevation Map */}
+            <div className="border border-slate-700 bg-slate-950 p-3.5 rounded-xl text-white space-y-3 shadow-inner">
+              <div className="flex items-center justify-between text-xs border-b border-slate-800 pb-2">
+                <span className="font-bold text-slate-200 flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-emerald-400" />
+                  ผังชั้นวางจำลอง (Rack R01 Elevation Map)
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono bg-slate-900 px-2 py-0.5 rounded border border-slate-800">
+                  Zone A • แถวที่ 1
+                </span>
+              </div>
+
+              {/* 3 Levels x 2 Bays Matrix */}
+              <div className="space-y-2 text-[10px] font-mono">
+                {/* Level 3 */}
+                <div className="flex gap-2 items-center">
+                  <span className="w-14 text-slate-400 text-right font-sans text-[11px]">ชั้น 3 (L03)</span>
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    <div className={`p-2 rounded-lg border text-center transition ${chosenTargetBin?.includes("L03-BN01") ? "bg-emerald-950 border-emerald-400 text-emerald-200 ring-2 ring-emerald-500" : "bg-slate-900/60 border-slate-800 text-slate-400"}`}>
+                      <div className="font-bold">B01-L03-BN01</div>
+                      <div className="text-[9px] text-slate-500">ช่วงเสา 1 • ชั้น 3</div>
+                    </div>
+                    <div className={`p-2 rounded-lg border text-center transition ${chosenTargetBin?.includes("L03-BN02") ? "bg-emerald-950 border-emerald-400 text-emerald-200 ring-2 ring-emerald-500" : "bg-slate-900/60 border-slate-800 text-slate-400"}`}>
+                      <div className="font-bold">B02-L03-BN02</div>
+                      <div className="text-[9px] text-slate-500">ช่วงเสา 2 • ชั้น 3</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Level 2 */}
+                <div className="flex gap-2 items-center">
+                  <span className="w-14 text-slate-400 text-right font-sans text-[11px]">ชั้น 2 (L02)</span>
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    <div className={`p-2 rounded-lg border text-center transition ${chosenTargetBin?.includes("L02-BN01") ? "bg-emerald-950 border-emerald-400 text-emerald-200 ring-2 ring-emerald-500" : "bg-slate-900/60 border-slate-800 text-slate-400"}`}>
+                      <div className="font-bold">B01-L02-BN01</div>
+                      <div className="text-[9px] text-slate-500">ช่วงเสา 1 • ชั้น 2</div>
+                    </div>
+                    <div className={`p-2 rounded-lg border text-center transition ${chosenTargetBin?.includes("L02-BN02") ? "bg-emerald-950 border-emerald-400 text-emerald-200 ring-2 ring-emerald-500" : "bg-slate-900/60 border-slate-800 text-slate-400"}`}>
+                      <div className="font-bold">B02-L02-BN02</div>
+                      <div className="text-[9px] text-slate-500">ช่วงเสา 2 • ชั้น 2</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Level 1 (Ground) - Target */}
+                <div className="flex gap-2 items-center">
+                  <span className="w-14 text-emerald-400 font-bold text-right font-sans text-[11px]">ชั้น 1 (พื้น)</span>
+                  <div className="grid grid-cols-2 gap-2 flex-1">
+                    {/* Bay 01 Bin 01 - The recommended slot */}
+                    <div
+                      className={`relative p-2.5 rounded-lg border-2 text-center transition flex flex-col items-center justify-center cursor-pointer ${
+                        chosenTargetBin === "WH-PM-A-R01-B01-L01-BN01" || (!chosenTargetBin && suggestedBin?.location_barcode === "WH-PM-A-R01-B01-L01-BN01")
+                          ? "bg-emerald-900/80 border-emerald-400 text-white shadow-[0_0_18px_rgba(16,185,129,0.6)] animate-pulse"
+                          : "bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-600"
+                      }`}
+                      onClick={() => setChosenTargetBin("WH-PM-A-R01-B01-L01-BN01")}
+                    >
+                      {(chosenTargetBin === "WH-PM-A-R01-B01-L01-BN01" || (!chosenTargetBin && suggestedBin?.location_barcode === "WH-PM-A-R01-B01-L01-BN01")) && (
+                        <span className="absolute -top-2 -right-2 flex h-5 w-5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-5 w-5 bg-emerald-500 text-[10px] items-center justify-center text-white font-bold shadow-md">📍</span>
+                        </span>
+                      )}
+                      <div className="font-bold text-xs text-emerald-200">WH-PM-A-R01-B01-L01-BN01</div>
+                      <div className="text-[10px] text-emerald-300 font-sans mt-0.5 font-medium">ช่วงเสา 1 • ช่องซ้าย (พิกัดแนะนำ 🟢)</div>
+                    </div>
+
+                    {/* Bay 02 Bin 02 */}
+                    <div
+                      className={`p-2.5 rounded-lg border text-center transition flex flex-col items-center justify-center cursor-pointer ${
+                        chosenTargetBin === "WH-PM-A-R01-B02-L01-BN02"
+                          ? "bg-emerald-950 border-emerald-400 text-emerald-200 ring-2 ring-emerald-500"
+                          : "bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-600"
+                      }`}
+                      onClick={() => setChosenTargetBin("WH-PM-A-R01-B02-L01-BN02")}
+                    >
+                      <div className="font-bold text-xs">WH-PM-A-R01-B02-L01-BN02</div>
+                      <div className="text-[10px] text-slate-500 font-sans mt-0.5">ช่วงเสา 2 • ช่องขวา</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-400 pt-2 border-t border-slate-800 flex flex-col sm:flex-row justify-between gap-1">
+                <span className="flex items-center gap-1 text-emerald-300 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                  ไฟสีเขียวกระพริบ: ตำแหน่งที่ระบบกำหนดให้นำพาเลทไปวาง
+                </span>
+                <span className="text-slate-300 font-mono text-[10px]">Max Load: 500 KG / พาเลท</span>
+              </div>
+            </div>
 
             <div>
               <Label className="text-xs font-semibold">เลือกหรือสแกนพิกัดจัดเก็บเป้าหมาย *</Label>
