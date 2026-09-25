@@ -457,12 +457,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                           {badgeCounts.fgQuarantine} รอปล่อย
                         </span>
                       )}
-                      {route.href === '/issues' && badgeCounts.issues > 0 && (
-                        <span className="ml-auto shrink-0 bg-rose-500/20 text-rose-300 border border-rose-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-rose-400"></span>
-                          {badgeCounts.issues} เคส
-                        </span>
-                      )}
                       {route.href === '/qc-queue' && badgeCounts.fgQuarantine > 0 && (
                         <span className="ml-auto shrink-0 bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
                           {badgeCounts.fgQuarantine} FG
@@ -476,9 +470,6 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
                     <>
                       {route.href === '/my-tasks/fg' && badgeCounts.fgQuarantine > 0 && (
                         <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-amber-400 ring-2 ring-[#2D2721] animate-pulse" />
-                      )}
-                      {route.href === '/issues' && badgeCounts.issues > 0 && (
-                        <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full bg-rose-400 ring-2 ring-[#2D2721]" />
                       )}
                     </>
                   )}
