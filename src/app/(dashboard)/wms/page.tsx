@@ -32,7 +32,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { toast } from "sonner";
@@ -166,8 +165,8 @@ export default function WmsDashboardPage() {
   }, [selectedWarehouse]);
 
   useEffect(() => {
+    if (activeTab === "receiving" || activeTab === "putaway") fetchDockItems();
     if (activeTab === "qc") fetchQcLots();
-    if (activeTab === "putaway") fetchDockItems();
     if (activeTab === "picking") fetchPickLists();
   }, [activeTab]);
 
@@ -516,40 +515,48 @@ export default function WmsDashboardPage() {
       </div>
 
       {/* 3. Operational Navigation Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="bg-white p-1 border shadow-sm rounded-lg flex flex-wrap h-auto gap-1">
-          <TabsTrigger value="overview" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <Boxes className="w-4 h-4 mr-1.5" />
-            ภาพรวมสต็อก & พิกัด (Balances)
-          </TabsTrigger>
-          <TabsTrigger value="receiving" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <Truck className="w-4 h-4 mr-1.5" />
-            รับสินค้าเข้า (GRN)
-          </TabsTrigger>
-          <TabsTrigger value="qc" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <ShieldCheck className="w-4 h-4 mr-1.5" />
-            ตรวจรับ QC ({pendingCounts.qc})
-          </TabsTrigger>
-          <TabsTrigger value="putaway" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <ArrowRightLeft className="w-4 h-4 mr-1.5" />
-            จัดเก็บเข้าที่ Put-away ({pendingCounts.putaway})
-          </TabsTrigger>
-          <TabsTrigger value="picking" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <ScanLine className="w-4 h-4 mr-1.5" />
-            เบิกจ่าย FEFO ({pendingCounts.picking})
-          </TabsTrigger>
-          <TabsTrigger value="trace" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <Search className="w-4 h-4 mr-1.5" />
-            สืบย้อนกลับ 360° (Traceability)
-          </TabsTrigger>
-          <TabsTrigger value="transactions" className="data-[state=active]:bg-slate-900 data-[state=active]:text-white">
-            <FileText className="w-4 h-4 mr-1.5" />
-            สมุดบัญชีสต็อก (Ledger Audit)
-          </TabsTrigger>
-        </TabsList>
+      <div className="bg-white p-1.5 border border-slate-200 shadow-sm rounded-xl flex flex-wrap items-center gap-1.5">
+        {[
+          { id: "overview", label: "ภาพรวมสต็อก & พิกัด (Balances)", icon: Boxes },
+          { id: "receiving", label: "รับสินค้าเข้า (GRN)", icon: Truck },
+          { id: "qc", label: "ตรวจรับ QC", icon: ShieldCheck, badge: pendingCounts.qc },
+          { id: "putaway", label: "จัดเก็บเข้าที่ Put-away", icon: ArrowRightLeft, badge: pendingCounts.putaway },
+          { id: "picking", label: "เบิกจ่าย FEFO", icon: ScanLine, badge: pendingCounts.picking },
+          { id: "trace", label: "สืบย้อนกลับ 360° (Traceability)", icon: Search },
+          { id: "transactions", label: "สมุดบัญชีสต็อก (Ledger Audit)", icon: FileText },
+        ].map((tab) => {
+          const isActive = activeTab === tab.id;
+          const Icon = tab.icon;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setActiveTab(tab.id)}
+              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition-all cursor-pointer ${
+                isActive
+                  ? "bg-slate-900 text-white shadow-sm ring-1 ring-slate-800"
+                  : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+              }`}
+            >
+              <Icon className={`w-4 h-4 ${isActive ? "text-emerald-400" : "text-slate-400"}`} />
+              <span>{tab.label}</span>
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span
+                  className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold leading-none ${
+                    isActive ? "bg-emerald-500 text-white" : "bg-amber-100 text-amber-800 border border-amber-300"
+                  }`}
+                >
+                  {tab.badge}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
 
-        {/* TAB 1: OVERVIEW & REAL-TIME BALANCES */}
-        <TabsContent value="overview" className="space-y-4">
+      {/* TAB 1: OVERVIEW & REAL-TIME BALANCES */}
+      {activeTab === "overview" && (
+        <div className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="p-4 border-b bg-slate-50 flex flex-row items-center justify-between">
               <div>
@@ -641,10 +648,12 @@ export default function WmsDashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 2: INBOUND RECEIVING */}
-        <TabsContent value="receiving" className="space-y-4">
+      {/* TAB 2: INBOUND RECEIVING */}
+      {activeTab === "receiving" && (
+        <div className="space-y-4">
           <div className="grid md:grid-cols-3 gap-6">
             {/* Form */}
             <Card className="md:col-span-1 border shadow-sm">
@@ -805,10 +814,12 @@ export default function WmsDashboardPage() {
               </CardContent>
             </Card>
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 3: QC DISPOSITION */}
-        <TabsContent value="qc" className="space-y-4">
+      {/* TAB 3: QC DISPOSITION */}
+      {activeTab === "qc" && (
+        <div className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="bg-slate-50 border-b flex flex-row items-center justify-between">
               <div>
@@ -879,10 +890,12 @@ export default function WmsDashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 4: PUT-AWAY CONSOLE */}
-        <TabsContent value="putaway" className="space-y-4">
+      {/* TAB 4: PUT-AWAY CONSOLE */}
+      {activeTab === "putaway" && (
+        <div className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="bg-slate-50 border-b">
               <CardTitle className="text-base">งานจัดเก็บขึ้นชั้นวาง (Directed Put-Away Console)</CardTitle>
@@ -925,10 +938,12 @@ export default function WmsDashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 5: FEFO PICKING & WAVE DISPATCHER */}
-        <TabsContent value="picking" className="space-y-4">
+      {/* TAB 5: FEFO PICKING & WAVE DISPATCHER */}
+      {activeTab === "picking" && (
+        <div className="space-y-4">
           <div className="flex justify-between items-center bg-white p-4 rounded-lg border shadow-sm">
             <div>
               <h3 className="font-bold text-slate-900">การเบิกจ่ายและส่งมอบการผลิต (FEFO Wave Dispatcher)</h3>
@@ -976,10 +991,12 @@ export default function WmsDashboardPage() {
               </Card>
             ))}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 6: TRACEABILITY */}
-        <TabsContent value="trace" className="space-y-4">
+      {/* TAB 6: TRACEABILITY */}
+      {activeTab === "trace" && (
+        <div className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="bg-slate-50 border-b">
               <CardTitle className="text-base">ระบบสืบย้อนกลับ 360° (Lot Genealogy & Recall Simulator)</CardTitle>
@@ -1045,10 +1062,12 @@ export default function WmsDashboardPage() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </div>
+      )}
 
-        {/* TAB 7: IMMUTABLE LEDGER AUDIT */}
-        <TabsContent value="transactions" className="space-y-4">
+      {/* TAB 7: IMMUTABLE LEDGER AUDIT */}
+      {activeTab === "transactions" && (
+        <div className="space-y-4">
           <Card className="border shadow-sm">
             <CardHeader className="bg-slate-50 border-b">
               <CardTitle className="text-base">สมุดบัญชีคลังสินค้า (Immutable Double-Entry Ledger)</CardTitle>
@@ -1099,8 +1118,119 @@ export default function WmsDashboardPage() {
               </div>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
+
+      {/* MODAL: INBOUND RECEIVING (GRN) */}
+      <Dialog open={receivingOpen} onOpenChange={setReceivingOpen}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-900">
+              <Truck className="w-5 h-5 text-emerald-600" />
+              ลงทะเบียนรับสินค้าเข้า (Generate GRN)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              บันทึกสินค้าเข้าพิกัด DOCK-QUARANTINE ตามมาตรฐาน GMP และสั่งพิมพ์ Pallet QR Tag ทันที
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleReceivingSubmit} className="space-y-3.5 py-1">
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">เลขที่ใบสั่งซื้อ (PO Number) *</Label>
+              <Input
+                placeholder="เช่น PO-2026-0925"
+                value={rcvPo}
+                onChange={(e) => setRcvPo(e.target.value)}
+                required
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">ชื่อซัพพลายเออร์ (Supplier) *</Label>
+              <Input
+                placeholder="เช่น Thai Glass Packaging Co."
+                value={rcvSupplier}
+                onChange={(e) => setRcvSupplier(e.target.value)}
+                required
+                className="mt-1"
+              />
+            </div>
+            <div>
+              <Label className="text-xs font-semibold text-slate-700">เลือกรายการบรรจุภัณฑ์ *</Label>
+              <Select value={rcvItemId} onValueChange={(val: any) => setRcvItemId(val || "")} required>
+                <SelectTrigger className="mt-1">
+                  <SelectValue placeholder="-- เลือกรหัสสินค้า --" />
+                </SelectTrigger>
+                <SelectContent>
+                  {itemsList.map((item) => (
+                    <SelectItem key={item.item_id} value={item.item_id}>
+                      {item.item_code} - {item.item_name_th}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">จำนวนรับจริง *</Label>
+                <Input
+                  type="number"
+                  placeholder="เช่น 5000"
+                  value={rcvQty}
+                  onChange={(e) => setRcvQty(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">Lot ซัพพลายเออร์ *</Label>
+                <Input
+                  placeholder="SUPP-LOT-01"
+                  value={rcvSupplierLot}
+                  onChange={(e) => setRcvSupplierLot(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">วันที่ผลิต (MFG) *</Label>
+                <Input
+                  type="date"
+                  value={rcvMfgDate}
+                  onChange={(e) => setRcvMfgDate(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label className="text-xs font-semibold text-slate-700">วันหมดอายุ (EXP) *</Label>
+                <Input
+                  type="date"
+                  value={rcvExpDate}
+                  onChange={(e) => setRcvExpDate(e.target.value)}
+                  required
+                  className="mt-1"
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="pt-3 gap-2">
+              <Button type="button" variant="outline" onClick={() => setReceivingOpen(false)}>
+                ยกเลิก
+              </Button>
+              <Button
+                type="submit"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+                disabled={submittingRcv}
+              >
+                {submittingRcv ? "กำลังบันทึก..." : "ยืนยันการรับเข้า & พิมพ์ฉลาก"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* MODAL: QR CODE LABEL PRINTING */}
       <Dialog open={qrModalOpen} onOpenChange={setQrModalOpen}>

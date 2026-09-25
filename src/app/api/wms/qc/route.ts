@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
        JOIN wms_items i ON l.item_id = i.item_id
        LEFT JOIN wms_inventory_balances b ON l.lot_id = b.lot_id
        LEFT JOIN wms_locations loc ON b.location_id = loc.location_id
-       WHERE l.qc_status = $1 OR ($1 = 'ALL')
-       ORDER BY l.receiving_date DESC`,
+        WHERE l.qc_status = $1::varchar OR ($1::varchar = 'ALL')
+        ORDER BY l.receiving_date DESC`,
       [status]
     );
 
@@ -75,9 +75,9 @@ export async function POST(req: NextRequest) {
       // 2. Update Lot QC status
       await client.query(
         `UPDATE wms_inventory_lots 
-         SET qc_status = $1, 
+         SET qc_status = $1::varchar, 
              qc_inspector = $2, 
-             qc_released_at = CASE WHEN $1 = 'RELEASED' THEN CURRENT_TIMESTAMP ELSE qc_released_at END,
+             qc_released_at = CASE WHEN $1::varchar = 'RELEASED' THEN CURRENT_TIMESTAMP ELSE qc_released_at END,
              qc_notes = $3
          WHERE lot_id = $4`,
         [new_status, inspector_user, qc_notes || null, lot_id]
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       // In dimension model: we update balances row matching this lot
       await client.query(
         `UPDATE wms_inventory_balances 
-         SET qc_status = $1,
+         SET qc_status = $1::varchar,
              updated_at = CURRENT_TIMESTAMP
          WHERE lot_id = $2`,
         [new_status, lot_id]
@@ -105,12 +105,13 @@ export async function POST(req: NextRequest) {
       await client.query(
         `INSERT INTO wms_audit_logs (
            table_name, record_id, action, old_values, new_values, user_id, user_name, reason_code
-         ) VALUES ($1, $2, 'UPDATE', $3, $4, $5, $5, $6)`,
+         ) VALUES ($1, $2, 'UPDATE', $3, $4, $5, $6, $7)`,
         [
           'wms_inventory_lots',
           lot_id,
           JSON.stringify({ qc_status: prevStatus }),
           JSON.stringify({ qc_status: new_status, inspector: inspector_user }),
+          inspector_user,
           inspector_user,
           reason_code,
         ]
