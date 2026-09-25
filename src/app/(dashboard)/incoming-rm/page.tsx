@@ -52,6 +52,7 @@ type RMItem = {
   bottom_remark?: string | null;
   top_remark?: string | null;
   remark?: string | null;
+  so_no?: string | null;
   received_qty?: number | null;
   released_date?: string | null;
   updated_at?: string | null;
@@ -254,6 +255,7 @@ export default function RMControlCenterPage() {
   const [receivePoQty, setReceivePoQty] = useState('');
   const [receiveUnit, setReceiveUnit] = useState('pcs');
   const [receiveDateInput, setReceiveDateInput] = useState('');
+  const [receiveTimeInput, setReceiveTimeInput] = useState('');
   const [controlNoInput, setControlNoInput] = useState('');
   const [receivedQtyInput, setReceivedQtyInput] = useState('');
   const [receiveRemarkInput, setReceiveRemarkInput] = useState('');
@@ -277,6 +279,8 @@ export default function RMControlCenterPage() {
   const [receiveOddBoxCount, setReceiveOddBoxCount] = useState('0');
   const [receiveOddQtyPerBox, setReceiveOddQtyPerBox] = useState('');
   const [receiveMfgLot, setReceiveMfgLot] = useState('-');
+  const [receiveSku, setReceiveSku] = useState('');
+  const [receiveLotProduct, setReceiveLotProduct] = useState('');
 
   // Customer Supplied PM State & Quick Search Selector
   const [isCmd2ModalOpen, setIsCmd2ModalOpen] = useState(false);
@@ -287,6 +291,7 @@ export default function RMControlCenterPage() {
     quantity: '', 
     customerName: '', 
     lotProduct: '', 
+    sku: '',
     warehouse: 'MMPM', 
     controlNo: '',
     packageType: 'ลัง',
@@ -314,6 +319,7 @@ export default function RMControlCenterPage() {
     unit: 'KG', 
     customerName: '', 
     lotProduct: '', 
+    sku: '',
     warehouse: 'MMRM', 
     controlNo: '',
     packageType: 'ถัง',
@@ -560,6 +566,9 @@ export default function RMControlCenterPage() {
     if (item.production_lots?.products?.sku) {
       return item.production_lots.products.sku;
     }
+    if (item.so_no && item.so_no.trim()) {
+      return item.so_no.trim();
+    }
     return extractSkuFromCode(item.rm_code, productSkus) || '-';
   };
 
@@ -660,13 +669,15 @@ export default function RMControlCenterPage() {
     return Array.from(set).filter(Boolean).sort();
   }, [cmd2PartOptions, r4PartOptions, items]);
 
-  const handleSelectCmd2Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string }) => {
+  const handleSelectCmd2Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string; sku?: string }) => {
+    const extractedSku = opt.sku || extractSkuFromCode(opt.code, productSkus) || '';
     setCmd2Form(prev => ({
       ...prev,
       customerName: opt.supplier || prev.customerName,
       pmCode: opt.code,
       pmName: opt.name,
       warehouse: opt.warehouse || 'MMPM',
+      sku: extractedSku || prev.sku
     }));
     setCmd2SearchQuery(`${opt.code} - ${opt.name}`);
     setIsCmd2SearchOpen(false);
@@ -676,7 +687,8 @@ export default function RMControlCenterPage() {
     }, 100);
   };
 
-  const handleSelectR4Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string }) => {
+  const handleSelectR4Part = (opt: { code: string; name: string; supplier: string; unit: string; warehouse: string; sku?: string }) => {
+    const extractedSku = opt.sku || extractSkuFromCode(opt.code, productSkus) || '';
     setR4Form(prev => ({
       ...prev,
       customerName: opt.supplier || prev.customerName,
@@ -684,6 +696,7 @@ export default function RMControlCenterPage() {
       rmName: opt.name,
       unit: opt.unit || 'KG',
       warehouse: opt.warehouse || 'MMRM',
+      sku: extractedSku || prev.sku
     }));
     setR4SearchQuery(`${opt.code} - ${opt.name}`);
     setIsR4SearchOpen(false);
@@ -1001,11 +1014,29 @@ export default function RMControlCenterPage() {
     setReceiveSupplier(item.supplier || '');
     setReceivePoQty(item.quantity != null ? item.quantity.toString() : '');
     setReceiveUnit(item.unit || 'pcs');
-    setReceiveDateInput(
-      item.receive_date 
-        ? new Date(item.receive_date).toISOString().split('T')[0] 
-        : new Date().toISOString().split('T')[0]
-    );
+    setReceiveSku(item.production_lots?.products?.sku || item.so_no || extractSkuFromCode(item.rm_code, productSkus) || '');
+    setReceiveLotProduct(item.production_lots?.lot_no || item.lot_product || '');
+    const now = new Date();
+    if (item.receive_date) {
+      const recDate = new Date(item.receive_date.endsWith('Z') || item.receive_date.includes('+') ? item.receive_date : item.receive_date + 'Z');
+      const yyyy = recDate.getFullYear();
+      const mm = String(recDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(recDate.getDate()).padStart(2, '0');
+      setReceiveDateInput(`${yyyy}-${mm}-${dd}`);
+
+      const hh = String(recDate.getHours()).padStart(2, '0');
+      const min = String(recDate.getMinutes()).padStart(2, '0');
+      setReceiveTimeInput(`${hh}:${min}`);
+    } else {
+      const yyyy = now.getFullYear();
+      const mm = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      setReceiveDateInput(`${yyyy}-${mm}-${dd}`);
+
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      setReceiveTimeInput(`${hh}:${min}`);
+    }
     setReceivedQtyInput(
       item.received_qty != null 
         ? item.received_qty.toString() 
@@ -1153,9 +1184,16 @@ export default function RMControlCenterPage() {
     }
 
     const nowIso = new Date().toISOString();
-    const formattedReceiveDate = receiveDateInput 
-      ? new Date(`${receiveDateInput}T12:00:00Z`).toISOString() 
-      : (receivingItem.receive_date || nowIso);
+    let formattedReceiveDate = receivingItem.receive_date || nowIso;
+    if (receiveDateInput) {
+      const now = new Date();
+      const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const timeStr = receiveTimeInput && receiveTimeInput.trim() ? receiveTimeInput.trim() : defaultTime;
+      const localDate = new Date(`${receiveDateInput}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`);
+      if (!isNaN(localDate.getTime())) {
+        formattedReceiveDate = localDate.toISOString();
+      }
+    }
 
     const bCount = parseInt(receiveBoxCount, 10) || 1;
     const pBox = parseFloat(receiveQtyPerBox) || Math.ceil(parsedQty / bCount);
@@ -1177,11 +1215,33 @@ export default function RMControlCenterPage() {
       supplier: receiveSupplier.trim() || null,
       quantity: parseFloat(receivePoQty) || receivingItem.quantity,
       unit: receiveUnit.trim() || 'pcs',
+      so_no: receiveSku.trim() || null,
+      lot_product: receiveLotProduct.trim() || null,
       control_no: controlNoInput.trim(),
       received_qty: parsedQty,
       receive_date: formattedReceiveDate,
       updated_at: nowIso
     };
+
+    if (receiveLotProduct.trim() || receiveSku.trim()) {
+      const lotClean = receiveLotProduct.trim().toLowerCase();
+      const skuClean = receiveSku.trim().toLowerCase();
+      const found = lotOptions.find(l => {
+        const lLot = (l.lot_no || '').toLowerCase();
+        const lSku = ((l.products as any)?.sku || '').toLowerCase();
+        if (lotClean && skuClean) {
+          return lLot === lotClean && lSku === skuClean;
+        } else if (lotClean) {
+          return lLot === lotClean;
+        } else if (skuClean) {
+          return lSku === skuClean;
+        }
+        return false;
+      });
+      if (found) {
+        updates.production_lot_id = found.id;
+      }
+    }
 
     if (receivingItem.status === 'WAITING_QC') {
       updates.status = 'WAITING_QC';
@@ -1432,6 +1492,7 @@ export default function RMControlCenterPage() {
       quantity: '', 
       customerName: '', 
       lotProduct: '', 
+      sku: '',
       warehouse: 'MMPM', 
       controlNo: initialControlNo,
       packageType: 'ลัง',
@@ -1501,6 +1562,30 @@ export default function RMControlCenterPage() {
     // If no code is provided, generate a pseudo one
     const fakeCode = cmd2Form.pmCode || `CMD2-${cmd2Form.customerName.substring(0,3).toUpperCase()}-${Date.now().toString().slice(-4)}`;
     const qtyVal = parseFloat(cmd2Form.quantity) || 0;
+    const lotTrim = cmd2Form.lotProduct?.trim();
+    const skuTrim = cmd2Form.sku?.trim();
+
+    // Match production_lot_id if lot or sku matches existing production lots
+    let matchedLotId: string | null = null;
+    if (lotTrim || skuTrim) {
+      const found = lotOptions.find(l => {
+        const lLot = (l.lot_no || '').toLowerCase();
+        const lSku = ((l.products as any)?.sku || '').toLowerCase();
+        if (lotTrim && skuTrim) {
+          return lLot === lotTrim.toLowerCase() && lSku === skuTrim.toLowerCase();
+        } else if (lotTrim) {
+          return lLot === lotTrim.toLowerCase();
+        } else if (skuTrim) {
+          return lSku === skuTrim.toLowerCase();
+        }
+        return false;
+      });
+      if (found) {
+        matchedLotId = found.id;
+      }
+    }
+
+    const skuTag = skuTrim ? `SKU: ${skuTrim}` : '';
 
     if (cmd2Form.receiveImmediately) {
       // Immediate receiving mode
@@ -1516,8 +1601,8 @@ export default function RMControlCenterPage() {
       const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ชิ้น${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ชิ้น` : ''}`;
       const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
       const combinedRemark = cmd2Form.remark?.trim() 
-        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()} • ${pkgStr}` 
-        : `[บรรจุภัณฑ์ลูกค้า CMD2] ${pkgStr}`;
+        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()}${skuTag ? ` • ${skuTag}` : ''} • ${pkgStr}` 
+        : `[บรรจุภัณฑ์ลูกค้า CMD2] ${skuTag ? `${skuTag} • ` : ''}${pkgStr}`;
 
       const { error } = await supabase.from('production_lot_rms').insert({
         po_no: finalPo,
@@ -1529,7 +1614,9 @@ export default function RMControlCenterPage() {
         received_qty: qtyVal,
         unit: 'pcs',
         warehouse: cmd2Form.warehouse || 'MMPM',
-        lot_product: cmd2Form.lotProduct || null,
+        so_no: skuTrim || null,
+        lot_product: lotTrim || null,
+        production_lot_id: matchedLotId,
         control_no: cmd2Form.controlNo.trim() || undefined,
         status: 'RECEIVED',
         receive_date: new Date().toISOString(),
@@ -1570,8 +1657,8 @@ export default function RMControlCenterPage() {
     } else {
       // Pending Delivery mode (Default for Sales Admin: awaiting physical delivery)
       const combinedRemark = cmd2Form.remark?.trim() 
-        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()}` 
-        : '[บรรจุภัณฑ์ลูกค้า CMD2]';
+        ? `[บรรจุภัณฑ์ลูกค้า CMD2] ${cmd2Form.remark.trim()}${skuTag ? ` • ${skuTag}` : ''}` 
+        : `[บรรจุภัณฑ์ลูกค้า CMD2]${skuTag ? ` ${skuTag}` : ''}`;
 
       const { error } = await supabase.from('production_lot_rms').insert({
         po_no: finalPo,
@@ -1583,7 +1670,9 @@ export default function RMControlCenterPage() {
         received_qty: null,
         unit: 'ชิ้น',
         warehouse: cmd2Form.warehouse || 'MMPM',
-        lot_product: cmd2Form.lotProduct || null,
+        so_no: skuTrim || null,
+        lot_product: lotTrim || null,
+        production_lot_id: matchedLotId,
         control_no: null,
         status: 'PENDING_DELIVERY',
         receive_date: null,
@@ -1620,6 +1709,7 @@ export default function RMControlCenterPage() {
       unit: 'KG', 
       customerName: '', 
       lotProduct: '', 
+      sku: '',
       warehouse: 'MMRM', 
       controlNo: initialControlNo,
       packageType: 'ถัง',
@@ -1690,6 +1780,30 @@ export default function RMControlCenterPage() {
     const cleanCustomer = r4Form.customerName.replace(/[^a-zA-Z0-9]/g, '').substring(0,3).toUpperCase() || 'CUS';
     const fakeCode = r4Form.rmCode.trim() || `R4-${cleanCustomer}-${Date.now().toString().slice(-4)}`;
     const qtyVal = parseFloat(r4Form.quantity) || 0;
+    const lotTrim = r4Form.lotProduct?.trim();
+    const skuTrim = r4Form.sku?.trim();
+
+    // Match production_lot_id if lot or sku matches existing production lots
+    let matchedLotId: string | null = null;
+    if (lotTrim || skuTrim) {
+      const found = lotOptions.find(l => {
+        const lLot = (l.lot_no || '').toLowerCase();
+        const lSku = ((l.products as any)?.sku || '').toLowerCase();
+        if (lotTrim && skuTrim) {
+          return lLot === lotTrim.toLowerCase() && lSku === skuTrim.toLowerCase();
+        } else if (lotTrim) {
+          return lLot === lotTrim.toLowerCase();
+        } else if (skuTrim) {
+          return lSku === skuTrim.toLowerCase();
+        }
+        return false;
+      });
+      if (found) {
+        matchedLotId = found.id;
+      }
+    }
+
+    const skuTag = skuTrim ? `SKU: ${skuTrim}` : '';
 
     if (r4Form.receiveImmediately) {
       // Immediate receiving mode
@@ -1705,8 +1819,8 @@ export default function RMControlCenterPage() {
       const breakdownStr = `${bCount} ${effectivePkg} x ${pBox} ${r4Form.unit || 'KG'}${oddBCount > 0 ? ` + ${oddBCount} ${effectivePkg}เศษ x ${oddPBox} ${r4Form.unit || 'KG'}` : ''}`;
       const pkgStr = `(${breakdownStr})${mfgLotStr !== '-' ? ` Lot.${mfgLotStr}` : ''}`;
       const combinedRemark = r4Form.remark?.trim() 
-        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()} • ${pkgStr}` 
-        : `[วัตถุดิบลูกค้า R4] ${pkgStr}`;
+        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()}${skuTag ? ` • ${skuTag}` : ''} • ${pkgStr}` 
+        : `[วัตถุดิบลูกค้า R4] ${skuTag ? `${skuTag} • ` : ''}${pkgStr}`;
 
       const { error } = await supabase.from('production_lot_rms').insert({
         po_no: finalPo,
@@ -1718,7 +1832,9 @@ export default function RMControlCenterPage() {
         received_qty: qtyVal,
         unit: r4Form.unit || 'KG',
         warehouse: r4Form.warehouse || 'MMRM',
-        lot_product: r4Form.lotProduct || null,
+        so_no: skuTrim || null,
+        lot_product: lotTrim || null,
+        production_lot_id: matchedLotId,
         control_no: r4Form.controlNo.trim() || undefined,
         status: 'RECEIVED',
         receive_date: new Date().toISOString(),
@@ -1759,8 +1875,8 @@ export default function RMControlCenterPage() {
     } else {
       // Pending Delivery mode (Default for Sales Admin: awaiting physical delivery)
       const combinedRemark = r4Form.remark?.trim() 
-        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()}` 
-        : '[วัตถุดิบลูกค้า R4]';
+        ? `[วัตถุดิบลูกค้า R4] ${r4Form.remark.trim()}${skuTag ? ` • ${skuTag}` : ''}` 
+        : `[วัตถุดิบลูกค้า R4]${skuTag ? ` ${skuTag}` : ''}`;
 
       const { error } = await supabase.from('production_lot_rms').insert({
         po_no: finalPo,
@@ -1772,7 +1888,9 @@ export default function RMControlCenterPage() {
         received_qty: null,
         unit: r4Form.unit || 'KG',
         warehouse: r4Form.warehouse || 'MMRM',
-        lot_product: r4Form.lotProduct || null,
+        so_no: skuTrim || null,
+        lot_product: lotTrim || null,
+        production_lot_id: matchedLotId,
         control_no: null,
         status: 'PENDING_DELIVERY',
         receive_date: null,
@@ -1871,6 +1989,7 @@ export default function RMControlCenterPage() {
       (item.rm_code || '').toLowerCase().includes(term) ||
       (item.rm_name || '').toLowerCase().includes(term) ||
       (item.lot_product || '').toLowerCase().includes(term) ||
+      (item.so_no || '').toLowerCase().includes(term) ||
       (item.supplier || '').toLowerCase().includes(term) ||
       (item.production_lots?.products?.sku || '').toLowerCase().includes(term) ||
       (extractSkuFromCode(item.rm_code, productSkus) || '').toLowerCase().includes(term) ||
@@ -4597,28 +4716,56 @@ export default function RMControlCenterPage() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ (ชิ้น) <span className="text-red-500">*</span></Label>
+              <Input 
+                ref={cmd2QtyInputRef}
+                required 
+                type="number" 
+                min="1" 
+                value={cmd2Form.quantity} 
+                onChange={e => handleCmd2QuantityChange(e.target.value)} 
+                placeholder="เช่น 10552"
+                className="font-bold text-slate-800 text-xs bg-white"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ (ชิ้น) <span className="text-red-500">*</span></Label>
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>รหัสงาน SKU สินค้า</span>
+                </Label>
                 <Input 
-                  ref={cmd2QtyInputRef}
-                  required 
-                  type="number" 
-                  min="1" 
-                  value={cmd2Form.quantity} 
-                  onChange={e => handleCmd2QuantityChange(e.target.value)} 
-                  placeholder="เช่น 10552"
-                  className="font-bold text-slate-800 text-xs bg-white"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">LOT งานผลิตอ้างอิง</Label>
-                <Input 
-                  value={cmd2Form.lotProduct} 
-                  onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} 
-                  placeholder="L.XXXX (ถ้ามี)" 
+                  list="cmd2-sku-options"
+                  value={cmd2Form.sku} 
+                  onChange={e => setCmd2Form({...cmd2Form, sku: e.target.value})} 
+                  placeholder="เช่น JHD-301, OWK-001 (ถ้ามี)" 
                   className="text-xs bg-white font-mono"
                 />
+                <datalist id="cmd2-sku-options">
+                  {productSkus.map(s => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Box className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>LOT งานผลิตอ้างอิง</span>
+                </Label>
+                <Input 
+                  list="cmd2-lot-options"
+                  value={cmd2Form.lotProduct} 
+                  onChange={e => setCmd2Form({...cmd2Form, lotProduct: e.target.value})} 
+                  placeholder="L.XXXX หรือ 010/26 (ถ้ามี)" 
+                  className="text-xs bg-white font-mono"
+                />
+                <datalist id="cmd2-lot-options">
+                  {Array.from(new Set(lotOptions.map(l => l.lot_no).filter(Boolean))).map(lotNo => (
+                    <option key={lotNo} value={lotNo} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -5081,37 +5228,65 @@ export default function RMControlCenterPage() {
               </div>
             </div>
 
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ <span className="text-red-500">*</span></Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  ref={r4QtyInputRef}
+                  required 
+                  type="number" 
+                  step="any" 
+                  min="0.001" 
+                  value={r4Form.quantity} 
+                  onChange={e => handleR4QuantityChange(e.target.value)} 
+                  placeholder="0.00" 
+                  className="font-bold text-slate-800 text-xs bg-white"
+                />
+                <Input 
+                  value={r4Form.unit} 
+                  onChange={e => setR4Form({...r4Form, unit: e.target.value})} 
+                  className="w-20 text-center uppercase font-bold text-xs bg-white" 
+                  placeholder="KG" 
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">จำนวนที่แจ้งส่งมอบ <span className="text-red-500">*</span></Label>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    ref={r4QtyInputRef}
-                    required 
-                    type="number" 
-                    step="any" 
-                    min="0.001" 
-                    value={r4Form.quantity} 
-                    onChange={e => handleR4QuantityChange(e.target.value)} 
-                    placeholder="0.00" 
-                    className="font-bold text-slate-800 text-xs bg-white"
-                  />
-                  <Input 
-                    value={r4Form.unit} 
-                    onChange={e => setR4Form({...r4Form, unit: e.target.value})} 
-                    className="w-20 text-center uppercase font-bold text-xs bg-white" 
-                    placeholder="KG" 
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold">LOT งานผลิตอ้างอิง</Label>
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>รหัสงาน SKU สินค้า</span>
+                </Label>
                 <Input 
-                  value={r4Form.lotProduct} 
-                  onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} 
-                  placeholder="L.XXXX (ถ้ามี)" 
+                  list="r4-sku-options"
+                  value={r4Form.sku} 
+                  onChange={e => setR4Form({...r4Form, sku: e.target.value})} 
+                  placeholder="เช่น JHD-318, OWK-001 (ถ้ามี)" 
                   className="text-xs bg-white font-mono"
                 />
+                <datalist id="r4-sku-options">
+                  {productSkus.map(s => (
+                    <option key={s} value={s} />
+                  ))}
+                </datalist>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Box className="w-3.5 h-3.5 text-[#D4AF37]" />
+                  <span>LOT งานผลิตอ้างอิง</span>
+                </Label>
+                <Input 
+                  list="r4-lot-options"
+                  value={r4Form.lotProduct} 
+                  onChange={e => setR4Form({...r4Form, lotProduct: e.target.value})} 
+                  placeholder="L.XXXX หรือ 001/26 (ถ้ามี)" 
+                  className="text-xs bg-white font-mono"
+                />
+                <datalist id="r4-lot-options">
+                  {Array.from(new Set(lotOptions.map(l => l.lot_no).filter(Boolean))).map(lotNo => (
+                    <option key={lotNo} value={lotNo} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
@@ -5481,6 +5656,46 @@ export default function RMControlCenterPage() {
                     className="text-xs bg-white" 
                   />
                 </div>
+
+                {/* รหัสงาน SKU สินค้า */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    <span>รหัสงาน SKU สินค้า</span>
+                  </Label>
+                  <Input 
+                    list="receive-sku-options"
+                    value={receiveSku} 
+                    onChange={e => setReceiveSku(e.target.value)} 
+                    placeholder="เช่น JHD-301, OWK-001 (ถ้ามี)" 
+                    className="text-xs bg-white font-mono" 
+                  />
+                  <datalist id="receive-sku-options">
+                    {productSkus.map(s => (
+                      <option key={s} value={s} />
+                    ))}
+                  </datalist>
+                </div>
+
+                {/* LOT งานผลิตอ้างอิง */}
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
+                    <Box className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    <span>LOT งานผลิตอ้างอิง</span>
+                  </Label>
+                  <Input 
+                    list="receive-lot-options"
+                    value={receiveLotProduct} 
+                    onChange={e => setReceiveLotProduct(e.target.value)} 
+                    placeholder="เช่น L.XXXX หรือ 010/26 (ถ้ามี)" 
+                    className="text-xs bg-white font-mono" 
+                  />
+                  <datalist id="receive-lot-options">
+                    {Array.from(new Set(lotOptions.map(l => l.lot_no).filter(Boolean))).map(lotNo => (
+                      <option key={lotNo} value={lotNo} />
+                    ))}
+                  </datalist>
+                </div>
               </div>
             </div>
 
@@ -5525,14 +5740,25 @@ export default function RMControlCenterPage() {
                   disabled={isGeneratingControlNo}
                   className="font-mono font-bold text-sm text-purple-700 bg-white border-purple-300"
                 />
-                <div className="flex items-center gap-2 pt-1">
-                  <span className="text-[11px] text-slate-500 shrink-0 font-medium">วันที่รับ:</span>
-                  <Input 
-                    type="date"
-                    value={receiveDateInput}
-                    onChange={(e) => setReceiveDateInput(e.target.value)}
-                    className="h-7 text-xs bg-white border-slate-300 font-mono"
-                  />
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-500 shrink-0 font-medium">วันที่รับ:</span>
+                    <Input 
+                      type="date"
+                      value={receiveDateInput}
+                      onChange={(e) => setReceiveDateInput(e.target.value)}
+                      className="h-7 text-xs bg-white border-slate-300 font-mono"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[11px] text-slate-500 shrink-0 font-medium">เวลา:</span>
+                    <Input 
+                      type="time"
+                      value={receiveTimeInput}
+                      onChange={(e) => setReceiveTimeInput(e.target.value)}
+                      className="h-7 text-xs bg-white border-slate-300 font-mono"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
