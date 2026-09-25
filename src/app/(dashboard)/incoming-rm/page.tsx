@@ -254,8 +254,6 @@ export default function RMControlCenterPage() {
   const [receiveSupplier, setReceiveSupplier] = useState('');
   const [receivePoQty, setReceivePoQty] = useState('');
   const [receiveUnit, setReceiveUnit] = useState('pcs');
-  const [receiveDateInput, setReceiveDateInput] = useState('');
-  const [receiveTimeInput, setReceiveTimeInput] = useState('');
   const [controlNoInput, setControlNoInput] = useState('');
   const [receivedQtyInput, setReceivedQtyInput] = useState('');
   const [receiveRemarkInput, setReceiveRemarkInput] = useState('');
@@ -1016,27 +1014,6 @@ export default function RMControlCenterPage() {
     setReceiveUnit(item.unit || 'pcs');
     setReceiveSku(item.production_lots?.products?.sku || item.so_no || extractSkuFromCode(item.rm_code, productSkus) || '');
     setReceiveLotProduct(item.production_lots?.lot_no || item.lot_product || '');
-    const now = new Date();
-    if (item.receive_date) {
-      const recDate = new Date(item.receive_date.endsWith('Z') || item.receive_date.includes('+') ? item.receive_date : item.receive_date + 'Z');
-      const yyyy = recDate.getFullYear();
-      const mm = String(recDate.getMonth() + 1).padStart(2, '0');
-      const dd = String(recDate.getDate()).padStart(2, '0');
-      setReceiveDateInput(`${yyyy}-${mm}-${dd}`);
-
-      const hh = String(recDate.getHours()).padStart(2, '0');
-      const min = String(recDate.getMinutes()).padStart(2, '0');
-      setReceiveTimeInput(`${hh}:${min}`);
-    } else {
-      const yyyy = now.getFullYear();
-      const mm = String(now.getMonth() + 1).padStart(2, '0');
-      const dd = String(now.getDate()).padStart(2, '0');
-      setReceiveDateInput(`${yyyy}-${mm}-${dd}`);
-
-      const hh = String(now.getHours()).padStart(2, '0');
-      const min = String(now.getMinutes()).padStart(2, '0');
-      setReceiveTimeInput(`${hh}:${min}`);
-    }
     setReceivedQtyInput(
       item.received_qty != null 
         ? item.received_qty.toString() 
@@ -1184,16 +1161,10 @@ export default function RMControlCenterPage() {
     }
 
     const nowIso = new Date().toISOString();
-    let formattedReceiveDate = receivingItem.receive_date || nowIso;
-    if (receiveDateInput) {
-      const now = new Date();
-      const defaultTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-      const timeStr = receiveTimeInput && receiveTimeInput.trim() ? receiveTimeInput.trim() : defaultTime;
-      const localDate = new Date(`${receiveDateInput}T${timeStr.length === 5 ? timeStr + ':00' : timeStr}`);
-      if (!isNaN(localDate.getTime())) {
-        formattedReceiveDate = localDate.toISOString();
-      }
-    }
+    // บันทึกวันและเวลาจริง ณ วินาทีที่กดรับเข้า (หากเป็นการแก้ไขรายการที่เคยรับเข้าแล้ว ให้คงวันเวลารับเข้าเดิมไว้)
+    const formattedReceiveDate = isAlreadyReceived 
+      ? (receivingItem.receive_date || nowIso) 
+      : nowIso;
 
     const bCount = parseInt(receiveBoxCount, 10) || 1;
     const pBox = parseFloat(receiveQtyPerBox) || Math.ceil(parsedQty / bCount);
@@ -5740,25 +5711,17 @@ export default function RMControlCenterPage() {
                   disabled={isGeneratingControlNo}
                   className="font-mono font-bold text-sm text-purple-700 bg-white border-purple-300"
                 />
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-slate-500 shrink-0 font-medium">วันที่รับ:</span>
-                    <Input 
-                      type="date"
-                      value={receiveDateInput}
-                      onChange={(e) => setReceiveDateInput(e.target.value)}
-                      className="h-7 text-xs bg-white border-slate-300 font-mono"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[11px] text-slate-500 shrink-0 font-medium">เวลา:</span>
-                    <Input 
-                      type="time"
-                      value={receiveTimeInput}
-                      onChange={(e) => setReceiveTimeInput(e.target.value)}
-                      className="h-7 text-xs bg-white border-slate-300 font-mono"
-                    />
-                  </div>
+                <div className="flex items-center gap-1.5 pt-1 text-[11px] text-purple-700 bg-purple-100/70 px-2.5 py-1.5 rounded-lg border border-purple-200">
+                  <Clock className="w-3.5 h-3.5 text-purple-600 shrink-0" />
+                  <span className="font-medium">
+                    {receivingItem?.receive_date 
+                      ? (() => {
+                          const d = new Date(receivingItem.receive_date.endsWith('Z') || receivingItem.receive_date.includes('+') ? receivingItem.receive_date : receivingItem.receive_date + 'Z');
+                          return `วัน-เวลารับเข้า: ${d.toLocaleDateString('th-TH')} เวลา ${d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} น.`;
+                        })()
+                      : 'ระบบจะบันทึกวันและเวลาจริง ณ วินาทีที่กดรับเข้าอัตโนมัติ'
+                    }
+                  </span>
                 </div>
               </div>
             </div>
