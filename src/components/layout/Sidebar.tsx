@@ -23,7 +23,8 @@ import {
   KeyRound,
   TrendingUp,
   Briefcase,
-  FolderArchive
+  FolderArchive,
+  Warehouse
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/utils/supabase/client'
@@ -65,6 +66,22 @@ const routes = [
     href: '/incoming-rm',
     color: 'text-[#D4AF37]',
     allowedRoles: ['admin', 'planner', 'warehouse_mmrm_bu', 'warehouse_mmpm_fg', 'production_mx', 'purchase', 'qc', 'qa']
+  },
+  {
+    label: 'CosmeFlow WMS',
+    subtitle: 'ระบบบริหารคลังสินค้า GMP & สมุดบัญชีสต็อก',
+    icon: Warehouse,
+    href: '/wms',
+    color: 'text-[#D4AF37]',
+    subRoutes: [
+      { label: 'หอควบคุมคลัง (Control Tower)', href: '/wms' },
+      { label: 'รับสินค้าเข้า (Inbound & GRN)', href: '/wms?tab=receiving' },
+      { label: 'ตรวจสอบคุณภาพ (QC Disposition)', href: '/wms?tab=qc' },
+      { label: 'จัดเก็บเข้าที่ (Directed Put-away)', href: '/wms?tab=putaway' },
+      { label: 'เบิกจ่าย FEFO (Wave Picking)', href: '/wms?tab=picking' },
+      { label: 'สืบย้อนกลับ 360° (Traceability)', href: '/wms?tab=trace' },
+      { label: '📱 โหมดสแกนเนอร์ PDA (Mobile PWA)', href: '/wms/mobile' },
+    ]
   },
   {
     label: 'CosmeFlow Production',
@@ -310,7 +327,7 @@ export function Sidebar({ isCollapsed, setIsCollapsed, onMobileClose }: SidebarP
           if (userRole.startsWith('custom:')) {
             return hasAccessToRoute(sub.href, userRole);
           }
-          return (!sub.allowedRoles || sub.allowedRoles.includes(userRole)) || hasAccessToRoute(sub.href, userRole);
+          return (!(sub as any).allowedRoles || (sub as any).allowedRoles.includes(userRole)) || hasAccessToRoute(sub.href, userRole);
         })
       }
     }
