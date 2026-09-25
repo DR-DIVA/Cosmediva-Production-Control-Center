@@ -60,6 +60,7 @@ export default function WmsDashboardPage() {
   const [qrModalOpen, setQrModalOpen] = useState(false);
   const [currentLabel, setCurrentLabel] = useState<any>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>("");
+  const [printCopies, setPrintCopies] = useState<number>(1);
 
   // Inbound Form State
   const [rcvPo, setRcvPo] = useState("");
@@ -228,7 +229,35 @@ export default function WmsDashboardPage() {
     }
   };
 
-  // Dedicated Clean Label Printing (Only QR Tag, 1-page sticker / tag)
+  // Open QR Print Modal for Any Lot / Balance item
+  const handleOpenPrintLot = async (item: any) => {
+    try {
+      const internalLot = item.internal_lot_number || item.lot_number;
+      const qrPayload = `CFWMS|PALLET|${item.lot_id || item.balance_id || "LOT"}|${item.item_code || ""}|${internalLot}|${item.physical_quantity || item.quantity || 0}|${item.expiry_date || ""}`;
+      const qrUrl = await QRCode.toDataURL(qrPayload, { width: 250, margin: 2 });
+      setQrCodeDataUrl(qrUrl);
+      setCurrentLabel({
+        internal_lot_number: internalLot,
+        item_code: item.item_code,
+        item_name_th: item.item_name_th,
+        grn_number: item.grn_number || item.reference_number || "REPRINT",
+        dock_location: item.location_barcode || item.dock_location || "WH-PM",
+        quantity: item.physical_quantity || item.quantity || 0,
+        uom: item.base_uom || item.uom || "PCS",
+        manufacturing_date: item.manufacturing_date,
+        expiry_date: item.expiry_date,
+        supplier_lot_number: item.supplier_lot_number || "-",
+        supplier_name: item.supplier_name || "-",
+        qc_status: item.qc_status || "RELEASED",
+      });
+      setPrintCopies(1);
+      setQrModalOpen(true);
+    } catch (e: any) {
+      toast.error("ไม่สามารถสร้าง QR Tag ได้: " + e.message);
+    }
+  };
+
+  // Dedicated Clean Label Printing (Only QR Tag, 1-page sticker / tag, supports multiple copies)
   const handlePrintLabel = () => {
     if (!currentLabel) return;
     const printWindow = window.open("", "_blank", "width=550,height=750");
@@ -236,6 +265,67 @@ export default function WmsDashboardPage() {
       window.print();
       return;
     }
+    const copies = Math.max(1, printCopies || 1);
+    const tagsHtml = Array.from({ length: copies }).map((_, idx) => `
+      <div class="tag-box ${idx < copies - 1 ? "page-break" : ""}">
+        <div class="org-header">COSMEFLOW WMS — PALLET / BOX IDENTIFICATION TAG ${copies > 1 ? `(${idx + 1}/${copies})` : ""}</div>
+        <div class="lot-badge">${currentLabel.internal_lot_number || ""}</div>
+        <div class="qr-container">
+          <img class="qr-img" src="${qrCodeDataUrl}" alt="QR Code" />
+        </div>
+        <table class="info-table">
+          <tr>
+            <td class="info-lbl">รหัสสินค้า:</td>
+            <td class="info-val">${currentLabel.item_code || "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">ชื่อสินค้า:</td>
+            <td class="info-val">${currentLabel.item_name_th || "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">จำนวนรับจริง:</td>
+            <td class="info-val">${Number(currentLabel.quantity || 0).toLocaleString()} ${currentLabel.uom || "PCS"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">เลขที่ GRN:</td>
+            <td class="info-val">${currentLabel.grn_number || "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">Lot ซัพพลาย:</td>
+            <td class="info-val">${currentLabel.supplier_lot_number || "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">ซัพพลายเออร์:</td>
+            <td class="info-val">${currentLabel.supplier_name || "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">วันผลิต (MFG):</td>
+            <td class="info-val">${currentLabel.manufacturing_date ? new Date(currentLabel.manufacturing_date).toLocaleDateString("th-TH") : "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">วันหมดอายุ:</td>
+            <td class="info-val">${currentLabel.expiry_date ? new Date(currentLabel.expiry_date).toLocaleDateString("th-TH") : "-"}</td>
+          </tr>
+          <tr>
+            <td class="info-lbl">พิกัดรับเข้า:</td>
+            <td class="info-val">${currentLabel.dock_location || "-"}</td>
+          </tr>
+        </table>
+
+        <div class="qc-status ${currentLabel.qc_status === "RELEASED" ? "released" : ""}">
+          ${
+            currentLabel.qc_status === "RELEASED"
+              ? "✅ ผ่านการรับรอง (RELEASED — สามารถเบิกจ่ายได้)"
+              : "🛑 กักกัน (QUARANTINE — ห้ามเบิกจ่ายก่อนผ่าน QC)"
+          }
+        </div>
+
+        <div class="gmp-note">
+          GMP ISO 22716 & 21 CFR Part 11 Electronic Identification Tag
+        </div>
+      </div>
+    `).join("");
+
     const html = `
       <!DOCTYPE html>
       <html lang="th">
@@ -250,11 +340,14 @@ export default function WmsDashboardPage() {
             @media print {
               html, body {
                 width: 100%;
-                height: 100%;
                 margin: 0;
                 padding: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
+              }
+              .page-break {
+                page-break-after: always;
+                break-after: page;
               }
               .no-print { display: none !important; }
             }
@@ -271,7 +364,7 @@ export default function WmsDashboardPage() {
               border-radius: 8px;
               padding: 12px;
               max-width: 380px;
-              margin: 0 auto;
+              margin: 0 auto 16px auto;
               text-align: center;
               box-sizing: border-box;
             }
@@ -357,63 +450,7 @@ export default function WmsDashboardPage() {
           </style>
         </head>
         <body>
-          <div class="tag-box">
-            <div class="org-header">COSMEFLOW WMS — PALLET / BOX IDENTIFICATION TAG</div>
-            <div class="lot-badge">\${currentLabel.internal_lot_number || ""}</div>
-            <div class="qr-container">
-              <img class="qr-img" src="\${qrCodeDataUrl}" alt="QR Code" />
-            </div>
-            <table class="info-table">
-              <tr>
-                <td class="info-lbl">รหัสสินค้า:</td>
-                <td class="info-val">\${currentLabel.item_code || "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">ชื่อสินค้า:</td>
-                <td class="info-val">\${currentLabel.item_name_th || "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">จำนวนรับจริง:</td>
-                <td class="info-val">\${Number(currentLabel.quantity || 0).toLocaleString()} \${currentLabel.uom || "PCS"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">เลขที่ GRN:</td>
-                <td class="info-val">\${currentLabel.grn_number || "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">Lot ซัพพลาย:</td>
-                <td class="info-val">\${currentLabel.supplier_lot_number || "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">ซัพพลายเออร์:</td>
-                <td class="info-val">\${currentLabel.supplier_name || "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">วันผลิต (MFG):</td>
-                <td class="info-val">\${currentLabel.manufacturing_date ? new Date(currentLabel.manufacturing_date).toLocaleDateString("th-TH") : "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">วันหมดอายุ:</td>
-                <td class="info-val">\${currentLabel.expiry_date ? new Date(currentLabel.expiry_date).toLocaleDateString("th-TH") : "-"}</td>
-              </tr>
-              <tr>
-                <td class="info-lbl">พิกัดรับเข้า:</td>
-                <td class="info-val">\${currentLabel.dock_location || "-"}</td>
-              </tr>
-            </table>
-
-            <div class="qc-status \${currentLabel.qc_status === "RELEASED" ? "released" : ""}">
-              \${
-                currentLabel.qc_status === "RELEASED"
-                  ? "✅ ผ่านการรับรอง (RELEASED — สามารถเบิกจ่ายได้)"
-                  : "🛑 กักกัน (QUARANTINE — ห้ามเบิกจ่ายก่อนผ่าน QC)"
-              }
-            </div>
-
-            <div class="gmp-note">
-              GMP ISO 22716 & 21 CFR Part 11 Electronic Identification Tag
-            </div>
-          </div>
+          ${tagsHtml}
           <script>
             window.onload = function() {
               window.print();
@@ -836,12 +873,13 @@ export default function WmsDashboardPage() {
                       <th className="px-4 py-3 text-right">ยอดจริง (Physical)</th>
                       <th className="px-4 py-3 text-right">ยอดจอง (Reserved)</th>
                       <th className="px-4 py-3 text-right font-bold text-emerald-700">พร้อมใช้ (Available)</th>
+                      <th className="px-4 py-3 text-center">พิมพ์ฉลาก</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {balances.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="text-center py-8 text-slate-400">
+                        <td colSpan={9} className="text-center py-8 text-slate-400">
                           ไม่พบข้อมูลสินค้าคงคลังในคลัง {selectedWarehouse}
                         </td>
                       </tr>
@@ -893,6 +931,17 @@ export default function WmsDashboardPage() {
                           </td>
                           <td className="px-4 py-3 text-right font-bold text-emerald-700 text-base">
                             {Number(b.available_quantity).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 text-xs font-medium text-slate-700 hover:text-emerald-700 hover:bg-emerald-50 border-slate-300 shadow-xs"
+                              onClick={() => handleOpenPrintLot(b)}
+                            >
+                              <Printer className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                              พิมพ์ QR
+                            </Button>
                           </td>
                         </tr>
                       ))
@@ -1389,13 +1438,24 @@ export default function WmsDashboardPage() {
                               </Badge>
                             </td>
                             <td className="px-4 py-2.5 text-right">
-                              {item.qc_status === "RELEASED" ? (
-                                <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8" onClick={() => handleOpenPutaway(item)}>
-                                  นำขึ้นชั้นวาง Put-away
+                              <div className="flex items-center justify-end gap-1.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs h-8 text-slate-700 hover:text-emerald-700 hover:border-emerald-300"
+                                  onClick={() => handleOpenPrintLot(item)}
+                                >
+                                  <Printer className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                  พิมพ์ฉลาก
                                 </Button>
-                              ) : (
-                                <span className="text-xs text-slate-400 italic">รอ QC ปล่อย</span>
-                              )}
+                                {item.qc_status === "RELEASED" ? (
+                                  <Button size="sm" variant="default" className="bg-blue-600 hover:bg-blue-700 text-white text-xs h-8" onClick={() => handleOpenPutaway(item)}>
+                                    นำขึ้นชั้นวาง Put-away
+                                  </Button>
+                                ) : (
+                                  <span className="text-xs text-slate-400 italic px-2">รอ QC ปล่อย</span>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1462,17 +1522,28 @@ export default function WmsDashboardPage() {
                             <Badge className="bg-amber-100 text-amber-800">{lot.qc_status}</Badge>
                           </td>
                           <td className="px-4 py-3 text-right">
-                            <Button
-                              size="sm"
-                              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
-                              onClick={() => {
-                                setSelectedQcLot(lot);
-                                setQcActionModal(true);
-                              }}
-                            >
-                              <FileCheck2 className="w-3.5 h-3.5 mr-1" />
-                              ลงผลตรวจ QC
-                            </Button>
+                            <div className="flex items-center justify-end gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="text-xs h-8 text-slate-700 hover:text-emerald-700 hover:border-emerald-300"
+                                onClick={() => handleOpenPrintLot(lot)}
+                              >
+                                <Printer className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+                                พิมพ์ฉลาก
+                              </Button>
+                              <Button
+                                size="sm"
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-8"
+                                onClick={() => {
+                                  setSelectedQcLot(lot);
+                                  setQcActionModal(true);
+                                }}
+                              >
+                                <FileCheck2 className="w-3.5 h-3.5 mr-1" />
+                                ลงผลตรวจ QC
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))
@@ -1520,9 +1591,14 @@ export default function WmsDashboardPage() {
                             <div><span className="text-slate-400">จำนวน:</span> <b>{Number(item.physical_quantity).toLocaleString()} {item.base_uom}</b></div>
                             <div><span className="text-slate-400">EXP:</span> {new Date(item.expiry_date).toLocaleDateString("th-TH")}</div>
                           </div>
-                          <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium" onClick={() => handleOpenPutaway(item)}>
-                            จัดเก็บเข้าช่อง (Directed Put-away)
-                          </Button>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm" className="h-9 px-3 text-xs border-slate-300 hover:border-emerald-400" onClick={() => handleOpenPrintLot(item)}>
+                              <Printer className="w-3.5 h-3.5 mr-1 text-emerald-600" /> ฉลาก QR
+                            </Button>
+                            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs h-9" onClick={() => handleOpenPutaway(item)}>
+                              จัดเก็บเข้าช่อง (Directed Put-away)
+                            </Button>
+                          </div>
                         </CardContent>
                       </Card>
                     ))
@@ -1741,6 +1817,17 @@ export default function WmsDashboardPage() {
 
               {traceResult && (
                 <div className="space-y-4 pt-4 border-t">
+                  <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                    <h4 className="font-bold text-sm text-slate-900">ข้อมูล Lot และสถานะสืบย้อนกลับ</h4>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-xs border-emerald-300 text-emerald-700 hover:bg-emerald-50 self-start sm:self-auto"
+                      onClick={() => handleOpenPrintLot(traceResult.lot)}
+                    >
+                      <Printer className="w-3.5 h-3.5 mr-1 text-emerald-600" /> พิมพ์ฉลาก QR Tag ประจำ Lot นี้
+                    </Button>
+                  </div>
                   <div className="bg-slate-50 p-4 rounded-lg border grid md:grid-cols-4 gap-4 text-sm">
                     <div><span className="text-slate-500 text-xs">Lot ภายใน:</span> <div className="font-mono font-bold">{traceResult.lot.internal_lot_number}</div></div>
                     <div><span className="text-slate-500 text-xs">สินค้า:</span> <div className="font-semibold">{traceResult.lot.item_code} - {traceResult.lot.item_name_th}</div></div>
@@ -1992,12 +2079,46 @@ export default function WmsDashboardPage() {
                 {currentLabel.expiry_date && (
                   <div><b>วันหมดอายุ (EXP):</b> {new Date(currentLabel.expiry_date).toLocaleDateString("th-TH")}</div>
                 )}
-                <div className="text-[10px] text-amber-700 font-bold mt-1 pt-1 border-t">
-                  ⚠️ สถานะ: QUARANTINE (กักกัน — ห้ามเบิกจ่ายก่อนผ่าน QC)
+                <div className={`text-[10px] font-bold mt-1 pt-1 border-t ${
+                  currentLabel.qc_status === "RELEASED" ? "text-emerald-700" : "text-amber-700"
+                }`}>
+                  {currentLabel.qc_status === "RELEASED"
+                    ? "✅ สถานะ: RELEASED (ผ่านการรับรอง — สามารถเบิกจ่ายได้)"
+                    : "⚠️ สถานะ: QUARANTINE (กักกัน — ห้ามเบิกจ่ายก่อนผ่าน QC)"}
                 </div>
               </div>
             </div>
           )}
+
+          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-lg border">
+            <div>
+              <div className="text-xs font-semibold text-slate-800">จำนวนฉลากที่ต้องการพิมพ์</div>
+              <div className="text-[11px] text-slate-500">สำหรับติดแยกตามจำนวนพาเลทหรือกล่อง</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 font-bold text-slate-700"
+                disabled={printCopies <= 1}
+                onClick={() => setPrintCopies(Math.max(1, printCopies - 1))}
+              >
+                -
+              </Button>
+              <span className="font-mono font-bold text-sm w-8 text-center text-slate-900">{printCopies}</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 w-8 p-0 font-bold text-slate-700"
+                onClick={() => setPrintCopies(printCopies + 1)}
+              >
+                +
+              </Button>
+              <span className="text-xs text-slate-500 ml-1">ใบ</span>
+            </div>
+          </div>
 
           <DialogFooter className="flex gap-2">
             <Button variant="outline" onClick={() => setQrModalOpen(false)}>
@@ -2008,7 +2129,7 @@ export default function WmsDashboardPage() {
               onClick={handlePrintLabel}
             >
               <Printer className="w-4 h-4 mr-1.5" />
-              สั่งพิมพ์ฉลาก (Print Label)
+              สั่งพิมพ์ฉลาก ({printCopies} ใบ)
             </Button>
           </DialogFooter>
         </DialogContent>
