@@ -2191,17 +2191,20 @@ export default function WmsDashboardPage() {
             </div>
 
             <div>
-              <Label className="text-xs font-semibold">เลือกหรือสแกนพิกัดจัดเก็บเป้าหมาย *</Label>
+              <Label className="text-xs font-semibold text-slate-700">เลือกหรือสแกนพิกัดจัดเก็บเป้าหมาย *</Label>
               <Select value={chosenTargetBin} onValueChange={(val: any) => setChosenTargetBin(val || "")}>
-                <SelectTrigger className="mt-1 font-mono">
-                  <SelectValue placeholder="-- เลือกพิกัด --" />
+                <SelectTrigger className="w-full mt-1.5 font-mono h-11 bg-white border-slate-300 shadow-sm text-sm">
+                  <SelectValue placeholder="-- เลือกพิกัดจัดเก็บเป้าหมาย --" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="min-w-[420px] max-w-[560px] max-h-[320px]">
                   {locationsList
                     .filter((l) => l.warehouse_code === "WH-PM" && l.location_type === "RACK_BIN")
                     .map((loc) => (
-                      <SelectItem key={loc.location_id} value={loc.location_barcode}>
-                        {loc.location_barcode} ({loc.location_name})
+                      <SelectItem key={loc.location_id} value={loc.location_barcode} className="py-2 px-3 cursor-pointer">
+                        <div className="flex flex-col text-left py-0.5">
+                          <span className="font-mono font-bold text-xs text-slate-900 tracking-wide">{loc.location_barcode}</span>
+                          <span className="text-[11px] text-slate-500 font-sans mt-0.5">{loc.location_name}</span>
+                        </div>
                       </SelectItem>
                     ))}
                 </SelectContent>
