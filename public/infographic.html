@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CosmeFlow OS — แผนภาพ Infographic ขั้นตอนการเชื่อมโยงระบบโรงงานครบวงจร</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+    body {
+      font-family: 'Sarabun', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .font-mono {
+      font-family: 'JetBrains Mono', monospace;
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 15px rgba(16, 185, 129, 0.4); }
+      50% { box-shadow: 0 0 30px rgba(16, 185, 129, 0.8); }
+    }
+    .active-step-glow {
+      animation: pulse-glow 2s infinite;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen p-4 md:p-8 antialiased selection:bg-emerald-500 selection:text-white">
+
+  <!-- Main Container -->
+  <div class="max-w-7xl mx-auto space-y-8">
+
+    <!-- Header Section -->
+    <header class="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950 border border-slate-800 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden">
+      <div class="absolute -right-16 -top-16 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
+      <div class="absolute -left-16 -bottom-16 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl"></div>
+      
+      <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-500/40 text-emerald-400 text-xs font-mono font-semibold mb-3">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            COSMEFLOW MANUFACTURING INTEGRATION BLUEPRINT
+          </div>
+          <h1 class="text-2xl md:text-3xl font-extrabold text-white tracking-tight">
+            แผนผังภาพกระบวนการทำงานครบวงจร (End-to-End Workflow)
+          </h1>
+          <p class="text-slate-400 text-sm mt-1">
+            ความเชื่อมโยงไร้รอยต่อระหว่าง <strong class="text-indigo-400">ฝ่ายวางแผน (Planning)</strong> $\rightarrow$ <strong class="text-blue-400">ฝ่ายคลังสินค้า (WMS)</strong> $\rightarrow$ <strong class="text-emerald-400">ฝ่ายคุณภาพ (QA/QC)</strong> $\rightarrow$ <strong class="text-purple-400">ฝ่ายผลิต (Shopfloor)</strong> $\rightarrow$ <strong class="text-amber-400">คลังสินค้าสำเร็จรูป (WH-FG)</strong>
+          </p>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-center">
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider">มาตรฐานสากล</div>
+            <div class="text-xs font-bold text-slate-200 mt-0.5">GMP ISO 22716</div>
+          </div>
+          <div class="bg-slate-800/80 border border-slate-700 rounded-xl px-4 py-2.5 text-center">
+            <div class="text-[10px] text-slate-400 uppercase tracking-wider">บันทึกอิเล็กทรอนิกส์</div>
+            <div class="text-xs font-bold text-slate-200 mt-0.5">21 CFR Part 11</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Metrics Ribbon -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-6 text-center">
+        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">ระยะเวลาสืบย้อนกลับ</div>
+          <div class="text-xl font-bold font-mono text-emerald-400">&lt; 1 วินาที</div>
+          <div class="text-[10px] text-slate-500">360° Audit Trail</div>
+        </div>
+        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">การป้องกันสินค้าเก่าเก็บ</div>
+          <div class="text-xl font-bold font-mono text-indigo-400">100% FEFO</div>
+          <div class="text-[10px] text-slate-500">Auto-Allocation Engine</div>
+        </div>
+        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">ป้องกันการหยิบผิดรุ่น</div>
+          <div class="text-xl font-bold font-mono text-blue-400">Zero Error</div>
+          <div class="text-[10px] text-slate-500">Poka-Yoke Barcode First</div>
+        </div>
+        <div class="bg-slate-900/60 p-3 rounded-xl border border-slate-800">
+          <div class="text-[11px] text-slate-400">การเซ็นเอกสารกระดาษ</div>
+          <div class="text-xl font-bold font-mono text-amber-400">0 แผ่น</div>
+          <div class="text-[10px] text-slate-500">Paperless Digital Handover</div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Isometric Infographic Poster -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 overflow-hidden shadow-2xl">
+      <div class="flex items-center justify-between pb-3 px-2">
+        <div class="text-sm font-bold text-white flex items-center gap-2">
+          <span>🖼️ แผนภาพสถาปัตยกรรมกระบวนการโรงงานผลิตและคลังสินค้าอัจฉริยะ (Isometric Architecture Poster)</span>
+        </div>
+        <span class="text-xs text-emerald-400 font-mono">GMP CLOSED-LOOP PIPELINE</span>
+      </div>
+      <img 
+        src="/cosmeflow_infographic.jpg" 
+        alt="CosmeFlow Manufacturing and Warehouse Flowchart" 
+        class="w-full h-auto rounded-xl border border-slate-800 shadow-lg object-cover" 
+      />
+    </div>
+
+    <!-- Swimlane Workflow Map -->
+    <div class="space-y-6">
+
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>เส้นทางกระบวนการ 7 ขั้นตอน (The 7-Step Life Cycle)</span>
+        </h2>
+        <span class="text-xs text-slate-500 font-mono">FLOW: INBOUND $\rightarrow$ STORAGE $\rightarrow$ DISPATCH $\rightarrow$ EXECUTION</span>
+      </div>
+
+      <!-- Step Cards Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <!-- STEP 1: PLANNING -->
+        <div class="bg-slate-900 border-2 border-indigo-500/50 rounded-2xl p-5 space-y-3 relative hover:border-indigo-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 font-mono font-bold text-xs">
+              STEP 01
+            </span>
+            <span class="text-[11px] font-semibold text-indigo-400 bg-indigo-950 px-2 py-0.5 rounded border border-indigo-800">
+              ฝ่ายวางแผน (Planning)
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-indigo-300 transition">เปิดคำสั่งผลิต & แตก BOM</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              เปิดคำสั่งผลิตในเมนู <code class="text-indigo-300">/planner</code> เช่น <b class="text-white">MO-2026-0925-01</b>
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">คำสั่งผลิต:</span> <b class="text-white">MO-2026-0925-01</b></div>
+            <div><span class="text-slate-500">สินค้าเป้าหมาย:</span> เซรั่มขวดใส 30ml</div>
+            <div><span class="text-slate-500">กำหนดไลน์ผลิต:</span> <span class="text-emerald-400">Filling Line 1</span></div>
+            <div><span class="text-slate-500">BOM Auto-Explode:</span> ขวดแก้ว 2,000 ใบ</div>
+          </div>
+          <div class="text-[11px] text-indigo-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ ส่งงานเข้าคิว WMS อัตโนมัติ</span>
+          </div>
+        </div>
+
+        <!-- STEP 2: RECEIVING & QC DOCK -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-blue-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-blue-500/20 text-blue-300 font-mono font-bold text-xs">
+              STEP 02
+            </span>
+            <span class="text-[11px] font-semibold text-blue-400 bg-blue-950 px-2 py-0.5 rounded border border-blue-800">
+              ฝ่ายคลังสินค้า (WMS)
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-blue-300 transition">รับสินค้าเข้า & ติด QR Tag</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              รับขวดแก้วจากซัพพลายเออร์ที่จุดรับเข้า <code class="text-blue-300">WH-PM-DOCK-QUAR-01</code>
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">เลข GRN:</span> <b class="text-white">GRN-202609-0001</b></div>
+            <div><span class="text-slate-500">สร้าง Lot ภายใน:</span> <b class="text-amber-400">LOT-PM-202609-0002</b></div>
+            <div><span class="text-slate-500">วันหมดอายุ (EXP):</span> 25/09/2027</div>
+            <div class="text-amber-400 font-bold text-[10px] bg-amber-950/60 p-1 rounded border border-amber-800 text-center">
+              ⚠️ QUARANTINE (กักกันห้ามเบิกจ่าย)
+            </div>
+          </div>
+          <div class="text-[11px] text-blue-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ พิมพ์ Pallet QR Tag ติดกล่อง</span>
+          </div>
+        </div>
+
+        <!-- STEP 3: QC DISPOSITION -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-emerald-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-mono font-bold text-xs">
+              STEP 03
+            </span>
+            <span class="text-[11px] font-semibold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+              ฝ่ายคุณภาพ (QA/QC)
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-emerald-300 transition">สุ่มตรวจ & อนุมัติปล่อย</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              เจ้าหน้าที่ QC เข้าตรวจแล็บ ทดสอบเกลียวฝา ความใส และการรั่วซึม
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">ผลตัดสิน QC:</span> <b class="text-emerald-400">RELEASED ✅</b></div>
+            <div><span class="text-slate-500">ผู้รับรอง:</span> QA Specialist (e-Sign)</div>
+            <div><span class="text-slate-500">บันทึกผล:</span> ผ่านเกณฑ์ขนาดและ Leak Test</div>
+            <div class="text-emerald-400 font-bold text-[10px] bg-emerald-950/60 p-1 rounded border border-emerald-800 text-center">
+              ✅ ปลดล็อกสถานะให้เบิกจ่ายได้
+            </div>
+          </div>
+          <div class="text-[11px] text-emerald-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ แจ้งเตือนฝ่ายคลังให้นำขึ้นชั้นวาง</span>
+          </div>
+        </div>
+
+        <!-- STEP 4: DIRECTED PUT-AWAY -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-cyan-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 font-mono font-bold text-xs">
+              STEP 04
+            </span>
+            <span class="text-[11px] font-semibold text-cyan-400 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-800">
+              คลังสินค้า (Put-away)
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-cyan-300 transition">จัดเก็บขึ้นชั้นวาง (AI Slotting)</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              ระบบคำนวณตำแหน่งที่เหมาะสมที่สุดและเปิดไฟกระพริบชี้เป้าบนผัง
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">พิกัดเป้าหมาย:</span></div>
+            <div class="text-emerald-300 font-bold bg-slate-900 p-1 rounded border border-emerald-500/30 flex items-center justify-between">
+              <span>WH-PM-A-R01-B01-L01-BN01</span>
+              <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+            </div>
+            <div><span class="text-slate-500">ตำแหน่ง:</span> แร็ค R01 • ช่วงเสา 1 • ชั้น 1</div>
+            <div><span class="text-slate-500">การยืนยัน:</span> สแกนพิกัดเสา $\rightarrow$ สแกน Lot</div>
+          </div>
+          <div class="text-[11px] text-cyan-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ สินค้าพร้อมเบิกในพิกัดเสมือนจริง</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Second Row of Steps (Dispatch & Shopfloor & FG) -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        <!-- STEP 5: FEFO PICKING & DISPATCH -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-purple-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-purple-500/20 text-purple-300 font-mono font-bold text-xs">
+              STEP 05
+            </span>
+            <span class="text-[11px] font-semibold text-purple-400 bg-purple-950 px-2 py-0.5 rounded border border-purple-800">
+              WMS FEFO Dispatcher
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-purple-300 transition">จัดสรร FEFO & หยิบสินค้า</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              ระบบตรวจสอบวันหมดอายุและเลือกล็อตที่หมดอายุก่อนให้อัตโนมัติ (Wave Picking)
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">ใบงานหยิบ:</span> <b class="text-white">PICK-202609-0001</b></div>
+            <div><span class="text-slate-500">อิงคำสั่งผลิต:</span> <b class="text-indigo-400">MO-2026-0925-01</b></div>
+            <div><span class="text-slate-500">ล็อตที่ถูกเลือก:</span> LOT-PM-202609-0002 (2,000 PCS)</div>
+            <div><span class="text-slate-500">อุปกรณ์:</span> รถโฟล์คลิฟต์ / รถลากพาเลท</div>
+          </div>
+          <div class="text-[11px] text-purple-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ หยิบครบ 100% พร้อมนำไปส่งมอบ</span>
+          </div>
+        </div>
+
+        <!-- STEP 6: PHYSICAL HANDOVER TO PRODUCTION LINE -->
+        <div class="bg-slate-900 border-2 border-emerald-500/50 rounded-2xl p-5 space-y-3 active-step-glow transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-emerald-500/20 text-emerald-300 font-mono font-bold text-xs">
+              STEP 06 (จุดที่ทำสำเร็จ)
+            </span>
+            <span class="text-[11px] font-semibold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+              จุดพักหน้าไลน์ผลิต (Staging)
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-emerald-300 transition">ส่งมอบเข้าไลน์ผลิต (Handover)</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              ขับรถนำพาเลทมาวางที่จุดพักหน้าไลน์ 1 สแกนบาร์โค้ดพิกัดหน้าห้องเพื่อลงนาม
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">พิกัดส่งมอบ:</span> <b class="text-emerald-300">WH-PM-STAGE-LINE-01</b></div>
+            <div><span class="text-slate-500">สถานะใบงาน:</span> <span class="text-emerald-400 font-bold bg-emerald-950 px-1.5 py-0.5 rounded border border-emerald-700">ส่งมอบเข้าไลน์ผลิตแล้ว (ISSUED)</span></div>
+            <div><span class="text-slate-500">ธุรกรรมสมุดบัญชี:</span> ISSUE_TO_PROD</div>
+            <div><span class="text-slate-500">ผลลัพธ์:</span> สต็อกโอนเป็น WIP หน้าไลน์บรรจุทันที</div>
+          </div>
+          <div class="text-[11px] text-emerald-400 flex items-center gap-1 font-bold">
+            <span>✅ งานคลังสินค้าเสร็จสมบูรณ์ 100%</span>
+          </div>
+        </div>
+
+        <!-- STEP 7: SHOPFLOOR EXECUTION & FG WAREHOUSE -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 space-y-3 hover:border-amber-400 transition shadow-lg group">
+          <div class="flex items-center justify-between">
+            <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 font-mono font-bold text-xs">
+              STEP 07 (ขั้นตอนต่อไป)
+            </span>
+            <span class="text-[11px] font-semibold text-amber-400 bg-amber-950 px-2 py-0.5 rounded border border-amber-800">
+              ฝ่ายผลิต $\rightarrow$ คลัง FG
+            </span>
+          </div>
+          <div>
+            <h3 class="font-bold text-white text-base group-hover:text-amber-300 transition">เดินเครื่องบรรจุ & รับเข้า FG</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              พนักงานบรรจุสแกนขวด Poka-Yoke เดินเครื่องบรรจุเซรั่ม และส่งมอบสินค้าสำเร็จรูป
+            </p>
+          </div>
+          <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 text-xs space-y-1.5 font-mono text-slate-300">
+            <div><span class="text-slate-500">หน้างาน:</span> เมนูงานของฉัน (My Tasks - บรรจุ)</div>
+            <div><span class="text-slate-500">บันทึกยอด:</span> Actual Output, Scrap & Loss</div>
+            <div><span class="text-slate-500">กรณีใช้ไม่หมด:</span> ทำใบส่งคืนเศษ (Return PM)</div>
+            <div><span class="text-slate-500">สินค้าสำเร็จรูป:</span> โอนเข้า <b class="text-amber-300">WH-FG (คลัง FG)</b></div>
+          </div>
+          <div class="text-[11px] text-amber-300 flex items-center gap-1 font-medium">
+            <span>$\rightarrow$ พร้อมจัดส่งให้ลูกค้า (Shipment)</span>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+    <!-- Data Architecture Integration -->
+    <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 md:p-8 space-y-6 shadow-xl">
+      <div class="border-b border-slate-800 pb-4">
+        <h2 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>สถาปัตยกรรมการเชื่อมโยงข้อมูลในระบบ CosmeFlow OS (Data Architecture)</span>
+        </h2>
+        <p class="text-xs text-slate-400 mt-0.5">
+          แสดงการส่งต่อข้อมูลแบบ Real-Time ระหว่าง Planning, WMS, QA/QC และ Shopfloor Execution
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+
+        <!-- Module 1: Planning -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-indigo-900/60 space-y-2 text-left">
+          <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center font-bold font-mono text-sm">
+            01
+          </div>
+          <div class="font-bold text-sm text-indigo-300">Planner Module (/planner)</div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <div>• ออกคำสั่งผลิต (MO)</div>
+            <div>• คำนวณความต้องการสูตร (BOM)</div>
+            <div>• กำหนดไลน์ผลิต (Filling Line 1)</div>
+            <div>• ส่งคิวงานอัตโนมัติมา WMS</div>
+          </div>
+        </div>
+
+        <!-- Module 2: WMS Storage -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-blue-900/60 space-y-2 text-left">
+          <div class="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center font-bold font-mono text-sm">
+            02
+          </div>
+          <div class="font-bold text-sm text-blue-300">WMS Storage (/wms)</div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <div>• ออก GRN & Pallet Smart QR Tag</div>
+            <div>• บันทึกวันหมดอายุ (EXP)</div>
+            <div>• ชี้เป้าชั้นวางบน 2D Digital Twin</div>
+            <div>• ระบบพิกัด Sub-Bin แบบเรียลไทม์</div>
+          </div>
+        </div>
+
+        <!-- Module 3: WMS Outbound FEFO -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-purple-900/60 space-y-2 text-left">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/20 text-purple-400 flex items-center justify-center font-bold font-mono text-sm">
+            03
+          </div>
+          <div class="font-bold text-sm text-purple-300">FEFO Dispatch Engine</div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <div>• ดึง MO จาก Planning อัตโนมัติ</div>
+            <div>• FEFO ล็อก Lot ใกล้หมดอายุก่อน</div>
+            <div>• สร้างใบงานหยิบ (Wave Pick List)</div>
+            <div>• ส่งมอบ Staging บันทึกตัดสต็อก</div>
+          </div>
+        </div>
+
+        <!-- Module 4: Shopfloor & FG -->
+        <div class="p-4 rounded-xl bg-slate-950 border border-emerald-900/60 space-y-2 text-left">
+          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold font-mono text-sm">
+            04
+          </div>
+          <div class="font-bold text-sm text-emerald-300">Shopfloor & WH-FG</div>
+          <div class="text-xs text-slate-400 space-y-1">
+            <div>• สแกน Poka-Yoke ยืนยันขวดตรงรุ่น</div>
+            <div>• บันทึกยอดจริง & ของเสีย (Scrap)</div>
+            <div>• ปิดยอด & ส่งคืนเศษเข้าคลัง (Return)</div>
+            <div>• โอนสินค้าสำเร็จรูปเข้า WH-FG</div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Closed-Loop GMP Banner -->
+      <div class="bg-gradient-to-r from-emerald-950/40 via-slate-950 to-blue-950/40 border border-emerald-500/30 rounded-xl p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+          <div class="p-3 bg-emerald-500/20 text-emerald-400 rounded-xl text-xl font-bold">
+            🛡️
+          </div>
+          <div>
+            <h4 class="font-bold text-sm text-white">ระบบสืบย้อนกลับ 360° ตลอดชีพ (Closed-Loop Traceability)</h4>
+            <p class="text-xs text-slate-400">
+              ทุกรายการบันทึกในสมุดบัญชีสต็อก (Immutable Ledger) จะไม่สามารถแก้ไขย้อนหลังได้ ตอบโจทย์การตรวจสอบโรงงาน GMP / อย. และระบบ Recall จำลอง 100%
+            </p>
+          </div>
+        </div>
+        <div class="shrink-0 font-mono text-xs text-emerald-300 bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-700">
+          BIRTH-TO-GRAVE AUDIT READY
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Note -->
+    <footer class="text-center text-xs text-slate-500 py-4 border-t border-slate-800">
+      CosmeFlow WMS & Manufacturing Execution System • ออกแบบสำหรับโรงงานผลิตเครื่องสำอาง OEM/ODM มาตรฐานสากล
+    </footer>
+
+  </div>
+
+</body>
+</html>
