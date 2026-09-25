@@ -33,6 +33,23 @@ export const APP_MODULES: AppModuleItem[] = [
     href: '/incoming-rm',
   },
   {
+    id: 'wms',
+    label: 'CosmeFlow WMS',
+    shortLabel: 'ระบบคลังสินค้า (WMS)',
+    href: '/wms',
+    iconName: 'Warehouse',
+    subModules: [
+      { id: 'wms_tower', label: 'หอควบคุมคลัง (Control Tower)', href: '/wms' },
+      { id: 'wms_receiving', label: 'รับสินค้าเข้า (Inbound & GRN)', href: '/wms?tab=receiving' },
+      { id: 'wms_qc', label: 'ตรวจสอบคุณภาพ (QC Disposition)', href: '/wms?tab=qc' },
+      { id: 'wms_putaway', label: 'จัดเก็บเข้าที่ (Directed Put-away)', href: '/wms?tab=putaway' },
+      { id: 'wms_picking', label: 'เบิกจ่าย FEFO (Wave Picking)', href: '/wms?tab=picking' },
+      { id: 'wms_count', label: 'ตรวจนับสต็อก (Cycle Count)', href: '/wms?tab=counts' },
+      { id: 'wms_trace', label: 'สืบย้อนกลับ 360° (Traceability)', href: '/wms?tab=trace' },
+      { id: 'wms_mobile', label: '📱 โหมดสแกนเนอร์ PDA (Mobile PWA)', href: '/wms/mobile' },
+    ]
+  },
+  {
     id: 'production',
     label: 'CosmeFlow Production',
     shortLabel: 'กระบวนการผลิต',
@@ -120,7 +137,7 @@ export const APP_MODULES: AppModuleItem[] = [
 ]
 
 export const ALL_MODULE_IDS = [
-  'dashboard', 'planner', 'incoming-rm', 'production_overview', 'production_weighing', 
+  'dashboard', 'planner', 'incoming-rm', 'wms', 'production_overview', 'production_weighing', 
   'production_mixing', 'production_packing', 'production_pof', 'qc', 'issues', 'dcc',
   'fg', 'purchase', 'maintenance', 'people', 'costing', 'improve', 'master-data', 'sales-pipeline'
 ]
@@ -379,6 +396,10 @@ export function getRouteAccessLevel(href: string, userRole?: string | null): Acc
   if (href === '/dashboard') key = 'dashboard'
   else if (href === '/planner') key = 'planner'
   else if (href === '/incoming-rm') key = 'incoming-rm'
+  else if (href.startsWith('/wms')) {
+    if (['admin', 'warehouse', 'qa', 'qc', 'planner'].includes(userRole || '')) return 'EDIT'
+    return perms['wms'] || 'VIEW'
+  }
   else if (href === '/my-tasks/overview') key = 'production_overview'
   else if (href === '/my-tasks/weighing') key = 'production_weighing'
   else if (href === '/my-tasks/mixing') key = 'production_mixing'
