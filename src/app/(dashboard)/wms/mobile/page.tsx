@@ -104,11 +104,15 @@ export default function WmsMobileOperatorPage() {
     }
   }, [activeMode]);
 
-  // Handle Hardware Laser Scan / Enter Key
-  const handleScanSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const raw = scanInput.trim();
-    if (!raw) return;
+  // Core scan processing logic
+  const executeScan = async (rawInput: string) => {
+    const raw = (rawInput || "").trim();
+    if (!raw) {
+      playSound("error");
+      toast.info("กรุณาพิมพ์เลข Lot หรือแตะปุ่มตัวอย่างด้านล่างเพื่อทดสอบสแกน");
+      inputRef.current?.focus();
+      return;
+    }
     setScanInput("");
 
     const parsed = parseBarcode(raw);
@@ -120,9 +124,10 @@ export default function WmsMobileOperatorPage() {
         const queryTerm = parsed.lotNumber || parsed.id || raw;
         const res = await fetch(`/api/wms/trace?lot=${encodeURIComponent(queryTerm)}`);
         const data = await res.json();
-        if (res.ok && data.lot) {
+        if (res.ok && (data.lot || data.location)) {
           playSound("success");
           setInquiryResult(data);
+          toast.success(`สแกนสำเร็จ: ${data.lot?.internal_lot_number || data.location?.location_barcode}`);
         } else {
           playSound("error");
           toast.error("ไม่พบข้อมูลบาร์โค้ดนี้ในระบบ");
@@ -198,6 +203,12 @@ export default function WmsMobileOperatorPage() {
         return;
       }
     }
+  };
+
+  // Handle Hardware Laser Scan / Enter Key
+  const handleScanSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    executeScan(scanInput);
   };
 
   // Submit Put-away Execution
@@ -445,7 +456,58 @@ export default function WmsMobileOperatorPage() {
             <div className="bg-slate-800 p-4 rounded-xl border border-slate-700 text-center">
               <Scan className="w-12 h-12 mx-auto text-emerald-400 mb-2 animate-bounce" />
               <div className="font-bold text-base text-white">พร้อมสแกนค้นหาข้อมูล</div>
-              <p className="text-xs text-slate-400 mt-1">ยิงสแกนบาร์โค้ด QR บนกล่อง หรือบาร์โค้ดพิกัดช่องเก็บได้ทันที</p>
+              <p className="text-xs text-slate-400 mt-1">
+                ยิงสแกนบาร์โค้ด QR บนกล่อง หรือพิมพ์เลข Lot ในช่องด้านบนแล้วกดยิงสแกน
+              </p>
+            </div>
+
+            {/* Quick Test Barcode Chips for Mobile Testers */}
+            <div className="bg-slate-900/90 border border-slate-800 p-3.5 rounded-xl space-y-2.5">
+              <div className="text-xs font-semibold text-slate-300 flex items-center justify-between">
+                <span>⚡ แตะเพื่อทดสอบสแกน (Quick Scan):</span>
+                <span className="text-[10px] text-emerald-400 font-mono">1-TAP TEST</span>
+              </div>
+              <p className="text-[11px] text-slate-400">
+                แตะปุ่มด้านล่างเพื่อจำลองการยิงบาร์โค้ด (มีเสียง Chime ตอบรับทันที):
+              </p>
+              <div className="flex flex-col gap-2 pt-0.5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between text-xs font-mono h-11 bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
+                  onClick={() => executeScan("LOT-PM-202609-0001")}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-sans font-bold text-[10px]">LOT 1</span>
+                    <span>LOT-PM-202609-0001</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-sans">ขวดแก้วใส 30ml</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between text-xs font-mono h-11 bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
+                  onClick={() => executeScan("LOT-PM-202609-0002")}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-emerald-500/20 text-emerald-400 rounded font-sans font-bold text-[10px]">LOT 2</span>
+                    <span>LOT-PM-202609-0002</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-sans">ขวดแก้วใส 30ml</span>
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full justify-between text-xs font-mono h-11 bg-slate-950 border-slate-700 text-slate-200 hover:bg-slate-800 hover:text-white"
+                  onClick={() => executeScan("WH-PM-A-R01-B01-L01-BN01")}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded font-sans font-bold text-[10px]">พิกัด BIN</span>
+                    <span>WH-PM-A-R01-B01-L01-BN01</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-sans">ชั้น 1 แร็ค R01</span>
+                </Button>
+              </div>
             </div>
 
             {inquiryResult && (
@@ -481,7 +543,7 @@ export default function WmsMobileOperatorPage() {
 
                 <div className="space-y-1.5 pt-1">
                   <div className="text-xs font-semibold text-slate-400">พิกัดจัดเก็บปัจจุบัน:</div>
-                  {inquiryResult.currentLocations.map((loc: any) => (
+                  {inquiryResult.currentLocations && inquiryResult.currentLocations.map((loc: any) => (
                     <div key={loc.balance_id} className="p-2.5 bg-slate-900 rounded border border-slate-800 flex justify-between items-center">
                       <div>
                         <div className="font-mono font-bold text-emerald-400">{loc.location_barcode}</div>
@@ -524,6 +586,16 @@ export default function WmsMobileOperatorPage() {
                 <p className="text-xs text-slate-300">
                   ขับรถโฟล์คลิฟต์ไปยังช่องเก็บเป้าหมาย แล้วสแกน QR Code พิกัดที่เสา (เช่น WH-PM-A-...)
                 </p>
+                <div className="pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-mono h-10 bg-slate-900 border-slate-700 text-blue-300 hover:bg-slate-700"
+                    onClick={() => executeScan("WH-PM-A-R01-B01-L01-BN01")}
+                  >
+                    ⚡ จำลองสแกน: WH-PM-A-R01-B01-L01-BN01
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -532,9 +604,17 @@ export default function WmsMobileOperatorPage() {
                 <CheckCircle2 className="w-8 h-8 mx-auto text-emerald-400" />
                 <div className="text-xs text-slate-400">พิกัดเป้าหมายที่เลือก:</div>
                 <div className="font-mono text-xl font-bold text-emerald-400">{scannedBin}</div>
-                <div className="border-t border-slate-700 pt-3">
+                <div className="border-t border-slate-700 pt-3 space-y-2">
                   <h3 className="text-lg font-bold text-white">ขั้นตอนที่ 2: สแกน QR บนกล่อง/พาเลท</h3>
-                  <p className="text-xs text-slate-300 mt-1">ยิงสแกนบาร์โค้ด Lot ที่กำลังจะวางลงช่อง</p>
+                  <p className="text-xs text-slate-300">ยิงสแกนบาร์โค้ด Lot ที่กำลังจะวางลงช่อง</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full text-xs font-mono h-10 bg-slate-900 border-slate-700 text-emerald-300 hover:bg-slate-700"
+                    onClick={() => executeScan("LOT-PM-202609-0001")}
+                  >
+                    ⚡ จำลองสแกน: LOT-PM-202609-0001
+                  </Button>
                 </div>
               </div>
             )}

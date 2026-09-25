@@ -12,6 +12,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'กรุณาระบุเลข Lot ที่ต้องการสืบย้อนกลับ' }, { status: 400 });
     }
 
+    // If querying by Location barcode (e.g. WH-PM-...)
+    if (lotQuery.startsWith('WH-')) {
+      const locRes = await queryPeople(
+        `SELECT loc.*, w.warehouse_code, w.warehouse_name 
+         FROM wms_locations loc 
+         JOIN wms_warehouses w ON loc.warehouse_id = w.warehouse_id 
+         WHERE loc.location_barcode = $1`,
+        [lotQuery]
+      );
+      if (locRes.rows.length === 0) {
+        return NextResponse.json({ error: `ไม่พบพิกัดจัดเก็บ: ${lotQuery}` }, { status: 404 });
+      }
+      const location = locRes.rows[0];
+
+      const balancesRes = await queryPeople(
+        `SELECT b.*, i.item_code, i.item_name_th, l.internal_lot_number, l.expiry_date, loc.location_barcode, loc.location_name
+         FROM wms_inventory_balances b
+         JOIN wms_items i ON b.item_id = i.item_id
+         JOIN wms_inventory_lots l ON b.lot_id = l.lot_id
+         JOIN wms_locations loc ON b.location_id = loc.location_id
+         WHERE b.location_id = $1 AND b.physical_quantity > 0`,
+        [location.location_id]
+      );
+
+      const firstLot = balancesRes.rows[0];
+      return NextResponse.json({
+        type: 'LOCATION',
+        location,
+        currentLocations: balancesRes.rows,
+        lot: firstLot ? {
+          item_code: firstLot.item_code,
+          item_name_th: `${firstLot.item_name_th} (${balancesRes.rows.length} รายการในช่องนี้)`,
+          internal_lot_number: firstLot.internal_lot_number,
+          expiry_date: firstLot.expiry_date,
+          qc_status: firstLot.qc_status,
+        } : {
+          item_code: location.location_barcode,
+          item_name_th: `${location.location_name} (พิกัดว่าง - ไม่มีสินค้าคงค้าง)`,
+          internal_lot_number: "EMPTY-BIN",
+          expiry_date: new Date().toISOString(),
+          qc_status: "AVAILABLE",
+        },
+      });
+    }
+
     // 1. Locate lot
     const lotRes = await queryPeople(
       `SELECT l.*, i.item_code, i.item_name_th, i.item_name_en, i.item_type, i.base_uom
