@@ -28,6 +28,8 @@ import {
   SlidersHorizontal,
   MapPin,
   Navigation,
+  Check,
+  ClipboardList,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -546,6 +548,50 @@ export default function WmsDashboardPage() {
     }
   };
 
+  // Handle Pick Single Item
+  const handlePickItem = async (itemPickId: string) => {
+    try {
+      const res = await fetch("/api/wms/picking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "CONFIRM_PICK_ITEM",
+          item_pick_id: itemPickId,
+          user_name: "เจ้าหน้าที่คลังสินค้า (Picker)",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.success("ยืนยันหยิบสินค้าเข้าสู่จุดเตรียมส่งมอบเรียบร้อย");
+      fetchPickLists();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
+  // Handle Pick All Items in a Wave
+  const handlePickAll = async (pickListId: string) => {
+    try {
+      const res = await fetch("/api/wms/picking", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "PICK_ALL",
+          pick_list_id: pickListId,
+          user_name: "เจ้าหน้าที่คลังสินค้า (Picker)",
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+
+      toast.success("ยืนยันหยิบสินค้าครบทุกรายการเรียบร้อยแล้ว");
+      fetchPickLists();
+    } catch (err: any) {
+      toast.error(err.message);
+    }
+  };
+
   // Handle Handover to Production
   const handleHandover = async (pickListId: string) => {
     try {
@@ -555,7 +601,7 @@ export default function WmsDashboardPage() {
         body: JSON.stringify({
           action: "HANDOVER_TO_PRODUCTION",
           pick_list_id: pickListId,
-          warehouse_user: "คลังสินค้า (Sender)",
+          warehouse_user: "เจ้าหน้าที่คลังสินค้า (Sender)",
           line_leader_user: "หัวหน้าไลน์ผลิต (Receiver)",
         }),
       });
@@ -1490,52 +1536,181 @@ export default function WmsDashboardPage() {
       {/* TAB 5: FEFO PICKING & WAVE DISPATCHER */}
       {activeTab === "picking" && (
         <div className="space-y-4">
-          <div className="flex justify-between items-center bg-white p-4 rounded-lg border shadow-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border shadow-sm">
             <div>
-              <h3 className="font-bold text-slate-900">การเบิกจ่ายและส่งมอบการผลิต (FEFO Wave Dispatcher)</h3>
-              <p className="text-xs text-slate-500">สร้างใบงานหยิบจ่าย จัดสรรตามวันหมดอายุใกล้สุด และส่งมอบหน้าไลน์ผลิต</p>
+              <div className="flex items-center gap-2">
+                <h3 className="font-bold text-slate-900">การเบิกจ่ายและส่งมอบการผลิต (FEFO Wave Dispatcher)</h3>
+                <Badge variant="outline" className="bg-indigo-50 text-indigo-700 border-indigo-200 text-xs">
+                  FEFO ENFORCED
+                </Badge>
+              </div>
+              <p className="text-xs text-slate-500 mt-0.5">
+                สร้างใบงานหยิบจ่าย จัดสรรตามวันหมดอายุใกล้สุด (FEFO) และบันทึกการส่งมอบเข้าไลน์ผลิต (ISSUE_TO_PROD)
+              </p>
             </div>
-            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white" onClick={() => setCreateWaveOpen(true)}>
+            <Button className="bg-indigo-600 hover:bg-indigo-700 text-white font-medium" onClick={() => setCreateWaveOpen(true)}>
               <Plus className="w-4 h-4 mr-1.5" />
               สร้าง Wave เบิกจ่ายใหม่ (FEFO)
             </Button>
           </div>
 
-          <div className="space-y-3">
-            {pickLists.map((pick) => (
-              <Card key={pick.pick_list_id} className="border shadow-sm">
-                <CardHeader className="p-4 pb-2 bg-slate-50 border-b flex flex-row items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-bold text-base text-slate-900">{pick.pick_list_number}</span>
-                      <Badge className={pick.status === "ISSUED" ? "bg-emerald-100 text-emerald-800" : "bg-blue-100 text-blue-800"}>
-                        {pick.status === "ISSUED" ? "ส่งมอบเข้าไลน์ผลิตแล้ว (ISSUED)" : "กำลังเบิกจ่าย (IN_PROGRESS)"}
-                      </Badge>
-                    </div>
-                    <CardDescription className="text-xs mt-0.5">
-                      อ้างอิงคำสั่งผลิต: <b>{pick.production_order_no}</b> | จุดส่งมอบ: <b>{pick.staging_location}</b>
-                    </CardDescription>
-                  </div>
-                  {pick.status !== "ISSUED" && (
-                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium" onClick={() => handleHandover(pick.pick_list_id)}>
-                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
-                      ลงนามส่งมอบเข้าไลน์ (Handover)
-                    </Button>
-                  )}
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="text-xs text-slate-500 mb-2">
-                    ความคืบหน้าการหยิบ: {pick.picked_items} / {pick.total_items} รายการ
-                  </div>
-                  <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                    <div
-                      className="bg-emerald-500 h-full"
-                      style={{ width: `${pick.total_items ? (pick.picked_items / pick.total_items) * 100 : 0}%` }}
-                    />
-                  </div>
+          <div className="space-y-4">
+            {pickLists.length === 0 ? (
+              <Card className="border shadow-sm">
+                <CardContent className="py-12 text-center text-slate-400 text-sm">
+                  ไม่มีใบสั่งเบิกจ่ายในขณะนี้ กดปุ่ม &quot;สร้าง Wave เบิกจ่ายใหม่ (FEFO)&quot; เพื่อเริ่มกระบวนการ
                 </CardContent>
               </Card>
-            ))}
+            ) : (
+              pickLists.map((pick) => {
+                const isAllPicked = Number(pick.picked_items) >= Number(pick.total_items) && Number(pick.total_items) > 0;
+                const isIssued = pick.status === "ISSUED";
+
+                return (
+                  <Card key={pick.pick_list_id} className={`border shadow-sm transition ${isIssued ? "bg-slate-50/60 border-slate-200" : "bg-white border-indigo-200 ring-1 ring-indigo-500/20"}`}>
+                    <CardHeader className="p-4 pb-3 bg-slate-50/80 border-b flex flex-col md:flex-row md:items-center justify-between gap-3">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-bold text-base text-slate-900">{pick.pick_list_number}</span>
+                          <Badge className={isIssued ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-blue-100 text-blue-800 border-blue-300"}>
+                            {isIssued ? "ส่งมอบเข้าไลน์ผลิตแล้ว (ISSUED)" : "กำลังเบิกจ่าย (IN_PROGRESS)"}
+                          </Badge>
+                          <span className="text-xs text-slate-400 font-mono">
+                            {new Date(pick.created_at).toLocaleString("th-TH")}
+                          </span>
+                        </div>
+                        <CardDescription className="text-xs mt-1 text-slate-600">
+                          คำสั่งผลิต: <b className="font-mono text-slate-900">{pick.production_order_no}</b> | จุดส่งมอบปลายทาง: <b className="font-mono text-indigo-700">{pick.staging_location}</b>
+                        </CardDescription>
+                      </div>
+
+                      {!isIssued && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          {!isAllPicked && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-xs border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                              onClick={() => handlePickAll(pick.pick_list_id)}
+                            >
+                              <Boxes className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                              ⚡ ยืนยันหยิบครบทั้งหมด
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm"
+                            onClick={() => handleHandover(pick.pick_list_id)}
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5 mr-1" />
+                            {isAllPicked ? "ลงนามส่งมอบเข้าไลน์ (Handover)" : "ยืนยันหยิบ & ส่งมอบเข้าไลน์ (Pick & Handover)"}
+                          </Button>
+                        </div>
+                      )}
+                    </CardHeader>
+
+                    <CardContent className="p-4 space-y-3">
+                      {/* Progress bar */}
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-xs text-slate-600">
+                          <span>ความคืบหน้าการหยิบสินค้า:</span>
+                          <span className="font-semibold font-mono">
+                            {pick.picked_items} / {pick.total_items} รายการ ({pick.total_items ? Math.round((pick.picked_items / pick.total_items) * 100) : 0}%)
+                          </span>
+                        </div>
+                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full transition-all duration-300 ${isIssued ? "bg-emerald-500" : isAllPicked ? "bg-blue-500" : "bg-amber-500"}`}
+                            style={{ width: `${pick.total_items ? (pick.picked_items / pick.total_items) * 100 : 0}%` }}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Items table */}
+                      {pick.items && pick.items.length > 0 && (
+                        <div className="border rounded-lg overflow-hidden bg-white mt-3">
+                          <div className="bg-slate-100/70 px-3 py-1.5 text-xs font-semibold text-slate-700 border-b flex items-center justify-between">
+                            <span className="flex items-center gap-1.5">
+                              <ClipboardList className="w-3.5 h-3.5 text-slate-500" />
+                              รายการสินค้าที่ FEFO คัดสรรให้หยิบ (Pick Tasks):
+                            </span>
+                            <span className="text-[11px] text-slate-500 font-normal">
+                              จัดสรรจาก Lot ที่หมดอายุก่อนอัตโนมัติ
+                            </span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs text-left">
+                              <thead className="bg-slate-50 text-slate-600 font-medium border-b">
+                                <tr>
+                                  <th className="px-3 py-2">สินค้า (Item)</th>
+                                  <th className="px-3 py-2">พิกัดจัดเก็บ (Source Bin)</th>
+                                  <th className="px-3 py-2">Lot จัดสรร (FEFO)</th>
+                                  <th className="px-3 py-2">วันหมดอายุ (EXP)</th>
+                                  <th className="px-3 py-2 text-right">จำนวนที่ต้องหยิบ</th>
+                                  <th className="px-3 py-2 text-center">สถานะ</th>
+                                  {!isIssued && <th className="px-3 py-2 text-right">การดำเนินการ</th>}
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {pick.items.map((item: any) => {
+                                  const itemPicked = item.status === "PICKED";
+                                  return (
+                                    <tr key={item.item_pick_id} className="hover:bg-slate-50/80">
+                                      <td className="px-3 py-2.5">
+                                        <div className="font-semibold text-slate-900">{item.item_code}</div>
+                                        <div className="text-[11px] text-slate-500 line-clamp-1">{item.item_name_th}</div>
+                                      </td>
+                                      <td className="px-3 py-2.5">
+                                        <span className="font-mono text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                          {item.location_barcode}
+                                        </span>
+                                      </td>
+                                      <td className="px-3 py-2.5 font-mono font-bold text-slate-800">
+                                        {item.internal_lot_number}
+                                      </td>
+                                      <td className="px-3 py-2.5 font-mono text-slate-600">
+                                        {item.expiry_date ? new Date(item.expiry_date).toLocaleDateString("th-TH") : "-"}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-right font-mono font-bold text-slate-900">
+                                        {Number(item.required_qty).toLocaleString()} {item.uom}
+                                      </td>
+                                      <td className="px-3 py-2.5 text-center">
+                                        <Badge className={itemPicked ? "bg-emerald-100 text-emerald-800 border-emerald-300" : "bg-amber-100 text-amber-800 border-amber-300"}>
+                                          {itemPicked ? "หยิบแล้ว (PICKED)" : "รอหยิบ (ALLOCATED)"}
+                                        </Badge>
+                                      </td>
+                                      {!isIssued && (
+                                        <td className="px-3 py-2.5 text-right">
+                                          {!itemPicked ? (
+                                            <Button
+                                              size="sm"
+                                              className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white cursor-pointer"
+                                              onClick={() => handlePickItem(item.item_pick_id)}
+                                            >
+                                              <Check className="w-3 h-3 mr-1" />
+                                              หยิบของ
+                                            </Button>
+                                          ) : (
+                                            <span className="text-[11px] text-emerald-600 font-semibold flex items-center justify-end gap-1">
+                                              <CheckCircle2 className="w-3 h-3" />
+                                              พร้อมส่งมอบ
+                                            </span>
+                                          )}
+                                        </td>
+                                      )}
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })
+            )}
           </div>
         </div>
       )}
