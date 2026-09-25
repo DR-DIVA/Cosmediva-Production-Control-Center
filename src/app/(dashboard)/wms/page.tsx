@@ -30,6 +30,7 @@ import {
   Navigation,
   Check,
   ClipboardList,
+  ArrowUpRight,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -729,6 +730,23 @@ export default function WmsDashboardPage() {
             รับสินค้าเข้า (GRN)
           </Button>
 
+          {/* Infographic Workflow Link */}
+          <a
+            href="/infographic.html"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            <Button
+              variant="outline"
+              size="sm"
+              className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200 font-semibold shadow-sm"
+            >
+              <FileText className="w-4 h-4 mr-1.5 text-indigo-600" />
+              แผนผังกระบวนการ (Infographic)
+              <ArrowUpRight className="w-3.5 h-3.5 ml-1 text-indigo-500" />
+            </Button>
+          </a>
+
           {/* Dedicated Mobile Scanner Link */}
           <Link href="/wms/mobile">
             <Button variant="default" className="bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-sm" size="sm">
@@ -736,6 +754,40 @@ export default function WmsDashboardPage() {
               เปิดโหมดสแกนเนอร์ PDA
             </Button>
           </Link>
+        </div>
+      </div>
+
+      {/* Visual Infographic Banner Link */}
+      <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-emerald-950 text-white p-4 rounded-xl border border-indigo-700/50 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 bg-indigo-500/20 text-indigo-300 rounded-lg border border-indigo-500/30 text-xl font-bold">
+            🗺️
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm text-white">แผนผังภาพกระบวนการทำงานครบวงจร (End-to-End Workflow Infographic)</span>
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400 text-emerald-300 text-[10px] font-mono font-bold">
+                GMP BLUEPRINT
+              </span>
+            </div>
+            <p className="text-xs text-slate-300 mt-0.5">
+              ความเชื่อมโยง 7 ขั้นตอน: ฝ่ายวางแผน (Planning) $\rightarrow$ คลังสินค้า (WMS) $\rightarrow$ ตรวจปล่อย (QC) $\rightarrow$ ไลน์ผลิต (Filling & Packing) $\rightarrow$ คลังสำเร็จรูป (WH-FG)
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 w-full md:w-auto">
+          <a
+            href="/infographic.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full md:w-auto"
+          >
+            <Button size="sm" className="w-full md:w-auto bg-indigo-500 hover:bg-indigo-600 text-white font-medium text-xs shadow-sm">
+              <Eye className="w-3.5 h-3.5 mr-1.5" />
+              เปิดดูแผนผัง Infographic (คลิกที่นี่)
+              <ArrowUpRight className="w-3.5 h-3.5 ml-1 text-indigo-200" />
+            </Button>
+          </a>
         </div>
       </div>
 
@@ -853,6 +905,18 @@ export default function WmsDashboardPage() {
             </button>
           );
         })}
+
+        {/* External Infographic Tab Link */}
+        <a
+          href="/infographic.html"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="ml-auto inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 hover:bg-indigo-100 transition shadow-xs cursor-pointer"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
+          <span>แผนผังกระบวนการ Infographic</span>
+          <ArrowUpRight className="w-3.5 h-3.5 text-indigo-500" />
+        </a>
       </div>
 
       {/* TAB 1: OVERVIEW & REAL-TIME BALANCES */}
