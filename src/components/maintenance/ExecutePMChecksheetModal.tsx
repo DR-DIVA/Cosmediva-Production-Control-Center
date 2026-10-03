@@ -19,21 +19,18 @@ import {
   FileCheck, 
   UserCheck, 
   Wrench,
-  Printer,
-  FileSpreadsheet,
-  LayoutGrid,
-  ExternalLink
+  Zap,
+  Thermometer,
+  ExternalLink,
+  ChevronRight
 } from 'lucide-react'
 import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { submitPMChecksheet } from '@/app/actions/maintenance'
 import { 
   getPMChecksheetTemplate, 
   PM_FORM_CODE, 
-  PM_FORM_REVISION,
-  PM_FORM_TITLE,
   PMChecklistItem 
 } from '@/lib/pmChecksheetCatalog'
-import DCCPMChecksheetPaper from '@/components/maintenance/DCCPMChecksheetPaper'
 
 interface ExecutePMChecksheetModalProps {
   isOpen: boolean
@@ -64,9 +61,8 @@ export default function ExecutePMChecksheetModal({
   const checklistItems: PMChecklistItem[] = template.items
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
 
-  // Primary view: DCC_EXCEL (Exact replica of original Excel DCC form)
-  const [viewMode, setViewMode] = useState<'DCC_EXCEL' | 'MOBILE_CARDS'>('DCC_EXCEL')
   const [execTechName, setExecTechName] = useState(technicianName || 'ช่างยะ ปิยะราช รามมา')
+  const [isEditingTech, setIsEditingTech] = useState(false)
   const [ownerSignName, setOwnerSignName] = useState('')
   const [generalNotes, setGeneralNotes] = useState('')
   const [readinessStatus, setReadinessStatus] = useState<'READY' | 'NOT_READY'>('READY')
@@ -94,6 +90,17 @@ export default function ExecutePMChecksheetModal({
     })
     return init
   })
+
+  // Group items by category
+  const categories = useMemo(() => {
+    const cats: { [cat: string]: PMChecklistItem[] } = {}
+    checklistItems.forEach(item => {
+      const cat = item.category || 'ตรวจเช็คทั่วไป'
+      if (!cats[cat]) cats[cat] = []
+      cats[cat].push(item)
+    })
+    return Object.entries(cats).map(([name, items]) => ({ name, items }))
+  }, [checklistItems])
 
   // Count scores
   const scoreCounts = useMemo(() => {
@@ -203,7 +210,9 @@ export default function ExecutePMChecksheetModal({
       })
 
       if (res.success) {
-        toast.success(res.message || 'บันทึกรายงานผลตรวจเช็ค PM สำเร็จ!')
+        toast.success(
+          res.message || 'บันทึกรายงานผลตรวจเช็ค PM สำเร็จ! ข้อมูลถูกสรุปลงแบบฟอร์ม DCC เรียบร้อยแล้ว'
+        )
         onSuccess()
         onClose()
       } else {
@@ -218,236 +227,285 @@ export default function ExecutePMChecksheetModal({
 
   return (
     <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-5xl sm:max-w-5xl w-[98vw] p-4 sm:p-6 rounded-3xl bg-stone-100 shadow-2xl border border-stone-300 max-h-[95vh] overflow-y-auto font-sans print:p-0 print:m-0 print:border-none print:shadow-none print:bg-white print:max-h-none print:w-full print:max-w-none">
+      <DialogContent className="max-w-4xl sm:max-w-4xl w-[96vw] p-5 sm:p-7 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[94vh] overflow-y-auto font-sans">
         
-        {/* Print Styles for Pixel-Perfect A4 Form */}
-        <style dangerouslySetInnerHTML={{ __html: `
-          @media print {
-            @page {
-              size: A4 portrait;
-              margin: 6mm;
-            }
-            body, html {
-              background: white !important;
-              color: black !important;
-              margin: 0 !important;
-              padding: 0 !important;
-              overflow: visible !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              -webkit-print-color-adjust: exact !important;
-              print-color-adjust: exact !important;
-            }
-            div[role="dialog"] > div {
-              box-shadow: none !important;
-              border: none !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              max-height: none !important;
-              overflow: visible !important;
-              width: 100% !important;
-              max-width: 100% !important;
-              background: white !important;
-            }
-            .print\\:hidden, button, header, nav, [class*="DialogHeader"] {
-              display: none !important;
-            }
-            .dcc-pm-sheet {
-              width: 100% !important;
-              max-width: 100% !important;
-              padding: 0 !important;
-              margin: 0 !important;
-              page-break-inside: avoid !important;
-              break-inside: avoid !important;
-            }
-          }
-        `}} />
-
-        {/* Top Action Toolbar (Hidden on Print) */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-stone-200 shadow-xs print:hidden">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-mono text-xs font-black text-emerald-900 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-              <span>แบบฟอร์ม DCC: MT-PF-001E</span>
-            </span>
-            <span className="font-mono text-xs font-bold text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg">
-              {plan.machine_code} - {template.machineName || plan.machine_name}
-            </span>
-            <span className={`px-2 py-0.5 rounded-full text-xs font-bold font-mono border ${freq.color}`}>
-              {freq.full}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            {/* View Mode Toggle */}
-            <div className="bg-stone-100 p-1 rounded-xl flex items-center text-xs">
-              <button
-                type="button"
-                onClick={() => setViewMode('DCC_EXCEL')}
-                className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                  viewMode === 'DCC_EXCEL'
-                    ? 'bg-white text-stone-950 shadow-xs'
-                    : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
-                <span>แบบฟอร์ม Excel เดิม</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('MOBILE_CARDS')}
-                className={`px-3 py-1 rounded-lg font-bold transition flex items-center gap-1.5 ${
-                  viewMode === 'MOBILE_CARDS'
-                    ? 'bg-white text-stone-950 shadow-xs'
-                    : 'text-stone-500 hover:text-stone-800'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5 text-cyan-700" />
-                <span>มุมมองการ์ด</span>
-              </button>
+        {/* Header - Checklist Mode */}
+        <DialogHeader className="text-left border-b border-stone-200 pb-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-mono text-xs font-bold text-cyan-700 bg-cyan-50 px-2.5 py-0.5 rounded-full border border-cyan-200">
+                  {plan.plan_code}
+                </span>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold font-mono border ${freq.color}`}>
+                  {freq.full}
+                </span>
+                <span className="text-[11px] font-medium text-stone-500 bg-stone-100 px-2.5 py-0.5 rounded-full border border-stone-200">
+                  แบบฟอร์ม DCC: {PM_FORM_CODE}
+                </span>
+              </div>
+              <DialogTitle className="text-lg sm:text-xl font-black text-stone-900 mt-1 flex items-center gap-2">
+                <span>Checklist ตรวจเช็คบำรุงรักษาเครื่องจักรประจำรอบ</span>
+              </DialogTitle>
+              <DialogDescription className="text-xs text-stone-600 mt-0.5">
+                <b className="font-bold text-stone-900">{plan.machine_code}</b> - {template.machineName || plan.machine_name} 
+                <span className="text-stone-400 mx-1.5">•</span>
+                <span className="text-stone-500">พื้นที่: {template.location || 'ฝ่ายผลิต'}</span>
+              </DialogDescription>
             </div>
 
-            {/* Print Button */}
-            <Button
-              type="button"
-              onClick={() => window.print()}
-              className="bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs h-8 px-3 rounded-xl flex items-center gap-1.5 shadow-xs"
-            >
-              <Printer className="w-3.5 h-3.5 text-[#D4AF37]" />
-              <span>พิมพ์เอกสาร A4</span>
-            </Button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-
-          {/* VIEW MODE 1: EXACT DCC EXCEL TEMPLATE */}
-          {viewMode === 'DCC_EXCEL' && (
-            <div className="bg-white rounded-2xl border border-stone-300 shadow-md p-2 sm:p-5 overflow-x-auto print:border-none print:shadow-none print:p-0">
-              <DCCPMChecksheetPaper
-                template={template}
-                plan={plan}
-                results={results}
-                onScoreChange={handleScoreChange}
-                onReadingChange={handleReadingChange}
-                readinessStatus={readinessStatus}
-                onReadinessChange={setReadinessStatus}
-                generalNotes={generalNotes}
-                onGeneralNotesChange={setGeneralNotes}
-                execTechName={execTechName}
-                onTechNameChange={setExecTechName}
-                ownerSignName={ownerSignName}
-                onOwnerSignNameChange={setOwnerSignName}
-              />
-            </div>
-          )}
-
-          {/* VIEW MODE 2: MOBILE FRIENDLY CARDS */}
-          {viewMode === 'MOBILE_CARDS' && (
-            <div className="space-y-3 bg-white p-4 rounded-2xl border border-stone-200">
-              <div className="flex items-center justify-between border-b pb-2">
-                <span className="text-xs font-bold text-stone-700">รายการตรวจเช็ค ({checklistItems.length} ข้อ)</span>
-                <span className="text-xs text-stone-400">ติ๊กเลือก 1 (ปกติ) / 2 (เฝ้าระวัง) / 3 (ซ่อมด่วน)</span>
-              </div>
-
-              <div className="space-y-2">
-                {checklistItems.map((chk, idx) => {
-                  const current = results[chk.id] || { score: 1, status: 'PASS', remark: '', readings: {} }
-                  return (
-                    <div
-                      key={chk.id}
-                      className={`p-3 rounded-xl border text-xs transition ${
-                        current.score === 1 ? 'bg-stone-50 border-stone-200' :
-                        current.score === 2 ? 'bg-amber-50/60 border-amber-300' :
-                        'bg-rose-50/60 border-rose-300'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded bg-stone-200 font-bold flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <span className="font-bold text-stone-900">{chk.item}</span>
-                          </div>
-                          <div className="text-[11px] text-stone-500 pl-7">{chk.standard}</div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 self-end sm:self-center shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => handleScoreChange(chk.id, 1)}
-                            className={`px-3 py-1 rounded-lg font-bold text-xs ${
-                              current.score === 1 ? 'bg-emerald-600 text-white' : 'bg-white border text-stone-700'
-                            }`}
-                          >
-                            1 ปกติ
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleScoreChange(chk.id, 2)}
-                            className={`px-3 py-1 rounded-lg font-bold text-xs ${
-                              current.score === 2 ? 'bg-amber-500 text-stone-950' : 'bg-white border text-stone-700'
-                            }`}
-                          >
-                            2 เฝ้าระวัง
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleScoreChange(chk.id, 3)}
-                            className={`px-3 py-1 rounded-lg font-bold text-xs ${
-                              current.score === 3 ? 'bg-rose-600 text-white' : 'bg-white border text-stone-700'
-                            }`}
-                          >
-                            3 ซ่อมด่วน
-                          </button>
-                        </div>
-                      </div>
-
-                      {current.score > 1 && (
-                        <div className="mt-2 pt-2 border-t border-stone-200/60 pl-7">
-                          <Input
-                            placeholder="ระบุข้อสังเกต หรือสาเหตุที่ต้องซ่อมด่วน..."
-                            value={current.remark}
-                            onChange={e => handleRemarkChange(chk.id, e.target.value)}
-                            className="h-8 text-xs bg-white"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Signatures in card view */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 border-t">
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">ผู้ส่งมอบ (ช่างผู้ตรวจ):</label>
+            {/* Technician Info */}
+            <div className="text-left sm:text-right shrink-0">
+              <span className="text-[11px] text-stone-400 block">ช่างผู้ตรวจเช็ค:</span>
+              {isEditingTech ? (
+                <div className="flex items-center gap-1 mt-1">
                   <Input
+                    type="text"
                     value={execTechName}
                     onChange={e => setExecTechName(e.target.value)}
-                    className="h-8 text-xs"
+                    className="h-7 text-xs w-44"
+                    placeholder="พิมพ์ชื่อช่างผู้ตรวจ"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTech(false)}
+                    className="text-[11px] font-bold px-2 py-1 bg-stone-900 text-white rounded-md"
+                  >
+                    ตกลง
+                  </button>
                 </div>
-                <div>
-                  <label className="text-[11px] font-bold text-stone-700 block mb-1">ผู้รับมอบ (หัวหน้าแผนก): *</label>
-                  <Input
-                    required
-                    value={ownerSignName}
-                    onChange={e => setOwnerSignName(e.target.value)}
-                    placeholder="พิมพ์ชื่อผู้รับมอบ"
-                    className="h-8 text-xs border-blue-400"
-                  />
+              ) : (
+                <div className="inline-flex items-center gap-1.5 mt-0.5">
+                  <span className="font-bold text-xs text-stone-800 bg-stone-100 px-2.5 py-1 rounded-lg">
+                    {execTechName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTech(true)}
+                    className="text-[10px] text-cyan-700 hover:underline font-medium"
+                  >
+                    (เปลี่ยน)
+                  </button>
                 </div>
+              )}
+            </div>
+          </div>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4 pt-2">
+
+          {/* Safety Alert Note */}
+          <div className="p-3 bg-amber-50 rounded-2xl border border-amber-200 text-xs text-amber-900 flex items-start gap-2.5">
+            <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <b className="font-bold">ข้อควรระวังความปลอดภัยในการทำงาน (Safety Note):</b>
+              <p className="mt-0.5 text-[11px] text-amber-800">
+                {plan.safety_requirements || 'ตัดกระแสไฟฟ้าก่อนเริ่มงาน (Lockout/Tagout), สวมถุงมือนิรภัยและแว่นตาเซฟตี้'}
+              </p>
+            </div>
+          </div>
+
+          {/* Standard 3-Tier Rating Guide */}
+          <div className="grid grid-cols-3 gap-2 p-2.5 bg-stone-50 rounded-2xl border border-stone-200 text-xs text-center font-bold">
+            <div className="p-1.5 rounded-xl bg-emerald-50 text-emerald-800 border border-emerald-200 flex items-center justify-center gap-1.5">
+              <span className="w-4 h-4 rounded-full bg-emerald-600 text-white text-[10px] flex items-center justify-center">1</span>
+              <span>ใช้งานได้ปกติ</span>
+            </div>
+            <div className="p-1.5 rounded-xl bg-amber-50 text-amber-800 border border-amber-200 flex items-center justify-center gap-1.5">
+              <span className="w-4 h-4 rounded-full bg-amber-500 text-stone-950 text-[10px] flex items-center justify-center">2</span>
+              <span>ระมัดระวังการใช้งาน</span>
+            </div>
+            <div className="p-1.5 rounded-xl bg-rose-50 text-rose-800 border border-rose-200 flex items-center justify-center gap-1.5">
+              <span className="w-4 h-4 rounded-full bg-rose-600 text-white text-[10px] flex items-center justify-center">3</span>
+              <span>ซ่อมหรือแก้ไขด่วน</span>
+            </div>
+          </div>
+
+          {/* Checklist Items Grouped by Category */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
+                <FileCheck className="w-4 h-4 text-[#D4AF37]" />
+                รายการตรวจเช็คตามข้อกำหนด ({checklistItems.length} ข้อ)
+              </h3>
+              <div className="flex items-center gap-2 text-xs font-bold">
+                <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  ปกติ: {scoreCounts.pass}
+                </span>
+                {scoreCounts.caution > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+                    เฝ้าระวัง: {scoreCounts.caution}
+                  </span>
+                )}
+                {scoreCounts.defect > 0 && (
+                  <span className="px-2.5 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-300 animate-pulse">
+                    ซ่อมด่วน: {scoreCounts.defect}
+                  </span>
+                )}
               </div>
             </div>
-          )}
 
-          {/* Level 3 Defect Alert & Auto Breakdown Ticket prompt */}
+            {categories.map((cat) => (
+              <div key={cat.name} className="border border-stone-200 rounded-2xl overflow-hidden bg-white shadow-xs">
+                {/* Category Header */}
+                <div className="px-4 py-2 bg-stone-100 border-b border-stone-200 flex items-center justify-between">
+                  <span className="font-bold text-xs text-stone-800 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-cyan-700"></span>
+                    {cat.name}
+                  </span>
+                  <span className="text-[11px] text-stone-400 font-medium">
+                    {cat.items.length} รายการ
+                  </span>
+                </div>
+
+                {/* Items */}
+                <div className="divide-y divide-stone-100">
+                  {cat.items.map((item) => {
+                    const current = results[item.id] || { score: 1, status: 'PASS', remark: '', readings: {} }
+                    const hasReadings = Boolean(item.readings)
+
+                    return (
+                      <div
+                        key={item.id}
+                        className={`p-3.5 transition ${
+                          current.score === 1 ? 'hover:bg-stone-50/60' :
+                          current.score === 2 ? 'bg-amber-50/50' :
+                          'bg-rose-50/60'
+                        }`}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                          {/* Item Details */}
+                          <div className="space-y-1 sm:max-w-[60%]">
+                            <div className="flex items-start gap-2">
+                              <span className="w-5 h-5 rounded-md bg-stone-200 text-stone-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                {item.id}
+                              </span>
+                              <div>
+                                <div className="font-bold text-xs text-stone-900 leading-snug">
+                                  {item.item}
+                                </div>
+                                <div className="text-[11px] text-stone-500 mt-0.5">
+                                  <span className="text-stone-400">เกณฑ์มาตรฐาน:</span> {item.standard}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Inline Technical Measurement Inputs */}
+                            {hasReadings && item.readings && (
+                              <div className="mt-2 pl-7 flex flex-wrap items-center gap-2 p-2 bg-stone-100/80 rounded-xl border border-stone-200 text-xs">
+                                {item.readings.type === 'amp_uvw' ? (
+                                  <>
+                                    <span className="font-bold text-stone-700 flex items-center gap-1 text-[11px]">
+                                      <Zap className="w-3.5 h-3.5 text-amber-500" />
+                                      วัดกระแสไฟฟ้า (Amp):
+                                    </span>
+                                    {item.readings.fields.map(phase => (
+                                      <div key={phase} className="flex items-center gap-1">
+                                        <span className="font-bold text-stone-600 text-[11px]">{phase}:</span>
+                                        <Input
+                                          type="text"
+                                          placeholder="0.0"
+                                          value={current.readings?.[phase] || ''}
+                                          onChange={e => handleReadingChange(item.id, phase, e.target.value)}
+                                          className="w-16 h-7 text-xs bg-white text-center font-mono font-bold"
+                                        />
+                                        <span className="text-stone-400 text-[10px]">A</span>
+                                      </div>
+                                    ))}
+                                  </>
+                                ) : item.readings.type === 'temperature' ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="font-bold text-stone-700 flex items-center gap-1 text-[11px]">
+                                      <Thermometer className="w-3.5 h-3.5 text-rose-500" />
+                                      อุณหภูมิความร้อน:
+                                    </span>
+                                    <Input
+                                      type="text"
+                                      placeholder="เช่น 45.0"
+                                      value={current.readings?.['temp'] || ''}
+                                      onChange={e => handleReadingChange(item.id, 'temp', e.target.value)}
+                                      className="w-20 h-7 text-xs bg-white text-center font-mono font-bold"
+                                    />
+                                    <span className="text-stone-600 font-bold text-[11px]">°C</span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* 1 / 2 / 3 Score Buttons */}
+                          <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(item.id, 1)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                                current.score === 1
+                                  ? 'bg-emerald-600 text-white shadow-xs'
+                                  : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50'
+                              }`}
+                            >
+                              <span className="font-mono font-black text-xs">1</span>
+                              <span>ปกติ</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(item.id, 2)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                                current.score === 2
+                                  ? 'bg-amber-500 text-stone-950 shadow-xs'
+                                  : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50'
+                              }`}
+                            >
+                              <span className="font-mono font-black text-xs">2</span>
+                              <span>ระมัดระวัง</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleScoreChange(item.id, 3)}
+                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
+                                current.score === 3
+                                  ? 'bg-rose-600 text-white shadow-xs animate-pulse'
+                                  : 'bg-white text-stone-600 border border-stone-200 hover:bg-stone-50'
+                              }`}
+                            >
+                              <span className="font-mono font-black text-xs">3</span>
+                              <span>ซ่อมด่วน</span>
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Remark input if score 2 or 3 */}
+                        {current.score > 1 && (
+                          <div className="mt-2 pt-2 border-t border-stone-200/60 pl-7">
+                            <Input
+                              placeholder={
+                                current.score === 3 
+                                  ? '⚠️ ระบุอาการชำรุด หรือสาเหตุที่ต้องซ่อมด่วน (ระบบจะนำไปเปิดใบแจ้งซ่อม)...'
+                                  : 'ระบุข้อสังเกตเพื่อเฝ้าระวังในรอบถัดไป...'
+                              }
+                              value={current.remark}
+                              onChange={e => handleRemarkChange(item.id, e.target.value)}
+                              className={`h-8 text-xs bg-white rounded-xl ${
+                                current.score === 3 ? 'border-rose-400 focus:ring-rose-400' : 'border-amber-300'
+                              }`}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Level 3 Defect Warning & Auto-Ticket */}
           {scoreCounts.defect > 0 && (
-            <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs print:hidden">
+            <div className="p-3.5 bg-rose-50 border-2 border-rose-300 rounded-2xl space-y-2 text-xs">
               <div className="flex items-center gap-2 text-rose-900 font-bold">
-                <XCircle className="w-4 h-4 text-rose-600" />
+                <XCircle className="w-4 h-4 text-rose-600 shrink-0" />
                 <span>พบข้อบกพร่องระดับ 3 (ซ่อมหรือแก้ไขโดยด่วน) {scoreCounts.defect} รายการ</span>
               </div>
               <label className="flex items-center gap-2 cursor-pointer font-bold text-stone-800 pl-6">
@@ -455,29 +513,105 @@ export default function ExecutePMChecksheetModal({
                   type="checkbox"
                   checked={autoCreateBreakdown}
                   onChange={e => setAutoCreateBreakdown(e.target.checked)}
-                  className="w-4 h-4 rounded text-rose-600"
+                  className="w-4 h-4 rounded text-rose-600 focus:ring-rose-500"
                 />
                 <span>เปิดใบแจ้งซ่อมด่วน (Breakdown Ticket MT-PF-001D) อัตโนมัติทันที</span>
               </label>
+              {autoCreateBreakdown && (
+                <div className="pl-6">
+                  <Input
+                    placeholder="ระบุข้อคิดเห็นการแจ้งซ่อมด่วนเพิ่มเติม (ถ้ามี)..."
+                    value={breakdownNotes}
+                    onChange={e => setBreakdownNotes(e.target.value)}
+                    className="h-8 text-xs bg-white rounded-xl border-rose-300"
+                  />
+                </div>
+              )}
             </div>
           )}
 
-          {/* Bottom Action Footer (Hidden on Print) */}
-          <div className="flex items-center justify-between pt-2 border-t border-stone-200 print:hidden">
-            <span className="text-xs text-stone-500">
-              สถานะ: <b className={readinessStatus === 'READY' ? 'text-emerald-700' : 'text-rose-700'}>
-                {readinessStatus === 'READY' ? '🟢 พร้อมใช้งาน' : '🔴 ไม่พร้อมใช้งาน'}
-              </b>
-            </span>
+          {/* Machine Readiness & Additional Notes */}
+          <div className="p-4 bg-stone-50 rounded-2xl border border-stone-200 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200 pb-2">
+              <label className="text-xs font-bold text-stone-800">
+                สถานะความพร้อมของเครื่องจักรหลังตรวจเช็ค (Machine Readiness)
+              </label>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="modal_readiness"
+                    checked={readinessStatus === 'READY'}
+                    onChange={() => setReadinessStatus('READY')}
+                    className="text-emerald-600 focus:ring-emerald-500"
+                  />
+                  <span>🟢 เรียบร้อย / พร้อมใช้งาน</span>
+                </label>
 
-            <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs font-bold text-rose-800 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="modal_readiness"
+                    checked={readinessStatus === 'NOT_READY'}
+                    onChange={() => setReadinessStatus('NOT_READY')}
+                    className="text-rose-600 focus:ring-rose-500"
+                  />
+                  <span>🔴 ไม่พร้อมใช้งาน / รอตรวจสอบแก้ไข</span>
+                </label>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-stone-600 block mb-1">
+                รายละเอียดต้องการให้แก้ไขปรับปรุงเพิ่มเติม / ข้อคิดเห็นช่าง
+              </label>
+              <textarea
+                rows={2}
+                value={generalNotes}
+                onChange={e => setGeneralNotes(e.target.value)}
+                placeholder="เช่น ตรวจสอบความตึงสายพาน เปลี่ยนสารหล่อลื่น และเช็ดทำความสะอาดรอบเครื่องเรียบร้อย..."
+                className="w-full p-2 text-xs bg-white rounded-xl border border-stone-300 focus:outline-none focus:ring-1 focus:ring-cyan-700"
+              />
+            </div>
+          </div>
+
+          {/* Sign-off Section */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 text-xs">
+            <div>
+              <span className="font-bold text-blue-900 block mb-1">ผู้ส่งมอบ (ช่างผู้ตรวจ):</span>
+              <div className="p-2 bg-white rounded-xl border border-blue-200 font-bold text-stone-800">
+                {execTechName}
+              </div>
+            </div>
+
+            <div>
+              <span className="font-bold text-blue-900 block mb-1">
+                ผู้รับมอบ (หัวหน้าแผนกผู้เป็นเจ้าของเครื่อง): <span className="text-red-500">*</span>
+              </span>
+              <Input
+                required
+                placeholder="พิมพ์ชื่อหัวหน้าแผนกผู้รับมอบ..."
+                value={ownerSignName}
+                onChange={e => setOwnerSignName(e.target.value)}
+                className="h-9 text-xs bg-white border-blue-300 font-medium"
+              />
+            </div>
+          </div>
+
+          {/* Footer Info & Actions */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2 border-t border-stone-200">
+            <div className="text-[11px] text-stone-500">
+              💡 เมื่อกดบันทึก ผลการตรวจและค่าที่วัดได้จะถูกนำไปสรุปลงใน <b>แบบฟอร์ม DCC (MT-PF-001E)</b> อัตโนมัติ
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-auto">
               <Button
                 type="button"
                 variant="outline"
                 onClick={onClose}
                 className="text-xs rounded-xl border-stone-300 h-9"
               >
-                ปิดหน้าต่าง
+                ยกเลิก
               </Button>
 
               <Button

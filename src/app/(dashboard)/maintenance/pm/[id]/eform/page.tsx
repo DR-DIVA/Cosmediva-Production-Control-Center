@@ -28,5 +28,10 @@ export default async function DCCPMChecksheetPage({ params }: Props) {
     )
   }
 
-  return <DCCPMChecksheetStandalone plan={res.data} />
+  return (
+    <DCCPMChecksheetStandalone 
+      plan={res.data} 
+      latestExecution={(res as any).latestExecution} 
+    />
+  )
 }

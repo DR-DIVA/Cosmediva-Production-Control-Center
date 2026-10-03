@@ -2546,6 +2546,15 @@ export async function submitPMChecksheet(params: {
       closed_at: now.toISOString(),
       total_downtime_minutes: 0,
       repair_time_minutes: plan.estimated_minutes || 60,
+      diagnosis: JSON.stringify({
+        checklistResults: params.checklistResults,
+        readinessStatus: params.readinessStatus || 'READY',
+        executionNotes: params.executionNotes || '',
+        overallStatus: params.overallStatus,
+        technicianName: params.technicianName,
+        ownerSignName: params.ownerSignName,
+        submittedAt: now.toISOString()
+      }),
       corrective_action: `ตรวจเช็คบำรุงรักษาตามมาตรฐาน PM Checklist ${totalCount} ข้อ (DCC MT-WF-002D) ผลการตรวจ: ${params.overallStatus} [${readinessLabel}]. หมายเหตุช่าง: ${params.executionNotes || '-'}`,
       root_cause: `รอบการบำรุงรักษาเชิงป้องกันตามแผน (PM Plan ${plan.frequency_type})`,
       problem_category: 'Preventive Maintenance',
@@ -2695,7 +2704,29 @@ export async function getPMPlanDCCDetails(idOrCode: string) {
     if (error || !data) {
       return { success: false, error: 'ไม่พบข้อมูลแผน PM' }
     }
-    return { success: true, data }
+
+    // Also fetch latest executed PM work order for this machine/plan
+    let latestExecution: any = null
+    const { data: latestWo } = await supabase
+      .from('maintenance_work_orders')
+      .select('*')
+      .eq('machine_code', data.machine_code)
+      .ilike('wo_number', 'PM-%')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (latestWo && latestWo.diagnosis) {
+      try {
+        latestExecution = JSON.parse(latestWo.diagnosis)
+        latestExecution.wo_number = latestWo.wo_number
+        latestExecution.executed_at = latestWo.repair_completed_at || latestWo.created_at
+      } catch (e) {
+        // ignore parse error
+      }
+    }
+
+    return { success: true, data, latestExecution, latestWorkOrder: latestWo }
   } catch (err: any) {
     return { success: false, error: err.message }
   }
