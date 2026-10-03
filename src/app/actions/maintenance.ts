@@ -2451,9 +2451,19 @@ export async function submitPMChecksheet(params: {
   planId: string
   technicianName: string
   executionNotes?: string
-  checklistResults: { item: string; standard: string; status: 'PASS' | 'FAIL' | 'REMARK'; remark?: string }[]
+  checklistResults: { 
+    item: string
+    standard?: string
+    status: 'PASS' | 'FAIL' | 'REMARK'
+    remark?: string
+    score?: number
+    readings?: Record<string, string> 
+  }[]
   overallStatus: 'PASSED' | 'PASSED_WITH_REMARKS' | 'FAILED'
   ownerSignName: string
+  readinessStatus?: 'READY' | 'NOT_READY'
+  createBreakdownTicket?: boolean
+  breakdownNotes?: string
   photoBeforeUrls?: string[]
   photoAfterUrls?: string[]
 }) {
@@ -2509,6 +2519,10 @@ export async function submitPMChecksheet(params: {
   const passCount = params.checklistResults.filter(r => r.status === 'PASS').length
   const totalCount = params.checklistResults.length
 
+  const readinessLabel = params.readinessStatus === 'NOT_READY' 
+    ? '🔴 ไม่พร้อมใช้งาน / รอตรวจสอบแก้ไข' 
+    : '🟢 เรียบร้อย / พร้อมใช้งาน'
+
   const { data: wo, error: woErr } = await supabase
     .from('maintenance_work_orders')
     .insert({
@@ -2520,8 +2534,8 @@ export async function submitPMChecksheet(params: {
       priority: 'P3_NORMAL',
       status: 'VERIFIED',
       symptom_category: 'Other',
-      symptom_description: `งานตรวจเช็คบำรุงรักษาเชิงป้องกัน (PM) ตามแผน ${plan.plan_code} (${plan.frequency_type}): ผ่านเกณฑ์ ${passCount}/${totalCount} ข้อ`,
-      production_impact: 'Production can continue',
+      symptom_description: `งานตรวจเช็คบำรุงรักษาเชิงป้องกัน (PM MT-WF-002D) แผน ${plan.plan_code} (${plan.frequency_type}): ผ่านเกณฑ์ ${passCount}/${totalCount} ข้อ [สถานะเครื่อง: ${readinessLabel}]`,
+      production_impact: params.readinessStatus === 'NOT_READY' ? 'Machine stopped' : 'Production can continue',
       is_emergency_breakdown: false,
       assigned_technician_name: params.technicianName,
       reported_at: now.toISOString(),
@@ -2532,17 +2546,38 @@ export async function submitPMChecksheet(params: {
       closed_at: now.toISOString(),
       total_downtime_minutes: 0,
       repair_time_minutes: plan.estimated_minutes || 60,
-      corrective_action: `ตรวจเช็คบำรุงรักษาตามมาตรฐาน PM Checklist ${totalCount} ข้อ ผลการตรวจ: ${params.overallStatus}. หมายเหตุ: ${params.executionNotes || '-'}`,
+      corrective_action: `ตรวจเช็คบำรุงรักษาตามมาตรฐาน PM Checklist ${totalCount} ข้อ (DCC MT-WF-002D) ผลการตรวจ: ${params.overallStatus} [${readinessLabel}]. หมายเหตุช่าง: ${params.executionNotes || '-'}`,
       root_cause: `รอบการบำรุงรักษาเชิงป้องกันตามแผน (PM Plan ${plan.frequency_type})`,
       problem_category: 'Preventive Maintenance',
       verified_by_name: params.ownerSignName || 'หัวหน้าแผนกผู้เป็นเจ้าของเครื่อง',
       verification_status: 'ACCEPTED',
-      verification_notes: 'เจ้าของเครื่องลงนามตรวจรับมอบงาน PM สมบูรณ์',
+      verification_notes: `เจ้าของเครื่องลงนามตรวจรับมอบงาน PM สมบูรณ์ (${readinessLabel})`,
       photo_before_urls: params.photoBeforeUrls || [],
       photo_after_urls: params.photoAfterUrls || []
     })
     .select()
     .single()
+
+  // 5. Optionally create Breakdown Ticket if requested and defects exist
+  let breakdownWo = null
+  if (params.createBreakdownTicket) {
+    const defects = params.checklistResults.filter(r => r.status === 'FAIL')
+    if (defects.length > 0) {
+      const defectSummary = defects.map((d, i) => `${i + 1}. ${d.item}${d.remark ? ` (อาการ: ${d.remark})` : ''}`).join('\n')
+      const repairRes = await createRepairRequest({
+        machine_code: plan.machine_code,
+        symptom_category: 'Preventive Maintenance Defect',
+        symptom_description: `[อัตโนมัติจากใบ PM ${plan.plan_code}] ตรวจพบข้อบกพร่องระดับ 3 (ซ่อมด่วน):\n${defectSummary}\n\nข้อคิดเห็นเพิ่มเติม: ${params.breakdownNotes || params.executionNotes || '-'}`,
+        production_impact: params.readinessStatus === 'NOT_READY' ? 'Machine stopped' : 'Production can continue',
+        is_emergency_breakdown: true,
+        requester_name: params.technicianName,
+        requester_department_name: 'ฝ่ายซ่อมบำรุง (Maintenance Team)'
+      })
+      if (repairRes.success) {
+        breakdownWo = repairRes.data
+      }
+    }
+  }
 
   revalidatePath('/maintenance')
   revalidatePath('/maintenance/technician')
@@ -2554,7 +2589,10 @@ export async function submitPMChecksheet(params: {
   return { 
     success: true, 
     data: wo, 
-    message: `บันทึกผลตรวจเช็ค PM เครื่อง ${plan.machine_code} และส่งมอบงานให้แผนกเจ้าของเครื่องเรียบร้อยแล้ว!` 
+    breakdownWo,
+    message: breakdownWo 
+      ? `บันทึกผล PM เรียบร้อย พร้อมเปิดใบแจ้งซ่อมด่วนรหัส ${breakdownWo.wo_number} ให้ทันที!`
+      : `บันทึกผลตรวจเช็ค PM เครื่อง ${plan.machine_code} และส่งมอบงานให้แผนกเจ้าของเครื่องเรียบร้อยแล้ว!` 
   }
 }
 
@@ -2635,3 +2673,30 @@ export async function dispatchPMWorkOrder(params: {
   }
 }
 
+/**
+ * Get PM Plan details for DCC PM Check Sheet Form (MT-PF-001E)
+ */
+export async function getPMPlanDCCDetails(idOrCode: string) {
+  try {
+    const supabase = createAdminClient()
+    let query = supabase
+      .from('maintenance_pm_plans')
+      .select('*, machine:maintenance_machines(*)')
+
+    if (idOrCode.includes('-') && idOrCode.length === 36) {
+      query = query.eq('id', idOrCode)
+    } else if (idOrCode.startsWith('PM-')) {
+      query = query.eq('plan_code', idOrCode)
+    } else {
+      query = query.eq('machine_code', idOrCode)
+    }
+
+    const { data, error } = await query.maybeSingle()
+    if (error || !data) {
+      return { success: false, error: 'ไม่พบข้อมูลแผน PM' }
+    }
+    return { success: true, data }
+  } catch (err: any) {
+    return { success: false, error: err.message }
+  }
+}

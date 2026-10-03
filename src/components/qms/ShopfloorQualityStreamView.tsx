@@ -1,0 +1,1309 @@
+"use client";
+
+import React, { useState, useEffect, useMemo } from 'react'
+import { createClient } from '@supabase/supabase-js'
+import { toast } from 'sonner'
+import { 
+  AlertTriangle, 
+  Hammer, 
+  PackageSearch, 
+  ShieldAlert, 
+  CheckCircle2, 
+  PlusCircle, 
+  History, 
+  User,
+  Leaf,
+  Box,
+  FlaskConical,
+  Package,
+  TrendingUp,
+  Filter,
+  ShieldCheck,
+  X,
+  Layers,
+  Sparkles,
+  RefreshCw,
+  ArrowUpRight
+} from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Input } from "@/components/ui/input"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Badge } from "@/components/ui/badge"
+import { getUsers } from "@/app/actions/users"
+import { useKpiPeriod } from '@/hooks/useKpiPeriod'
+import { KpiReportingPeriodToolbar } from '@/components/common/KpiReportingPeriodToolbar'
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+const supabase = createClient(supabaseUrl, supabaseAnonKey)
+
+export interface ShopfloorQualityStreamViewProps {
+  currentUser?: string
+  currentUserInfo?: any
+  onActiveIssuesCountChange?: (count: number) => void
+  onEscalateToQms?: (issueData: {
+    sku?: string
+    lotNo?: string
+    productName?: string
+    description: string
+    stage?: string
+  }) => void
+}
+
+export default function ShopfloorQualityStreamView({
+  currentUser: parentCurrentUser,
+  currentUserInfo: parentCurrentUserInfo,
+  onActiveIssuesCountChange,
+  onEscalateToQms
+}: ShopfloorQualityStreamViewProps) {
+  const [issues, setIssues] = useState<any[]>([])
+  const [resolvedIssues, setResolvedIssues] = useState<any[]>([])
+  const [activeTasks, setActiveTasks] = useState<any[]>([])
+  const [isReportOpen, setIsReportOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState('')
+  const [reportNote, setReportNote] = useState('')
+  
+  const [isResolveOpen, setIsResolveOpen] = useState(false)
+  const [resolvingIssue, setResolvingIssue] = useState<any>(null)
+  const [resolveNote, setResolveNote] = useState('')
+  const [currentUserInfo, setCurrentUserInfo] = useState<any>(parentCurrentUserInfo || null)
+  const [masterUsers, setMasterUsers] = useState<any[]>([])
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentUser, setCurrentUser] = useState<string>(parentCurrentUser || '')
+  const [streamFilter, setStreamFilter] = useState<'ALL' | 'RM' | 'PM' | 'BULK' | 'FG'>('ALL')
+  const [selectedInspector, setSelectedInspector] = useState<string>('')
+  const kpiPeriod = useKpiPeriod()
+
+  const [rawQualityData, setRawQualityData] = useState<{ rmData: any[]; logsData: any[]; bulkData: any[]; fgData: any[] }>({
+    rmData: [], logsData: [], bulkData: [], fgData: []
+  })
+  
+  const fetchQualityMetrics = async () => {
+    try {
+      // 1. Fetch RM & PM data and logs for historical hold events
+      const [{ data: rmData }, { data: logsData }, { data: bulkData }, { data: fgData }] = await Promise.all([
+        supabase.from('production_lot_rms').select('id, rm_code, rm_name, qc_status, status, receive_date, created_at'),
+        supabase.from('production_logs').select('id, note, status, tank_details, activity_date, created_at, processes(process_name)'),
+        supabase.from('production_logs').select('id, status, tank_start, tank_end, total_tanks, tank_details, note, activity_date, created_at, processes(process_name)'),
+        supabase.from('fg_inventory').select('id, qc_status, created_at, updated_at')
+      ])
+
+      setRawQualityData({
+        rmData: rmData || [],
+        logsData: logsData || [],
+        bulkData: bulkData || [],
+        fgData: fgData || []
+      })
+    } catch (err) {
+      console.error('Error fetching quality metrics:', err)
+    }
+  }
+
+  // Reactive Quality KPI Metrics (Scoped to KPI Period)
+  const qualityStats = useMemo(() => {
+    const rmData = kpiPeriod.filterByPeriod(rawQualityData.rmData, (i: any) => i.receive_date || i.created_at)
+    const logsData = kpiPeriod.filterByPeriod(rawQualityData.logsData, (l: any) => l.activity_date || l.created_at)
+    const bulkData = kpiPeriod.filterByPeriod(rawQualityData.bulkData, (b: any) => b.activity_date || b.created_at)
+    const fgData = kpiPeriod.filterByPeriod(rawQualityData.fgData, (f: any) => f.created_at || f.updated_at)
+
+    // Extract all RM / PM hold logs from production_logs note
+    const rmHoldCodes = new Set<string>()
+    const pmHoldCodes = new Set<string>()
+    logsData.forEach((l: any) => {
+      const note = l.note || ''
+      if (note.includes('[QC HOLD]')) {
+        if (note.includes(' PM [') || note.includes(' PM:')) {
+          pmHoldCodes.add(note)
+        } else if (note.includes(' RM [') || note.includes(' RM:') || note.includes('RM/PM')) {
+          rmHoldCodes.add(note)
+        }
+      }
+    })
+
+    // 1. RM & PM Calculation
+    let rmTotal = 0, rmPassed = 0, rmHold = 0, rmReject = 0
+    let pmTotal = 0, pmPassed = 0, pmHold = 0, pmReject = 0
+
+    rmData.forEach((item: any) => {
+      const code = (item.rm_code || '').toUpperCase().trim()
+      const wh = (item.warehouse || '').toUpperCase().trim()
+      const isPM = code.startsWith('CMD') || code.startsWith('PM') || code.toLowerCase().startsWith('p') || ((wh === 'MMPM' || wh === 'WH-PM') && !code.startsWith('R'))
+      const qc = item.qc_status?.toUpperCase()
+      const isReceived = item.receive_date != null || item.status === 'RECEIVED' || item.status === 'READY' || item.status === 'REJECTED'
+
+      if (isReceived || qc) {
+        if (isPM) {
+          pmTotal++
+          if (qc === 'PASSED') pmPassed++
+          if (qc === 'REJECTED') pmReject++
+          
+          const inHoldLogs = Array.from(pmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+          if (qc === 'HOLD' || inHoldLogs) {
+            pmHold++
+          }
+        } else {
+          rmTotal++
+          if (qc === 'PASSED') rmPassed++
+          if (qc === 'REJECTED') rmReject++
+          
+          const inHoldLogs = Array.from(rmHoldCodes).some(n => item.rm_code && n.includes(item.rm_code))
+          if (qc === 'HOLD' || inHoldLogs) {
+            rmHold++
+          }
+        }
+      }
+    })
+
+    // 2. Bulk Calculation (with historical hold / reprocess per tank)
+    let bulkTotal = 0, bulkPassed = 0, bulkHold = 0, bulkReject = 0
+    const qcLogs = bulkData.filter((t: any) => {
+      const pName = Array.isArray(t.processes) ? t.processes[0]?.process_name : (t.processes as any)?.process_name
+      return pName === 'รอ QC'
+    })
+
+    qcLogs.forEach((task: any) => {
+      const details = task.tank_details || {}
+      const start = parseInt(task.tank_start) || 1
+      const end = parseInt(task.tank_end) || start
+      for (let i = start; i <= end; i++) {
+        const s = details[i]
+        bulkTotal++
+        if (s === 'QC_PASS' || s === 'SENT_TO_PACKING' || s === 'COMPLETED') {
+          bulkPassed++
+        }
+        if (s === 'FAILED' || s === 'REJECTED') {
+          bulkReject++
+        }
+
+        const historyKey = `${i}_history`
+        const histories = details[historyKey]
+        const hasHoldHistory = Array.isArray(histories) && histories.some((h: any) => 
+          h.status === 'PAUSED' || h.status === 'REPROCESS' || h.status === 'HOLD' || (h.note && (h.note.includes('HOLD') || h.note.includes('REPROCESS')))
+        )
+
+        if (s === 'PAUSED' || s === 'REPROCESS' || s === 'HOLD' || hasHoldHistory) {
+          bulkHold++
+        }
+      }
+    })
+
+    // 3. FG Calculation
+    let fgTotal = 0, fgPassed = 0, fgHold = 0, fgReject = 0
+
+    fgData.forEach((item: any) => {
+      const qc = item.qc_status?.toUpperCase()
+      if (qc) {
+        fgTotal++
+        if (qc === 'RELEASED' || qc === 'PASSED' || qc === 'QC_PASS') {
+          fgPassed++
+        } else if (qc === 'QUARANTINE' || qc === 'HOLD' || qc === 'PAUSED') {
+          fgHold++
+        } else if (qc === 'REJECTED' || qc === 'FAILED') {
+          fgReject++
+        }
+      }
+    })
+
+    const calcPcts = (total: number, passed: number, hold: number, reject: number) => {
+      const t = total > 0 ? total : 0
+      return {
+        total: t,
+        passed,
+        hold,
+        reject,
+        passedPct: t > 0 ? ((passed / t) * 100).toFixed(1) : '100.0',
+        holdPct: t > 0 ? ((hold / t) * 100).toFixed(1) : '0.0',
+        rejectPct: t > 0 ? ((reject / t) * 100).toFixed(1) : '0.0'
+      }
+    }
+
+    const rmMetrics = calcPcts(rmTotal, rmPassed, rmHold, rmReject)
+    const pmMetrics = calcPcts(pmTotal, pmPassed, pmHold, pmReject)
+    const bulkMetrics = calcPcts(bulkTotal, bulkPassed, bulkHold, bulkReject)
+    const fgMetrics = calcPcts(fgTotal, fgPassed, fgHold, fgReject)
+
+    const grandTotal = rmTotal + pmTotal + bulkTotal + fgTotal
+    const grandPassed = rmPassed + pmPassed + bulkPassed + fgPassed
+    const grandHold = rmHold + pmHold + bulkHold + fgHold
+    const grandReject = rmReject + pmReject + bulkReject + fgReject
+
+    return {
+      rm: rmMetrics,
+      pm: pmMetrics,
+      bulk: bulkMetrics,
+      fg: fgMetrics,
+      overall: {
+        total: grandTotal,
+        passed: grandPassed,
+        hold: grandHold,
+        reject: grandReject,
+        fpyPct: grandTotal > 0 ? ((grandPassed / grandTotal) * 100).toFixed(1) : '100.0'
+      }
+    }
+  }, [rawQualityData, kpiPeriod])
+
+  const fetchIssues = async () => {
+    const { data, error } = await supabase.from('production_logs')
+      .select(`
+        id,
+        status,
+        note,
+        updated_at,
+        tank_start,
+        tank_end,
+        production_lots (
+          lot_no,
+          products:sku_id (product_name, sku)
+        ),
+        processes (process_name),
+        rooms (room_name)
+      `)
+      .or('note.ilike.%[QC HOLD]%,note.ilike.%[QC REJECT]%,note.ilike.%[QC REPROCESS]%,note.ilike.%[แจ้งปัญหา]%')
+      .order('updated_at', { ascending: false })
+
+    if (error) {
+      toast.error('โหลดข้อมูลล้มเหลว')
+      return
+    }
+
+    const parsedActive: any[] = []
+    ;(data || []).forEach(task => {
+      if (task.note) {
+        const lines = task.note.split('\n').filter((l: string) => l.trim())
+        lines.forEach((line: string, idx: number) => {
+          if ((line.includes('[QC ') || line.includes('[แจ้งปัญหา]')) && !line.includes('[Resolved') && !line.includes('> [QA Approved]')) {
+            parsedActive.push({
+              ...task,
+              parsedNote: line,
+              lineIndex: idx,
+              originalNote: task.note
+            })
+          }
+        })
+      }
+    })
+    setIssues(parsedActive)
+    if (onActiveIssuesCountChange) {
+      onActiveIssuesCountChange(parsedActive.length)
+    }
+    
+    // Fetch Resolved Issues
+    const { data: resolvedData } = await supabase.from('production_logs')
+      .select(`
+        id, status, note, updated_at, tank_start, tank_end,
+        production_lots (lot_no, products:sku_id (product_name, sku)),
+        processes (process_name), rooms (room_name)
+      `)
+      .or('note.ilike.%[Resolved%,note.ilike.%> [QA Approved]%')
+      .order('updated_at', { ascending: false })
+      .limit(50)
+      
+    const parsedResolved: any[] = []
+    ;(resolvedData || []).forEach(task => {
+      if (task.note) {
+        const lines = task.note.split('\n').filter((l: string) => l.trim())
+        lines.forEach((line: string, idx: number) => {
+          if ((line.includes('[QC ') || line.includes('[แจ้งปัญหา]')) && (line.includes('[Resolved') || line.includes('> [QA Approved]'))) {
+            parsedResolved.push({
+              ...task,
+              parsedNote: line,
+              lineIndex: idx,
+              originalNote: task.note
+            })
+          }
+        })
+      }
+    })
+    setResolvedIssues(parsedResolved)
+  }
+
+  const fetchActiveTasks = async () => {
+    const { data } = await supabase.from('production_logs')
+      .select(`
+        id,
+        status,
+        production_lots (
+          lot_no,
+          products:sku_id (product_name)
+        ),
+        processes (process_name)
+      `)
+      .in('status', ['WAITING', 'IN_PROGRESS'])
+      .order('updated_at', { ascending: false })
+
+    if (data) {
+      setActiveTasks(data)
+    }
+  }
+
+  const handleRefreshAll = () => {
+    fetchIssues()
+    fetchActiveTasks()
+    fetchQualityMetrics()
+    toast.success('รีเฟรชข้อมูลคุณภาพสายการผลิตล่าสุดแล้ว')
+  }
+
+  const fetchCurrentAuthUser = async (uList: any[] = masterUsers) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      let authUser: any = session?.user
+
+      if (!authUser) {
+        const { data: { user } } = await supabase.auth.getUser()
+        authUser = user
+      }
+
+      if (authUser) {
+        const email = authUser.email || ''
+        const prefix = email.includes('@') ? email.split('@')[0] : email
+        const metaEmpId = authUser.user_metadata?.employee_id || authUser.user_metadata?.username
+        const metaName = authUser.user_metadata?.full_name || authUser.user_metadata?.name
+
+        let matched = uList.find(u => 
+          u.id === authUser!.id || 
+          u.employee_id?.toLowerCase() === prefix.toLowerCase() ||
+          u.employee_id?.toLowerCase() === metaEmpId?.toLowerCase()
+        )
+
+        if (!matched) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .or(`id.eq.${authUser.id},employee_id.ilike.${prefix},employee_id.ilike.${metaEmpId || prefix}`)
+            .maybeSingle()
+          if (profile) matched = profile
+        }
+
+        if (matched) {
+          setCurrentUserInfo(matched)
+          const empId = matched.employee_id.toUpperCase()
+          setCurrentUser(empId)
+          if (!selectedInspector) setSelectedInspector(empId)
+          return matched
+        } else {
+          const fallbackUsername = (metaEmpId || (prefix && prefix.toLowerCase() !== 'system' ? prefix : 'QA')).toUpperCase()
+          const info = {
+            employee_id: fallbackUsername,
+            full_name: metaName || fallbackUsername
+          }
+          setCurrentUserInfo(info)
+          setCurrentUser(fallbackUsername)
+          if (!selectedInspector) setSelectedInspector(fallbackUsername)
+          return info
+        }
+      } else {
+        const qaUser = uList.find(u => u.employee_id?.toUpperCase().startsWith('QA') || u.role?.includes('issues:edit'))
+        if (qaUser) {
+          setCurrentUserInfo(qaUser)
+          const empId = qaUser.employee_id.toUpperCase()
+          setCurrentUser(empId)
+          if (!selectedInspector) setSelectedInspector(empId)
+          return qaUser
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching auth user in issues page:', err)
+    }
+    return null
+  }
+
+  useEffect(() => {
+    const initData = async () => {
+      let uList: any[] = []
+      try {
+        const res = await getUsers()
+        if (res.success && res.data) {
+          uList = res.data
+          setMasterUsers(res.data)
+        }
+      } catch (err) {
+        console.error('Error fetching master users:', err)
+      }
+
+      await fetchCurrentAuthUser(uList)
+    }
+
+    initData()
+    fetchIssues()
+    fetchActiveTasks()
+    fetchQualityMetrics()
+  }, [])
+
+  const openResolveDialog = async (issue: any) => {
+    setResolvingIssue(issue)
+    setResolveNote('')
+    if (!currentUser || currentUser.toLowerCase() === 'system') {
+      await fetchCurrentAuthUser()
+    }
+    setSelectedInspector(currentUserInfo?.employee_id || currentUser || 'QA')
+    setIsResolveOpen(true)
+  }
+
+  const handleResolveConfirm = async () => {
+    if (!resolvingIssue) return
+    
+    const timestamp = new Date().toLocaleString('th-TH')
+    const inspector = (selectedInspector || currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+    const resolutionText = resolveNote.trim() 
+      ? ` > [QA Approved] ${resolveNote.replace(/\n/g, ' ')} (โดย ${inspector} - ${timestamp})` 
+      : ` > [QA Approved] ตรวจสอบและอนุมัติแล้ว (โดย ${inspector} - ${timestamp})`
+    
+    const lines = resolvingIssue.originalNote.split('\n')
+    lines[resolvingIssue.lineIndex] = `${lines[resolvingIssue.lineIndex]}${resolutionText}`
+    const newNote = lines.join('\n')
+    
+    const allResolved = lines.filter((l: string) => l.trim() && (l.includes('[QC ') || l.includes('[แจ้งปัญหา]')) && !l.includes('[Resolved') && !l.includes('> [QA Approved]')).length === 0
+    
+    const updateData: any = { note: newNote }
+    if (resolvingIssue.status === 'PAUSED') {
+      updateData.status = allResolved ? 'WAITING' : 'PAUSED'
+    }
+
+    const { error } = await supabase.from('production_logs').update(updateData).eq('id', resolvingIssue.id)
+
+    if (error) {
+      toast.error('บันทึกการแก้ไขปัญหาล้มเหลว')
+      return
+    }
+
+    toast.success('แก้ไขปัญหาเรียบร้อยแล้ว')
+    setIsResolveOpen(false)
+    setResolvingIssue(null)
+    fetchIssues()
+    fetchActiveTasks()
+    fetchQualityMetrics()
+  }
+
+  const handleSyncLegacySystemRecords = async () => {
+    const targetInspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+    try {
+      const { data: logs, error: fetchErr } = await supabase.from('production_logs')
+        .select('id, note')
+        .or('note.ilike.%(โดย SYSTEM -%,note.ilike.%(โดย System -%')
+
+      if (fetchErr || !logs || logs.length === 0) {
+        toast.info('ไม่พบรายการประวัติที่ใช้ชื่อ SYSTEM')
+        return
+      }
+
+      let updatedCount = 0
+      for (const log of logs) {
+        const updatedNote = log.note.replace(/\(โดย (?:SYSTEM|System) -/g, `(โดย ${targetInspector} -`)
+        const { error: updateErr } = await supabase
+          .from('production_logs')
+          .update({ note: updatedNote })
+          .eq('id', log.id)
+        if (!updateErr) updatedCount++
+      }
+
+      toast.success(`อัปเดตชื่อผู้ตรวจสอบเป็น ${targetInspector} สำเร็จ ${updatedCount} รายการ`)
+      fetchIssues()
+    } catch (err) {
+      console.error('Error syncing legacy system records:', err)
+      toast.error('เกิดข้อผิดพลาดในการอัปเดตข้อมูล')
+    }
+  }
+
+  const handleReportSubmit = async () => {
+    if (!selectedTaskId) {
+      toast.error('กรุณาเลือกรายการที่เกิดปัญหา')
+      return
+    }
+    if (!reportNote.trim()) {
+      toast.error('กรุณาระบุรายละเอียดปัญหา')
+      return
+    }
+
+    const { error } = await supabase.from('production_logs').update({
+      status: 'PAUSED',
+      note: `[แจ้งปัญหาใหม่] ${reportNote.replace(/\n/g, ' ')}`
+    }).eq('id', selectedTaskId)
+
+    if (error) {
+      toast.error('บันทึกปัญหาล้มเหลว')
+      return
+    }
+
+    toast.success('บันทึกปัญหาและระงับงานเรียบร้อยแล้ว')
+    setIsReportOpen(false)
+    setSelectedTaskId('')
+    setReportNote('')
+    fetchIssues()
+    fetchActiveTasks()
+    fetchQualityMetrics()
+  }
+
+  const getIssueStyle = (note: string = '') => {
+    if (note.includes('[QC REJECT]')) return 'bg-red-50 text-red-700 border-red-200'
+    if (note.includes('[QC HOLD]')) return 'bg-orange-50 text-orange-700 border-orange-200'
+    if (note.includes('[QC REPROCESS]')) return 'bg-purple-50 text-purple-700 border-purple-200'
+    if (note.includes('[ช่างซ่อม]')) return 'bg-indigo-50 text-indigo-700 border-indigo-200'
+    if (note.includes('[รอของ]')) return 'bg-yellow-50 text-yellow-700 border-yellow-200'
+    return 'bg-[#F8F6F0] text-slate-700 border-slate-200'
+  }
+
+  const filterIssuesList = (list: any[]) => {
+    const periodScopedList = kpiPeriod.syncTableWithPeriod 
+      ? kpiPeriod.filterByPeriod(list, i => i.updated_at || i.created_at || i.activity_date)
+      : list;
+    return periodScopedList.filter(i => {
+      const term = searchQuery.toLowerCase()
+      const sku = (i.production_lots?.products?.sku || '').toLowerCase()
+      const lotNo = (i.production_lots?.lot_no || '').toLowerCase()
+      const matchesSearch = !term || sku.includes(term) || lotNo.includes(term)
+      if (!matchesSearch) return false
+
+      if (streamFilter === 'ALL') return true
+      const note = i.parsedNote || ''
+      const proc = i.processes?.process_name || ''
+      if (streamFilter === 'RM') {
+        return (note.includes('RM/PM') || note.includes(' RM [') || note.includes(' RM:')) && !note.includes(' PM [') && !note.includes(' PM:')
+      }
+      if (streamFilter === 'PM') {
+        return note.includes(' PM [') || note.includes(' PM:')
+      }
+      if (streamFilter === 'BULK') {
+        return note.includes(' ถัง ') || proc === 'รอ QC' || proc === 'ผสม'
+      }
+      if (streamFilter === 'FG') {
+        return note.includes(' FG ') || note.includes(' FG(')
+      }
+      return true
+    })
+  }
+
+  const activeFilteredIssues = filterIssuesList(issues)
+  const resolvedFilteredIssues = filterIssuesList(resolvedIssues)
+
+  return (
+    <div className="space-y-6 w-full animate-in fade-in duration-200">
+      {/* KPI Reporting Period Toolbar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#D4AF37]/30 shadow-xs">
+        <div className="flex-1">
+          <KpiReportingPeriodToolbar
+            period={kpiPeriod}
+            title="ช่วงเวลารายงาน KPI สายการผลิต (First-Pass Yield)"
+            showSyncCheckbox
+            syncCheckboxLabel="กรองปัญหาหน้างานและประวัติตามช่วงเวลานี้"
+          />
+        </div>
+        <div className="flex items-center gap-2 self-end sm:self-center">
+          <Button onClick={() => setIsReportOpen(true)} size="sm" className="bg-[#D4AF37] hover:bg-[#b89528] text-white font-medium text-xs">
+            <PlusCircle className="w-3.5 h-3.5 mr-1.5" /> แจ้งปัญหาใหม่
+          </Button>
+          <Button onClick={handleRefreshAll} variant="outline" size="sm" className="text-xs">
+            <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> รีเฟรช
+          </Button>
+        </div>
+      </div>
+
+      {/* 1. Executive Summary Bar */}
+      <div className="bg-gradient-to-r from-[#2D2721] via-[#3E352B] to-[#2D2721] text-white p-4 sm:p-5 rounded-2xl shadow-xl border border-[#D4AF37]/30 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 sm:gap-5 w-full">
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="w-10 sm:w-12 h-10 sm:h-12 rounded-2xl bg-[#D4AF37] text-white flex items-center justify-center shadow-lg shadow-[#D4AF37]/30 shrink-0">
+            <ShieldCheck className="w-5 sm:w-7 h-5 sm:h-7 text-white" />
+          </div>
+          <div>
+            <div className="text-[10px] sm:text-xs font-bold text-[#D4AF37] uppercase tracking-wider flex items-center gap-1.5">
+              <TrendingUp className="w-3.5 h-3.5" /> Quality Yield & Performance Metrics
+            </div>
+            <div className="text-base sm:text-lg md:text-xl font-black text-white mt-0.5">
+              Executive Quality Assurance KPI
+            </div>
+            <div className="text-[11px] sm:text-xs text-stone-300 mt-0.5">
+              มาตรฐานคุณภาพโรงงาน • ตรวจสอบสถิติ First-Pass Yield (FPY) และจุดเสี่ยง 4 สายการผลิต
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full xl:w-auto">
+          {/* Overall FPY */}
+          <div className="bg-white/10 backdrop-blur-md px-3 sm:px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[10px] sm:text-[11px] text-stone-300 font-medium">Overall FPY (อัตราผ่านรวม)</div>
+            <div className="text-xl sm:text-2xl font-black text-[#D4AF37] tracking-tight">
+              {qualityStats.overall.fpyPct}%
+            </div>
+          </div>
+
+          {/* Total Inspected */}
+          <div className="bg-white/10 backdrop-blur-md px-4 py-2.5 rounded-xl border border-white/15 text-center">
+            <div className="text-[11px] text-stone-300 font-medium">ยอดตรวจรวมทั้งหมด</div>
+            <div className="text-2xl font-black text-white">
+              {qualityStats.overall.total} <span className="text-xs font-normal text-stone-300">รายการ</span>
+            </div>
+          </div>
+
+          {/* Total Passed */}
+          <div className="bg-emerald-500/15 backdrop-blur-md px-4 py-2.5 rounded-xl border border-emerald-400/30 text-center">
+            <div className="text-[11px] text-emerald-200 font-medium">ผ่านเกณฑ์รวม (Passed)</div>
+            <div className="text-2xl font-black text-emerald-400">
+              {qualityStats.overall.passed} <span className="text-xs font-normal text-emerald-200">รายการ</span>
+            </div>
+          </div>
+
+          {/* Open Issues Waiting QA */}
+          <div className="bg-amber-500/20 backdrop-blur-md px-4 py-2.5 rounded-xl border border-amber-400/30 text-center">
+            <div className="text-[11px] text-amber-200 font-medium">ปัญหาที่รอ QA จัดการ</div>
+            <div className="text-2xl font-black text-amber-300">
+              {issues.length} <span className="text-xs font-normal text-amber-200">เคส</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Four Quality Inspection Stream KPI Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Raw Material (RM) */}
+        <Card 
+          onClick={() => setStreamFilter(streamFilter === 'RM' ? 'ALL' : 'RM')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${streamFilter === 'RM' ? 'border-emerald-500 ring-2 ring-emerald-500/20 bg-emerald-50/50' : 'border-slate-200 hover:border-emerald-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center font-bold shadow-sm">
+                  <Leaf className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">1. วัตถุดิบ (RM)</div>
+                  <div className="text-[11px] text-slate-500">Raw Material</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                เข้าตรวจ {qualityStats.rm.total}
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-emerald-600">{qualityStats.rm.passedPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">Pass Rate</span>
+              </div>
+              <Badge className="bg-emerald-100 text-emerald-800 border-emerald-200 text-[10px] font-bold">
+                {qualityStats.rm.passed}/{qualityStats.rm.total}
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${qualityStats.rm.passedPct}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Passed: ${qualityStats.rm.passedPct}%`} />
+              <div style={{ width: `${qualityStats.rm.holdPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Hold: ${qualityStats.rm.holdPct}%`} />
+              <div style={{ width: `${qualityStats.rm.rejectPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Reject: ${qualityStats.rm.rejectPct}%`} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-emerald-50/70 border border-emerald-100">
+                <div className="text-[10px] font-semibold text-emerald-700">ผ่าน (Pass)</div>
+                <div className="text-xs font-bold text-emerald-800 mt-0.5">{qualityStats.rm.passed}</div>
+                <div className="text-[9px] text-emerald-600 font-medium">{qualityStats.rm.passedPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">กัก (Hold)</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{qualityStats.rm.hold}</div>
+                <div className="text-[9px] text-amber-600 font-medium">{qualityStats.rm.holdPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">ไม่ผ่าน (Rej)</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{qualityStats.rm.reject}</div>
+                <div className="text-[9px] text-rose-600 font-medium">{qualityStats.rm.rejectPct}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 2: Packaging Material (PM) */}
+        <Card 
+          onClick={() => setStreamFilter(streamFilter === 'PM' ? 'ALL' : 'PM')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${streamFilter === 'PM' ? 'border-blue-500 ring-2 ring-blue-500/20 bg-blue-50/50' : 'border-slate-200 hover:border-blue-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold shadow-sm">
+                  <Box className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">2. บรรจุภัณฑ์ (PM)</div>
+                  <div className="text-[11px] text-slate-500">Packaging</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                เข้าตรวจ {qualityStats.pm.total}
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-blue-600">{qualityStats.pm.passedPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">Pass Rate</span>
+              </div>
+              <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-[10px] font-bold">
+                {qualityStats.pm.passed}/{qualityStats.pm.total}
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${qualityStats.pm.passedPct}%` }} className="bg-blue-500 h-full transition-all duration-500" title={`Passed: ${qualityStats.pm.passedPct}%`} />
+              <div style={{ width: `${qualityStats.pm.holdPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Hold: ${qualityStats.pm.holdPct}%`} />
+              <div style={{ width: `${qualityStats.pm.rejectPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Reject: ${qualityStats.pm.rejectPct}%`} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-blue-50/70 border border-blue-100">
+                <div className="text-[10px] font-semibold text-blue-700">ผ่าน (Pass)</div>
+                <div className="text-xs font-bold text-blue-800 mt-0.5">{qualityStats.pm.passed}</div>
+                <div className="text-[9px] text-blue-600 font-medium">{qualityStats.pm.passedPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">กัก (Hold)</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{qualityStats.pm.hold}</div>
+                <div className="text-[9px] text-amber-600 font-medium">{qualityStats.pm.holdPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">ไม่ผ่าน (Rej)</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{qualityStats.pm.reject}</div>
+                <div className="text-[9px] text-rose-600 font-medium">{qualityStats.pm.rejectPct}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 3: Bulk (งานผสม) */}
+        <Card 
+          onClick={() => setStreamFilter(streamFilter === 'BULK' ? 'ALL' : 'BULK')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${streamFilter === 'BULK' ? 'border-purple-500 ring-2 ring-purple-500/20 bg-purple-50/50' : 'border-slate-200 hover:border-purple-300 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center font-bold shadow-sm">
+                  <FlaskConical className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">3. งานผสม (Bulk)</div>
+                  <div className="text-[11px] text-slate-500">Bulk Production</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                เข้าตรวจ {qualityStats.bulk.total} ถัง
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-purple-600">{qualityStats.bulk.passedPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">Pass Rate</span>
+              </div>
+              <Badge className="bg-purple-100 text-purple-800 border-purple-200 text-[10px] font-bold">
+                {qualityStats.bulk.passed}/{qualityStats.bulk.total}
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${qualityStats.bulk.passedPct}%` }} className="bg-purple-500 h-full transition-all duration-500" title={`Passed: ${qualityStats.bulk.passedPct}%`} />
+              <div style={{ width: `${qualityStats.bulk.holdPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Hold: ${qualityStats.bulk.holdPct}%`} />
+              <div style={{ width: `${qualityStats.bulk.rejectPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Reject: ${qualityStats.bulk.rejectPct}%`} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-purple-50/70 border border-purple-100">
+                <div className="text-[10px] font-semibold text-purple-700">ผ่าน (Pass)</div>
+                <div className="text-xs font-bold text-purple-800 mt-0.5">{qualityStats.bulk.passed}</div>
+                <div className="text-[9px] text-purple-600 font-medium">{qualityStats.bulk.passedPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-amber-700">กัก/แก้ (Hold)</div>
+                <div className="text-xs font-bold text-amber-800 mt-0.5">{qualityStats.bulk.hold}</div>
+                <div className="text-[9px] text-amber-600 font-medium">{qualityStats.bulk.holdPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">ไม่ผ่าน (Rej)</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{qualityStats.bulk.reject}</div>
+                <div className="text-[9px] text-rose-600 font-medium">{qualityStats.bulk.rejectPct}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Card 4: Finished Goods (FG) */}
+        <Card 
+          onClick={() => setStreamFilter(streamFilter === 'FG' ? 'ALL' : 'FG')}
+          className={`cursor-pointer transition-all duration-200 border-2 hover:shadow-lg ${streamFilter === 'FG' ? 'border-[#D4AF37] ring-2 ring-[#D4AF37]/30 bg-amber-50/50' : 'border-slate-200 hover:border-[#D4AF37]/50 bg-white'}`}
+        >
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 text-[#8B7355] flex items-center justify-center font-bold shadow-sm">
+                  <Package className="w-4 h-4" />
+                </div>
+                <div>
+                  <div className="font-bold text-sm text-slate-800">4. สำเร็จรูป (FG)</div>
+                  <div className="text-[11px] text-slate-500">Finished Goods</div>
+                </div>
+              </div>
+              <Badge variant="outline" className="text-xs bg-slate-50 border-slate-200 font-semibold text-slate-700">
+                เข้าตรวจ {qualityStats.fg.total}
+              </Badge>
+            </div>
+
+            <div className="flex items-baseline justify-between pt-1">
+              <div>
+                <span className="text-2xl font-black text-[#D4AF37]">{qualityStats.fg.passedPct}%</span>
+                <span className="text-xs text-slate-500 ml-1.5 font-medium">Release Rate</span>
+              </div>
+              <Badge className="bg-amber-100 text-[#8B7355] border-amber-200 text-[10px] font-bold">
+                {qualityStats.fg.passed}/{qualityStats.fg.total}
+              </Badge>
+            </div>
+
+            <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden flex shadow-inner">
+              <div style={{ width: `${qualityStats.fg.passedPct}%` }} className="bg-[#D4AF37] h-full transition-all duration-500" title={`Passed: ${qualityStats.fg.passedPct}%`} />
+              <div style={{ width: `${qualityStats.fg.holdPct}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`Quarantine: ${qualityStats.fg.holdPct}%`} />
+              <div style={{ width: `${qualityStats.fg.rejectPct}%` }} className="bg-rose-500 h-full transition-all duration-500" title={`Reject: ${qualityStats.fg.rejectPct}%`} />
+            </div>
+
+            <div className="grid grid-cols-3 gap-1.5 pt-1 text-center border-t border-slate-100">
+              <div className="p-1.5 rounded-lg bg-amber-50/70 border border-amber-100">
+                <div className="text-[10px] font-semibold text-[#8B7355]">ปล่อย (Release)</div>
+                <div className="text-xs font-bold text-amber-900 mt-0.5">{qualityStats.fg.passed}</div>
+                <div className="text-[9px] text-[#8B7355] font-medium">{qualityStats.fg.passedPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-orange-50/70 border border-orange-100">
+                <div className="text-[10px] font-semibold text-orange-700">กัก (Quaran)</div>
+                <div className="text-xs font-bold text-orange-800 mt-0.5">{qualityStats.fg.hold}</div>
+                <div className="text-[9px] text-orange-600 font-medium">{qualityStats.fg.holdPct}%</div>
+              </div>
+              <div className="p-1.5 rounded-lg bg-rose-50/70 border border-rose-100">
+                <div className="text-[10px] font-semibold text-rose-700">ไม่ผ่าน (Rej)</div>
+                <div className="text-xs font-bold text-rose-800 mt-0.5">{qualityStats.fg.reject}</div>
+                <div className="text-[9px] text-rose-600 font-medium">{qualityStats.fg.rejectPct}%</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Active Filter Bar (when a stream is clicked) */}
+      {streamFilter !== 'ALL' && (
+        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center justify-between animate-in fade-in duration-200">
+          <div className="flex items-center gap-2 text-sm text-amber-900 font-medium">
+            <Filter className="w-4 h-4 text-amber-700" />
+            <span>กำลังกรองแสดงเฉพาะปัญหาของหมวด: <strong>{
+              streamFilter === 'RM' ? '🌿 วัตถุดิบ (Raw Material)' :
+              streamFilter === 'PM' ? '📦 บรรจุภัณฑ์ (Packaging)' :
+              streamFilter === 'BULK' ? '🧪 งานผสม (Bulk Production)' :
+              '🎁 สินค้าสำเร็จรูป (Finished Goods)'
+            }</strong></span>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => setStreamFilter('ALL')}
+            className="text-amber-800 hover:text-amber-950 hover:bg-amber-100 h-8 px-2.5 text-xs font-semibold"
+          >
+            <X className="w-3.5 h-3.5 mr-1" /> แสดงทั้งหมด (Clear Filter)
+          </Button>
+        </div>
+      )}
+
+      {/* 3. Issue Management Tabs */}
+      <Tabs defaultValue="active" className="space-y-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <TabsList className="bg-slate-100 dark:bg-slate-800">
+            <TabsTrigger value="active" className="flex items-center text-xs font-semibold">
+              <AlertTriangle className="w-4 h-4 mr-1.5 text-amber-500" />
+              ปัญหาที่รอการแก้ไข ({activeFilteredIssues.length})
+            </TabsTrigger>
+            <TabsTrigger value="resolved" className="flex items-center text-xs font-semibold">
+              <History className="w-4 h-4 mr-1.5 text-slate-500" />
+              ประวัติการแก้ไขล่าสุด ({resolvedFilteredIssues.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <div className="w-full sm:w-64">
+            <Input 
+              placeholder="ค้นหา SKU หรือ LOT..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="h-8 text-xs bg-white"
+            />
+          </div>
+        </div>
+        
+        {/* Active Issues Tab */}
+        <TabsContent value="active">
+          <Card>
+            <CardHeader className="py-3 px-4 bg-slate-50/50 border-b">
+              <CardTitle className="text-sm font-bold flex items-center justify-between">
+                <span>รายการปัญหาหน้างานที่ต้องแก้ไข (Shopfloor Active Issues)</span>
+                {streamFilter !== 'ALL' && (
+                  <Badge variant="outline" className="text-[11px] bg-amber-50 text-amber-800 border-amber-300">
+                    Filter: {streamFilter}
+                  </Badge>
+                )}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="whitespace-nowrap">SKU</TableHead>
+                      <TableHead className="whitespace-nowrap">LOT No.</TableHead>
+                      <TableHead className="min-w-[160px]">สินค้า</TableHead>
+                      <TableHead className="whitespace-nowrap">ขั้นตอน / ห้อง</TableHead>
+                      <TableHead className="min-w-[240px]">รายละเอียดปัญหา</TableHead>
+                      <TableHead className="whitespace-nowrap">เวลาที่แจ้ง</TableHead>
+                      <TableHead className="text-right whitespace-nowrap">จัดการ (QA Action)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeFilteredIssues.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-8 text-slate-500">
+                          {streamFilter !== 'ALL' 
+                            ? `ไม่พบปัญหาในหมวด ${streamFilter} ที่เปิดอยู่ในขณะนี้ 🎉` 
+                            : 'ไม่มีปัญหาหน้างานที่เปิดอยู่ในขณะนี้ 🎉'}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      activeFilteredIssues.map((issue, idx) => (
+                        <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`}>
+                          <TableCell className="font-medium text-purple-600 whitespace-nowrap">
+                            <span>{issue.production_lots?.products?.sku || '-'}</span>
+                          </TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                          </TableCell>
+                          <TableCell className="text-xs" title={issue.production_lots?.products?.product_name}>
+                            <span className="line-clamp-2">{issue.production_lots?.products?.product_name || '-'}</span>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-semibold">
+                                {(() => {
+                                  const note = issue.parsedNote || ''
+                                  if (note.includes('RM/PM') || note.includes(' RM [') || note.includes(' RM:')) return 'QC RM'
+                                  if (note.includes(' PM [') || note.includes(' PM:')) return 'QC PM'
+                                  if (note.includes(' FG ') || note.includes(' FG(')) return 'QC FG'
+                                  if (note.includes(' ถัง ')) return 'QC Bulk'
+                                  if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
+                                  return issue.processes?.process_name || '-'
+                                })()}
+                              </span>
+                              {issue.rooms?.room_name && <span className="text-[10px] text-slate-400">({issue.rooms.room_name})</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className={`p-2 rounded border inline-block ${getIssueStyle(issue.parsedNote)}`}>
+                              <div className="whitespace-pre-wrap leading-relaxed">
+                                {issue.parsedNote.includes('[') ? 
+                                  <span><strong>{issue.parsedNote.split(']')[0] + ']'}</strong> {issue.parsedNote.split(']').slice(1).join(']')}</span> : 
+                                  <span>{issue.parsedNote}</span>}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-500 whitespace-nowrap">
+                            {new Date(issue.updated_at).toLocaleString('th-TH')}
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <div className="flex items-center justify-end gap-1.5">
+                              {/* Escalate to QMS button */}
+                              {onEscalateToQms && (
+                                <Button 
+                                  size="sm" 
+                                  variant="outline"
+                                  onClick={() => onEscalateToQms({
+                                    sku: issue.production_lots?.products?.sku,
+                                    lotNo: issue.production_lots?.lot_no,
+                                    productName: issue.production_lots?.products?.product_name,
+                                    description: issue.parsedNote,
+                                    stage: issue.processes?.process_name
+                                  })}
+                                  className="text-xs h-7 border-indigo-300 text-indigo-700 hover:bg-indigo-50 font-medium"
+                                  title="ยกระดับเปิด Quality Event สู่กระบวนการ eQMS (ISO 22716)"
+                                >
+                                  <ArrowUpRight className="w-3.5 h-3.5 mr-1 text-indigo-600" />
+                                  ยกระดับสู่ QE
+                                </Button>
+                              )}
+
+                              <Button 
+                                size="sm" 
+                                onClick={() => openResolveDialog(issue)}
+                                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 font-medium"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 mr-1" /> รับทราบ / แก้ไขแล้ว
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+        
+        {/* Resolved Issues Tab */}
+        <TabsContent value="resolved">
+          <Card>
+            <CardHeader className="bg-[#F8F6F0] border-b border-[#D4AF37]/20 py-3 px-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <CardTitle className="text-sm font-bold flex items-center gap-2 text-[#4A4238]">
+                    <History className="w-4 h-4 text-indigo-600" />
+                    ประวัติปัญหาที่แก้ไขแล้ว (50 รายการล่าสุด)
+                  </CardTitle>
+                  <CardDescription className="text-[11px] text-[#8B7355] mt-0.5">
+                    บันทึกประวัติการตรวจสอบและรับรองโดยฝ่ายประกันคุณภาพ (Quality Assurance)
+                  </CardDescription>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleSyncLegacySystemRecords}
+                    className="text-xs bg-white hover:bg-amber-50 border-[#D4AF37]/40 text-[#8B7355] font-semibold flex items-center gap-1.5 h-7"
+                    title="อัปเดตบันทึกประวัติย้อนหลังที่เคยเป็น SYSTEM ให้เป็น username ผู้ตรวจสอบปัจจุบัน"
+                  >
+                    <RefreshCw className="w-3 h-3 text-[#D4AF37]" />
+                    ซิงค์ชื่อผู้ตรวจ SYSTEM
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table className="text-xs">
+                  <TableHeader>
+                    <TableRow className="bg-slate-50">
+                      <TableHead className="whitespace-nowrap">SKU</TableHead>
+                      <TableHead className="whitespace-nowrap">LOT No.</TableHead>
+                      <TableHead className="whitespace-nowrap">ขั้นตอน / ห้อง</TableHead>
+                      <TableHead className="min-w-[280px]">รายละเอียด / บันทึกการแก้ไข</TableHead>
+                      <TableHead className="whitespace-nowrap">ผู้ตรวจสอบ (QA)</TableHead>
+                      <TableHead className="whitespace-nowrap">เวลาที่แก้ไขล่าสุด</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {resolvedFilteredIssues.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-8 text-slate-500">
+                          {streamFilter !== 'ALL' 
+                            ? `ไม่พบประวัติการแก้ไขในหมวด ${streamFilter}` 
+                            : 'ยังไม่มีประวัติการแก้ไขปัญหา'}
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      resolvedFilteredIssues.map((issue, idx) => (
+                        <TableRow key={`${issue.id}-${issue.lineIndex}-${idx}`} className="opacity-80">
+                          <TableCell className="font-medium text-purple-600 whitespace-nowrap">
+                            <span>{issue.production_lots?.products?.sku || '-'}</span>
+                          </TableCell>
+                          <TableCell className="font-medium whitespace-nowrap">
+                            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 w-fit">{issue.production_lots?.lot_no}</Badge>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <span className="font-semibold">
+                              {(() => {
+                                const note = issue.parsedNote || ''
+                                if (note.includes('RM/PM') || note.includes(' RM [') || note.includes(' RM:')) return 'QC RM'
+                                if (note.includes(' PM [') || note.includes(' PM:')) return 'QC PM'
+                                if (note.includes(' FG ') || note.includes(' FG(')) return 'QC FG'
+                                if (note.includes(' ถัง ')) return 'QC Bulk'
+                                if (issue.processes?.process_name === 'รอ QC') return 'QC Bulk'
+                                return issue.processes?.process_name || '-'
+                              })()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="p-2 rounded border inline-block bg-[#F8F6F0] text-slate-700 border-slate-200">
+                              <div className="whitespace-pre-wrap leading-relaxed">
+                                {(() => {
+                                  let displayNote = issue.parsedNote || ''
+                                  if (displayNote.includes('(โดย SYSTEM -') || displayNote.includes('(โดย System -')) {
+                                    const activeInspector = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+                                    displayNote = displayNote.replace(/\(โดย (?:SYSTEM|System) -/g, `(โดย ${activeInspector} -`)
+                                  }
+                                  return displayNote.includes('[') ? (
+                                    <span>
+                                      <strong className={displayNote.includes('Resolved') ? 'text-green-600' : ''}>
+                                        {displayNote.split(']')[0] + ']'}
+                                      </strong>{' '}
+                                      {displayNote.split(']').slice(1).join(']')}
+                                    </span>
+                                  ) : (
+                                    <span>{displayNote}</span>
+                                  )
+                                })()}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="whitespace-nowrap">
+                            <div className="flex items-center text-slate-700">
+                              <User className="w-3.5 h-3.5 mr-1 text-[#D4AF37]" />
+                              {(() => {
+                                const match = issue.parsedNote.match(/\(โดย (.*?) - /)
+                                let inspectorId = match ? match[1].trim() : ''
+                                const isLegacy = !inspectorId || inspectorId.toUpperCase() === 'SYSTEM'
+                                if (isLegacy) {
+                                  inspectorId = (currentUserInfo?.employee_id || currentUser || 'QA').toUpperCase()
+                                }
+                                const matchedUser = masterUsers.find(u => u.employee_id?.toLowerCase() === inspectorId.toLowerCase()) || 
+                                  (currentUserInfo?.employee_id?.toLowerCase() === inspectorId.toLowerCase() ? currentUserInfo : null)
+                                return (
+                                  <div className="flex items-center gap-1.5">
+                                    <Badge variant="outline" className={`font-bold px-1.5 py-0.2 text-[10px] ${
+                                      isLegacy 
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300' 
+                                        : 'bg-amber-50 text-[#8B7355] border-[#D4AF37]/30'
+                                    }`}>
+                                      {inspectorId}
+                                    </Badge>
+                                    {matchedUser?.full_name && (
+                                      <span className="text-slate-500 text-[11px]">({matchedUser.full_name})</span>
+                                    )}
+                                  </div>
+                                )
+                              })()}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-slate-500 whitespace-nowrap">
+                            {new Date(issue.updated_at).toLocaleString('th-TH')}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Modal: Report New Issue */}
+      <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>แจ้งปัญหาการผลิตหน้างานใหม่</DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2">
+              <Label>รายการงานที่เกิดปัญหา (เลือกจากงานที่เปิดอยู่)</Label>
+              <select 
+                value={selectedTaskId}
+                onChange={(e) => setSelectedTaskId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <option value="">-- กรุณาเลือกรายการงาน --</option>
+                {activeTasks.map(t => (
+                  <option key={t.id} value={t.id}>
+                    LOT: {t.production_lots?.lot_no} | ขั้นตอน: {t.processes?.process_name} ({t.status})
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>รายละเอียดปัญหา</Label>
+              <Textarea 
+                value={reportNote} 
+                onChange={(e) => setReportNote(e.target.value)} 
+                placeholder="เช่น พบสิ่งเจือปน, อุณหภูมิไม่คงที่, สีเพี้ยน..."
+                rows={4}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReportOpen(false)}>ยกเลิก</Button>
+            <Button onClick={handleReportSubmit} className="bg-[#D4AF37] hover:bg-[#b89528] text-white">บันทึกปัญหา</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal: Resolve Issue (QA) */}
+      <Dialog open={isResolveOpen} onOpenChange={setIsResolveOpen}>
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className="text-base flex items-center gap-2 text-[#4A4238]">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              บันทึกการแก้ไขปัญหาหน้างาน (QA Resolution)
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div className="bg-[#F8F6F0] p-3.5 rounded-xl border border-[#D4AF37]/40 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-[#8B7355] font-bold flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-[#D4AF37]" />
+                  ผู้ตรวจสอบ (QA Inspector) ที่ลงชื่อรับรอง
+                </Label>
+                <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200 text-[10px] font-bold">
+                  Logged in: {currentUser || 'QA'}
+                </Badge>
+              </div>
+
+              <div className="pt-0.5">
+                <select
+                  value={selectedInspector}
+                  onChange={(e) => setSelectedInspector(e.target.value)}
+                  className="flex h-9 w-full rounded-lg border border-[#D4AF37]/50 bg-white px-3 py-1.5 text-xs font-bold text-slate-800 shadow-xs focus:outline-none focus:ring-2 focus:ring-[#D4AF37]"
+                >
+                  {currentUser && (
+                    <option value={currentUser.toUpperCase()}>
+                      {currentUser.toUpperCase()} {currentUserInfo?.full_name ? `(${currentUserInfo.full_name})` : ''} ★ บัญชีปัจจุบัน
+                    </option>
+                  )}
+                  {masterUsers.filter(u => u.employee_id?.toUpperCase() !== currentUser.toUpperCase()).map(u => (
+                    <option key={u.employee_id} value={u.employee_id.toUpperCase()}>
+                      {u.employee_id.toUpperCase()} - {u.full_name} {u.role?.includes('issues') || u.role?.includes('qc') ? '⭐ (QA/QC)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="text-[11px] text-slate-600 flex items-center justify-between pt-1 border-t border-[#D4AF37]/20">
+                <span>บันทึกประวัติด้วยชื่อ: <strong className="text-[#8B7355] font-bold">{selectedInspector || currentUser || 'QA'}</strong></span>
+                {(() => {
+                  const targetUser = masterUsers.find(u => u.employee_id?.toUpperCase() === (selectedInspector || currentUser).toUpperCase()) || currentUserInfo
+                  return targetUser?.full_name ? (
+                    <span className="font-semibold text-slate-700">({targetUser.full_name})</span>
+                  ) : null
+                })()}
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-slate-700">หมายเหตุ / วิธีแก้ไข / ข้อสรุป NC (ตัวเลือก)</Label>
+              <Textarea 
+                value={resolveNote} 
+                onChange={(e) => setResolveNote(e.target.value)} 
+                placeholder="ระบุวิธีการแก้ไขปัญหา, ข้อสรุปการจัดการ NC, หรือผลตรวจซ้ำ..."
+                rows={3}
+                className="text-xs"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setIsResolveOpen(false)}>ยกเลิก</Button>
+            <Button 
+              size="sm"
+              onClick={handleResolveConfirm} 
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium"
+            >
+              <CheckCircle2 className="w-4 h-4 mr-1" />
+              บันทึกและปิดปัญหา
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}

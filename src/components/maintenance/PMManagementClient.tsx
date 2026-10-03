@@ -483,6 +483,15 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                               <span>🚀 ตรวจ PM</span>
                             </button>
 
+                            <Link
+                              href={`/maintenance/pm/${plan.plan_code}/eform`}
+                              target="_blank"
+                              title="ดูและพิมพ์แบบฟอร์ม DCC MT-PF-001E (Print / PDF)"
+                              className="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-stone-900 hover:bg-stone-800 text-white transition shadow-2xs inline-flex items-center gap-1 whitespace-nowrap active:scale-95"
+                            >
+                              <span>📄 ฟอร์ม DCC</span>
+                            </Link>
+
                             <button
                               onClick={() => handleOpenAssignModal(plan)}
                               title="มอบหมายงาน PM ให้ช่างพร้อมออกใบสั่งซ่อมบำรุง"
@@ -608,6 +617,14 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                           >
                             🚀 ตรวจ
                           </button>
+                          <Link
+                            href={`/maintenance/pm/${plan.plan_code}/eform`}
+                            target="_blank"
+                            title="ดูและพิมพ์แบบฟอร์ม DCC MT-PF-001E"
+                            className="px-2 py-1 rounded-lg text-xs bg-stone-900 hover:bg-stone-800 text-white font-bold transition whitespace-nowrap active:scale-95"
+                          >
+                            📄 ฟอร์ม
+                          </Link>
                           <button
                             onClick={() => handleOpenAssignModal(plan)}
                             title="มอบหมายงาน PM ให้ช่างพร้อมออกใบสั่งงาน"
