@@ -228,3 +228,27 @@ export function searchMasterUsers(query: string): MasterUserOption[] {
     )
   })
 }
+
+/**
+ * Check if a Master Data user belongs to the Maintenance / Engineering department
+ */
+export function isMaintenanceTechnician(user: MasterUserOption): boolean {
+  if (!user) return false
+  const dept = (user.department || '').toLowerCase()
+  const role = (user.role || '').toLowerCase()
+  const code = (user.employeeId || '').toUpperCase().trim()
+  const name = (user.fullName || '').toLowerCase()
+  return (
+    code.startsWith('MT') ||
+    dept.includes('ซ่อมบำรุง') ||
+    dept.includes('วิศวกรรม') ||
+    dept.includes('engineering') ||
+    dept.includes('facilities') ||
+    dept.includes('maintenance') ||
+    role.includes('maintenance') ||
+    role.includes('technician') ||
+    role.includes('ช่าง') ||
+    name.startsWith('ช่าง')
+  )
+}
+

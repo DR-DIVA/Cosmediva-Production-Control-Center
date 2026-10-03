@@ -32,6 +32,7 @@ interface NameAutocompleteInputProps {
   defaultFallback?: string
   onSelect?: (name: string) => void
   onSelectUser?: (user: MasterUserOption) => void
+  filter?: (user: MasterUserOption) => boolean
 }
 
 export default function NameAutocompleteInput({
@@ -44,7 +45,8 @@ export default function NameAutocompleteInput({
   autoFocus = false,
   defaultFallback = '',
   onSelect,
-  onSelectUser
+  onSelectUser,
+  filter
 }: NameAutocompleteInputProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
@@ -100,7 +102,10 @@ export default function NameAutocompleteInput({
     const q = (value || '').trim().toLowerCase()
 
     // 1. Filter Master Data Users who have a department
-    const validMasterUsers = masterUsers.filter(u => u.department && u.department.trim() !== '')
+    let validMasterUsers = masterUsers.filter(u => u.department && u.department.trim() !== '')
+    if (filter) {
+      validMasterUsers = validMasterUsers.filter(filter)
+    }
 
     const matchedMaster: EnrichedSuggestion[] = validMasterUsers
       .filter(u => {

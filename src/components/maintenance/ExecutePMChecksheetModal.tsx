@@ -34,15 +34,7 @@ import {
   PMChecklistItem 
 } from '@/lib/pmChecksheetCatalog'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
-import { getMasterUsersList, MasterUserOption } from '@/lib/userMemory'
-
-const DEFAULT_TECH_LIST = [
-  { label: 'นายปิยะราช ถมมา (MTPIT1933) - หัวหน้าฝ่ายซ่อมบำรุง', value: 'นายปิยะราช ถมมา (MTPIT1933)' },
-  { label: 'นายอนันต์ รอดเสงี่ยม (MTANR1898) - ช่างซ่อมบำรุง', value: 'นายอนันต์ รอดเสงี่ยม (MTANR1898)' },
-  { label: 'ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)', value: 'ช่างยะ ปิยะราช รามมา' },
-  { label: 'ช่างคิม อนันต์ รอดเสงี่ยม (ช่างซ่อมบำรุง)', value: 'ช่างคิม อนันต์ รอดเสงี่ยม' },
-  { label: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)', value: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)' }
-]
+import { getMasterUsersList, MasterUserOption, isMaintenanceTechnician } from '@/lib/userMemory'
 
 const COMMON_SUPERVISORS = [
   { label: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620) - แผนกผสม', value: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620)' },
@@ -113,13 +105,76 @@ export default function ExecutePMChecksheetModal({
       .catch(() => {})
   }, [])
 
-  const masterUsersByDept = useMemo(() => {
-    const map: Record<string, MasterUserOption[]> = {}
-    masterUsers.forEach(u => {
-      const dept = u.department || 'ฝ่ายผลิตและปฏิบัติการ'
-      if (!map[dept]) map[dept] = []
-      map[dept].push(u)
+  // Dynamically filter Maintenance & Engineering technicians from Master Data
+  // When any new technician is added to Master Data (profiles), it automatically includes them!
+  const maintenanceTechnicians = useMemo(() => {
+    const list: { label: string; value: string }[] = []
+    const seenNames = new Set<string>()
+
+    // 1. From live Master Data
+    masterUsers.filter(isMaintenanceTechnician).forEach(u => {
+      const val = u.displayName
+      const key = val.trim().toLowerCase()
+      if (!seenNames.has(key)) {
+        seenNames.add(key)
+        list.push({
+          label: `${u.fullName} (${u.employeeId || 'MT'}) - ช่างซ่อมบำรุง`,
+          value: val
+        })
+      }
     })
+
+    // 2. Standard factory technicians fallback
+    const fallbacks = [
+      { label: 'นายปิยะราช ถมมา (MTPIT1933) - หัวหน้าฝ่ายซ่อมบำรุง', value: 'นายปิยะราช ถมมา (MTPIT1933)' },
+      { label: 'นายอนันต์ รอดเสงี่ยม (MTANR1898) - ช่างซ่อมบำรุง', value: 'นายอนันต์ รอดเสงี่ยม (MTANR1898)' },
+      { label: 'ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)', value: 'ช่างยะ ปิยะราช รามมา' },
+      { label: 'ช่างคิม อนันต์ รอดเสงี่ยม (ช่างซ่อมบำรุง)', value: 'ช่างคิม อนันต์ รอดเสงี่ยม' }
+    ]
+
+    fallbacks.forEach(fb => {
+      const alreadyHas = Array.from(seenNames).some(existing => 
+        (existing.includes('ปิยะราช') && fb.value.includes('ปิยะราช')) ||
+        (existing.includes('อนันต์') && fb.value.includes('อนันต์'))
+      )
+      if (!alreadyHas && !seenNames.has(fb.value.toLowerCase())) {
+        list.push(fb)
+        seenNames.add(fb.value.toLowerCase())
+      }
+    })
+
+    // 3. Outsource service option
+    list.push({
+      label: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)',
+      value: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)'
+    })
+
+    return list
+  }, [masterUsers])
+
+  // Filter machine owner / recipient departments: only Production & Operations
+  const ownerUsersByDept = useMemo(() => {
+    const map: Record<string, MasterUserOption[]> = {}
+    masterUsers
+      .filter(u => {
+        // Exclude purely maintenance technicians from the owner list
+        if (isMaintenanceTechnician(u)) return false
+        // Exclude purely office/finance departments (Accounting, Purchasing, HR) from machine owner list
+        const dept = (u.department || '').toLowerCase()
+        if (
+          dept.includes('accounting') || dept.includes('บัญชี') || 
+          dept.includes('purchasing') || dept.includes('จัดซื้อ') || 
+          dept.includes('ทรัพยากรบุคคล') || dept.includes('hr')
+        ) {
+          return false
+        }
+        return true
+      })
+      .forEach(u => {
+        const dept = u.department || 'ฝ่ายผลิตและปฏิบัติการ'
+        if (!map[dept]) map[dept] = []
+        map[dept].push(u)
+      })
     return map
   }, [masterUsers])
 
@@ -686,25 +741,15 @@ export default function ExecutePMChecksheetModal({
                   className="w-full h-9 px-3 text-xs bg-white border border-blue-300 rounded-xl font-bold text-stone-800 outline-none focus:ring-2 focus:ring-blue-500/20"
                 >
                   {execTechName && 
-                    !DEFAULT_TECH_LIST.some(t => t.value === execTechName) && 
-                    !masterUsers.some(u => u.displayName === execTechName) && (
+                    !maintenanceTechnicians.some(t => t.value === execTechName) && (
                       <option value={execTechName}>{execTechName} (ระบุเอง)</option>
                   )}
-                  <optgroup label="ช่างซ่อมบำรุงประจำโรงงาน">
-                    {DEFAULT_TECH_LIST.map(t => (
+                  <optgroup label="ฝ่ายช่างซ่อมบำรุงและวิศวกรรม (Engineering & Maintenance)">
+                    {maintenanceTechnicians.map(t => (
                       <option key={t.value} value={t.value}>{t.label}</option>
                     ))}
                   </optgroup>
-                  {Object.entries(masterUsersByDept).map(([dept, users]) => (
-                    <optgroup key={dept} label={`พนักงาน: ${dept}`}>
-                      {users.map(u => (
-                        <option key={u.employeeId} value={u.displayName}>
-                          {u.displayName}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                  <option value="__AUTOCOMPLETE__">🔍 -- พิมพ์ค้นหาละเอียดจาก Master Data --</option>
+                  <option value="__AUTOCOMPLETE__">🔍 -- พิมพ์ค้นหาช่าง / ระบุชื่ออื่น --</option>
                 </select>
               ) : (
                 <NameAutocompleteInput
@@ -713,6 +758,7 @@ export default function ExecutePMChecksheetModal({
                   onChange={setExecTechName}
                   placeholder="พิมพ์ชื่อหรือรหัสพนักงานช่างผู้ส่งมอบ..."
                   className="h-9 text-xs bg-white border-blue-300 font-bold"
+                  filter={isMaintenanceTechnician}
                   required
                   autoFocus
                 />
@@ -771,8 +817,8 @@ export default function ExecutePMChecksheetModal({
                       <option key={s.value} value={s.value}>{s.label}</option>
                     ))}
                   </optgroup>
-                  {Object.entries(masterUsersByDept).map(([dept, users]) => (
-                    <optgroup key={dept} label={`พนักงาน: ${dept}`}>
+                  {Object.entries(ownerUsersByDept).map(([dept, users]) => (
+                    <optgroup key={dept} label={`หัวหน้า/พนักงาน: ${dept}`}>
                       {users.map(u => (
                         <option key={u.employeeId} value={u.displayName}>
                           {u.displayName}

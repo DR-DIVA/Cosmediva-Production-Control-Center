@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react'
 import { MaintenancePMPlan, getPmFrequencyInfo, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { dispatchPMWorkOrder } from '@/app/actions/maintenance'
+import { getMasterUsersList, MasterUserOption, isMaintenanceTechnician } from '@/lib/userMemory'
 
 interface AssignPMTechnicianModalProps {
   isOpen: boolean
@@ -41,8 +42,53 @@ export default function AssignPMTechnicianModal({
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
   const todayStr = new Date().toISOString().split('T')[0]
 
+  const [masterUsers, setMasterUsers] = useState<MasterUserOption[]>(() => getMasterUsersList())
+
+  useEffect(() => {
+    setMasterUsers(getMasterUsersList())
+    fetch(`/api/master-data/users?t=${Date.now()}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setMasterUsers(res.data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const maintenanceTechnicians = useMemo(() => {
+    const list: { label: string; value: string }[] = []
+    const seenNames = new Set<string>()
+
+    masterUsers.filter(isMaintenanceTechnician).forEach(u => {
+      const val = u.displayName
+      const key = val.trim().toLowerCase()
+      if (!seenNames.has(key)) {
+        seenNames.add(key)
+        list.push({
+          label: `${u.fullName} (${u.employeeId || 'MT'}) - ช่างซ่อมบำรุง`,
+          value: val
+        })
+      }
+    })
+
+    FACTORY_TECHNICIANS.forEach(t => {
+      const val = t.split(' (')[0]
+      const alreadyHas = Array.from(seenNames).some(existing => 
+        (existing.includes('ปิยะราช') && val.includes('ปิยะราช')) ||
+        (existing.includes('อนันต์') && val.includes('อนันต์'))
+      )
+      if (!alreadyHas && !seenNames.has(val.toLowerCase())) {
+        list.push({ label: t, value: val })
+        seenNames.add(val.toLowerCase())
+      }
+    })
+
+    return list
+  }, [masterUsers])
+
   const [selectedTech, setSelectedTech] = useState(
-    (plan as any).machine?.responsible_technician_name || 'ช่างยะ ปิยะราช รามมา'
+    (plan as any).machine?.responsible_technician_name || 'นายปิยะราช ถมมา (MTPIT1933)'
   )
   const [customTech, setCustomTech] = useState('')
   const [targetDate, setTargetDate] = useState(plan.next_due_date || todayStr)
@@ -142,9 +188,9 @@ export default function AssignPMTechnicianModal({
               }}
               className="w-full px-3 py-2.5 rounded-xl border border-stone-200 bg-white text-stone-900 font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none"
             >
-              {FACTORY_TECHNICIANS.map(t => (
-                <option key={t} value={t.split(' (')[0]}>
-                  {t}
+              {maintenanceTechnicians.map(t => (
+                <option key={t.value} value={t.value}>
+                  {t.label}
                 </option>
               ))}
               <option value="__CUSTOM__">-- พิมพ์ระบุชื่อช่างคนอื่น / ผู้รับเหมาภายนอก --</option>
