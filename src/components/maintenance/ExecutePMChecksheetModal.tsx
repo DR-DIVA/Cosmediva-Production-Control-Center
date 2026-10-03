@@ -18,13 +18,20 @@ import {
   ShieldAlert, 
   FileCheck, 
   UserCheck, 
-  Wrench,
-  Zap,
-  Thermometer,
-  ExternalLink,
-  ChevronRight,
-  Search,
-  ListFilter
+  Wrench, 
+  Zap, 
+  Thermometer, 
+  ExternalLink, 
+  ChevronRight, 
+  Search, 
+  ListFilter,
+  Camera,
+  ImageIcon,
+  Plus,
+  Trash2,
+  Eye,
+  Loader2,
+  X
 } from 'lucide-react'
 import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { submitPMChecksheet } from '@/app/actions/maintenance'
@@ -35,6 +42,7 @@ import {
 } from '@/lib/pmChecksheetCatalog'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import { getMasterUsersList, MasterUserOption, isMaintenanceTechnician } from '@/lib/userMemory'
+import { compressImage, uploadMaintenancePhoto } from '@/lib/maintenanceMedia'
 
 const COMMON_SUPERVISORS = [
   { label: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620) - แผนกผสม', value: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620)' },
@@ -195,6 +203,86 @@ export default function ExecutePMChecksheetModal({
   const [breakdownNotes, setBreakdownNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // Photo evidence state (sharp compression, max 1600px, quality 0.80)
+  interface PMPhotoEvidence {
+    id: string
+    url: string
+    previewUrl: string
+    name: string
+    uploading: boolean
+    error?: string
+  }
+  const [photos, setPhotos] = useState<PMPhotoEvidence[]>([])
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    const newItems: PMPhotoEvidence[] = []
+    const fileArray = Array.from(files)
+    e.target.value = ''
+
+    for (const file of fileArray) {
+      const id = `${Date.now()}_${Math.random().toString(36).substring(7)}`
+      const previewUrl = URL.createObjectURL(file)
+      newItems.push({
+        id,
+        url: previewUrl,
+        previewUrl,
+        name: file.name,
+        uploading: true
+      })
+    }
+
+    setPhotos(prev => [...prev, ...newItems])
+
+    // Compress & upload each photo in background with maximum clarity and compact size
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i]
+      const item = newItems[i]
+
+      try {
+        // Max 1600px dimension & 0.82 quality keeps dials, serials, and gauges 100% readable
+        const compressedBlob = await compressImage(file, 1600, 0.82)
+        const uploadRes = await uploadMaintenancePhoto(compressedBlob, file.name)
+
+        if (uploadRes.success && uploadRes.url) {
+          setPhotos(prev =>
+            prev.map(p =>
+              p.id === item.id
+                ? { ...p, url: uploadRes.url!, uploading: false }
+                : p
+            )
+          )
+        } else {
+          setPhotos(prev =>
+            prev.map(p =>
+              p.id === item.id
+                ? { ...p, uploading: false, error: uploadRes.error || 'อัปโหลดไม่สำเร็จ' }
+                : p
+            )
+          )
+        }
+      } catch (err: any) {
+        console.error('Error uploading PM photo evidence:', err)
+        setPhotos(prev =>
+          prev.map(p =>
+            p.id === item.id
+              ? { ...p, uploading: false, error: 'เกิดข้อผิดพลาดในการประมวลผล' }
+              : p
+          )
+        )
+      }
+    }
+  }
+
+  const handleRemovePhoto = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setPhotos(prev => prev.filter(p => p.id !== id))
+  }
+
   // Results state for each item (key by item id)
   const [results, setResults] = useState<{
     [itemId: number]: {
@@ -308,6 +396,17 @@ export default function ExecutePMChecksheetModal({
       return
     }
 
+    // Check if any photo is in progress of uploading
+    const isUploading = photos.some(p => p.uploading)
+    if (isUploading) {
+      toast.info('กำลังอัปโหลดรูปภาพหลักฐาน กรุณารอสักครู่...')
+      await new Promise(r => setTimeout(r, 1500))
+    }
+
+    const validPhotoUrls = photos
+      .map(p => p.url)
+      .filter(url => url && (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:image')))
+
     setIsSubmitting(true)
     try {
       const checklistPayload = checklistItems.map(chk => {
@@ -331,7 +430,8 @@ export default function ExecutePMChecksheetModal({
         ownerSignName: ownerSignName.trim(),
         readinessStatus,
         createBreakdownTicket: scoreCounts.defect > 0 && autoCreateBreakdown,
-        breakdownNotes
+        breakdownNotes,
+        photoAfterUrls: validPhotoUrls
       })
 
       if (res.success) {
@@ -351,7 +451,8 @@ export default function ExecutePMChecksheetModal({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
+    <>
+      <Dialog open={isOpen} onOpenChange={open => !open && onClose()}>
       <DialogContent className="max-w-4xl sm:max-w-4xl w-[96vw] p-5 sm:p-7 rounded-3xl bg-white shadow-2xl border border-stone-200 max-h-[94vh] overflow-y-auto font-sans">
         
         {/* Header - Checklist Mode */}
@@ -700,6 +801,122 @@ export default function ExecutePMChecksheetModal({
             </div>
           </div>
 
+          {/* Photo Evidence Section */}
+          <div className="p-3.5 bg-stone-50 rounded-2xl border border-stone-200 space-y-2.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-cyan-700" />
+                  <span className="font-bold text-xs text-stone-900">
+                    แนบภาพถ่ายหลักฐานการตรวจสอบ (Photo Evidence)
+                  </span>
+                  <span className="text-[10px] font-bold text-cyan-800 bg-cyan-100/70 border border-cyan-200 px-2 py-0.5 rounded-full">
+                    {photos.length} ภาพ
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  ระบบปรับลดขนาดและบีบอัดภาพให้อัตโนมัติ (ความคมชัดสูง ชัดเจนทุกจุด) • <span className="text-amber-700 font-semibold">ภาพนี้จะไม่ถูกนำไปใส่ในแบบฟอร์ม DCC</span>
+                </p>
+              </div>
+
+              {/* Upload Action Button */}
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={handlePhotoSelect}
+                />
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="h-8 text-xs font-bold border-cyan-600 text-cyan-800 hover:bg-cyan-50 rounded-xl flex items-center gap-1.5 shadow-sm"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>แนบภาพ / ถ่ายรูป</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Photo Thumbnails Grid */}
+            {photos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2.5 pt-1">
+                {photos.map((photo, index) => (
+                  <div
+                    key={photo.id}
+                    onClick={() => setPreviewImage(photo.url || photo.previewUrl)}
+                    className="group relative aspect-square rounded-xl overflow-hidden border border-stone-300 bg-black cursor-pointer shadow-sm hover:shadow-md transition hover:ring-2 hover:ring-cyan-600"
+                    title="คลิกเพื่อเปิดดูภาพขนาดใหญ่คมชัด"
+                  >
+                    {/* Thumbnail Image */}
+                    <img
+                      src={photo.previewUrl || photo.url}
+                      alt={`evidence-${index + 1}`}
+                      className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-105"
+                    />
+
+                    {/* Uploading Status Overlay */}
+                    {photo.uploading && (
+                      <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white text-[10px] gap-1 p-1 text-center">
+                        <Loader2 className="w-4 h-4 animate-spin text-cyan-400" />
+                        <span>กำลังบีบอัด & อัปโหลด...</span>
+                      </div>
+                    )}
+
+                    {/* Error Overlay */}
+                    {photo.error && (
+                      <div className="absolute inset-0 bg-rose-950/80 flex flex-col items-center justify-center text-white text-[9px] p-1 text-center">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-300 mb-0.5" />
+                        <span className="line-clamp-2">{photo.error}</span>
+                      </div>
+                    )}
+
+                    {/* Hover Zoom Icon */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
+                      <span className="p-1.5 bg-white/90 rounded-full text-stone-900 shadow">
+                        <Eye className="w-3.5 h-3.5" />
+                      </span>
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => handleRemovePhoto(photo.id, e)}
+                      className="absolute top-1 right-1 p-1 bg-black/75 hover:bg-rose-600 text-white rounded-full transition shadow z-10"
+                      title="ลบภาพนี้"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+
+                    {/* Sequence Badge */}
+                    <span className="absolute bottom-1 left-1 bg-black/75 text-white text-[9px] font-mono px-1.5 py-0.5 rounded backdrop-blur-sm">
+                      #{index + 1}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                onClick={() => fileInputRef.current?.click()}
+                className="p-4 rounded-xl border border-dashed border-stone-300 bg-white hover:bg-cyan-50/40 transition cursor-pointer text-center flex flex-col items-center justify-center gap-1"
+              >
+                <div className="w-8 h-8 rounded-full bg-cyan-50 flex items-center justify-center text-cyan-700">
+                  <Camera className="w-4 h-4" />
+                </div>
+                <div className="text-xs font-semibold text-stone-700">
+                  แตะที่นี่เพื่อถ่ายภาพหรือแนบรูปหลักฐานการตรวจเช็ค (รองรับหลายรูปพร้อมกัน)
+                </div>
+                <div className="text-[10px] text-stone-400">
+                  ระบบปรับแต่งความละเอียดสูงให้เปิดดูเห็นชัดเจน และบีบอัดขนาดไฟล์อัตโนมัติ
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Sign-off Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 text-xs">
             {/* Deliverer (Technician) */}
@@ -873,5 +1090,52 @@ export default function ExecutePMChecksheetModal({
 
       </DialogContent>
     </Dialog>
+
+    {/* Full-screen Image Preview Lightbox */}
+    <Dialog open={!!previewImage} onOpenChange={() => setPreviewImage(null)}>
+      <DialogContent className="max-w-4xl p-3 bg-stone-950/95 border-stone-800 text-white z-[99999]">
+        <div className="relative flex flex-col items-center justify-center">
+          <div className="w-full flex items-center justify-between pb-2 text-xs border-b border-stone-800 mb-2">
+            <span className="font-bold flex items-center gap-1.5 text-stone-200">
+              <Camera className="w-4 h-4 text-cyan-400" />
+              <span>ภาพหลักฐานการตรวจเช็ค PM (ความละเอียดสูง)</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setPreviewImage(null)}
+              className="p-1 text-stone-400 hover:text-white rounded-lg transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+
+          <div className="max-h-[75vh] w-full overflow-auto flex items-center justify-center p-1 bg-black/60 rounded-xl">
+            {previewImage && (
+              <img
+                src={previewImage}
+                alt="Preview Evidence"
+                className="max-h-[72vh] w-auto max-w-full rounded-lg object-contain shadow-2xl"
+              />
+            )}
+          </div>
+
+          <div className="w-full pt-2.5 text-center text-[11px] text-stone-400 border-t border-stone-800 mt-2 flex items-center justify-between">
+            <span>💡 ภาพหลักฐานสำหรับบันทึกประวัติเครื่องจักรในระบบ (ไม่แสดงในแบบฟอร์ม DCC)</span>
+            {previewImage?.startsWith('http') && (
+              <a
+                href={previewImage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-400 hover:underline flex items-center gap-1 font-semibold"
+              >
+                <span>เปิดภาพขนาดเต็ม</span>
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }

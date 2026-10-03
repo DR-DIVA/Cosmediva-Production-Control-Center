@@ -2553,6 +2553,7 @@ export async function submitPMChecksheet(params: {
         overallStatus: params.overallStatus,
         technicianName: params.technicianName,
         ownerSignName: params.ownerSignName,
+        photoUrls: params.photoAfterUrls || [],
         submittedAt: now.toISOString()
       }),
       corrective_action: `ตรวจเช็คบำรุงรักษาตามมาตรฐาน PM Checklist ${totalCount} ข้อ (DCC MT-WF-002D) ผลการตรวจ: ${params.overallStatus} [${readinessLabel}]. หมายเหตุช่าง: ${params.executionNotes || '-'}`,
