@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,9 @@ import {
   Zap,
   Thermometer,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  Search,
+  ListFilter
 } from 'lucide-react'
 import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { submitPMChecksheet } from '@/app/actions/maintenance'
@@ -31,6 +33,41 @@ import {
   PM_FORM_CODE, 
   PMChecklistItem 
 } from '@/lib/pmChecksheetCatalog'
+import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
+import { getMasterUsersList, MasterUserOption } from '@/lib/userMemory'
+
+const DEFAULT_TECH_LIST = [
+  { label: 'นายปิยะราช ถมมา (MTPIT1933) - หัวหน้าฝ่ายซ่อมบำรุง', value: 'นายปิยะราช ถมมา (MTPIT1933)' },
+  { label: 'นายอนันต์ รอดเสงี่ยม (MTANR1898) - ช่างซ่อมบำรุง', value: 'นายอนันต์ รอดเสงี่ยม (MTANR1898)' },
+  { label: 'ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)', value: 'ช่างยะ ปิยะราช รามมา' },
+  { label: 'ช่างคิม อนันต์ รอดเสงี่ยม (ช่างซ่อมบำรุง)', value: 'ช่างคิม อนันต์ รอดเสงี่ยม' },
+  { label: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)', value: 'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)' }
+]
+
+const COMMON_SUPERVISORS = [
+  { label: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620) - แผนกผสม', value: 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620)' },
+  { label: 'คุณเบ็ญจพร พูลสวัสดิ์ (pkbjp518) - แผนกบรรจุและแพ็กกิ้ง', value: 'คุณเบ็ญจพร พูลสวัสดิ์ (pkbjp518)' },
+  { label: 'น.ส.สายวรุณ มงคลคลี (SMSAM963) - แผนก RM / คลังสินค้า', value: 'น.ส.สายวรุณ มงคลคลี (SMSAM963)' },
+  { label: 'คุณฐิติกาญจน์ มากร (QCTTM181) - ฝ่ายควบคุมคุณภาพ (QC)', value: 'คุณฐิติกาญจน์ มากร (QCTTM181)' },
+  { label: 'คุณบรรเจิด พึ่งกระจ่าง (QABUP1677) - ฝ่ายประกันคุณภาพ (QA)', value: 'คุณบรรเจิด พึ่งกระจ่าง (QABUP1677)' },
+  { label: 'คุณศิรินภา แฝงกระโทก (PDSIF1932) - ฝ่ายผลิตทั่วไป', value: 'คุณศิรินภา แฝงกระโทก (PDSIF1932)' },
+  { label: 'คุณพรทิพย์ บูรณ์รัตน์ธรรม (PLPTB1234) - ฝ่ายวางแผนการผลิต', value: 'คุณพรทิพย์ บูรณ์รัตน์ธรรม (PLPTB1234)' }
+]
+
+function getSuggestedSupervisor(machineCode: string, machineName?: string): string {
+  const code = (machineCode || '').toUpperCase()
+  const name = (machineName || '').toLowerCase()
+  if (code.includes('MX') || name.includes('ผสม') || name.includes('agitator') || name.includes('homo')) {
+    return 'คุณกิตติศักดิ์ จิระพนาวัลย์ (mxktj620)'
+  }
+  if (code.includes('PK') || code.includes('FILL') || name.includes('บรรจุ') || name.includes('fill') || name.includes('pack')) {
+    return 'คุณเบ็ญจพร พูลสวัสดิ์ (pkbjp518)'
+  }
+  if (code.includes('RM') || code.includes('MM') || name.includes('คลัง') || name.includes('warehouse')) {
+    return 'น.ส.สายวรุณ มงคลคลี (SMSAM963)'
+  }
+  return 'คุณเบ็ญจพร พูลสวัสดิ์ (pkbjp518)'
+}
 
 interface ExecutePMChecksheetModalProps {
   isOpen: boolean
@@ -61,9 +98,42 @@ export default function ExecutePMChecksheetModal({
   const checklistItems: PMChecklistItem[] = template.items
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)
 
-  const [execTechName, setExecTechName] = useState(technicianName || 'ช่างยะ ปิยะราช รามมา')
+  // Master users list for selection
+  const [masterUsers, setMasterUsers] = useState<MasterUserOption[]>(() => getMasterUsersList())
+
+  useEffect(() => {
+    setMasterUsers(getMasterUsersList())
+    fetch(`/api/master-data/users?t=${Date.now()}`, { cache: 'no-store' })
+      .then(res => res.json())
+      .then(res => {
+        if (res.success && Array.isArray(res.data) && res.data.length > 0) {
+          setMasterUsers(res.data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  const masterUsersByDept = useMemo(() => {
+    const map: Record<string, MasterUserOption[]> = {}
+    masterUsers.forEach(u => {
+      const dept = u.department || 'ฝ่ายผลิตและปฏิบัติการ'
+      if (!map[dept]) map[dept] = []
+      map[dept].push(u)
+    })
+    return map
+  }, [masterUsers])
+
+  const initialSuggestedOwner = useMemo(() => {
+    return getSuggestedSupervisor(plan.machine_code, plan.machine_name)
+  }, [plan.machine_code, plan.machine_name])
+
+  const initialTech = technicianName || plan.machine?.responsible_technician_name || 'นายปิยะราช ถมมา (MTPIT1933)'
+
+  const [execTechName, setExecTechName] = useState(initialTech)
   const [isEditingTech, setIsEditingTech] = useState(false)
-  const [ownerSignName, setOwnerSignName] = useState('')
+  const [ownerSignName, setOwnerSignName] = useState(initialSuggestedOwner)
+  const [techInputMode, setTechInputMode] = useState<'select' | 'autocomplete'>('select')
+  const [ownerInputMode, setOwnerInputMode] = useState<'select' | 'autocomplete'>('select')
   const [generalNotes, setGeneralNotes] = useState('')
   const [readinessStatus, setReadinessStatus] = useState<'READY' | 'NOT_READY'>('READY')
   const [autoCreateBreakdown, setAutoCreateBreakdown] = useState(true)
@@ -577,24 +647,152 @@ export default function ExecutePMChecksheetModal({
 
           {/* Sign-off Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-blue-50/60 rounded-2xl border border-blue-200 text-xs">
-            <div>
-              <span className="font-bold text-blue-900 block mb-1">ผู้ส่งมอบ (ช่างผู้ตรวจ):</span>
-              <div className="p-2 bg-white rounded-xl border border-blue-200 font-bold text-stone-800">
-                {execTechName}
+            {/* Deliverer (Technician) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-700" />
+                  <span>ผู้ส่งมอบ (ช่างผู้ตรวจ): <span className="text-red-500">*</span></span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTechInputMode(m => m === 'select' ? 'autocomplete' : 'select')}
+                  className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline flex items-center gap-1"
+                >
+                  {techInputMode === 'select' ? (
+                    <>
+                      <Search className="w-2.5 h-2.5" />
+                      <span>พิมพ์ค้นหา</span>
+                    </>
+                  ) : (
+                    <>
+                      <ListFilter className="w-2.5 h-2.5" />
+                      <span>เลือกจากรายการ</span>
+                    </>
+                  )}
+                </button>
               </div>
+
+              {techInputMode === 'select' ? (
+                <select
+                  value={execTechName}
+                  onChange={e => {
+                    if (e.target.value === '__AUTOCOMPLETE__') {
+                      setTechInputMode('autocomplete')
+                    } else {
+                      setExecTechName(e.target.value)
+                    }
+                  }}
+                  className="w-full h-9 px-3 text-xs bg-white border border-blue-300 rounded-xl font-bold text-stone-800 outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {execTechName && 
+                    !DEFAULT_TECH_LIST.some(t => t.value === execTechName) && 
+                    !masterUsers.some(u => u.displayName === execTechName) && (
+                      <option value={execTechName}>{execTechName} (ระบุเอง)</option>
+                  )}
+                  <optgroup label="ช่างซ่อมบำรุงประจำโรงงาน">
+                    {DEFAULT_TECH_LIST.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </optgroup>
+                  {Object.entries(masterUsersByDept).map(([dept, users]) => (
+                    <optgroup key={dept} label={`พนักงาน: ${dept}`}>
+                      {users.map(u => (
+                        <option key={u.employeeId} value={u.displayName}>
+                          {u.displayName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__AUTOCOMPLETE__">🔍 -- พิมพ์ค้นหาละเอียดจาก Master Data --</option>
+                </select>
+              ) : (
+                <NameAutocompleteInput
+                  id="pm-tech-name-input"
+                  value={execTechName}
+                  onChange={setExecTechName}
+                  placeholder="พิมพ์ชื่อหรือรหัสพนักงานช่างผู้ส่งมอบ..."
+                  className="h-9 text-xs bg-white border-blue-300 font-bold"
+                  required
+                  autoFocus
+                />
+              )}
             </div>
 
-            <div>
-              <span className="font-bold text-blue-900 block mb-1">
-                ผู้รับมอบ (หัวหน้าแผนกผู้เป็นเจ้าของเครื่อง): <span className="text-red-500">*</span>
-              </span>
-              <Input
-                required
-                placeholder="พิมพ์ชื่อหัวหน้าแผนกผู้รับมอบ..."
-                value={ownerSignName}
-                onChange={e => setOwnerSignName(e.target.value)}
-                className="h-9 text-xs bg-white border-blue-300 font-medium"
-              />
+            {/* Recipient (Department Owner) */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-blue-900 flex items-center gap-1.5">
+                  <UserCheck className="w-3.5 h-3.5 text-blue-700" />
+                  <span>ผู้รับมอบ (หัวหน้าแผนกผู้เป็นเจ้าของเครื่อง): <span className="text-red-500">*</span></span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setOwnerInputMode(m => m === 'select' ? 'autocomplete' : 'select')}
+                  className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline flex items-center gap-1"
+                >
+                  {ownerInputMode === 'select' ? (
+                    <>
+                      <Search className="w-2.5 h-2.5" />
+                      <span>พิมพ์ค้นหา</span>
+                    </>
+                  ) : (
+                    <>
+                      <ListFilter className="w-2.5 h-2.5" />
+                      <span>เลือกจากรายการ</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {ownerInputMode === 'select' ? (
+                <select
+                  value={ownerSignName}
+                  onChange={e => {
+                    if (e.target.value === '__AUTOCOMPLETE__') {
+                      setOwnerInputMode('autocomplete')
+                    } else {
+                      setOwnerSignName(e.target.value)
+                    }
+                  }}
+                  required
+                  className="w-full h-9 px-3 text-xs bg-white border border-blue-300 rounded-xl font-bold text-stone-800 outline-none focus:ring-2 focus:ring-blue-500/20"
+                >
+                  {!ownerSignName && (
+                    <option value="" disabled>-- เลือกหัวหน้าแผนก / ผู้รับมอบ --</option>
+                  )}
+                  {ownerSignName && 
+                    !COMMON_SUPERVISORS.some(s => s.value === ownerSignName) && 
+                    !masterUsers.some(u => u.displayName === ownerSignName) && (
+                      <option value={ownerSignName}>{ownerSignName} (ระบุเอง)</option>
+                  )}
+                  <optgroup label="หัวหน้าแผนก / เจ้าของเครื่องจักรแนะนำ">
+                    {COMMON_SUPERVISORS.map(s => (
+                      <option key={s.value} value={s.value}>{s.label}</option>
+                    ))}
+                  </optgroup>
+                  {Object.entries(masterUsersByDept).map(([dept, users]) => (
+                    <optgroup key={dept} label={`พนักงาน: ${dept}`}>
+                      {users.map(u => (
+                        <option key={u.employeeId} value={u.displayName}>
+                          {u.displayName}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                  <option value="__AUTOCOMPLETE__">🔍 -- พิมพ์ค้นหาละเอียดจาก Master Data --</option>
+                </select>
+              ) : (
+                <NameAutocompleteInput
+                  id="pm-owner-name-input"
+                  value={ownerSignName}
+                  onChange={setOwnerSignName}
+                  placeholder="พิมพ์ชื่อหรือรหัสพนักงานหัวหน้าแผนกผู้รับมอบ..."
+                  className="h-9 text-xs bg-white border-blue-300 font-bold"
+                  required
+                  autoFocus
+                />
+              )}
             </div>
           </div>
 
