@@ -32,7 +32,7 @@ import {
 import { MaintenanceActivityLogItem, MaintenanceActivityType } from '@/types/maintenance'
 import { getMaintenanceActivityLogs } from '@/app/actions/maintenance'
 import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
-import { formatThaiDate } from '@/lib/maintenanceHelpers'
+import { formatThaiDate, resolveDepartmentAndAreaFromCode } from '@/lib/maintenanceHelpers'
 import * as XLSX from 'xlsx'
 
 interface MaintenanceActivityLogModalProps {
@@ -170,6 +170,10 @@ export default function MaintenanceActivityLogModal({
           minute: '2-digit'
         })
 
+        const dept = (item.departmentName && item.departmentName !== '-')
+          ? item.departmentName
+          : resolveDepartmentAndAreaFromCode(item.machineCode)?.department || '-'
+
         return {
           'ลำดับ': idx + 1,
           'วันที่ (วว/ดด/ปปปป)': numericDateStr,
@@ -178,7 +182,7 @@ export default function MaintenanceActivityLogModal({
           'ประเภทกิจกรรม': item.activityLabel,
           'รหัสเครื่องจักร': item.machineCode,
           'ชื่อเครื่องจักร': item.machineName,
-          'สังกัด/แผนก': item.departmentName || '-',
+          'สังกัด/แผนก': dept,
           'เลขที่อ้างอิง/ใบงาน': item.refNumber || '-',
           'ผู้ดำเนินการ': item.performedBy,
           'สรุปกิจกรรม': item.summary,

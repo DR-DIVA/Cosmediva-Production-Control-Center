@@ -18,6 +18,7 @@ import {
   MaintenanceActivityType
 } from '@/types/maintenance'
 import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
+import { resolveDepartmentAndAreaFromCode } from '@/lib/maintenanceHelpers'
 
 /**
  * Generate sequential WO number: MTR-YYMMXXX (e.g. MTR-2609001)
@@ -2799,6 +2800,31 @@ export async function getMaintenanceActivityLogs(params?: {
       .order('created_at', { ascending: false })
       .limit(limit)
 
+    // Build lookup maps from machines master data
+    const machineDeptMap = new Map<string, string>()
+    const machineNameMap = new Map<string, string>()
+
+    if (machines && machines.length > 0) {
+      machines.forEach((m: any) => {
+        const cleanCode = (m.machine_code || '').toUpperCase().trim()
+        const resolved = resolveDepartmentAndAreaFromCode(cleanCode)
+        const dept = m.department_name || resolved?.department || ''
+        if (cleanCode) {
+          if (dept) machineDeptMap.set(cleanCode, dept)
+          if (m.machine_name) machineNameMap.set(cleanCode, m.machine_name)
+        }
+      })
+    }
+
+    const getMachineDept = (code?: string, fallback?: string): string => {
+      if (!code) return fallback || '-'
+      const clean = code.toUpperCase().trim()
+      if (machineDeptMap.has(clean)) return machineDeptMap.get(clean)!
+      const resolved = resolveDepartmentAndAreaFromCode(clean)
+      if (resolved?.department) return resolved.department
+      return fallback || '-'
+    }
+
     const items: MaintenanceActivityLogItem[] = []
     const recordedMachineCreateKeys = new Set<string>()
 
@@ -2810,6 +2836,10 @@ export async function getMaintenanceActivityLogs(params?: {
           (log.edit_reason || '').includes('ลงทะเบียน') ||
           (log.changes_summary && log.changes_summary.some((c: any) => c.field === 'machine_code' && !c.old_value))
 
+        const cleanCode = (log.machine_code || '').toUpperCase().trim()
+        const deptName = getMachineDept(log.machine_code)
+        const mName = log.machine_name || machineNameMap.get(cleanCode) || log.machine_code
+
         if (isCreate) {
           recordedMachineCreateKeys.add(log.machine_code)
           items.push({
@@ -2819,7 +2849,8 @@ export async function getMaintenanceActivityLogs(params?: {
             activityLabel: 'เพิ่มเครื่องจักรใหม่',
             badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
             machineCode: log.machine_code,
-            machineName: log.machine_name || log.machine_code,
+            machineName: mName,
+            departmentName: deptName,
             refNumber: log.machine_code,
             performedBy: (log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `ขึ้นทะเบียนเครื่องจักรใหม่ ${log.machine_code}`,
@@ -2843,7 +2874,8 @@ export async function getMaintenanceActivityLogs(params?: {
             activityLabel: 'แก้ไขข้อมูลเครื่องจักร',
             badgeColor: 'bg-amber-50 text-amber-800 border-amber-300',
             machineCode: log.machine_code,
-            machineName: log.machine_name || log.machine_code,
+            machineName: mName,
+            departmentName: deptName,
             refNumber: log.machine_code,
             performedBy: (log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `แก้ไขข้อมูลเครื่องจักร ${log.machine_code} (${(log.changes_summary || []).length} รายการ)`,
@@ -2900,6 +2932,10 @@ export async function getMaintenanceActivityLogs(params?: {
             overall === 'PASSED' ? 'ผ่านเกณฑ์ปกติ' :
             overall === 'PASSED_WITH_REMARKS' ? 'ผ่านแบบมีข้อระมัดระวัง' : 'ไม่ผ่าน/มีจุดชำรุด'
 
+          const cleanCode = (wo.machine_code || '').toUpperCase().trim()
+          const deptName = getMachineDept(wo.machine_code, wo.department_name)
+          const mName = wo.machine_name || machineNameMap.get(cleanCode) || wo.machine_code
+
           items.push({
             id: `wo-pm-${wo.id}`,
             timestamp: wo.repair_completed_at || wo.created_at,
@@ -2907,7 +2943,8 @@ export async function getMaintenanceActivityLogs(params?: {
             activityLabel: 'ดำเนินการทำ PM',
             badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-300',
             machineCode: wo.machine_code,
-            machineName: wo.machine_name,
+            machineName: mName,
+            departmentName: deptName,
             refNumber: wo.wo_number,
             performedBy: tech,
             summary: `ดำเนินการตรวจเช็ค PM ประจำงวด (${wo.wo_number})`,
@@ -2917,6 +2954,10 @@ export async function getMaintenanceActivityLogs(params?: {
           })
         } else {
           // Regular Repair Work Order
+          const cleanCode = (wo.machine_code || '').toUpperCase().trim()
+          const deptName = getMachineDept(wo.machine_code, wo.department_name)
+          const mName = wo.machine_name || machineNameMap.get(cleanCode) || wo.machine_code
+
           // 0. Repair Request Event (การแจ้งซ่อมจากฝ่ายที่เกี่ยวข้อง)
           const reqTime = wo.reported_at || wo.created_at
           const priorityThai = 
@@ -2931,12 +2972,12 @@ export async function getMaintenanceActivityLogs(params?: {
             activityLabel: 'แจ้งซ่อมจากฝ่ายที่เกี่ยวข้อง',
             badgeColor: 'bg-rose-50 text-rose-800 border-rose-300',
             machineCode: wo.machine_code,
-            machineName: wo.machine_name,
-            departmentName: wo.department_name,
+            machineName: mName,
+            departmentName: deptName,
             refNumber: wo.wo_number,
             performedBy: (wo.requester_name || 'ผู้แจ้งซ่อม (ฝ่ายที่เกี่ยวข้อง)').replace(/รามมา/g, 'ถมมา'),
             summary: `ฝ่ายที่เกี่ยวข้องแจ้งซ่อม ${wo.machine_code} (${wo.wo_number})`,
-            details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} • แผนกผู้แจ้ง: ${wo.department_name || '-'} • ความเร่งด่วน: ${priorityThai} • หมวดปัญหา: ${wo.symptom_category || '-'}`,
+            details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} • แผนกผู้แจ้ง: ${deptName} • ความเร่งด่วน: ${priorityThai} • หมวดปัญหา: ${wo.symptom_category || '-'}`,
             status: `สถานะ: ${wo.status || 'NEW'}`,
             reason: wo.symptom_description || wo.symptom_category || 'แจ้งซ่อมเครื่องจักรขัดข้อง'
           })
@@ -2950,7 +2991,8 @@ export async function getMaintenanceActivityLogs(params?: {
               activityLabel: 'รับงานซ่อม',
               badgeColor: 'bg-purple-50 text-purple-800 border-purple-300',
               machineCode: wo.machine_code,
-              machineName: wo.machine_name,
+              machineName: mName,
+              departmentName: deptName,
               refNumber: wo.wo_number,
               performedBy: (wo.assigned_technician_name || 'ช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
               summary: `ช่างรับงานซ่อม ${wo.wo_number}`,
@@ -2972,7 +3014,8 @@ export async function getMaintenanceActivityLogs(params?: {
               activityLabel: 'ปิดงานซ่อม',
               badgeColor: 'bg-blue-50 text-blue-800 border-blue-300',
               machineCode: wo.machine_code,
-              machineName: wo.machine_name,
+              machineName: mName,
+              departmentName: deptName,
               refNumber: wo.wo_number,
               performedBy: actionBy,
               summary: `ซ่อมเสร็จและปิดงานซ่อม ${wo.wo_number}`,
