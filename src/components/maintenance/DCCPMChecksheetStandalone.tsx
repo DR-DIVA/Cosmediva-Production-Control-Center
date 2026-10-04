@@ -21,7 +21,7 @@ export default function DCCPMChecksheetStandalone({ plan, latestExecution }: Pro
   )
 
   const [execTechName, setExecTechName] = useState(
-    latestExecution?.technicianName || 'ช่างยะ ปิยะราช รามมา'
+    latestExecution?.technicianName || 'ช่างยะ ปิยะราช ถมมา'
   )
   const [ownerSignName, setOwnerSignName] = useState(
     latestExecution?.ownerSignName || ''

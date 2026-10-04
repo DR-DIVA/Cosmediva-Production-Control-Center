@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { MaintenancePMPlan, getPmFrequencyInfo } from '@/types/maintenance'
 import { adjustPMPlanFrequency } from '@/app/actions/maintenance'
+import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
 
 interface Props {
   isOpen: boolean
@@ -160,12 +161,14 @@ export default function AdjustPMFrequencyModal({ isOpen, onClose, plan, onSucces
               <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">
                 วันครบกำหนดรอบถัดไป
               </label>
-              <input
-                type="date"
-                value={nextDueDate}
-                onChange={(e) => setNextDueDate(e.target.value)}
-                className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-2 text-xs text-stone-900 focus:outline-none focus:bg-white focus:border-[#D4AF37] font-mono"
-              />
+              <div className="w-full bg-stone-50 border border-stone-200 rounded-xl px-3 py-1.5 flex items-center">
+                <ThaiDateInput
+                  value={nextDueDate}
+                  onChange={setNextDueDate}
+                  className="w-full justify-between"
+                  title="วันครบกำหนดรอบถัดไป (วัน/เดือน/ปี)"
+                />
+              </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-stone-700 uppercase tracking-wider mb-1.5">

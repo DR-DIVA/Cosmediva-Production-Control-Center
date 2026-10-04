@@ -26,6 +26,8 @@ import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { MaintenanceActivityLogItem, MaintenanceActivityType } from '@/types/maintenance'
 import { getMaintenanceActivityLogs } from '@/app/actions/maintenance'
+import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
+import { formatThaiDate } from '@/lib/maintenanceHelpers'
 import * as XLSX from 'xlsx'
 
 export default function MaintenanceActivityLogsPage() {
@@ -93,6 +95,7 @@ export default function MaintenanceActivityLogsPage() {
   const counts = useMemo(() => {
     let created = 0
     let updated = 0
+    let req = 0
     let ack = 0
     let close = 0
     let pm = 0
@@ -100,12 +103,13 @@ export default function MaintenanceActivityLogsPage() {
     logs.forEach(l => {
       if (l.activityType === 'MACHINE_CREATED') created++
       else if (l.activityType === 'MACHINE_UPDATED') updated++
+      else if (l.activityType === 'REPAIR_REQUESTED') req++
       else if (l.activityType === 'REPAIR_ACKNOWLEDGED') ack++
       else if (l.activityType === 'REPAIR_COMPLETED') close++
       else if (l.activityType === 'PM_EXECUTED') pm++
     })
 
-    return { created, updated, ack, close, pm, total: logs.length }
+    return { created, updated, req, ack, close, pm, total: logs.length }
   }, [logs])
 
   const filteredLogs = useMemo(() => {
@@ -135,20 +139,18 @@ export default function MaintenanceActivityLogsPage() {
       }
 
       const rows = filteredLogs.map((item, idx) => {
+        const thaiDateStr = formatThaiDate(item.timestamp, 'short')
+        const numericDateStr = formatThaiDate(item.timestamp, 'numeric')
         const dateObj = new Date(item.timestamp)
-        const thaiDateStr = dateObj.toLocaleDateString('th-TH', {
-          year: 'numeric',
-          month: 'short',
-          day: 'numeric'
-        })
-        const timeStr = dateObj.toLocaleTimeString('th-TH', {
+        const timeStr = isNaN(dateObj.getTime()) ? '-' : dateObj.toLocaleTimeString('th-TH', {
           hour: '2-digit',
           minute: '2-digit'
         })
 
         return {
           'ลำดับ': idx + 1,
-          'วันที่': thaiDateStr,
+          'วันที่ (วว/ดด/ปปปป)': numericDateStr,
+          'วันที่แสดงผล': thaiDateStr,
           'เวลา': timeStr,
           'ประเภทกิจกรรม': item.activityLabel,
           'รหัสเครื่องจักร': item.machineCode,
@@ -212,6 +214,13 @@ export default function MaintenanceActivityLogsPage() {
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 shrink-0">
             <FileEdit className="w-3.5 h-3.5 text-amber-700" />
+            <span>{label}</span>
+          </span>
+        )
+      case 'REPAIR_REQUESTED':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-900 border border-rose-300 shrink-0">
+            <AlertTriangle className="w-3.5 h-3.5 text-rose-700" />
             <span>{label}</span>
           </span>
         )
@@ -293,7 +302,7 @@ export default function MaintenanceActivityLogsPage() {
       </div>
 
       {/* KPI Summary Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
         <div
           onClick={() => setActivityType('ALL')}
           className={`p-3.5 rounded-2xl border transition cursor-pointer ${
@@ -334,6 +343,21 @@ export default function MaintenanceActivityLogsPage() {
             <span>แก้ไขข้อมูล</span>
           </div>
           <div className="text-xl font-black mt-1">{counts.updated}</div>
+        </div>
+
+        <div
+          onClick={() => setActivityType('REPAIR_REQUESTED')}
+          className={`p-3.5 rounded-2xl border transition cursor-pointer ${
+            activityType === 'REPAIR_REQUESTED'
+              ? 'bg-rose-700 text-white border-rose-700 shadow-md'
+              : 'bg-rose-50/70 hover:bg-rose-100/70 text-rose-900 border-rose-200'
+          }`}
+        >
+          <div className="text-[11px] font-semibold flex items-center gap-1">
+            <AlertTriangle className="w-3.5 h-3.5" />
+            <span>แจ้งซ่อม (ฝ่ายต่างๆ)</span>
+          </div>
+          <div className="text-xl font-black mt-1">{counts.req}</div>
         </div>
 
         <div
@@ -420,27 +444,22 @@ export default function MaintenanceActivityLogsPage() {
           {/* Date Range & Presets */}
           <div className="md:col-span-5 flex flex-wrap items-center gap-2">
             <div className="flex items-center gap-1.5 bg-stone-50 border border-stone-200 rounded-xl px-2.5 py-1.5 text-xs">
-              <Calendar className="w-4 h-4 text-stone-500 shrink-0" />
-              <input
-                type="date"
+              <ThaiDateInput
                 value={startDate}
-                onChange={e => setStartDate(e.target.value)}
-                className="bg-transparent text-xs outline-none text-stone-700 w-32"
-                title="จากวันที่"
+                onChange={setStartDate}
+                title="จากวันที่ (วัน/เดือน/ปี)"
               />
-              <span className="text-stone-400 text-xs">ถึง</span>
-              <input
-                type="date"
+              <span className="text-stone-400 text-xs font-bold">ถึง</span>
+              <ThaiDateInput
                 value={endDate}
-                onChange={e => setEndDate(e.target.value)}
-                className="bg-transparent text-xs outline-none text-stone-700 w-32"
-                title="ถึงวันที่"
+                onChange={setEndDate}
+                title="ถึงวันที่ (วัน/เดือน/ปี)"
               />
               {(startDate || endDate) && (
                 <button
                   type="button"
                   onClick={() => { setStartDate(''); setEndDate(''); }}
-                  className="text-stone-400 hover:text-red-500 p-0.5"
+                  className="text-stone-400 hover:text-red-500 p-0.5 ml-1 cursor-pointer"
                   title="ล้างช่วงวันที่"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -512,13 +531,9 @@ export default function MaintenanceActivityLogsPage() {
               </thead>
               <tbody className="divide-y divide-stone-100 bg-white">
                 {filteredLogs.map((item, index) => {
+                  const thaiDateStr = formatThaiDate(item.timestamp, 'short')
                   const dateObj = new Date(item.timestamp)
-                  const thaiDateStr = dateObj.toLocaleDateString('th-TH', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric'
-                  })
-                  const timeStr = dateObj.toLocaleTimeString('th-TH', {
+                  const timeStr = isNaN(dateObj.getTime()) ? '-' : dateObj.toLocaleTimeString('th-TH', {
                     hour: '2-digit',
                     minute: '2-digit'
                   })

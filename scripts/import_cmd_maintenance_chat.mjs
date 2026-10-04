@@ -29,7 +29,7 @@ async function run() {
     console.log(`Total lines: ${lines.length}`);
 
     // Detect known senders
-    const knownSenders = new Set(['Nong', 'Tewan Ladbasri', 'ปิยะราช รามมา', 'Kim', 'YA', 'Ma nut', 'ช่างสุรเชษฐ์']);
+    const knownSenders = new Set(['Nong', 'Tewan Ladbasri', 'ปิยะราช ถมมา', 'Kim', 'YA', 'Ma nut', 'ช่างสุรเชษฐ์']);
     for (const l of lines) {
       const m = l.match(/^\d{2}:\d{2}\s+(.+?)\s+(Stickers|Photos|Videos|Files|Deleted an album|Added a new note)\s*$/);
       if (m) knownSenders.add(m[1].trim());

@@ -449,7 +449,7 @@ export default function DCCWorkOrderEForm({ workOrder }: Props) {
                 {isClosed ? (
                   <>
                     <span className="font-mono font-bold text-xs text-stone-900 underline decoration-dotted">
-                      {wo.supervisor_name || 'ปิยะราช รามมา'}
+                      {wo.supervisor_name || 'ปิยะราช ถมมา'}
                     </span>
                     <span className="text-[9px] text-stone-500">
                       (ตรวจสอบความถูกต้องและปิดงาน)

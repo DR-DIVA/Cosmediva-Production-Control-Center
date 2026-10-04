@@ -20,6 +20,7 @@ import {
   FileText,
   AlertCircle
 } from 'lucide-react'
+import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
 import { MaintenancePMPlan, getPmFrequencyInfo, FACTORY_TECHNICIANS } from '@/types/maintenance'
 import { dispatchPMWorkOrder } from '@/app/actions/maintenance'
 import { getMasterUsersList, MasterUserOption, isMaintenanceTechnician } from '@/lib/userMemory'
@@ -94,7 +95,7 @@ export default function AssignPMTechnicianModal({
   const [targetDate, setTargetDate] = useState(plan.next_due_date || todayStr)
   const [priority, setPriority] = useState('P3_NORMAL')
   const [notes, setNotes] = useState('')
-  const [assignedByName, setAssignedByName] = useState('ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)')
+  const [assignedByName, setAssignedByName] = useState('ช่างยะ ปิยะราช ถมมา (หัวหน้าฝ่ายซ่อมบำรุง)')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -216,12 +217,14 @@ export default function AssignPMTechnicianModal({
                 <Calendar className="w-3.5 h-3.5 text-stone-600" />
                 <span>วันกำหนดเข้าทำ (Target Date)</span>
               </label>
-              <Input
-                type="date"
-                value={targetDate}
-                onChange={e => setTargetDate(e.target.value)}
-                className="text-xs"
-              />
+              <div className="h-10 px-3 rounded-xl border border-stone-200 bg-white flex items-center">
+                <ThaiDateInput
+                  value={targetDate}
+                  onChange={setTargetDate}
+                  className="w-full justify-between"
+                  title="วันกำหนดเข้าทำ (วัน/เดือน/ปี)"
+                />
+              </div>
             </div>
 
             <div className="space-y-1.5">

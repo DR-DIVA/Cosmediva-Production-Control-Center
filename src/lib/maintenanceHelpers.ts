@@ -210,3 +210,49 @@ export function resolveDepartmentAndAreaFromCode(code: string): DepartmentClassi
 
   return null
 }
+
+/**
+ * Format any date or timestamp strictly to Day-Month-Year (วัน เดือน ปี เสมอ)
+ * e.g. "30/09/2026" or "30 ก.ย. 2026"
+ */
+export function formatThaiDate(dateStr?: string | null, format: 'numeric' | 'short' | 'long' = 'short'): string {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+
+  const day = d.getDate().toString().padStart(2, '0')
+  const month = (d.getMonth() + 1).toString().padStart(2, '0')
+  const year = d.getFullYear()
+
+  if (format === 'numeric') {
+    return `${day}/${month}/${year}`
+  }
+
+  const thaiMonthsShort = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+  const thaiMonthsLong = [
+    'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+    'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'
+  ]
+
+  if (format === 'long') {
+    return `${d.getDate()} ${thaiMonthsLong[d.getMonth()]} ${year}`
+  }
+
+  return `${d.getDate()} ${thaiMonthsShort[d.getMonth()]} ${year}`
+}
+
+/**
+ * Format any date or timestamp strictly to Day-Month-Year with time (วัน เดือน ปี เวลา เสมอ)
+ * e.g. "30 ก.ย. 2026 16:32 น."
+ */
+export function formatThaiDateTime(dateStr?: string | null): string {
+  if (!dateStr) return '-'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return dateStr
+
+  const datePart = formatThaiDate(dateStr, 'short')
+  const hours = d.getHours().toString().padStart(2, '0')
+  const minutes = d.getMinutes().toString().padStart(2, '0')
+  return `${datePart} ${hours}:${minutes} น.`
+}
+

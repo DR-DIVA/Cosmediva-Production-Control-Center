@@ -8,6 +8,7 @@ import { Plus, Wrench, Building, Cpu, Layers, Building2, Target, CalendarDays } 
 import { toast } from 'sonner'
 import { createMachine } from '@/app/actions/maintenance'
 import { resolveDepartmentAndAreaFromCode, DEPARTMENTS } from '@/lib/maintenanceHelpers'
+import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
 
 interface AddMachineModalProps {
   isOpen: boolean
@@ -411,27 +412,31 @@ export default function AddMachineModal({ isOpen, onClose, onSuccess }: AddMachi
                   <div>
                     <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
                       <CalendarDays className="w-3.5 h-3.5 text-cyan-700" />
-                      <span>วันที่สอบเทียบล่าสุด</span>
+                      <span>วันที่สอบเทียบล่าสุด (วัน/เดือน/ปี)</span>
                     </label>
-                    <Input
-                      type="date"
-                      value={lastCalibrationDate}
-                      onChange={e => setLastCalibrationDate(e.target.value)}
-                      className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono"
-                    />
+                    <div className="h-9 px-3 rounded-xl bg-white border border-cyan-200 flex items-center">
+                      <ThaiDateInput
+                        value={lastCalibrationDate}
+                        onChange={setLastCalibrationDate}
+                        className="w-full justify-between"
+                        title="วันที่สอบเทียบล่าสุด (วัน/เดือน/ปี)"
+                      />
+                    </div>
                   </div>
 
                   <div>
                     <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
                       <CalendarDays className="w-3.5 h-3.5 text-rose-600" />
-                      <span>กำหนดสอบเทียบครั้งถัดไป</span>
+                      <span>กำหนดสอบเทียบครั้งถัดไป (วัน/เดือน/ปี)</span>
                     </label>
-                    <Input
-                      type="date"
-                      value={nextCalibrationDate}
-                      onChange={e => setNextCalibrationDate(e.target.value)}
-                      className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono font-bold text-rose-700"
-                    />
+                    <div className="h-9 px-3 rounded-xl bg-white border border-cyan-200 flex items-center">
+                      <ThaiDateInput
+                        value={nextCalibrationDate}
+                        onChange={setNextCalibrationDate}
+                        className="w-full justify-between"
+                        title="กำหนดสอบเทียบครั้งถัดไป (วัน/เดือน/ปี)"
+                      />
+                    </div>
                   </div>
                 </div>
 

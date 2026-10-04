@@ -23,6 +23,7 @@ import {
   Square
 } from 'lucide-react'
 import { toast } from 'sonner'
+import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
 import { updateMachine, getMachineAuditLogs } from '@/app/actions/maintenance'
 import { MaintenanceMachine, MaintenanceMachineAuditLog } from '@/types/maintenance'
 import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
@@ -617,27 +618,31 @@ export default function EditMachineModal({
                     <div>
                       <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
                         <CalendarDays className="w-3.5 h-3.5 text-cyan-700" />
-                        <span>วันที่สอบเทียบล่าสุด (Last CAL)</span>
+                        <span>วันที่สอบเทียบล่าสุด (Last CAL: วัน/เดือน/ปี)</span>
                       </label>
-                      <Input
-                        type="date"
-                        value={lastCalibrationDate}
-                        onChange={e => setLastCalibrationDate(e.target.value)}
-                        className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono"
-                      />
+                      <div className="h-9 px-3 rounded-xl bg-white border border-cyan-200 flex items-center">
+                        <ThaiDateInput
+                          value={lastCalibrationDate}
+                          onChange={setLastCalibrationDate}
+                          className="w-full justify-between"
+                          title="วันที่สอบเทียบล่าสุด (วัน/เดือน/ปี)"
+                        />
+                      </div>
                     </div>
 
                     <div>
                       <label className="text-[11px] font-medium text-stone-700 block mb-1 flex items-center gap-1">
                         <CalendarDays className="w-3.5 h-3.5 text-rose-600" />
-                        <span>กำหนดสอบเทียบครั้งถัดไป (Next Due)</span>
+                        <span>กำหนดสอบเทียบครั้งถัดไป (Next Due: วัน/เดือน/ปี)</span>
                       </label>
-                      <Input
-                        type="date"
-                        value={nextCalibrationDate}
-                        onChange={e => setNextCalibrationDate(e.target.value)}
-                        className="h-9 text-xs rounded-xl bg-white border-cyan-200 font-mono font-bold text-rose-700"
-                      />
+                      <div className="h-9 px-3 rounded-xl bg-white border border-cyan-200 flex items-center">
+                        <ThaiDateInput
+                          value={nextCalibrationDate}
+                          onChange={setNextCalibrationDate}
+                          className="w-full justify-between"
+                          title="กำหนดสอบเทียบครั้งถัดไป (วัน/เดือน/ปี)"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -783,7 +788,7 @@ export default function EditMachineModal({
                         <span className="p-1.5 rounded-lg bg-blue-100 text-blue-800">
                           <User className="w-3.5 h-3.5" />
                         </span>
-                        <span className="text-xs font-bold text-stone-900">{log.edited_by_name}</span>
+                        <span className="text-xs font-bold text-stone-900">{(log.edited_by_name || '').replace(/รามมา/g, 'ถมมา')}</span>
                       </div>
                       <div className="flex items-center gap-1 text-[11px] text-stone-500 font-mono">
                         <Clock className="w-3 h-3 text-stone-400" />

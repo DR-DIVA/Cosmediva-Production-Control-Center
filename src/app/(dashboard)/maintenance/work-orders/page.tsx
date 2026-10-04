@@ -497,8 +497,8 @@ export default function WorkOrdersKanbanPage() {
       const res = await transitionWorkOrderStatus({
         work_order_id: wo.id,
         to_status: 'CLOSED',
-        changed_by_name: 'ปิยะราช รามมา',
-        notes: 'หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช รามมา) ตรวจสอบความสมบูรณ์และปิดงานซ่อม'
+        changed_by_name: 'ปิยะราช ถมมา',
+        notes: 'หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช ถมมา) ตรวจสอบความสมบูรณ์และปิดงานซ่อม'
       })
 
       if (res.success) {
@@ -1332,7 +1332,7 @@ export default function WorkOrdersKanbanPage() {
                     className="w-full h-10 bg-stone-900 hover:bg-stone-800 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center justify-center gap-2"
                   >
                     <ShieldCheck className="w-4 h-4 text-[#D4AF37]" />
-                    หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช รามมา) กดปิดงานสมบูรณ์ (CLOSE WORK ORDER)
+                    หัวหน้าฝ่ายซ่อมบำรุง (ปิยะราช ถมมา) กดปิดงานสมบูรณ์ (CLOSE WORK ORDER)
                   </Button>
                 </div>
               </div>
@@ -1346,7 +1346,7 @@ export default function WorkOrdersKanbanPage() {
                   <div>
                     <span className="font-bold text-stone-900 block">งานซ่อมนี้ปิดสมบูรณ์แล้ว (Closed & Archived)</span>
                     <span className="text-[11px] text-stone-600">
-                      หัวหน้าช่างผู้ปิดงาน: <b className="text-stone-800">{detailWO.supervisor_name || 'ปิยะราช รามมา'}</b> • บันทึกเข้าประวัติเครื่องจักร DCC เรียบร้อย
+                      หัวหน้าช่างผู้ปิดงาน: <b className="text-stone-800">{detailWO.supervisor_name || 'ปิยะราช ถมมา'}</b> • บันทึกเข้าประวัติเครื่องจักร DCC เรียบร้อย
                     </span>
                   </div>
                 </div>

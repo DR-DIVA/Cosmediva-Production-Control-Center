@@ -46,7 +46,7 @@ export function formatWorkOrderStatus(status?: string | null): string {
 }
 
 export const FACTORY_TECHNICIANS = [
-  'ช่างยะ ปิยะราช รามมา (หัวหน้าฝ่ายซ่อมบำรุง)',
+  'ช่างยะ ปิยะราช ถมมา (หัวหน้าฝ่ายซ่อมบำรุง)',
   'ช่างคิม อนันต์ รอดเสงี่ยม (ช่างซ่อมบำรุง)',
   'ซัพพลายเออร์ / ทีมบริการภายนอก (Outsource Service)'
 ]
@@ -400,6 +400,7 @@ export type MaintenanceActivityType =
   | 'ALL'
   | 'MACHINE_CREATED'      // เพิ่มเครื่องจักรใหม่
   | 'MACHINE_UPDATED'      // แก้ไขข้อมูลเครื่องจักร
+  | 'REPAIR_REQUESTED'    // แจ้งซ่อมจากฝ่ายที่เกี่ยวข้อง
   | 'REPAIR_ACKNOWLEDGED'  // ช่างรับงานซ่อม
   | 'REPAIR_COMPLETED'     // ปิดงานซ่อม / ซ่อมเสร็จ
   | 'PM_EXECUTED'          // ดำเนินการทำ PM
@@ -407,7 +408,7 @@ export type MaintenanceActivityType =
 export interface MaintenanceActivityLogItem {
   id: string
   timestamp: string // ISO timestamp
-  activityType: 'MACHINE_CREATED' | 'MACHINE_UPDATED' | 'REPAIR_ACKNOWLEDGED' | 'REPAIR_COMPLETED' | 'PM_EXECUTED'
+  activityType: 'MACHINE_CREATED' | 'MACHINE_UPDATED' | 'REPAIR_REQUESTED' | 'REPAIR_ACKNOWLEDGED' | 'REPAIR_COMPLETED' | 'PM_EXECUTED'
   activityLabel: string
   badgeColor: string
   machineCode: string

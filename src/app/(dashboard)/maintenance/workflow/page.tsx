@@ -265,7 +265,7 @@ export default function MaintenanceWorkflowPage() {
               6. ปิดงาน & ใบแจ้งซ่อม 5 ส่วน
             </h3>
             <p className="text-xs text-stone-600 leading-relaxed">
-              อนุมัติปิดงานสมบูรณ์ (Closed) โดยคุณปิยะราช รามมา พร้อมออกเอกสาร DCC ใบแจ้งซ่อม 5 ส่วน และประมวลผลสถิติ Downtime / MTTR / MTBF
+              อนุมัติปิดงานสมบูรณ์ (Closed) โดยคุณปิยะราช ถมมา พร้อมออกเอกสาร DCC ใบแจ้งซ่อม 5 ส่วน และประมวลผลสถิติ Downtime / MTTR / MTBF
             </p>
           </div>
           <div className="mt-4 pt-3 border-t border-stone-100 text-[11px] text-purple-700 font-bold">

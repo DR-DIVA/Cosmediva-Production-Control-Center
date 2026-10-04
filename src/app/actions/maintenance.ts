@@ -1179,7 +1179,7 @@ export async function transitionWorkOrderStatus(payload: {
 
   if (payload.to_status === 'CLOSED') {
     updateFields.closed_at = nowIso
-    updateFields.supervisor_name = payload.changed_by_name || 'ปิยะราช รามมา'
+    updateFields.supervisor_name = payload.changed_by_name || 'ปิยะราช ถมมา'
     if (!wo.verified_at) updateFields.verified_at = nowIso
     
     await supabase
@@ -2821,7 +2821,7 @@ export async function getMaintenanceActivityLogs(params?: {
             machineCode: log.machine_code,
             machineName: log.machine_name || log.machine_code,
             refNumber: log.machine_code,
-            performedBy: log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง',
+            performedBy: (log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `ขึ้นทะเบียนเครื่องจักรใหม่ ${log.machine_code}`,
             details: log.edit_reason || 'ขึ้นทะเบียนเครื่องจักรใหม่เข้าสู่ระบบ Machine Master',
             changes: log.changes_summary || [],
@@ -2845,7 +2845,7 @@ export async function getMaintenanceActivityLogs(params?: {
             machineCode: log.machine_code,
             machineName: log.machine_name || log.machine_code,
             refNumber: log.machine_code,
-            performedBy: log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง',
+            performedBy: (log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `แก้ไขข้อมูลเครื่องจักร ${log.machine_code} (${(log.changes_summary || []).length} รายการ)`,
             details: changeText || log.edit_reason || 'มีการปรับปรุงข้อมูลในทะเบียนเครื่องจักร',
             changes: log.changes_summary || [],
@@ -2870,7 +2870,7 @@ export async function getMaintenanceActivityLogs(params?: {
             machineName: m.machine_name,
             departmentName: m.department_name,
             refNumber: m.machine_code,
-            performedBy: m.responsible_technician_name || 'ฝ่ายช่างซ่อมบำรุง',
+            performedBy: (m.responsible_technician_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `ขึ้นทะเบียนเครื่องจักร ${m.machine_code} - ${m.machine_name}`,
             details: `สังกัด/แผนก: ${m.department_name || '-'} • หมวดหมู่: ${m.category || '-'} • สถานะ: ${m.status || 'Running'}`,
             status: m.status || 'Running',
@@ -2892,8 +2892,8 @@ export async function getMaintenanceActivityLogs(params?: {
             if (wo.diagnosis) diagData = JSON.parse(wo.diagnosis)
           } catch (e) {}
 
-          const tech = diagData.technicianName || wo.assigned_technician_name || 'ช่างซ่อมบำรุง'
-          const owner = diagData.ownerSignName || wo.verified_by_name || '-'
+          const tech = (diagData.technicianName || wo.assigned_technician_name || 'ช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา')
+          const owner = (diagData.ownerSignName || wo.verified_by_name || '-').replace(/รามมา/g, 'ถมมา')
           const readiness = diagData.readinessStatus === 'NOT_READY' ? '🔴 ไม่พร้อมใช้งาน' : '🟢 พร้อมใช้งาน'
           const overall = diagData.overallStatus || wo.status || 'PASSED'
           const overallThai = 
@@ -2911,13 +2911,37 @@ export async function getMaintenanceActivityLogs(params?: {
             refNumber: wo.wo_number,
             performedBy: tech,
             summary: `ดำเนินการตรวจเช็ค PM ประจำงวด (${wo.wo_number})`,
-            details: `ผลการตรวจ: ${overallThai} [${readiness}] • ผู้ส่งมอบ (ช่าง): ${tech} • ผู้รับมอบ: ${owner}${diagData.executionNotes ? ` • หมายเหตุ: ${diagData.executionNotes}` : ''}`,
+            details: `ผลการตรวจ: ${overallThai} [${readiness}] • ผู้ส่งมอบ (ช่าง): ${tech} • ผู้รับมอบ: ${owner}${diagData.executionNotes ? ` • หมายเหตุ: ${diagData.executionNotes}` : ''}`.replace(/รามมา/g, 'ถมมา'),
             status: overallThai,
             reason: wo.symptom_description || 'รอบการบำรุงรักษาเชิงป้องกันตามแผน'
           })
         } else {
           // Regular Repair Work Order
-          // 2. Repair Acknowledged (รับงานซ่อม)
+          // 0. Repair Request Event (การแจ้งซ่อมจากฝ่ายที่เกี่ยวข้อง)
+          const reqTime = wo.reported_at || wo.created_at
+          const priorityThai = 
+            wo.priority === 'P1_CRITICAL' ? 'ด่วนฉุกเฉิน (P1)' :
+            wo.priority === 'P2_HIGH' ? 'ด่วนสูง (P2)' :
+            wo.priority === 'P3_NORMAL' ? 'ปกติ (P3)' : 'ต่ำ (P4)'
+
+          items.push({
+            id: `wo-req-${wo.id}`,
+            timestamp: reqTime,
+            activityType: 'REPAIR_REQUESTED',
+            activityLabel: 'แจ้งซ่อมจากฝ่ายที่เกี่ยวข้อง',
+            badgeColor: 'bg-rose-50 text-rose-800 border-rose-300',
+            machineCode: wo.machine_code,
+            machineName: wo.machine_name,
+            departmentName: wo.department_name,
+            refNumber: wo.wo_number,
+            performedBy: (wo.requester_name || 'ผู้แจ้งซ่อม (ฝ่ายที่เกี่ยวข้อง)').replace(/รามมา/g, 'ถมมา'),
+            summary: `ฝ่ายที่เกี่ยวข้องแจ้งซ่อม ${wo.machine_code} (${wo.wo_number})`,
+            details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} • แผนกผู้แจ้ง: ${wo.department_name || '-'} • ความเร่งด่วน: ${priorityThai} • หมวดปัญหา: ${wo.symptom_category || '-'}`,
+            status: `สถานะ: ${wo.status || 'NEW'}`,
+            reason: wo.symptom_description || wo.symptom_category || 'แจ้งซ่อมเครื่องจักรขัดข้อง'
+          })
+
+          // 2. Repair Acknowledged (ช่างรับงานซ่อม)
           if (wo.acknowledged_at) {
             items.push({
               id: `wo-ack-${wo.id}`,
@@ -2928,9 +2952,9 @@ export async function getMaintenanceActivityLogs(params?: {
               machineCode: wo.machine_code,
               machineName: wo.machine_name,
               refNumber: wo.wo_number,
-              performedBy: wo.assigned_technician_name || 'ช่างซ่อมบำรุง',
+              performedBy: (wo.assigned_technician_name || 'ช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
               summary: `ช่างรับงานซ่อม ${wo.wo_number}`,
-              details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} (ผู้แจ้ง: ${wo.requester_name || '-'})`,
+              details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} (ผู้แจ้ง: ${(wo.requester_name || '-').replace(/รามมา/g, 'ถมมา')})`,
               status: wo.status,
               reason: wo.symptom_category
             })
@@ -2940,7 +2964,7 @@ export async function getMaintenanceActivityLogs(params?: {
           const isClosed = ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(wo.status) || wo.closed_at || wo.repair_completed_at
           if (isClosed) {
             const closedTime = wo.closed_at || wo.verified_at || wo.repair_completed_at || wo.updated_at
-            const actionBy = wo.verified_by_name || wo.assigned_technician_name || 'ช่างซ่อมบำรุง'
+            const actionBy = (wo.verified_by_name || wo.assigned_technician_name || 'ช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา')
             items.push({
               id: `wo-close-${wo.id}`,
               timestamp: closedTime,
@@ -2952,7 +2976,7 @@ export async function getMaintenanceActivityLogs(params?: {
               refNumber: wo.wo_number,
               performedBy: actionBy,
               summary: `ซ่อมเสร็จและปิดงานซ่อม ${wo.wo_number}`,
-              details: `การแก้ไข: ${wo.corrective_action || '-'} • สาเหตุ: ${wo.root_cause || '-'} • เวลาซ่อม: ${wo.repair_time_minutes || 0} นาที • ค่าอะไหล่: ฿${(wo.total_part_cost || 0).toLocaleString()} (ผู้ตรวจรับ: ${wo.verified_by_name || '-'})`,
+              details: `การแก้ไข: ${wo.corrective_action || '-'} • สาเหตุ: ${wo.root_cause || '-'} • เวลาซ่อม: ${wo.repair_time_minutes || 0} นาที • ค่าอะไหล่: ฿${(wo.total_part_cost || 0).toLocaleString()} (ผู้ตรวจรับ: ${(wo.verified_by_name || '-').replace(/รามมา/g, 'ถมมา')})`,
               status: `ปิดงานแล้ว (${wo.status})`,
               reason: wo.root_cause || wo.symptom_category
             })
