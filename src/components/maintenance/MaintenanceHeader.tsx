@@ -17,6 +17,7 @@ import {
   MessageSquare,
   Zap,
   Scale,
+  History
 } from 'lucide-react'
 import LineSettingsModal from '@/components/maintenance/LineSettingsModal'
 import MachineQRScannerModal from '@/components/maintenance/MachineQRScannerModal'
@@ -87,6 +88,13 @@ export default function MaintenanceHeader({ onOpenReport, onOpenQR, machines = [
       icon: Wrench,
       frameClass: 'bg-emerald-50 hover:bg-emerald-100 text-emerald-950 border border-emerald-300 hover:border-emerald-400',
       iconClass: 'border border-emerald-400 bg-emerald-600 text-white' 
+    },
+    { 
+      label: 'Log กิจกรรมช่าง', 
+      href: '/maintenance/activity-logs', 
+      icon: History, 
+      frameClass: 'bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 hover:border-amber-400',
+      iconClass: 'border border-amber-400 bg-amber-600 text-white' 
     },
     { 
       label: 'พิมพ์ QR หน้าเครื่อง', 

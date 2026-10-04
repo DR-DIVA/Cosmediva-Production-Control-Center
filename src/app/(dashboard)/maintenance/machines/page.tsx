@@ -16,7 +16,8 @@ import {
   Printer,
   Plus,
   Pencil,
-  FileCheck
+  FileCheck,
+  History
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ import AddMachineModal from '@/components/maintenance/AddMachineModal'
 import EditMachineModal from '@/components/maintenance/EditMachineModal'
 import MachineActionRequestModal from '@/components/maintenance/MachineActionRequestModal'
 import MachineRequestsListModal from '@/components/maintenance/MachineRequestsListModal'
+import MaintenanceActivityLogModal from '@/components/maintenance/MaintenanceActivityLogModal'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { DEPARTMENTS_LIST, CATEGORIES_LIST } from '@/lib/maintenanceHelpers'
 import { CALIBRATION_ITEMS, CalibrationItem } from '@/lib/calibrationData'
@@ -85,6 +87,7 @@ export default function MachinesMasterPage() {
   }, [departmentFilter, search])
   const [isRequestsListOpen, setIsRequestsListOpen] = useState(false)
   const [isActionRequestOpen, setIsActionRequestOpen] = useState(false)
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false)
 
   const fetchMachines = async () => {
     setIsLoading(true)
@@ -229,6 +232,16 @@ export default function MachinesMasterPage() {
           >
             <FileCheck className="w-3.5 h-3.5 text-blue-600" />
             <span>คำขอดำเนินการ (MT-PF-002)</span>
+          </Button>
+
+          <Button
+            type="button"
+            onClick={() => setIsActivityLogOpen(true)}
+            className="h-10 px-3.5 rounded-xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 shadow-sm flex items-center gap-1.5 transition"
+            title="ดู Log ประวัติกิจกรรมฝ่ายช่าง & Export Excel (เพิ่มเครื่องจักร, แก้ไขข้อมูล, รับงานซ่อม, ปิดงานซ่อม, ทำ PM)"
+          >
+            <History className="w-3.5 h-3.5 text-amber-700" />
+            <span>Log กิจกรรมช่าง & Excel</span>
           </Button>
 
           <Button
@@ -685,6 +698,12 @@ export default function MachinesMasterPage() {
         onClose={() => setIsActionRequestOpen(false)}
         initialType="NEW_MACHINE"
         onSuccess={fetchMachines}
+      />
+
+      {/* Activity and Audit Logs Modal */}
+      <MaintenanceActivityLogModal
+        isOpen={isActivityLogOpen}
+        onClose={() => setIsActivityLogOpen(false)}
       />
     </div>
   )

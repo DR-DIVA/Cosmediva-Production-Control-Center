@@ -396,6 +396,32 @@ export interface MaintenanceMachineAuditLog {
   created_at: string
 }
 
+export type MaintenanceActivityType = 
+  | 'ALL'
+  | 'MACHINE_CREATED'      // เพิ่มเครื่องจักรใหม่
+  | 'MACHINE_UPDATED'      // แก้ไขข้อมูลเครื่องจักร
+  | 'REPAIR_ACKNOWLEDGED'  // ช่างรับงานซ่อม
+  | 'REPAIR_COMPLETED'     // ปิดงานซ่อม / ซ่อมเสร็จ
+  | 'PM_EXECUTED'          // ดำเนินการทำ PM
+
+export interface MaintenanceActivityLogItem {
+  id: string
+  timestamp: string // ISO timestamp
+  activityType: 'MACHINE_CREATED' | 'MACHINE_UPDATED' | 'REPAIR_ACKNOWLEDGED' | 'REPAIR_COMPLETED' | 'PM_EXECUTED'
+  activityLabel: string
+  badgeColor: string
+  machineCode: string
+  machineName: string
+  departmentName?: string
+  refNumber?: string
+  performedBy: string
+  summary: string
+  details?: string
+  changes?: MachineAuditChange[]
+  status?: string
+  reason?: string
+}
+
 export interface PmFrequencyInfo {
   code: 'PM1' | 'PM2' | 'PM3' | 'PM4' | 'PM6' | 'PM12'
   interval: number

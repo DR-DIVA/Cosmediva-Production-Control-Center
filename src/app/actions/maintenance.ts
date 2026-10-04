@@ -13,7 +13,9 @@ import {
   MaintenanceMachineRequest,
   MachineRequestType,
   MachineRequestStatus,
-  MaintenanceMachineAuditLog
+  MaintenanceMachineAuditLog,
+  MaintenanceActivityLogItem,
+  MaintenanceActivityType
 } from '@/types/maintenance'
 import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
 
@@ -235,6 +237,29 @@ export async function createMachine(payload: {
 
   if (error) {
     return { success: false, error: error.message }
+  }
+
+  // Record Audit Log for Traceability
+  const nowIso = new Date().toISOString()
+  try {
+    await supabase
+      .from('maintenance_machine_audit_logs')
+      .insert({
+        machine_id: data.id,
+        machine_code: data.machine_code,
+        machine_name: data.machine_name,
+        edited_by_name: (payload as any).registered_by_name || 'ฝ่ายช่างซ่อมบำรุง',
+        edit_reason: 'ขึ้นทะเบียนเครื่องจักรใหม่ (MT-PF-002)',
+        changes_summary: [
+          { field: 'machine_code', label: 'รหัสเครื่องจักร', old_value: null, new_value: data.machine_code },
+          { field: 'machine_name', label: 'ชื่อเครื่องจักร', old_value: null, new_value: data.machine_name },
+          { field: 'department_name', label: 'สังกัด/แผนก', old_value: null, new_value: data.department_name },
+          { field: 'category', label: 'หมวดหมู่', old_value: null, new_value: data.category }
+        ],
+        created_at: nowIso
+      })
+  } catch (logErr) {
+    console.warn('Failed to record createMachine audit log:', logErr)
   }
 
   revalidatePath('/maintenance')
@@ -2732,3 +2757,257 @@ export async function getPMPlanDCCDetails(idOrCode: string) {
     return { success: false, error: err.message }
   }
 }
+
+/**
+ * Get comprehensive Maintenance Activity and Audit Logs
+ * Aggregates:
+ * 1. Machine registrations (เพิ่มเครื่องจักรใหม่)
+ * 2. Machine modifications with detailed diffs (แก้ไขเปลี่ยนแปลงข้อมูล)
+ * 3. Repair work orders acknowledged/in-progress (รับงานซ่อม)
+ * 4. Repair work orders completed and closed (ปิดงานซ่อม)
+ * 5. Preventive Maintenance executions (ดำเนินการทำ PM)
+ */
+export async function getMaintenanceActivityLogs(params?: {
+  startDate?: string
+  endDate?: string
+  activityType?: string
+  machineCode?: string
+  search?: string
+  limit?: number
+}) {
+  try {
+    const supabase = createAdminClient()
+    const limit = params?.limit || 1000
+
+    // 1. Fetch Machine Audit Logs (diffs and edits)
+    const { data: auditLogs } = await supabase
+      .from('maintenance_machine_audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    // 2. Fetch Machines (to ensure every registered machine has an add log)
+    const { data: machines } = await supabase
+      .from('maintenance_machines')
+      .select('id, machine_code, machine_name, department_name, category, status, created_at, responsible_technician_name')
+      .order('created_at', { ascending: false })
+
+    // 3. Fetch Work Orders (repairs + PM executions)
+    const { data: workOrders } = await supabase
+      .from('maintenance_work_orders')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    const items: MaintenanceActivityLogItem[] = []
+    const recordedMachineCreateKeys = new Set<string>()
+
+    // A. Process Machine Audit Logs
+    if (auditLogs && auditLogs.length > 0) {
+      auditLogs.forEach((log: any) => {
+        const isCreate = 
+          (log.edit_reason || '').includes('ขึ้นทะเบียน') || 
+          (log.edit_reason || '').includes('ลงทะเบียน') ||
+          (log.changes_summary && log.changes_summary.some((c: any) => c.field === 'machine_code' && !c.old_value))
+
+        if (isCreate) {
+          recordedMachineCreateKeys.add(log.machine_code)
+          items.push({
+            id: `audit-${log.id}`,
+            timestamp: log.created_at,
+            activityType: 'MACHINE_CREATED',
+            activityLabel: 'เพิ่มเครื่องจักรใหม่',
+            badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+            machineCode: log.machine_code,
+            machineName: log.machine_name || log.machine_code,
+            refNumber: log.machine_code,
+            performedBy: log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง',
+            summary: `ขึ้นทะเบียนเครื่องจักรใหม่ ${log.machine_code}`,
+            details: log.edit_reason || 'ขึ้นทะเบียนเครื่องจักรใหม่เข้าสู่ระบบ Machine Master',
+            changes: log.changes_summary || [],
+            status: 'ลงทะเบียนแล้ว',
+            reason: log.edit_reason
+          })
+        } else {
+          // Format changes summary into readable text
+          const changeText = Array.isArray(log.changes_summary)
+            ? log.changes_summary
+                .map((c: any) => `[${c.label || c.field}: ${c.old_value ?? '-'} ➔ ${c.new_value ?? '-'}]`)
+                .join(' ')
+            : ''
+
+          items.push({
+            id: `audit-${log.id}`,
+            timestamp: log.created_at,
+            activityType: 'MACHINE_UPDATED',
+            activityLabel: 'แก้ไขข้อมูลเครื่องจักร',
+            badgeColor: 'bg-amber-50 text-amber-800 border-amber-300',
+            machineCode: log.machine_code,
+            machineName: log.machine_name || log.machine_code,
+            refNumber: log.machine_code,
+            performedBy: log.edited_by_name || 'ฝ่ายช่างซ่อมบำรุง',
+            summary: `แก้ไขข้อมูลเครื่องจักร ${log.machine_code} (${(log.changes_summary || []).length} รายการ)`,
+            details: changeText || log.edit_reason || 'มีการปรับปรุงข้อมูลในทะเบียนเครื่องจักร',
+            changes: log.changes_summary || [],
+            status: 'แก้ไขแล้ว',
+            reason: log.edit_reason
+          })
+        }
+      })
+    }
+
+    // B. Process Machines (fallback creation records for all registered machines)
+    if (machines && machines.length > 0) {
+      machines.forEach((m: any) => {
+        if (!recordedMachineCreateKeys.has(m.machine_code)) {
+          items.push({
+            id: `machine-init-${m.id}`,
+            timestamp: m.created_at,
+            activityType: 'MACHINE_CREATED',
+            activityLabel: 'เพิ่มเครื่องจักรใหม่',
+            badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
+            machineCode: m.machine_code,
+            machineName: m.machine_name,
+            departmentName: m.department_name,
+            refNumber: m.machine_code,
+            performedBy: m.responsible_technician_name || 'ฝ่ายช่างซ่อมบำรุง',
+            summary: `ขึ้นทะเบียนเครื่องจักร ${m.machine_code} - ${m.machine_name}`,
+            details: `สังกัด/แผนก: ${m.department_name || '-'} • หมวดหมู่: ${m.category || '-'} • สถานะ: ${m.status || 'Running'}`,
+            status: m.status || 'Running',
+            reason: 'ขึ้นทะเบียนในระบบ Machine Master'
+          })
+        }
+      })
+    }
+
+    // C. Process Work Orders
+    if (workOrders && workOrders.length > 0) {
+      workOrders.forEach((wo: any) => {
+        const isPM = (wo.wo_number || '').startsWith('PM-') || wo.problem_category === 'Preventive Maintenance'
+
+        if (isPM) {
+          // 1. PM Execution Event
+          let diagData: any = {}
+          try {
+            if (wo.diagnosis) diagData = JSON.parse(wo.diagnosis)
+          } catch (e) {}
+
+          const tech = diagData.technicianName || wo.assigned_technician_name || 'ช่างซ่อมบำรุง'
+          const owner = diagData.ownerSignName || wo.verified_by_name || '-'
+          const readiness = diagData.readinessStatus === 'NOT_READY' ? '🔴 ไม่พร้อมใช้งาน' : '🟢 พร้อมใช้งาน'
+          const overall = diagData.overallStatus || wo.status || 'PASSED'
+          const overallThai = 
+            overall === 'PASSED' ? 'ผ่านเกณฑ์ปกติ' :
+            overall === 'PASSED_WITH_REMARKS' ? 'ผ่านแบบมีข้อระมัดระวัง' : 'ไม่ผ่าน/มีจุดชำรุด'
+
+          items.push({
+            id: `wo-pm-${wo.id}`,
+            timestamp: wo.repair_completed_at || wo.created_at,
+            activityType: 'PM_EXECUTED',
+            activityLabel: 'ดำเนินการทำ PM',
+            badgeColor: 'bg-cyan-50 text-cyan-800 border-cyan-300',
+            machineCode: wo.machine_code,
+            machineName: wo.machine_name,
+            refNumber: wo.wo_number,
+            performedBy: tech,
+            summary: `ดำเนินการตรวจเช็ค PM ประจำงวด (${wo.wo_number})`,
+            details: `ผลการตรวจ: ${overallThai} [${readiness}] • ผู้ส่งมอบ (ช่าง): ${tech} • ผู้รับมอบ: ${owner}${diagData.executionNotes ? ` • หมายเหตุ: ${diagData.executionNotes}` : ''}`,
+            status: overallThai,
+            reason: wo.symptom_description || 'รอบการบำรุงรักษาเชิงป้องกันตามแผน'
+          })
+        } else {
+          // Regular Repair Work Order
+          // 2. Repair Acknowledged (รับงานซ่อม)
+          if (wo.acknowledged_at) {
+            items.push({
+              id: `wo-ack-${wo.id}`,
+              timestamp: wo.acknowledged_at,
+              activityType: 'REPAIR_ACKNOWLEDGED',
+              activityLabel: 'รับงานซ่อม',
+              badgeColor: 'bg-purple-50 text-purple-800 border-purple-300',
+              machineCode: wo.machine_code,
+              machineName: wo.machine_name,
+              refNumber: wo.wo_number,
+              performedBy: wo.assigned_technician_name || 'ช่างซ่อมบำรุง',
+              summary: `ช่างรับงานซ่อม ${wo.wo_number}`,
+              details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} (ผู้แจ้ง: ${wo.requester_name || '-'})`,
+              status: wo.status,
+              reason: wo.symptom_category
+            })
+          }
+
+          // 3. Repair Completed / Verified (ปิดงานซ่อม)
+          const isClosed = ['COMPLETED', 'VERIFIED', 'CLOSED'].includes(wo.status) || wo.closed_at || wo.repair_completed_at
+          if (isClosed) {
+            const closedTime = wo.closed_at || wo.verified_at || wo.repair_completed_at || wo.updated_at
+            const actionBy = wo.verified_by_name || wo.assigned_technician_name || 'ช่างซ่อมบำรุง'
+            items.push({
+              id: `wo-close-${wo.id}`,
+              timestamp: closedTime,
+              activityType: 'REPAIR_COMPLETED',
+              activityLabel: 'ปิดงานซ่อม',
+              badgeColor: 'bg-blue-50 text-blue-800 border-blue-300',
+              machineCode: wo.machine_code,
+              machineName: wo.machine_name,
+              refNumber: wo.wo_number,
+              performedBy: actionBy,
+              summary: `ซ่อมเสร็จและปิดงานซ่อม ${wo.wo_number}`,
+              details: `การแก้ไข: ${wo.corrective_action || '-'} • สาเหตุ: ${wo.root_cause || '-'} • เวลาซ่อม: ${wo.repair_time_minutes || 0} นาที • ค่าอะไหล่: ฿${(wo.total_part_cost || 0).toLocaleString()} (ผู้ตรวจรับ: ${wo.verified_by_name || '-'})`,
+              status: `ปิดงานแล้ว (${wo.status})`,
+              reason: wo.root_cause || wo.symptom_category
+            })
+          }
+        }
+      })
+    }
+
+    // Sort descending by timestamp
+    items.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+
+    // Apply Filters
+    let filtered = items
+
+    if (params?.activityType && params.activityType !== 'ALL') {
+      filtered = filtered.filter(item => item.activityType === params.activityType)
+    }
+
+    if (params?.machineCode) {
+      const code = params.machineCode.toLowerCase()
+      filtered = filtered.filter(item => item.machineCode.toLowerCase().includes(code))
+    }
+
+    if (params?.startDate) {
+      const start = new Date(params.startDate).getTime()
+      filtered = filtered.filter(item => new Date(item.timestamp).getTime() >= start)
+    }
+
+    if (params?.endDate) {
+      const end = new Date(params.endDate)
+      end.setHours(23, 59, 59, 999)
+      filtered = filtered.filter(item => new Date(item.timestamp).getTime() <= end.getTime())
+    }
+
+    if (params?.search && params.search.trim()) {
+      const q = params.search.trim().toLowerCase()
+      filtered = filtered.filter(item => 
+        item.machineCode.toLowerCase().includes(q) ||
+        item.machineName.toLowerCase().includes(q) ||
+        (item.refNumber && item.refNumber.toLowerCase().includes(q)) ||
+        item.performedBy.toLowerCase().includes(q) ||
+        item.summary.toLowerCase().includes(q) ||
+        (item.details && item.details.toLowerCase().includes(q))
+      )
+    }
+
+    return {
+      success: true,
+      data: filtered,
+      totalCount: filtered.length,
+      allCount: items.length
+    }
+  } catch (err: any) {
+    console.error('Error fetching maintenance activity logs:', err)
+    return { success: false, error: err.message || 'Failed to fetch activity logs', data: [], totalCount: 0, allCount: 0 }
+  }
+}
+
