@@ -57,6 +57,9 @@ const PROCESS_PALETTES: Record<string, { bg: string; text: string; border: strin
   'ผสม': { bg: 'bg-blue-100', text: 'text-blue-900', border: 'border-blue-300', dot: 'bg-blue-500', label: 'ผสม (MX)' },
   'บรรจุ': { bg: 'bg-emerald-100', text: 'text-emerald-900', border: 'border-emerald-300', dot: 'bg-emerald-500', label: 'บรรจุ (PK)' },
   'ลงลัง': { bg: 'bg-purple-100', text: 'text-purple-900', border: 'border-purple-300', dot: 'bg-purple-500', label: 'ลงลัง' },
+  'ส่ง FG': { bg: 'bg-indigo-100', text: 'text-indigo-900', border: 'border-indigo-300', dot: 'bg-indigo-500', label: 'ส่ง FG (FG)' },
+  'ส่งมอบ FG': { bg: 'bg-indigo-100', text: 'text-indigo-900', border: 'border-indigo-300', dot: 'bg-indigo-500', label: 'ส่งมอบ FG' },
+  'รอส่งมอบ': { bg: 'bg-indigo-100', text: 'text-indigo-900', border: 'border-indigo-300', dot: 'bg-indigo-500', label: 'รอส่งมอบ' },
   'รอ QC': { bg: 'bg-rose-100', text: 'text-rose-900', border: 'border-rose-300', dot: 'bg-rose-500', label: 'รอ QC' },
   'รอ POF': { bg: 'bg-indigo-100', text: 'text-indigo-900', border: 'border-indigo-300', dot: 'bg-indigo-500', label: 'รอ POF' },
   'รอเข้าคลัง FG': { bg: 'bg-teal-100', text: 'text-teal-900', border: 'border-teal-300', dot: 'bg-teal-500', label: 'รอเข้าคลัง FG' },
@@ -215,7 +218,11 @@ export function TimelinePrintModal({
           .sort((a, b) => {
             const dateA = a.activity_date ? new Date(a.activity_date).getTime() : 0
             const dateB = b.activity_date ? new Date(b.activity_date).getTime() : 0
-            return dateA - dateB
+            if (dateA !== dateB) return dateA - dateB
+            const pA = processes.find(p => p.id === a.process_id)?.process_name || a.processes?.process_name || ''
+            const pB = processes.find(p => p.id === b.process_id)?.process_name || b.processes?.process_name || ''
+            const orderMap: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3, 'ลงลัง': 4, 'ส่ง FG': 5, 'ส่งมอบ FG': 5, 'ส่งมอบ': 5 }
+            return (orderMap[pA] || 99) - (orderMap[pB] || 99)
           })
 
         return {
@@ -968,6 +975,7 @@ export function TimelinePrintModal({
                   {deptFilter === 'MX' && '🔵 ผสม (MX)'}
                   {deptFilter === 'PK' && '🟢 บรรจุ (PK)'}
                   {deptFilter === 'POF' && '🟣 ลงลัง/POF'}
+                  {deptFilter === 'FG' && '🚚 ส่ง FG (FG)'}
                   {deptFilter === 'ALL' && 'ทุกสายงาน (All)'}
                 </div>
               ) : (
@@ -981,6 +989,7 @@ export function TimelinePrintModal({
                     <SelectItem value="MX">ผสม (MX)</SelectItem>
                     <SelectItem value="PK">บรรจุ (PK)</SelectItem>
                     <SelectItem value="POF">ลงลัง/POF</SelectItem>
+                    <SelectItem value="FG">ส่ง FG (FG)</SelectItem>
                   </SelectContent>
                 </Select>
               )}
@@ -1101,7 +1110,7 @@ export function TimelinePrintModal({
                               {viewMode === 'compare' ? '⚖️ โหมดเปรียบเทียบ (Plan vs Actual)' : viewMode === 'actual' ? '🅰️ โหมดทำจริง (Actual)' : '🅿️ โหมดแผนงาน (Plan)'}
                             </span>
                             <span className="text-[10px] bg-slate-200 text-slate-800 font-bold px-2 py-0.5 rounded border border-slate-300">
-                              {deptFilter === 'ALL' ? 'ทุกสายงาน' : deptFilter === 'RM' ? 'ฝ่ายชั่งสาร' : deptFilter === 'MX' ? 'ฝ่ายผสม' : 'ฝ่ายบรรจุ'}
+                              {deptFilter === 'ALL' ? 'ทุกสายงาน' : deptFilter === 'RM' ? 'ฝ่ายชั่งสาร' : deptFilter === 'MX' ? 'ฝ่ายผสม' : deptFilter === 'PK' ? 'ฝ่ายบรรจุ' : deptFilter === 'POF' ? 'ลงลัง/POF' : 'ฝ่ายส่งมอบ FG'}
                             </span>
                           </div>
                           <div className="text-xs text-slate-600 font-medium mt-0.5">
@@ -1360,9 +1369,9 @@ export function TimelinePrintModal({
                             const palette = getTaskPalette(pName)
 
                             // 1st Batch detection
-                            const isAutoPamh = sku.includes('PAMH-008') && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
-                            const hasBatchTag = (log.note || '').toLowerCase().includes('[1st_batch]') || (lot.order_type || '').includes('[1ST_BATCH]')
-                            const is1stBatch = isAutoPamh || hasBatchTag
+                            const hasLogBatchTag = (log.note || '').toLowerCase().includes('[1st_batch]')
+                            const hasLotBatchTag = (lot.order_type || '').includes('[1ST_BATCH]') && (pName.includes('ผสม') || pName.includes('mix')) && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
+                            const is1stBatch = hasLogBatchTag || hasLotBatchTag
 
                             // Reschedule detection
                             const planInfo = parsePlanChangeInfo(log.note, log.activity_date, log.created_at)

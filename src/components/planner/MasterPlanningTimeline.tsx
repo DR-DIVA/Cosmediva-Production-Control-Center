@@ -20,12 +20,13 @@ import {
   Pin,
   ChevronUp,
   ChevronDown,
-  Check
+  Check,
+  Gift
 } from 'lucide-react'
-import { format, differenceInDays, startOfDay, addDays, isSameDay } from 'date-fns'
+import { format, differenceInDays, startOfDay, addDays, isSameDay, isBefore } from 'date-fns'
 import { createClient } from '@/utils/supabase/client'
 import { toast } from 'sonner'
-import { cn, getBaseOrderType } from '@/lib/utils'
+import { cn, getBaseOrderType, parseDeliverySchedule } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -56,29 +57,40 @@ import {
   ActualDelayInfo
 } from '@/lib/planTracking'
 
-export type ProductionDept = 'ALL' | 'RM' | 'MX' | 'PK' | 'POF'
+export type ProductionDept = 'ALL' | 'RM' | 'MX' | 'PK' | 'POF' | 'FG'
 
-export function getProcessDept(processName?: string): 'RM' | 'MX' | 'PK' | 'POF' | 'OTHER' {
+export function getProcessDept(processName?: string): 'RM' | 'MX' | 'PK' | 'POF' | 'FG' | 'OTHER' {
   if (!processName) return 'OTHER'
   const p = processName.toLowerCase().trim()
 
-  // 1. POF / Cartoning (check before general packing so POF / ลงลัง isn't captured by packing terms)
+  // 1. FG Delivery (check first)
+  if (
+    p.includes('ส่ง fg') ||
+    p.includes('ส่งมอบ fg') ||
+    p === 'ส่ง fg' ||
+    p === 'ส่งมอบ' ||
+    p.includes('รอส่งมอบ')
+  ) {
+    return 'FG'
+  }
+
+  // 2. POF / Cartoning (check before general packing so POF / ลงลัง isn't captured by packing terms)
   if (
     p.includes('pof') ||
     p.includes('อุโมงค์') ||
     p.includes('ลงลัง') ||
-    p.includes('fg') ||
-    p.includes('ส่งมอบ')
+    p.includes('รอเข้าคลัง fg') ||
+    p.includes('รับเข้า fg')
   ) {
     return 'POF'
   }
 
-  // 2. Weighing / RM
+  // 3. Weighing / RM
   if (p.includes('ชั่ง') || p.includes('weigh')) {
     return 'RM'
   }
 
-  // 3. Mixing / MX
+  // 4. Mixing / MX
   if (
     p.includes('ผสม') ||
     p.includes('mix') ||
@@ -90,7 +102,7 @@ export function getProcessDept(processName?: string): 'RM' | 'MX' | 'PK' | 'POF'
     return 'MX'
   }
 
-  // 4. Packing / PK
+  // 5. Packing / PK
   if (
     p.includes('บรรจุ') ||
     p.includes('pack') ||
@@ -132,7 +144,8 @@ export const PROCESS_TYPES = [
   { id: 'RM', name: 'ชั่งสาร', color: 'bg-amber-100 text-amber-800 border-amber-200' },
   { id: 'MX', name: 'ผสม', color: 'bg-[#D4AF37]/20 text-[#4A4238] border-[#D4AF37]/30' },
   { id: 'PK', name: 'บรรจุ', color: 'bg-emerald-100 text-emerald-800 border-emerald-200' },
-  { id: 'POF', name: 'ลงลัง/POF', color: 'bg-purple-100 text-purple-800 border-purple-200' }
+  { id: 'POF', name: 'ลงลัง/POF', color: 'bg-purple-100 text-purple-800 border-purple-200' },
+  { id: 'FG', name: 'ส่ง FG', color: 'bg-indigo-100 text-indigo-900 border-indigo-300' }
 ]
 
 export function MasterPlanningTimeline({
@@ -551,7 +564,7 @@ export function MasterPlanningTimeline({
       .sort((a, b) => {
         const processA = processes.find(p => p.id === a.process_id)?.process_name || ''
         const processB = processes.find(p => p.id === b.process_id)?.process_name || ''
-        const orderMap: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3, 'ลงลัง': 4 }
+        const orderMap: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3, 'ลงลัง': 4, 'ส่ง FG': 5, 'ส่งมอบ FG': 5, 'รอส่งมอบ': 5 }
         const weightA = orderMap[processA] || 99
         const weightB = orderMap[processB] || 99
         if (weightA !== weightB) return weightA - weightB
@@ -788,6 +801,16 @@ export function MasterPlanningTimeline({
     try {
       const { error } = await supabase.from('production_logs').update(updateData).eq('id', logId)
       if (error) throw error
+
+      // If rescheduling a "ส่ง FG" task, sync lot's fg_due_date too
+      const pName = (processes.find(p => p.id === existingLog?.process_id)?.process_name || '').toLowerCase()
+      if ((pName.includes('ส่ง') && pName.includes('fg')) || pName.includes('ส่งมอบ')) {
+        if (existingLog?.production_lot_id) {
+          const targetFgDate = updateData.end_date || newDate
+          await supabase.from('production_lots').update({ fg_due_date: targetFgDate, updated_at: new Date().toISOString() }).eq('id', existingLog.production_lot_id)
+        }
+      }
+
       toast.success('บันทึกการปรับเลื่อนแผนงานเรียบร้อย')
       if (onPlanChanged) onPlanChanged()
       else fetchInternalData()
@@ -830,6 +853,16 @@ export function MasterPlanningTimeline({
     try {
       const { error } = await supabase.from('production_logs').update(updateData).eq('id', logId)
       if (error) throw error
+
+      // If rescheduling a "ส่ง FG" task, sync lot's fg_due_date too
+      const pName = (processes.find(p => p.id === existingLog?.process_id)?.process_name || '').toLowerCase()
+      if ((pName.includes('ส่ง') && pName.includes('fg')) || pName.includes('ส่งมอบ')) {
+        if (existingLog?.production_lot_id) {
+          const targetFgDate = updateData.end_date || newDate
+          await supabase.from('production_lots').update({ fg_due_date: targetFgDate, updated_at: new Date().toISOString() }).eq('id', existingLog.production_lot_id)
+        }
+      }
+
       toast.success('ปรับวันที่เรียบร้อย')
       if (onPlanChanged) onPlanChanged()
       else fetchInternalData()
@@ -1146,6 +1179,7 @@ export function MasterPlanningTimeline({
                   {filterDept === 'MX' && '🔵 แผนกผสม (Mixing)'}
                   {filterDept === 'PK' && '🟢 แผนกบรรจุ (Packing)'}
                   {filterDept === 'POF' && '🟣 แผนกลงลัง/POF'}
+                  {filterDept === 'FG' && '🚚 ส่งมอบสินค้า FG (Delivery)'}
                   {filterDept === 'ALL' && 'ทุกสายงาน (All)'}
                 </span>
               </div>
@@ -1203,6 +1237,16 @@ export function MasterPlanningTimeline({
                   )}
                 >
                   ลงลัง/POF
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterDept('FG')}
+                  className={cn(
+                    "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                    filterDept === 'FG' ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                  )}
+                >
+                  ส่ง FG (FG)
                 </button>
               </div>
             )}
@@ -1542,7 +1586,7 @@ export function MasterPlanningTimeline({
                   <div className="text-sm font-semibold text-slate-700">ไม่พบคิวงานในแผนกและช่วงเวลาที่เลือก</div>
                   <p className="text-xs text-slate-400 mt-1 max-w-sm text-center">
                     {filterDept !== 'ALL' 
-                      ? `ไม่มีคิวงานของแผนก ${filterDept === 'RM' ? 'ชั่งสาร' : filterDept === 'MX' ? 'ผสม' : filterDept === 'PK' ? 'บรรจุ' : 'ลงลัง/POF'} ในกรอบเวลานี้`
+                      ? `ไม่มีคิวงานของแผนก ${filterDept === 'RM' ? 'ชั่งสาร' : filterDept === 'MX' ? 'ผสม' : filterDept === 'PK' ? 'บรรจุ' : filterDept === 'POF' ? 'ลงลัง/POF' : 'ส่ง FG'} ในกรอบเวลานี้`
                       : 'ลองเปลี่ยนช่วงวัน หรือค้นหาด้วยเงื่อนไขอื่น'}
                   </p>
                 </div>
@@ -1557,7 +1601,65 @@ export function MasterPlanningTimeline({
                             {lot.products?.sku} <span className="font-normal text-xs text-slate-500 ml-1">({lot.lot_no})</span>
                           </div>
                         </div>
-                        <div className="flex flex-1"></div>
+                        <div className="flex flex-1 relative h-full items-center">
+                          {(() => {
+                            const schedule = parseDeliverySchedule(lot.delivery_schedule)
+                            if (schedule && schedule.length > 0) {
+                              return schedule.map((inst, idx) => {
+                                if (!inst.date) return null
+                                const instDate = startOfDay(new Date(inst.date))
+                                const startDiff = differenceInDays(instDate, timelineStartDate)
+                                if (startDiff < 0 || startDiff >= totalTimelineDays) return null
+                                const leftPercent = (startDiff / totalTimelineDays) * 100
+                                const isPastDue = isBefore(instDate, today) && lot.current_status !== 'DONE'
+                                return (
+                                  <div
+                                    key={idx}
+                                    className={cn(
+                                      "absolute z-15 flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-2xs whitespace-nowrap border transition-transform hover:scale-105 select-none",
+                                      isPastDue 
+                                        ? "bg-rose-100 text-rose-800 border-rose-300 ring-1 ring-rose-300"
+                                        : "bg-indigo-50 text-indigo-900 border-indigo-200 ring-1 ring-indigo-200"
+                                    )}
+                                    style={{ left: `calc(${leftPercent}% + 4px)` }}
+                                    title={`งวดส่งมอบ FG ที่ ${inst.installment}: ${format(instDate, 'dd/MM/yyyy')} (${Number(inst.quantity || 0).toLocaleString()} pc)${inst.note ? ` - ${inst.note}` : ''}`}
+                                  >
+                                    <Gift className="w-3 h-3 text-indigo-600 shrink-0" />
+                                    <span>งวด {inst.installment}: {format(instDate, 'dd/MM')} ({Number(inst.quantity || 0).toLocaleString()} pc)</span>
+                                  </div>
+                                )
+                              })
+                            }
+
+                            if (lot.fg_due_date || lot.due_date) {
+                              const targetDateStr = lot.fg_due_date || lot.due_date
+                              const fgDate = startOfDay(new Date(targetDateStr))
+                              const startDiff = differenceInDays(fgDate, timelineStartDate)
+                              if (startDiff >= 0 && startDiff < totalTimelineDays) {
+                                const leftPercent = (startDiff / totalTimelineDays) * 100
+                                const isPastDue = isBefore(fgDate, today) && lot.current_status !== 'DONE'
+                                const totalPcs = lot.planned_quantity || lot.order_quantity || 0
+                                return (
+                                  <div
+                                    key="single-fg"
+                                    className={cn(
+                                      "absolute z-15 flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold shadow-2xs whitespace-nowrap border transition-transform hover:scale-105 select-none",
+                                      isPastDue
+                                        ? "bg-rose-100 text-rose-800 border-rose-300 ring-1 ring-rose-300 animate-pulse"
+                                        : "bg-indigo-600 text-white border-indigo-700 shadow-sm"
+                                    )}
+                                    style={{ left: `calc(${leftPercent}% + 4px)` }}
+                                    title={`กำหนดส่งมอบ FG: ${format(fgDate, 'dd/MM/yyyy')} (${Number(totalPcs).toLocaleString()} pc)`}
+                                  >
+                                    <Gift className="w-3 h-3 shrink-0 text-white" />
+                                    <span>กำหนดส่ง FG: {format(fgDate, 'dd/MM')} ({Number(totalPcs).toLocaleString()} pc)</span>
+                                  </div>
+                                )
+                              }
+                            }
+                            return null
+                          })()}
+                        </div>
                       </div>
 
                       {/* Individual Task Rows */}
@@ -1738,7 +1840,9 @@ export function MasterPlanningTimeline({
                                   }
                                 }}
                               >
-                                <span className="truncate">{process?.process_name || "Unknown"} (T{log.tank_start || 1}-{log.tank_end || 1})</span>
+                                <span className="truncate">
+                                  {deptKey === 'FG' ? (process?.process_name || "ส่ง FG") : `${process?.process_name || "Unknown"} (T${log.tank_start || 1}-${log.tank_end || 1})`}
+                                </span>
                                 {isCompleted ? (
                                   <span className="text-[9.5px] px-1 py-0 rounded bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0 flex items-center gap-0.5" title="ผลิตเสร็จสิ้นแล้ว">
                                     <Check className="w-2.5 h-2.5 text-emerald-700" />
@@ -1831,6 +1935,8 @@ export function MasterPlanningTimeline({
                                     <Check className="w-3 h-3 text-emerald-700 mr-1 shrink-0" />
                                   ) : isStarted ? (
                                     <Lock className="w-3 h-3 text-amber-800/80 mr-1 shrink-0" />
+                                  ) : deptKey === 'FG' ? (
+                                    <Gift className="w-3 h-3 text-indigo-700 mr-1 shrink-0" />
                                   ) : canEdit ? (
                                     <GripVertical className="w-3 h-3 text-slate-500/70 mr-0.5 shrink-0 hover:text-slate-900" />
                                   ) : null}
@@ -1931,11 +2037,13 @@ export function MasterPlanningTimeline({
                                         <Check className="w-2.5 h-2.5 text-emerald-700 mr-1 shrink-0" />
                                       ) : isStarted ? (
                                         <Lock className="w-2.5 h-2.5 text-amber-700 mr-1 shrink-0" />
+                                      ) : deptKey === 'FG' ? (
+                                        <Gift className="w-2.5 h-2.5 text-indigo-700 mr-1 shrink-0" />
                                       ) : canEdit ? (
                                         <GripVertical className="w-2.5 h-2.5 text-indigo-400 mr-0.5 shrink-0" />
                                       ) : null}
 
-                                      <span className="truncate">🅿️ แผน: {format(addDays(planData.start, currentDelta), 'dd/MM')}{planData.end > planData.start ? `-${format(addDays(planData.end, currentDelta), 'dd/MM')}` : ''}</span>
+                                      <span className="truncate">🅿️ {deptKey === 'FG' ? 'ส่ง FG' : 'แผน'}: {format(addDays(planData.start, currentDelta), 'dd/MM')}{planData.end > planData.start ? `-${format(addDays(planData.end, currentDelta), 'dd/MM')}` : ''}</span>
 
                                       {/* Floating Delta Badge when dragging in Compare mode */}
                                       {isDraggingThis && (

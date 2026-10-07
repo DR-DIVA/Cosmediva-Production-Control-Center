@@ -12,8 +12,6 @@ export function getBaseOrderType(orderType?: string | null): 'MTS' | 'MTO' {
 
 export function isLotFirstBatch(lot: any): boolean {
   if (!lot) return false
-  const sku = (lot.products?.sku || '').toUpperCase()
-  if (sku.includes('PAMH-008')) return true
   const ot = (lot.order_type || '').toUpperCase()
   const note = (lot.note || '').toUpperCase()
   return (

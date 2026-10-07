@@ -546,36 +546,38 @@ export function checkIsFirstBatch(log: any, lot: any, pName?: string): { isFirst
   const note = (log?.note || '').toLowerCase()
   const lotNote = (lot?.note || '').toLowerCase()
   const orderType = (lot?.order_type || '').toLowerCase()
-  const sku = (lot?.products?.sku || '').toUpperCase()
   const proc = (pName || log?.processes?.process_name || '').toLowerCase()
+
+  if (!proc.includes('ผสม') && !proc.includes('mix')) {
+    return { isFirstBatch: false, firstBatchTank: 1 }
+  }
 
   const startT = Number(log?.tank_start || 1)
   const endT = Number(log?.tank_end || startT || 1)
 
-  // 1. Explicit marker from Planner (in log.note, lot.order_type, lot.note, etc.)
-  const hasTag = 
+  // 1. Explicit marker on task log note
+  const hasLogTag = 
     note.includes('[1st_batch]') || 
     note.includes('1st batch') || 
-    note.includes('1st_batch') ||
     note.includes('pilot batch') ||
     note.includes('ผลิตครั้งแรก') ||
-    lotNote.includes('[1st_batch]') ||
-    lotNote.includes('1st batch') ||
-    orderType.includes('first') ||
-    orderType.includes('1st') ||
-    log?.is_first_batch === true ||
-    lot?.is_first_batch === true
+    log?.is_first_batch === true
 
-  // 2. Specific business rule for PAMH-008:
-  // "สำหรับงาน PAMH-008 ในคิวผสม ถัง 1 จะเป็น 1st batch เสมอค่ะ"
-  const isPamh008Tank1 = sku.includes('PAMH-008') && (startT <= 1 && endT >= 1) && (proc.includes('ผสม') || proc.includes('mix'))
-
-  if (isPamh008Tank1) {
-    return { isFirstBatch: true, firstBatchTank: 1 }
+  if (hasLogTag) {
+    return { isFirstBatch: true, firstBatchTank: startT }
   }
 
-  if (hasTag && (proc.includes('ผสม') || proc.includes('mix'))) {
-    return { isFirstBatch: true, firstBatchTank: startT }
+  // 2. Explicit marker on lot order_type or lot.is_first_batch (Tank 1 of mixing)
+  const hasLotTag = 
+    orderType.includes('[1st_batch]') ||
+    orderType.includes('1st_batch') ||
+    orderType.includes('first') ||
+    lotNote.includes('[1st_batch]') ||
+    lotNote.includes('1st batch') ||
+    lot?.is_first_batch === true
+
+  if (hasLotTag && (startT <= 1 && endT >= 1)) {
+    return { isFirstBatch: true, firstBatchTank: 1 }
   }
 
   return { isFirstBatch: false, firstBatchTank: 1 }

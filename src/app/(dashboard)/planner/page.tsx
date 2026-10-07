@@ -61,12 +61,20 @@ import {
 
 const PROCESS_TYPES = [
   { id: "RM", name: "ชั่งสาร", color: "bg-amber-100 text-amber-800 border-amber-200" },
-  { id: "MX", name: "ผสม", color: "bg-[#D4AF37]/ text-[#4A4238] border-[#D4AF37]/30" },
-  { id: "PK", name: "บรรจุ", color: "bg-emerald-100 text-emerald-800 border-emerald-200" }
+  { id: "MX", name: "ผสม", color: "bg-[#D4AF37]/20 text-[#4A4238] border-[#D4AF37]/30" },
+  { id: "PK", name: "บรรจุ", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+  { id: "POF", name: "ลงลัง", color: "bg-purple-100 text-purple-800 border-purple-200" },
+  { id: "FG", name: "ส่ง FG", color: "bg-indigo-100 text-indigo-800 border-indigo-200" }
 ]
 
-const searchMap: Record<string, string> = { "RM": "ชั่งสาร", "MX": "ผสม", "PK": "บรรจุ" }
-const ALLOWED_PROCESSES = ["ชั่งสาร", "ผสม", "บรรจุ", "ลงลัง", "ส่งมอบ FG"]
+const searchMap: Record<string, string> = { 
+  "RM": "ชั่งสาร", 
+  "MX": "ผสม", 
+  "PK": "บรรจุ",
+  "POF": "ลงลัง",
+  "FG": "ส่ง FG"
+}
+const ALLOWED_PROCESSES = ["ชั่งสาร", "ผสม", "บรรจุ", "ลงลัง", "ส่ง FG", "ส่งมอบ FG"]
 
 export default function PlannerPage() {
   const supabase = useMemo(() => createClient(), [])
@@ -551,6 +559,18 @@ const fetchAllProductionLots = async (client: any) => {
       if (newLot.id) {
         const { error: updateErr } = await supabase.from("production_lots").update(lotData).eq("id", newLot.id)
         if (updateErr) throw updateErr
+
+        // When 1st Batch is unchecked on the order, clean up any [1st_batch] notes on logs of this lot
+        if (!newLot.is_first_batch) {
+          const lotLogs = logs.filter(l => l.production_lot_id === newLot.id)
+          for (const l of lotLogs) {
+            if ((l.note || '').toLowerCase().includes('[1st_batch]')) {
+              const cleanedNote = (l.note || '').replace(/\[1st_batch[^\]]*\]/gi, '').trim()
+              await supabase.from('production_logs').update({ note: cleanedNote || null, updated_at: new Date().toISOString() }).eq('id', l.id)
+            }
+          }
+        }
+
         toast.success("แก้ไขงานเรียบร้อย")
       } else {
         lotData.created_by = currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
@@ -572,17 +592,35 @@ const fetchAllProductionLots = async (client: any) => {
     const lot = lots.find(l => l.id === lotId)
     if (!lot) return
 
-    const processId = processes.find(p => p.process_name.includes("ชั่งสาร"))?.id || processes[0]?.id
+    // Find which processes already exist for this lot
+    const lotLogs = logs.filter(l => l.production_lot_id === lotId)
+    const existingProcNames = lotLogs.map(l => {
+      const p = processes.find(proc => proc.id === l.process_id)
+      return p?.process_name || ''
+    })
+
+    // Sequential preferred flow: ชั่งสาร -> ผสม -> บรรจุ -> ลงลัง -> ส่ง FG
+    const flow = ['ชั่งสาร', 'ผสม', 'บรรจุ', 'ลงลัง', 'ส่ง FG']
+    let nextProcName = flow.find(name => !existingProcNames.some(ep => ep.includes(name)))
+    if (!nextProcName) nextProcName = 'ชั่งสาร'
+
+    const targetProcess = processes.find(p => p.process_name === nextProcName || p.process_name.includes(nextProcName)) 
+      || processes.find(p => p.process_name.includes("ชั่งสาร")) 
+      || processes[0]
+    const processId = targetProcess?.id
+
+    const isFg = targetProcess?.process_name?.includes('ส่ง') && targetProcess?.process_name?.includes('FG')
+    const defaultDate = isFg && lot.fg_due_date ? lot.fg_due_date : format(new Date(), "yyyy-MM-dd")
 
     const newLogData = {
       production_lot_id: lotId,
       process_id: processId,
-      tank_start: null,
-      tank_end: null,
+      tank_start: isFg ? null : 1,
+      tank_end: isFg ? null : (lot.total_tanks || 1),
       total_tanks: lot.total_tanks || 1,
       status: "PLANNED",
-      activity_date: format(new Date(), "yyyy-MM-dd"),
-      end_date: format(new Date(), "yyyy-MM-dd"),
+      activity_date: defaultDate,
+      end_date: defaultDate,
       created_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84',
       updated_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
     }
@@ -593,6 +631,10 @@ const fetchAllProductionLots = async (client: any) => {
       toast.success("เพิ่มคิวงานเรียบร้อย")
       if (insertedLog) {
         setLogs(prev => [...prev, insertedLog])
+      }
+      if (isFg && !lot.fg_due_date) {
+        supabase.from("production_lots").update({ fg_due_date: defaultDate, updated_at: new Date().toISOString() }).eq("id", lotId).then()
+        setLots(prev => prev.map(lt => lt.id === lotId ? { ...lt, fg_due_date: defaultDate } : lt))
       }
       setExpandedLots(prev => ({ ...prev, [lotId]: true }))
       fetchData()
@@ -695,6 +737,17 @@ const fetchAllProductionLots = async (client: any) => {
       
       if (field === 'tank_start' || field === 'tank_end') {
           updateData[field] = value === "" ? null : parseInt(value)
+      }
+
+      // Check if this task is "ส่ง FG" or being changed to "ส่ง FG"
+      const currentProcId = field === 'process_id' ? value : existingLog?.process_id
+      const procObj = processes.find(p => p.id === currentProcId)
+      const isFgProc = procObj?.process_name?.includes('ส่ง') && procObj?.process_name?.includes('FG')
+
+      if (isFgProc && (field === 'activity_date' || field === 'end_date') && value && existingLog?.production_lot_id) {
+        const targetFgDate = field === 'end_date' ? value : (updateData.end_date || value)
+        supabase.from("production_lots").update({ fg_due_date: targetFgDate, updated_at: new Date().toISOString() }).eq("id", existingLog.production_lot_id).then()
+        setLots(prev => prev.map(lt => lt.id === existingLog.production_lot_id ? { ...lt, fg_due_date: targetFgDate } : lt))
       }
 
       // Optimistic Update
@@ -841,6 +894,14 @@ const fetchAllProductionLots = async (client: any) => {
       updateData.end_date = newDate
     }
 
+    const currentProcObj = processes.find(p => p.id === existingLog?.process_id)
+    const isFgProc = currentProcObj?.process_name?.includes('ส่ง') && currentProcObj?.process_name?.includes('FG')
+    if (isFgProc && existingLog?.production_lot_id) {
+      const targetFgDate = updateData.end_date || newDate
+      supabase.from("production_lots").update({ fg_due_date: targetFgDate, updated_at: new Date().toISOString() }).eq("id", existingLog.production_lot_id).then()
+      setLots(prev => prev.map(lt => lt.id === existingLog.production_lot_id ? { ...lt, fg_due_date: targetFgDate } : lt))
+    }
+
     // Optimistic Update
     setLogs(logs.map(l => l.id === logId ? { ...l, ...updateData } : l))
     setRescheduleModal(null)
@@ -878,9 +939,12 @@ const fetchAllProductionLots = async (client: any) => {
       return
     }
     const currentNote = log.note || ''
-    const hasTag = currentNote.toLowerCase().includes('[1st_batch]')
+    const hasLogTag = currentNote.toLowerCase().includes('[1st_batch]')
+    const hasLotTag = isLotFirstBatch(lot) && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
+    const isCurrentlyFirstBatch = hasLogTag || hasLotTag
+
     let newNote = ''
-    if (hasTag) {
+    if (isCurrentlyFirstBatch) {
       newNote = currentNote.replace(/\[1st_batch[^\]]*\]/gi, '').trim()
     } else {
       const tankNum = log.tank_start || 1
@@ -888,7 +952,7 @@ const fetchAllProductionLots = async (client: any) => {
     }
 
     const updateData: any = { 
-      note: newNote,
+      note: newNote || null,
       updated_at: new Date().toISOString(),
       ...(currentUserId ? { updated_by: currentUserId } : {})
     }
@@ -899,7 +963,23 @@ const fetchAllProductionLots = async (client: any) => {
     try {
       const { error } = await supabase.from('production_logs').update(updateData).eq('id', log.id)
       if (error) throw error
-      toast.success(hasTag ? 'ยกเลิกสถานะ 1st Batch เรียบร้อย' : `กำหนดเป็น 1st Batch (ถัง ${log.tank_start || 1}) เรียบร้อย ระบบจะแจ้งเตือน QA และ MX บนเรดาร์ 21 วัน`)
+
+      if (isCurrentlyFirstBatch) {
+        if (lot && (lot.order_type || '').includes('[1ST_BATCH]')) {
+          const cleanType = getBaseOrderType(lot.order_type)
+          await supabase.from('production_lots').update({ order_type: cleanType, updated_at: new Date().toISOString() }).eq('id', lot.id)
+          setLots(lots.map(l => l.id === lot.id ? { ...l, order_type: cleanType } : l))
+        }
+        toast.success('ยกเลิกสถานะ 1st Batch เรียบร้อย')
+      } else {
+        if (lot && !(lot.order_type || '').includes('[1ST_BATCH]')) {
+          const newOrderType = `${getBaseOrderType(lot.order_type)} [1ST_BATCH]`
+          await supabase.from('production_lots').update({ order_type: newOrderType, updated_at: new Date().toISOString() }).eq('id', lot.id)
+          setLots(lots.map(l => l.id === lot.id ? { ...l, order_type: newOrderType } : l))
+        }
+        toast.success(`กำหนดเป็น 1st Batch (ถัง ${log.tank_start || 1}) เรียบร้อย ระบบจะแจ้งเตือน QA และ MX บนเรดาร์ 21 วัน`)
+      }
+      fetchData()
     } catch (err: any) {
       toast.error('อัปเดตไม่สำเร็จ: ' + err.message)
       fetchData()
@@ -942,7 +1022,7 @@ const fetchAllProductionLots = async (client: any) => {
       .sort((a, b) => {
         const processA = processes.find(p => p.id === a.process_id)?.process_name || ""
         const processB = processes.find(p => p.id === b.process_id)?.process_name || ""
-        const orderMap: Record<string, number> = { "ชั่งสาร": 1, "ผสม": 2, "บรรจุ": 3 }
+        const orderMap: Record<string, number> = { "ชั่งสาร": 1, "ผสม": 2, "บรรจุ": 3, "ลงลัง": 4, "ส่ง FG": 5, "ส่งมอบ FG": 5, "รอส่งมอบ": 5 }
         const weightA = orderMap[processA] || 99
         const weightB = orderMap[processB] || 99
         if (weightA !== weightB) return weightA - weightB
@@ -2255,6 +2335,26 @@ const fetchAllProductionLots = async (client: any) => {
                   >
                     บรรจุ (PK)
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("POF")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "POF" ? "bg-purple-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    ลงลัง (POF)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setFilterDept("FG")}
+                    className={cn(
+                      "h-7 px-2.5 rounded-md text-xs font-semibold transition-all cursor-pointer",
+                      filterDept === "FG" ? "bg-indigo-600 text-white shadow-2xs" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"
+                    )}
+                  >
+                    ส่ง FG (FG)
+                  </button>
                 </div>
 
                 {/* Order Type Filter (All, MTS, MTO) */}
@@ -2547,10 +2647,16 @@ const fetchAllProductionLots = async (client: any) => {
                   const lotLogs = getSortedLotLogs(lot.id)
                   
                   const hasTasksInDept = lotLogs.some(log => {
+                      if (filterDept === "ALL") return true
                       const process = processes.find(p => p.id === log.process_id)
+                      const pName = (process?.process_name || '').toLowerCase()
+                      if (filterDept === "RM") return pName.includes("ชั่ง")
+                      if (filterDept === "MX") return pName.includes("ผสม")
+                      if (filterDept === "PK") return pName.includes("บรรจุ")
+                      if (filterDept === "POF") return pName.includes("ลงลัง") || pName.includes("pof")
+                      if (filterDept === "FG") return (pName.includes("ส่ง") && pName.includes("fg")) || pName.includes("ส่งมอบ")
                       let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
-                      if (!pt) return filterDept === "ALL"
-                      return filterDept === "ALL" || filterDept === pt.id
+                      return filterDept === pt?.id
                   });
 
                   if (filterDept !== "ALL" && !hasTasksInDept && lotLogs.length > 0) return null;
@@ -2693,7 +2799,12 @@ const fetchAllProductionLots = async (client: any) => {
 
                       {isExpanded && lotLogs.map(log => {
                         const process = processes.find(p => p.id === log.process_id)
-                        let pt = PROCESS_TYPES.find(pt => searchMap[pt.id] === process?.process_name)
+                        let pt = PROCESS_TYPES.find(pt => {
+                          const pName = (process?.process_name || '').toLowerCase()
+                          if (pt.id === 'FG') return (pName.includes('ส่ง') && pName.includes('fg')) || pName.includes('ส่งมอบ')
+                          if (pt.id === 'POF') return pName.includes('ลงลัง') || pName.includes('pof')
+                          return searchMap[pt.id] === process?.process_name
+                        })
                         if (!pt) pt = { id: "OTHER", name: process?.process_name || "Unknown", color: "bg-slate-100 text-slate-800 border-slate-200" }
                         
                         if (filterDept !== "ALL" && filterDept !== pt.id) return null
@@ -2733,7 +2844,13 @@ const fetchAllProductionLots = async (client: any) => {
                                       <ChevronDown className="h-4 w-4 opacity-50" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      {processes.filter(p => ALLOWED_PROCESSES.includes(p.process_name)).map(p => <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>)}
+                                      {processes
+                                        .filter(p => ALLOWED_PROCESSES.includes(p.process_name))
+                                        .sort((a, b) => {
+                                          const order: Record<string, number> = { 'ชั่งสาร': 1, 'ผสม': 2, 'บรรจุ': 3, 'ลงลัง': 4, 'ส่ง FG': 5, 'ส่งมอบ FG': 5 }
+                                          return (order[a.process_name] || 99) - (order[b.process_name] || 99)
+                                        })
+                                        .map(p => <SelectItem key={p.id} value={p.id}>{p.process_name}</SelectItem>)}
                                     </SelectContent>
                                   </Select>
                                 ) : (
@@ -2774,9 +2891,9 @@ const fetchAllProductionLots = async (client: any) => {
                                 <span className="text-xs text-slate-500">)</span>
 
                                 {process?.process_name?.includes('ผสม') && (() => {
-                                  const isAutoPamh = (lot?.products?.sku || '').includes('PAMH-008') && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
-                                  const hasBatchTag = (log.note || '').toLowerCase().includes('[1st_batch]') || (lot?.order_type || '').includes('[1ST_BATCH]')
-                                  const is1stBatch = isAutoPamh || hasBatchTag
+                                  const hasLogTag = (log.note || '').toLowerCase().includes('[1st_batch]')
+                                  const hasLotTag = isLotFirstBatch(lot) && (Number(log.tank_start || 1) <= 1 && Number(log.tank_end || 1) >= 1)
+                                  const is1stBatch = hasLogTag || hasLotTag
 
                                   return (
                                     <button
@@ -2785,8 +2902,6 @@ const fetchAllProductionLots = async (client: any) => {
                                       onClick={() => handleToggleFirstBatch(log, lot)}
                                       title={isStarted
                                         ? "หน้างานเริ่มงานแล้ว ล็อก 1st Batch (เพื่อประเมิน KPI ความแม่นยำ)"
-                                        : isAutoPamh 
-                                        ? "งาน PAMH-008 ถัง 1 กำหนดเป็น 1st Batch โดยอัตโนมัติตามข้อกำหนด" 
                                         : "คลิกเพื่อเปิด/ปิด สถานะ 1st Batch เพื่อแจ้งเตือน QA เข้าประเมินร่วมกับ MX บนเรดาร์ 21 วัน"}
                                       className={cn(
                                         "text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border transition-all select-none shrink-0 ml-1.5",
@@ -2798,7 +2913,7 @@ const fetchAllProductionLots = async (client: any) => {
                                       )}
                                     >
                                       <span>🔬</span>
-                                      <span>{is1stBatch ? (isAutoPamh ? '1st Batch (Auto) ✓' : '1st Batch ✓') : '+ 1st Batch'}</span>
+                                      <span>{is1stBatch ? '1st Batch ✓' : '+ 1st Batch'}</span>
                                     </button>
                                   )
                                 })()}
