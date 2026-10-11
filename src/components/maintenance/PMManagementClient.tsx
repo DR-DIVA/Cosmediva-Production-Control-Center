@@ -360,7 +360,12 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
                     <div className="pt-2 border-t border-stone-200/80 space-y-2">
                       <div className="flex items-center justify-between text-[11px] text-stone-500">
-                        <span>รายการตรวจ: {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} ข้อ` : 'ตามมาตรฐาน'}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span>รายการตรวจ: {Array.isArray(plan.checklist_template) && plan.checklist_template.length > 0 ? `${plan.checklist_template.length} ข้อ` : 'ตามมาตรฐาน'}</span>
+                          <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                            Ver {machine?.specification?.pm_checklist_version || '1.0'}
+                          </span>
+                        </div>
                         <span className="font-mono text-cyan-700 font-bold">{plan.plan_code}</span>
                       </div>
 
@@ -468,9 +473,25 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                         </td>
 
                         <td className="p-3.5">
-                          <span className="text-xs text-stone-600">
-                            {Array.isArray(plan.checklist_template) ? `${plan.checklist_template.length} รายการตรวจเช็ค` : 'ตามมาตรฐาน'}
-                          </span>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-stone-900">
+                              {Array.isArray(plan.checklist_template) && plan.checklist_template.length > 0
+                                ? `${plan.checklist_template.length} รายการตรวจเช็ค`
+                                : 'มาตรฐานกลาง (5-6 ข้อ)'}
+                            </span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-bold bg-emerald-50 text-emerald-800 border border-emerald-300">
+                                Ver {machine?.specification?.pm_checklist_version || '1.0'}
+                              </span>
+                              <Link
+                                href={`/maintenance/machines/${plan.machine_code || machine?.machine_code || ''}#pm-section`}
+                                className="text-[10px] text-cyan-700 hover:text-cyan-900 font-bold underline"
+                                title="ไปที่ทะเบียนเครื่องจักรเพื่อจัดการ Checklist Master"
+                              >
+                                ⚙️ จัดการ Master
+                              </Link>
+                            </div>
+                          </div>
                         </td>
 
                         <td className="p-3.5 pr-5 text-right">

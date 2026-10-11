@@ -364,6 +364,7 @@ export default async function Machine360Page({ params }: Props) {
         pmPlan={pmPlan}
         pmAdjustmentLogs={pmAdjustmentLogs || []}
         machineCode={machine.machine_code}
+        machine={machine}
       />
 
       {/* MAINTENANCE HISTORY TIMELINE */}

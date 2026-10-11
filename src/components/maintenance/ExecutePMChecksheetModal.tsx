@@ -88,12 +88,21 @@ export default function ExecutePMChecksheetModal({
 
   // 1. Resolve template dynamically based on machine code
   const template = useMemo(() => {
+    const machineSpec = (plan as any).machine?.specification || {}
     return getPMChecksheetTemplate(
       plan.machine_code,
       plan.machine_name,
-      Array.isArray(plan.checklist_template) ? plan.checklist_template : []
+      Array.isArray(plan.checklist_template) && plan.checklist_template.length > 0 
+        ? plan.checklist_template 
+        : (Array.isArray(machineSpec.pm_checklist) ? machineSpec.pm_checklist : []),
+      {
+        formCode: 'MT-PF-001E',
+        revision: '00',
+        effectiveDate: machineSpec.pm_checklist_effective_date || '19 JAN 24',
+        checklistVersion: machineSpec.pm_checklist_version ? `Ver ${machineSpec.pm_checklist_version}` : 'Ver 1.0'
+      }
     )
-  }, [plan.machine_code, plan.machine_name, plan.checklist_template])
+  }, [plan.machine_code, plan.machine_name, plan.checklist_template, (plan as any).machine])
 
   const checklistItems: PMChecklistItem[] = template.items
   const freq = getPmFrequencyInfo(plan.frequency_type, plan.frequency_interval)

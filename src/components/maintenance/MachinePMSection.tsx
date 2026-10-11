@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
 import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
+import MachineChecklistManager from '@/components/maintenance/MachineChecklistManager'
 import { Calendar, ShieldCheck, History, Sliders, FileCheck } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -11,16 +12,23 @@ interface Props {
   pmPlan: MaintenancePMPlan | null
   pmAdjustmentLogs: MaintenancePMAdjustmentLog[]
   machineCode: string
+  machine?: any
 }
 
-export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode }: Props) {
+export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode, machine }: Props) {
   const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isExecuteModalOpen, setIsExecuteModalOpen] = useState(false)
 
+  const machineObj = machine || (pmPlan as any)?.machine
+  const machineSpec = machineObj?.specification || {}
+  const activeChecklist = (Array.isArray(pmPlan?.checklist_template) && pmPlan.checklist_template.length > 0)
+    ? pmPlan.checklist_template
+    : (Array.isArray(machineSpec.pm_checklist) ? machineSpec.pm_checklist : [])
+
   if (!pmPlan) {
     return (
-      <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-3">
+      <div className="bg-white rounded-3xl p-6 border border-stone-200 shadow-sm space-y-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-[#D4AF37]" />
@@ -29,9 +37,19 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
             </h2>
           </div>
         </div>
-        <div className="p-6 text-center text-xs text-stone-400 bg-stone-50 rounded-2xl border border-stone-200">
-          ยังไม่ได้ผูกแผน PM สำหรับเครื่อง {machineCode}
+        <div className="p-4 text-center text-xs text-stone-400 bg-stone-50 rounded-2xl border border-stone-200">
+          ยังไม่ได้ผูกรอบความถี่ PM สำหรับเครื่อง {machineCode} (สามารถกำหนด Checklist ประจำเครื่องไว้ล่วงหน้าได้ด้านล่าง)
         </div>
+
+        {/* Machine Master Checklist Manager */}
+        <MachineChecklistManager
+          machineCode={machineCode}
+          machineName={machineObj?.machine_name || machineCode}
+          currentChecklist={activeChecklist}
+          currentVersion={machineSpec.pm_checklist_version || '1.0'}
+          effectiveDate={machineSpec.pm_checklist_effective_date || '19 JAN 24'}
+          history={machineSpec.pm_checklist_history || []}
+        />
       </div>
     )
   }
@@ -102,37 +120,16 @@ export default function MachinePMSection({ pmPlan, pmAdjustmentLogs, machineCode
         </div>
       </div>
 
-      {/* Checklist Template */}
-      {Array.isArray(pmPlan.checklist_template) && pmPlan.checklist_template.length > 0 && (
-        <div className="space-y-2">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-stone-700 uppercase tracking-wider">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>รายการตรวจสอบมาตรฐาน (PM Checklist - {pmPlan.checklist_template.length} ข้อ)</span>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-            {pmPlan.checklist_template.map((chk: any, idx: number) => (
-              <div key={idx} className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex flex-col justify-between">
-                <div>
-                  <div className="font-bold text-stone-800 flex items-start gap-1.5">
-                    <span className="text-emerald-600 shrink-0">✓</span>
-                    <span>{chk.item}</span>
-                  </div>
-                  {chk.standard && (
-                    <div className="text-[11px] text-stone-500 mt-1 pl-4">
-                      มาตรฐาน: <b className="text-stone-700">{chk.standard}</b>
-                    </div>
-                  )}
-                </div>
-                {chk.method && (
-                  <div className="text-[10px] text-stone-400 mt-1 pl-4">
-                    วิธีตรวจ: {chk.method}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Machine Master Checklist Version Control */}
+      <MachineChecklistManager
+        machineCode={machineCode}
+        machineName={machineObj?.machine_name || machineCode}
+        currentChecklist={activeChecklist}
+        currentVersion={machineSpec.pm_checklist_version || '1.0'}
+        effectiveDate={machineSpec.pm_checklist_effective_date || '19 JAN 24'}
+        history={machineSpec.pm_checklist_history || []}
+        planCode={pmPlan.plan_code}
+      />
 
       {/* Audit History Logs for this machine */}
       {pmAdjustmentLogs.length > 0 && (

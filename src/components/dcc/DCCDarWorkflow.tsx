@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { 
   FileEdit, Plus, CheckCircle2, Clock, AlertTriangle, 
-  ArrowRight, ShieldCheck, UserCheck, Layers, FileCheck, X
+  ArrowRight, ShieldCheck, UserCheck, Layers, FileCheck, X, Download
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -12,7 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { DCCDarRequest, DCC_DEPARTMENTS, DCC_STREAMS } from '@/types/dcc'
-import { submitDCCDarRequest } from '@/app/actions/dcc'
+import { submitDCCDarRequest, approveDCCDarRequest } from '@/app/actions/dcc'
 import { toast } from 'sonner'
 
 interface DCCDarWorkflowProps {
@@ -24,6 +24,7 @@ export default function DCCDarWorkflow({ requests: initialRequests }: DCCDarWork
   const [isNewModalOpen, setIsNewModalOpen] = useState(false)
   const [selectedDar, setSelectedDar] = useState<DCCDarRequest | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
 
   // Form State
   const [requestType, setRequestType] = useState<'NEW' | 'REVISE' | 'CANCEL'>('REVISE')
@@ -39,6 +40,28 @@ export default function DCCDarWorkflow({ requests: initialRequests }: DCCDarWork
 
   const selectedDeptObj = DCC_DEPARTMENTS.find(d => d.code === deptCode)
   const streamCode = selectedDeptObj?.streamCode || 'OMS'
+
+  const handleApproveDar = async () => {
+    if (!selectedDar) return
+    setIsApproving(true)
+    try {
+      const res = await approveDCCDarRequest({
+        darId: selectedDar.id,
+        approverName: 'Plant Director (PDT)'
+      })
+      if (res.success && res.data) {
+        toast.success(res.message || 'อนุมัติใบคำขอ DAR สำเร็จ และซิงค์ Revision เรียบร้อยแล้ว')
+        setRequests(prev => prev.map(d => d.id === selectedDar.id ? (res.data as DCCDarRequest) : d))
+        setSelectedDar(res.data as DCCDarRequest)
+      } else {
+        toast.error(res.error || 'เกิดข้อผิดพลาดในการอนุมัติ')
+      }
+    } catch (err: any) {
+      toast.error('เกิดข้อผิดพลาด: ' + err.message)
+    } finally {
+      setIsApproving(false)
+    }
+  }
 
   const handleSubmitNew = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,13 +116,25 @@ export default function DCCDarWorkflow({ requests: initialRequests }: DCCDarWork
           </p>
         </div>
 
-        <Button
-          onClick={() => setIsNewModalOpen(true)}
-          className="bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs gap-1.5 shadow-sm shrink-0"
-        >
-          <Plus className="w-4 h-4 text-[#D4AF37]" />
-          <span>ยื่นขอจัดทำ / แก้ไขเอกสาร (New DAR)</span>
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap shrink-0">
+          <a
+            href="/templates/dcc/DCC-PF-002A-R02-DAR-Template.docx"
+            download
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white text-stone-800 border border-stone-300 hover:bg-stone-50 shadow-2xs transition"
+            title="ดาวน์โหลดแบบฟอร์มคำขอ DAR ฉบับมาตรฐาน (Word .docx)"
+          >
+            <Download className="w-4 h-4 text-[#D4AF37]" />
+            <span>📥 โหลดแบบฟอร์มคำขอ DAR (Word)</span>
+          </a>
+
+          <Button
+            onClick={() => setIsNewModalOpen(true)}
+            className="bg-stone-900 hover:bg-stone-800 text-white font-bold text-xs gap-1.5 shadow-sm"
+          >
+            <Plus className="w-4 h-4 text-[#D4AF37]" />
+            <span>ยื่นขอจัดทำ / แก้ไขเอกสาร (New DAR)</span>
+          </Button>
+        </div>
       </div>
 
       {/* Dynamic 4-Step Flow Indicator Graphic */}
@@ -473,6 +508,23 @@ export default function DCCDarWorkflow({ requests: initialRequests }: DCCDarWork
                     </span>
                   </div>
                 </div>
+
+                {/* Approve Button & Maintenance Auto-Sync Trigger */}
+                {selectedDar.status !== 'EFFECTIVE' && (
+                  <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl space-y-2">
+                    <div className="text-[11px] text-emerald-900 leading-snug">
+                      💡 <b>ระบบบูรณาการ DCC ➔ Maintenance:</b> เมื่อกดอนุมัติ ระบบจะลงนามดิจิทัล ปรับสถานะเป็นมีผลบังคับใช้ (Effective) และส่งสัญญาณปรับปรุง Revision ไปยังหัวแบบฟอร์มของโมดูล Maintenance แบบอัตโนมัติทันที
+                    </div>
+                    <Button
+                      onClick={handleApproveDar}
+                      disabled={isApproving}
+                      className="w-full bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs gap-1.5 shadow-sm"
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                      <span>{isApproving ? 'กำลังดำเนินการ...' : 'ลงนามอนุมัติคำขอ DAR & ประกาศใช้ (Auto-Sync to Maintenance)'}</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           )}

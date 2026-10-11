@@ -19,6 +19,7 @@ import {
 } from '@/types/maintenance'
 import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
 import { resolveDepartmentAndAreaFromCode, getWorkOrderMilestones } from '@/lib/maintenanceHelpers'
+import * as XLSX from 'xlsx'
 
 /**
  * Generate sequential WO number: MTR-YYMMXXX (e.g. MTR-2609001)
@@ -3192,4 +3193,249 @@ export async function getMaintenanceActivityLogs(params?: {
     return { success: false, error: err.message || 'Failed to fetch activity logs', data: [], totalCount: 0, allCount: 0 }
   }
 }
+
+// =========================================================================
+// ACTION: PARSE PM CHECKLIST EXCEL FILE (.xlsx / .xls)
+// Supports official MT-PF-001E template and generic tabular sheets
+// =========================================================================
+export async function parsePMChecklistExcel(base64Data: string): Promise<{
+  success: boolean
+  items?: Array<{ id: number; item: string; standard: string; method: string; category: string }>
+  detectedForm?: string
+  error?: string
+}> {
+  try {
+    const buf = Buffer.from(base64Data, 'base64')
+    const wb = XLSX.read(buf, { type: 'buffer' })
+    if (!wb.SheetNames || wb.SheetNames.length === 0) {
+      return { success: false, error: 'ไม่พบชีตข้อมูลในไฟล์ Excel' }
+    }
+
+    // Prefer MT-PF-001E sheet if present, otherwise first sheet
+    const targetSheetName = wb.SheetNames.find(n => n.toUpperCase().includes('MT-PF') || n.toUpperCase().includes('PM')) || wb.SheetNames[0]
+    const ws = wb.Sheets[targetSheetName]
+    if (!ws) {
+      return { success: false, error: 'ไม่สามารถเปิดอ่านชีตข้อมูลได้' }
+    }
+
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z60')
+    const parsedItems: Array<{ id: number; item: string; standard: string; method: string; category: string }> = []
+    let detectedForm = 'Generic'
+
+    // Check if this is official MT-PF-001E format
+    // Search cells in first 15 rows for 'MT-PF-001E' or 'หัวข้อการตรวจสอบ'
+    let isOfficialMTPF001E = false
+    let headerRowIdx = -1
+    let itemColIdx = 1
+    let standardColIdx = 5
+    let methodColIdx = -1
+    let categoryColIdx = -1
+
+    for (let r = 0; r <= Math.min(range.e.r, 20); r++) {
+      for (let c = 0; c <= Math.min(range.e.c, 20); c++) {
+        const val = String(ws[XLSX.utils.encode_cell({ r, c })]?.v || '').trim()
+        if (val.includes('MT-PF-001E') || val.includes('MT-WF-002D')) {
+          isOfficialMTPF001E = true
+        }
+        if (val.includes('หัวข้อการตรวจสอบ') || val.includes('รายการตรวจสอบ') || val.includes('รายการตรวจเช็ค')) {
+          headerRowIdx = r
+          itemColIdx = c
+        }
+        if (val.includes('จุดที่ทำการตรวจเช็ค') || val.includes('เกณฑ์มาตรฐาน') || val.includes('มาตรฐาน')) {
+          standardColIdx = c
+        }
+        if (val.includes('วิธีการตรวจ') || val.includes('วิธีตรวจ') || val.includes('วิธีการ')) {
+          methodColIdx = c
+        }
+        if (val.includes('หมวดหมู่') || val.includes('หมวดงาน') || val.includes('ระบบ')) {
+          categoryColIdx = c
+        }
+      }
+      if (headerRowIdx !== -1) break
+    }
+
+    if (isOfficialMTPF001E || headerRowIdx !== -1) {
+      detectedForm = isOfficialMTPF001E ? 'MT-PF-001E (DCC Standard)' : 'Excel Tabular'
+      const startRow = (headerRowIdx !== -1 ? headerRowIdx : 11) + 1
+
+      for (let r = startRow; r <= range.e.r; r++) {
+        // Stop if footer text is encountered
+        const firstColVal = String(ws[XLSX.utils.encode_cell({ r, c: 0 })]?.v || '').trim()
+        if (firstColVal.includes('รายละเอียดต้องการให้แก้ไข') || firstColVal.includes('ผู้ส่งมอบ') || firstColVal.includes('เรียบร้อย/พร้อมใช้งาน')) {
+          break
+        }
+
+        const itemVal = String(ws[XLSX.utils.encode_cell({ r, c: itemColIdx })]?.v || '').trim()
+        const standardVal = String(ws[XLSX.utils.encode_cell({ r, c: standardColIdx })]?.v || '').trim()
+        const methodVal = methodColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: methodColIdx })]?.v || '').trim() : ''
+        const categoryVal = categoryColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: categoryColIdx })]?.v || '').trim() : ''
+
+        // If row has content
+        if (itemVal && itemVal !== 'หัวข้อการตรวจสอบ' && itemVal !== 'ผลการตรวจสอบ') {
+          parsedItems.push({
+            id: parsedItems.length + 1,
+            item: itemVal,
+            standard: standardVal || 'ใช้งานได้ปกติ สมบูรณ์ตามมาตรฐาน',
+            method: methodVal || 'ตรวจด้วยสายตาและการทำงาน',
+            category: categoryVal || `หมวดที่ ${Math.floor(parsedItems.length / 5) + 1}`
+          })
+        }
+      }
+    } else {
+      // Fallback: standard json rows parser
+      const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
+      rawJson.forEach((row, idx) => {
+        const item = row['หัวข้อการตรวจสอบ'] || row['หัวข้อ'] || row['รายการตรวจเช็ค'] || row['รายการ'] || row['item'] || row['Item'] || ''
+        const standard = row['จุดที่ทำการตรวจเช็ค'] || row['เกณฑ์มาตรฐาน'] || row['มาตรฐาน'] || row['standard'] || row['Standard'] || 'ใช้งานได้ปกติ'
+        const method = row['วิธีการตรวจ'] || row['วิธีตรวจ'] || row['วิธีการ'] || row['method'] || 'ตรวจด้วยสายตา'
+        const category = row['หมวดหมู่'] || row['หมวดงาน'] || row['category'] || 'ตรวจเช็คทั่วไป'
+
+        if (String(item).trim()) {
+          parsedItems.push({
+            id: idx + 1,
+            item: String(item).trim(),
+            standard: String(standard).trim(),
+            method: String(method).trim(),
+            category: String(category).trim()
+          })
+        }
+      })
+    }
+
+    if (parsedItems.length === 0) {
+      return {
+        success: false,
+        error: 'ไม่พบหัวข้อการตรวจเช็คในไฟล์ กรุณาตรวจสอบว่ามีคอลัมน์ "หัวข้อการตรวจสอบ" หรือใช้แม่แบบมาตรฐาน MT-PF-001E'
+      }
+    }
+
+    return {
+      success: true,
+      items: parsedItems,
+      detectedForm
+    }
+  } catch (err: any) {
+    console.error('Error parsing PM Checklist Excel:', err)
+    return { success: false, error: err.message || 'เกิดข้อผิดพลาดในการอ่านไฟล์ Excel' }
+  }
+}
+
+// =========================================================================
+// ACTION: UPDATE MACHINE CHECKLIST MASTER (SINGLE SOURCE OF TRUTH)
+// Updates Machine 360 Specification, Checklist Version, History, and Syncs to PM Plan
+// =========================================================================
+export async function updateMachineChecklistMaster(payload: {
+  machineCode: string
+  items: Array<{
+    item: string
+    standard: string
+    method?: string
+    category?: string
+  }>
+  version: string
+  changeReason: string
+  updatedByName: string
+  effectiveDate?: string
+}) {
+  try {
+    const supabase = createAdminClient()
+    const now = new Date().toISOString()
+    const cleanCode = payload.machineCode.trim()
+
+    // 1. Fetch current machine
+    const { data: machine, error: mErr } = await supabase
+      .from('maintenance_machines')
+      .select('id, machine_code, machine_name, specification')
+      .eq('machine_code', cleanCode)
+      .maybeSingle()
+
+    if (mErr || !machine) {
+      return { success: false, error: `ไม่พบเครื่องจักร ${cleanCode} ในระบบ` }
+    }
+
+    // 2. Prepare specification updates
+    const currentSpec = machine.specification && typeof machine.specification === 'object' ? machine.specification : {}
+    const existingHistory = Array.isArray(currentSpec.pm_checklist_history) ? currentSpec.pm_checklist_history : []
+
+    const historyEntry = {
+      version: payload.version,
+      items_count: payload.items.length,
+      updated_at: now,
+      updated_by: payload.updatedByName || 'หัวหน้าฝ่ายซ่อมบำรุง',
+      reason: payload.changeReason || 'ปรับปรุงรายการตรวจเช็คประจำเครื่อง',
+      effective_date: payload.effectiveDate || now.slice(0, 10)
+    }
+
+    const updatedSpec = {
+      ...currentSpec,
+      pm_checklist: payload.items,
+      pm_checklist_version: payload.version,
+      pm_checklist_effective_date: payload.effectiveDate || now.slice(0, 10),
+      pm_checklist_history: [historyEntry, ...existingHistory]
+    }
+
+    // 3. Update maintenance_machines
+    const { error: updateMachineErr } = await supabase
+      .from('maintenance_machines')
+      .update({
+        specification: updatedSpec,
+        updated_at: now
+      })
+      .eq('id', machine.id)
+
+    if (updateMachineErr) {
+      console.error('Error updating machine specification:', updateMachineErr)
+      return { success: false, error: updateMachineErr.message }
+    }
+
+    // 4. Automatically Sync to maintenance_pm_plans (All active PM plans for this machine)
+    const { error: syncPlanErr } = await supabase
+      .from('maintenance_pm_plans')
+      .update({
+        checklist_template: payload.items,
+        updated_at: now
+      })
+      .eq('machine_code', cleanCode)
+
+    if (syncPlanErr) {
+      console.warn('Warning: sync to PM plans returned:', syncPlanErr.message)
+    }
+
+    // 5. Audit Log (Record in maintenance_machine_audit_logs if available)
+    try {
+      await supabase
+        .from('maintenance_machine_audit_logs')
+        .insert({
+          machine_id: machine.id,
+          machine_code: cleanCode,
+          action: 'UPDATE_CHECKLIST_VERSION',
+          changed_by: payload.updatedByName || 'Maintenance Engineer',
+          change_details: {
+            version: payload.version,
+            items_count: payload.items.length,
+            reason: payload.changeReason
+          },
+          created_at: now
+        })
+    } catch (auditErr) {
+      // Ignore if table doesn't have exact schema
+    }
+
+    // Revalidate paths for instant client-side update
+    try { revalidatePath('/maintenance') } catch {}
+    try { revalidatePath('/maintenance/pm') } catch {}
+    try { revalidatePath(`/maintenance/machines/${cleanCode}`) } catch {}
+
+    return {
+      success: true,
+      version: payload.version,
+      itemsCount: payload.items.length,
+      message: `บันทึกรายการตรวจเช็คเครื่อง ${cleanCode} เป็น Version ${payload.version} (${payload.items.length} ข้อ) และซิงค์แผน PM เรียบร้อยแล้ว`
+    }
+  } catch (err: any) {
+    console.error('Error in updateMachineChecklistMaster:', err)
+    return { success: false, error: err.message || 'Failed to update machine checklist master' }
+  }
+}
+
 

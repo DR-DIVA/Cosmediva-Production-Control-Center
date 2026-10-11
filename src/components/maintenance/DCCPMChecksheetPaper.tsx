@@ -142,8 +142,8 @@ export default function DCCPMChecksheetPaper({
             <td className="p-1.5 px-2.5 w-[18%] font-bold text-stone-900 border-r border-black">
               Serial No. :
             </td>
-            <td className="p-1.5 px-2.5 w-[22%]">
-              N/A
+            <td className="p-1.5 px-2.5 w-[22%] font-mono">
+              {(plan as any).machine?.serial_number || 'N/A'}
             </td>
           </tr>
 
@@ -152,13 +152,16 @@ export default function DCCPMChecksheetPaper({
               M/C No. :
             </td>
             <td className="p-1.5 px-2.5 font-mono font-black text-stone-950 border-r border-black text-[13px]">
-              {plan.machine_code}
+              <span>{plan.machine_code}</span>
+              <span className="text-[10px] font-sans font-bold text-emerald-800 ml-2 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-300">
+                Checklist {template.checklistVersion || 'Ver 1.0'}
+              </span>
             </td>
             <td className="p-1.5 px-2.5 font-bold text-stone-900 border-r border-black">
               Model :
             </td>
-            <td className="p-1.5 px-2.5">
-              N/A
+            <td className="p-1.5 px-2.5 font-mono">
+              {(plan as any).machine?.model || 'N/A'}
             </td>
           </tr>
 
@@ -167,7 +170,9 @@ export default function DCCPMChecksheetPaper({
               Location :
             </td>
             <td className="p-1.5 px-2.5 text-stone-900 border-r border-black">
-              {template.location || 'Mixing 2'}
+              {(plan as any).machine?.production_area 
+                ? `${(plan as any).machine?.department_code || 'Factory'} • ${(plan as any).machine?.production_area}`
+                : template.location || 'Factory Floor'}
             </td>
             <td className="p-1.5 px-2.5 font-bold text-stone-900 border-r border-black">
               PM DATE :

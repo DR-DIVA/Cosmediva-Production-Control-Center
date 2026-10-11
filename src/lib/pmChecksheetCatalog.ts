@@ -28,15 +28,17 @@ export interface PMChecksheetTemplate {
   formCode: string
   revision: string
   effectiveDate?: string
+  checklistVersion?: string
   items: PMChecklistItem[]
 }
 
-export const PM_FORM_CODE = 'MT-WF-002D'
+export const PM_FORM_CODE = 'MT-PF-001E'
 export const PM_FORM_REVISION = '00'
+export const PM_FORM_EFFECTIVE_DATE = '19 JAN 24'
 export const PM_FORM_TITLE = 'รายการตรวจสอบเครื่องมือเครื่องจักร (PM Check sheet)'
 
 /**
- * Standard Catalog extracted directly from DCC MT-WF-002D Excel Check Sheets
+ * Standard Catalog extracted directly from DCC MT-WF-002D / MT-PF-001E Excel Check Sheets
  */
 export const PM_CHECKSHEET_CATALOG: Record<string, PMChecksheetTemplate> = {
   // 1. Agitator Mixing 3000L / 2000L (AGI-MX-001 ~ AGI-MX-004)
@@ -222,50 +224,72 @@ PM_CHECKSHEET_CATALOG['VACH-MX'] = { ...PM_CHECKSHEET_CATALOG['VACH-MX-001'], ma
 export function getPMChecksheetTemplate(
   machineCode: string,
   machineName?: string,
-  existingChecklist?: any[]
+  existingChecklist?: any[],
+  customMeta?: {
+    formCode?: string
+    revision?: string
+    effectiveDate?: string
+    checklistVersion?: string
+  }
 ): PMChecksheetTemplate {
   const cleanCode = (machineCode || '').trim().toUpperCase()
 
-  // 1. Exact Match
-  if (PM_CHECKSHEET_CATALOG[cleanCode]) {
-    return PM_CHECKSHEET_CATALOG[cleanCode]
-  }
-
-  // 2. Prefix Match (e.g. AGI-MX, FILL-PK, VACH-MX)
-  for (const prefix of Object.keys(PM_CHECKSHEET_CATALOG)) {
-    if (cleanCode.startsWith(prefix)) {
-      return {
-        ...PM_CHECKSHEET_CATALOG[prefix],
-        machineCode: cleanCode,
-        machineName: machineName || PM_CHECKSHEET_CATALOG[prefix].machineName
-      }
-    }
-  }
-
-  // 3. Fallback from DB Plan checklist if present
+  // 1. TOP PRIORITY: Machine-Specific Custom Checklist from DB (Master Data / Uploaded Excel)
   if (Array.isArray(existingChecklist) && existingChecklist.length > 0) {
     return {
       machineCode: cleanCode,
       machineName: machineName || 'เครื่องจักร',
-      formCode: PM_FORM_CODE,
-      revision: PM_FORM_REVISION,
+      formCode: customMeta?.formCode || PM_FORM_CODE,
+      revision: customMeta?.revision || PM_FORM_REVISION,
+      effectiveDate: customMeta?.effectiveDate || PM_FORM_EFFECTIVE_DATE,
+      checklistVersion: customMeta?.checklistVersion || 'Ver 1.0',
       items: existingChecklist.map((c, idx) => ({
         id: c.id || idx + 1,
-        category: c.category || 'รายการตรวจเช็คมาตรฐาน',
-        item: c.item,
-        standard: c.standard || 'ใช้งานได้ปกติ',
-        method: c.method || 'ตรวจด้วยสายตาและการทำงาน',
+        category: c.category || `หมวดที่ ${Math.floor(idx / 5) + 1}`,
+        item: c.item || c.item_name || c.หัวข้อ || '',
+        standard: c.standard || c.จุดที่ทำการตรวจเช็ค || 'ใช้งานได้ปกติ สมบูรณ์ตามมาตรฐาน',
+        method: c.method || c.วิธีการ || 'ตรวจด้วยสายตาและการทำงาน',
         readings: c.readings || null
       }))
     }
   }
 
-  // 4. Default Standard Checklist
+  // 2. Exact Match in DCC Hardcoded Catalog (if no custom DB checklist)
+  if (PM_CHECKSHEET_CATALOG[cleanCode]) {
+    const catalogItem = PM_CHECKSHEET_CATALOG[cleanCode]
+    return {
+      ...catalogItem,
+      formCode: customMeta?.formCode || catalogItem.formCode || PM_FORM_CODE,
+      revision: customMeta?.revision || catalogItem.revision || PM_FORM_REVISION,
+      effectiveDate: customMeta?.effectiveDate || catalogItem.effectiveDate || PM_FORM_EFFECTIVE_DATE,
+      checklistVersion: customMeta?.checklistVersion || 'Ver 1.0'
+    }
+  }
+
+  // 3. Prefix Match (e.g. AGI-MX, FILL-PK, VACH-MX)
+  for (const prefix of Object.keys(PM_CHECKSHEET_CATALOG)) {
+    if (cleanCode.startsWith(prefix)) {
+      const catalogItem = PM_CHECKSHEET_CATALOG[prefix]
+      return {
+        ...catalogItem,
+        machineCode: cleanCode,
+        machineName: machineName || catalogItem.machineName,
+        formCode: customMeta?.formCode || catalogItem.formCode || PM_FORM_CODE,
+        revision: customMeta?.revision || catalogItem.revision || PM_FORM_REVISION,
+        effectiveDate: customMeta?.effectiveDate || catalogItem.effectiveDate || PM_FORM_EFFECTIVE_DATE,
+        checklistVersion: customMeta?.checklistVersion || 'Ver 1.0'
+      }
+    }
+  }
+
+  // 4. Default Standard Checklist (General Machines)
   return {
     machineCode: cleanCode,
     machineName: machineName || 'เครื่องจักร',
-    formCode: PM_FORM_CODE,
-    revision: PM_FORM_REVISION,
+    formCode: customMeta?.formCode || PM_FORM_CODE,
+    revision: customMeta?.revision || PM_FORM_REVISION,
+    effectiveDate: customMeta?.effectiveDate || PM_FORM_EFFECTIVE_DATE,
+    checklistVersion: customMeta?.checklistVersion || 'Ver 1.0',
     items: [
       { id: 1, category: '1. ระบบไฟฟ้า', item: 'ตรวจเช็คสายไฟ สวิตช์เปิด-ปิด และการต่อสายดิน', standard: 'สายไฟสมบูรณ์ ไม่มีรอยแตก ขั้วต่อแน่น มีสายดิน', method: 'ตรวจเช็คด้วยสายตา' },
       { id: 2, category: '2. มอเตอร์ & กลไกขับเคลื่อน', item: 'วัดกระแสไฟฟ้าขณะมอเตอร์ทำงาน (Amp)', standard: 'กระแสไม่เกินพิกัด Full Load Current (FLA)', method: 'ใช้ Clamp Meter วัด', readings: { type: 'amp_single', fields: ['Amp'], unit: 'A' } },

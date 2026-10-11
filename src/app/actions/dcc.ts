@@ -203,6 +203,60 @@ const SEED_MASTER_TEMPLATES: DCCMasterTemplate[] = [
     description: 'ฟอร์มแจ้งซ่อมออนไลน์ Stamp & Seal ลายเซ็นอัตโนมัติเมื่อช่างปิดงาน'
   },
   {
+    id: 'form-mt-001e',
+    docCode: 'MT-PF-001E',
+    titleTh: 'รายการตรวจสอบเครื่องมือ เครื่องจักร (PM Check sheet)',
+    titleEn: 'Machinery Preventive Maintenance Check Sheet Form',
+    tier: 'TIER_4_FORM',
+    departmentCode: 'MT',
+    streamCode: 'OMS',
+    revisionNo: '00',
+    effectiveDate: '2024-01-19',
+    status: 'EFFECTIVE',
+    controlledCopyNo: '13 (CONTROLLED)',
+    ownerName: 'ฝ่ายซ่อมบำรุงและวิศวกรรม (MT)',
+    approvedBy: 'Plant Director (PDT)',
+    isoStandardRef: ['ISO 22716 Clause 5.2', 'GMP Cosmetic', 'HALAL'],
+    description: 'แบบฟอร์มบันทึกการตรวจเช็ค PM ประจำรอบ พร้อมรองรับการพิมพ์ใบตรวจเช็ค DCC และอัปโหลด Checklist รายเครื่อง',
+    downloadUrl: '/templates/dcc/MT-PF-001E-PM-Checksheet-Template.xlsx'
+  },
+  {
+    id: 'form-mt-002d',
+    docCode: 'MT-WF-002D',
+    titleTh: 'บันทึกการตรวจเช็คและบำรุงรักษาเครื่องจักรประจำรอบ (PM Check Sheet - DCC)',
+    titleEn: 'Machinery Preventive Maintenance Check Sheet (DCC Ref)',
+    tier: 'TIER_4_FORM',
+    departmentCode: 'MT',
+    streamCode: 'OMS',
+    revisionNo: '00',
+    effectiveDate: '2024-01-19',
+    status: 'EFFECTIVE',
+    controlledCopyNo: '13 (CONTROLLED)',
+    ownerName: 'ฝ่ายซ่อมบำรุงและวิศวกรรม (MT)',
+    approvedBy: 'Plant Director (PDT)',
+    isoStandardRef: ['ISO 22716 Clause 5.2'],
+    description: 'รหัสเอกสารตามทะเบียน DCC แบบฟอร์มตรวจเช็คเครื่องมือเครื่องจักรประจำรอบ',
+    downloadUrl: '/templates/dcc/MT-PF-001E-PM-Checksheet-Template.xlsx'
+  },
+  {
+    id: 'form-dcc-002a',
+    docCode: 'DCC-PF-002A',
+    titleTh: 'ใบคำขอดำเนินการเอกสารควบคุม (DAR - Document Action Request)',
+    titleEn: 'Document Action Request Form (DAR)',
+    tier: 'TIER_4_FORM',
+    departmentCode: 'DCC',
+    streamCode: 'QM',
+    revisionNo: '02',
+    effectiveDate: '2026-01-01',
+    status: 'EFFECTIVE',
+    controlledCopyNo: '01 (MASTER)',
+    ownerName: 'Document Control Center (DCC)',
+    approvedBy: 'Plant Director (PDT)',
+    isoStandardRef: ['ISO 9001:2026 Clause 7.5', 'ISO 22716', 'ASEAN GMP'],
+    description: 'แบบฟอร์มคำร้องขอดำเนินการเอกสารควบคุม (จัดทำใหม่ / ขอแก้ไขเปลี่ยนแปลง / ขอยกเลิกเอกสาร)',
+    downloadUrl: '/templates/dcc/DCC-PF-002A-R02-DAR-Template.docx'
+  },
+  {
     id: 'form-mt-001c',
     docCode: 'MT-PF-001C',
     titleTh: 'บันทึกการตรวจเช็คและบำรุงรักษาเชิงป้องกันประจำงวด (PM Check Sheet)',
@@ -819,3 +873,66 @@ export async function submitDCCDarRequest(payload: {
   revalidatePath('/dcc')
   return { success: true, data: newDar }
 }
+
+// =========================================================================
+// ACTION: GET ACTIVE DCC MASTER TEMPLATE BY CODE
+// Used by Maintenance module to dynamically read the current DCC Revision & Effective Date
+// =========================================================================
+export async function getDCCMasterTemplateByCode(docCode: string): Promise<DCCMasterTemplate | null> {
+  const clean = (docCode || '').trim().toUpperCase()
+  const found = SEED_MASTER_TEMPLATES.find(t => 
+    t.docCode.toUpperCase() === clean ||
+    (clean.includes('MT-WF-002D') && (t.docCode === 'MT-WF-002D' || t.docCode === 'MT-PF-001E')) ||
+    (clean.includes('MT-PF-001E') && (t.docCode === 'MT-PF-001E' || t.docCode === 'MT-WF-002D'))
+  )
+  return found || null
+}
+
+// =========================================================================
+// ACTION: APPROVE E-DAR & AUTOMATICALLY SYNC NEW REVISION TO MAINTENANCE
+// =========================================================================
+export async function approveDCCDarRequest(payload: {
+  darId: string
+  approverName?: string
+  comments?: string
+}) {
+  const dar = SEED_DAR_REQUESTS.find(d => d.id === payload.darId)
+  if (!dar) {
+    return { success: false, error: 'ไม่พบใบคำขอ DAR นี้ในระบบ' }
+  }
+
+  // Update DAR status to EFFECTIVE
+  dar.status = 'EFFECTIVE'
+  dar.reviewerStatus = 'APPROVED'
+  dar.dccStatus = 'APPROVED'
+  dar.finalApprovalStatus = 'APPROVED'
+  dar.finalApprovalDate = new Date().toISOString().slice(0, 10)
+  if (payload.approverName) {
+    dar.finalApproverName = payload.approverName
+  }
+
+  // Auto-update matched master templates (e.g. MT-PF-001E or MT-WF-002D)
+  const matchedTemplates = SEED_MASTER_TEMPLATES.filter(t => 
+    t.docCode.toUpperCase() === dar.docCode.toUpperCase() ||
+    (dar.docCode.toUpperCase().includes('MT-PF-001E') && t.docCode.toUpperCase().includes('MT-WF-002D')) ||
+    (dar.docCode.toUpperCase().includes('MT-WF-002D') && t.docCode.toUpperCase().includes('MT-PF-001E'))
+  )
+
+  matchedTemplates.forEach(t => {
+    t.revisionNo = dar.proposedRev
+    t.effectiveDate = dar.effectiveTargetDate || new Date().toISOString().slice(0, 10)
+    t.status = 'EFFECTIVE'
+  })
+
+  try { revalidatePath('/dcc') } catch {}
+  try { revalidatePath('/maintenance') } catch {}
+  try { revalidatePath('/maintenance/pm') } catch {}
+
+  return { 
+    success: true, 
+    data: dar, 
+    updatedTemplatesCount: matchedTemplates.length,
+    message: `อนุมัติคำขอ ${dar.darNumber} สำเร็จ และอัปเดต Revision เป็น Rev.${dar.proposedRev} ไปยังโมดูล Maintenance อัตโนมัติแล้ว` 
+  }
+}
+

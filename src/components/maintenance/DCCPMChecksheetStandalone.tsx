@@ -14,10 +14,19 @@ interface Props {
 }
 
 export default function DCCPMChecksheetStandalone({ plan, latestExecution }: Props) {
+  const machineSpec = (plan as any).machine?.specification || {}
   const template = getPMChecksheetTemplate(
     plan.machine_code,
     plan.machine_name,
-    Array.isArray(plan.checklist_template) ? plan.checklist_template : []
+    Array.isArray(plan.checklist_template) && plan.checklist_template.length > 0 
+      ? plan.checklist_template 
+      : (Array.isArray(machineSpec.pm_checklist) ? machineSpec.pm_checklist : []),
+    {
+      formCode: 'MT-PF-001E',
+      revision: '00',
+      effectiveDate: machineSpec.pm_checklist_effective_date || '19 JAN 24',
+      checklistVersion: machineSpec.pm_checklist_version ? `Ver ${machineSpec.pm_checklist_version}` : 'Ver 1.0'
+    }
   )
 
   const [execTechName, setExecTechName] = useState(

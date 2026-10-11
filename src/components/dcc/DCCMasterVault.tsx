@@ -209,15 +209,28 @@ export default function DCCMasterVault({ templates }: DCCMasterVaultProps) {
                       <div className="text-[10px] text-stone-500">เจ้าของ: {t.ownerName}</div>
                     </td>
                     <td className="py-3 px-4 text-center whitespace-nowrap">
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => setPreviewTemplate(t)}
-                        className="h-7 text-xs text-stone-700 hover:text-stone-950 hover:bg-stone-100 gap-1"
-                      >
-                        <Eye className="w-3.5 h-3.5 text-[#D4AF37]" />
-                        <span>พรีวิว</span>
-                      </Button>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setPreviewTemplate(t)}
+                          className="h-7 text-xs text-stone-700 hover:text-stone-950 hover:bg-stone-100 gap-1"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-[#D4AF37]" />
+                          <span>พรีวิว</span>
+                        </Button>
+                        {t.downloadUrl && (
+                          <a
+                            href={t.downloadUrl}
+                            download
+                            className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md text-xs font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 transition"
+                            title={`ดาวน์โหลด ${t.docCode} แม่แบบมาตรฐาน`}
+                          >
+                            <Download className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>โหลดไฟล์</span>
+                          </a>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -311,6 +324,28 @@ export default function DCCMasterVault({ templates }: DCCMasterVaultProps) {
                   </div>
                 )}
               </div>
+
+              {/* Action Buttons & Download */}
+              {previewTemplate.downloadUrl && (
+                <div className="p-3 bg-emerald-50/80 border border-emerald-300 rounded-xl flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-emerald-950 text-xs block">
+                      📥 แม่แบบเอกสารควบคุมฉบับทางการ (Controlled Template)
+                    </span>
+                    <span className="text-[11px] text-emerald-800">
+                      ดาวน์โหลดไฟล์ {previewTemplate.downloadUrl.endsWith('.xlsx') ? 'Excel (.xlsx)' : 'Word (.docx)'} สำหรับนำไปใช้งานตามระเบียบ DCC
+                    </span>
+                  </div>
+                  <a
+                    href={previewTemplate.downloadUrl}
+                    download
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm transition active:scale-95 shrink-0"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>ดาวน์โหลดไฟล์</span>
+                  </a>
+                </div>
+              )}
 
               {/* Stamp Alert Rules */}
               <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-[11px] text-amber-900 flex items-start gap-2">
