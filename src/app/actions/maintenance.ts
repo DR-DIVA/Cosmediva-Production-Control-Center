@@ -18,7 +18,7 @@ import {
   MaintenanceActivityType
 } from '@/types/maintenance'
 import { dispatchWorkOrderLineAlert } from '@/app/actions/line'
-import { resolveDepartmentAndAreaFromCode } from '@/lib/maintenanceHelpers'
+import { resolveDepartmentAndAreaFromCode, getWorkOrderMilestones } from '@/lib/maintenanceHelpers'
 
 /**
  * Generate sequential WO number: MTR-YYMMXXX (e.g. MTR-2609001)
@@ -3054,6 +3054,7 @@ export async function getMaintenanceActivityLogs(params?: {
             wo.priority === 'P3_NORMAL' ? 'ปกติ (P3)' : 'ต่ำ (P4)'
 
           const parsed = parseRepairDetailsFromWO(wo, cleanCode, deptName, priorityThai)
+          const milestones = getWorkOrderMilestones(wo)
 
           items.push({
             id: `wo-req-${wo.id}`,
@@ -3075,7 +3076,9 @@ export async function getMaintenanceActivityLogs(params?: {
             repairType: parsed.repairType,
             requesterDept: parsed.requesterDept,
             urgency: parsed.urgency,
-            problemCategory: parsed.problemCategory
+            problemCategory: parsed.problemCategory,
+            downtimeMinutes: milestones.downtimeMinutes,
+            timelineSummary: milestones.timelineSummary
           })
 
           // 2. Repair Acknowledged (ช่างรับงานซ่อม)
@@ -3100,7 +3103,9 @@ export async function getMaintenanceActivityLogs(params?: {
               repairType: parsed.repairType,
               requesterDept: parsed.requesterDept,
               urgency: parsed.urgency,
-              problemCategory: parsed.problemCategory
+              problemCategory: parsed.problemCategory,
+              downtimeMinutes: milestones.downtimeMinutes,
+              timelineSummary: milestones.timelineSummary
             })
           }
 
@@ -3129,7 +3134,9 @@ export async function getMaintenanceActivityLogs(params?: {
               repairType: parsed.repairType,
               requesterDept: parsed.requesterDept,
               urgency: parsed.urgency,
-              problemCategory: parsed.problemCategory
+              problemCategory: parsed.problemCategory,
+              downtimeMinutes: milestones.downtimeMinutes,
+              timelineSummary: milestones.timelineSummary
             })
           }
         }

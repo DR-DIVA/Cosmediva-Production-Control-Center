@@ -48,6 +48,7 @@ import SparePartUsageModal from '@/components/maintenance/SparePartUsageModal'
 import CompleteRepairModal from '@/components/maintenance/CompleteRepairModal'
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import { shareToLine } from '@/lib/lineShare'
+import { getWorkOrderMilestones } from '@/lib/maintenanceHelpers'
 
 /**
  * Format live elapsed duration in Thai
@@ -272,6 +273,7 @@ export default function WorkOrdersKanbanPage() {
   const [detailWO, setDetailWO] = useState<MaintenanceWorkOrder | null>(null)
   const [assignTechName, setAssignTechName] = useState('')
   const [isCustomTech, setIsCustomTech] = useState(false)
+  const [hideClosedCards, setHideClosedCards] = useState(false)
   
   // Edit Operator / Requester (Step 1: NEW) state
   const [editingRequesterWO, setEditingRequesterWO] = useState<MaintenanceWorkOrder | null>(null)
@@ -527,9 +529,11 @@ export default function WorkOrdersKanbanPage() {
           ? wo.parts.map(p => `${p.part_name || ''} (${p.quantity} ${p.unit || ''})`).join(', ')
           : '-'
 
+        const m = getWorkOrderMilestones(wo)
+
         return {
           'เลขที่ใบสั่งซ่อม (WO)': wo.wo_number,
-          'วันที่แจ้ง': wo.reported_at ? new Date(wo.reported_at).toLocaleString('th-TH') : '-',
+          'วันที่แจ้ง': m.step1Time,
           'รหัสเครื่องจักร': wo.machine_code,
           'ชื่อเครื่องจักร': wo.machine_name || '-',
           'ระดับความเร่งด่วน': wo.priority,
@@ -537,13 +541,26 @@ export default function WorkOrdersKanbanPage() {
           'อาการที่แจ้ง': wo.symptom_category,
           'รายละเอียดอาการ': wo.symptom_description || '-',
           'ผลกระทบการผลิต': wo.production_impact || '-',
-          'ผู้แจ้งซ่อม': wo.requester_name || '-',
+          'Downtime รวม (นาที)': m.downtimeMinutes,
+          '1. เวลาแจ้งซ่อม': m.step1Time,
+          '1. ผู้แจ้งซ่อม (User)': m.step1User,
+          '2. เวลารับเรื่อง': m.step2Time,
+          '2. ผู้รับเรื่อง/ช่าง (User)': m.step2User,
+          '2. เวลาตอบรับ (Gap นาที)': m.step2GapText,
+          '3. เวลาเริ่มซ่อม': m.step3Time,
+          '3. ช่างลงมือซ่อม (User)': m.step3User,
+          '3. เวลารอเริ่มซ่อม (Gap นาที)': m.step3GapText,
+          '4. เวลาซ่อมเสร็จ': m.step4Time,
+          '4. ช่างปิดงานซ่อม (User)': m.step4User,
+          '4. เวลาที่ใช้ซ่อม (นาที)': m.step4RepairText,
+          '5. เวลาตรวจรับงาน': m.step5Time,
+          '5. ผู้ตรวจรับงาน (User)': m.step5User,
+          '5. เวลารอตรวจรับ (Gap นาที)': m.step5GapText,
+          '6. เวลาปิดงานสมบูรณ์': m.step6Time,
+          '6. ผู้ปิดงาน/หัวหน้าช่าง (User)': m.step6User,
+          '6. เวลารอปิดงาน (Gap นาที)': m.step6GapText,
+          'สรุปไทม์ไลน์ 6 ขั้นตอน': m.timelineSummary,
           'แผนกผู้แจ้ง': wo.requester_department_name || '-',
-          'ช่างผู้รับผิดชอบ': wo.assigned_technician_name || 'ยังไม่กำหนด',
-          'เวลารับเรื่อง': wo.acknowledged_at ? new Date(wo.acknowledged_at).toLocaleString('th-TH') : '-',
-          'เวลาเริ่มซ่อม': wo.repair_started_at ? new Date(wo.repair_started_at).toLocaleString('th-TH') : '-',
-          'เวลาซ่อมเสร็จ': wo.repair_completed_at ? new Date(wo.repair_completed_at).toLocaleString('th-TH') : '-',
-          'Downtime รวม (นาที)': wo.total_downtime_minutes || 0,
           'หมวดหมู่ปัญหา': wo.problem_category || '-',
           'สาเหตุที่แท้จริง (Root Cause)': wo.root_cause || '-',
           'วิธีการแก้ไข (Corrective Action)': wo.corrective_action || '-',
@@ -555,6 +572,44 @@ export default function WorkOrdersKanbanPage() {
       })
 
       const worksheet = XLSX.utils.json_to_sheet(rows)
+      worksheet['!cols'] = [
+        { wch: 18 }, // เลขที่ใบสั่งซ่อม
+        { wch: 18 }, // วันที่แจ้ง
+        { wch: 16 }, // รหัสเครื่องจักร
+        { wch: 28 }, // ชื่อเครื่องจักร
+        { wch: 16 }, // ระดับความเร่งด่วน
+        { wch: 18 }, // สถานะปัจจุบัน
+        { wch: 24 }, // อาการที่แจ้ง
+        { wch: 35 }, // รายละเอียดอาการ
+        { wch: 22 }, // ผลกระทบการผลิต
+        { wch: 16 }, // Downtime รวม
+        { wch: 18 }, // 1. เวลาแจ้งซ่อม
+        { wch: 22 }, // 1. ผู้แจ้งซ่อม
+        { wch: 18 }, // 2. เวลารับเรื่อง
+        { wch: 22 }, // 2. ผู้รับเรื่อง/ช่าง
+        { wch: 18 }, // 2. เวลาตอบรับ
+        { wch: 18 }, // 3. เวลาเริ่มซ่อม
+        { wch: 22 }, // 3. ช่างลงมือซ่อม
+        { wch: 18 }, // 3. เวลารอเริ่มซ่อม
+        { wch: 18 }, // 4. เวลาซ่อมเสร็จ
+        { wch: 22 }, // 4. ช่างปิดงานซ่อม
+        { wch: 18 }, // 4. เวลาที่ใช้ซ่อม
+        { wch: 18 }, // 5. เวลาตรวจรับงาน
+        { wch: 22 }, // 5. ผู้ตรวจรับงาน
+        { wch: 18 }, // 5. เวลารอตรวจรับ
+        { wch: 18 }, // 6. เวลาปิดงานสมบูรณ์
+        { wch: 22 }, // 6. ผู้ปิดงาน/หัวหน้าช่าง
+        { wch: 18 }, // 6. เวลารอปิดงาน
+        { wch: 60 }, // สรุปไทม์ไลน์ 6 ขั้นตอน
+        { wch: 25 }, // แผนกผู้แจ้ง
+        { wch: 22 }, // หมวดหมู่ปัญหา
+        { wch: 30 }, // Root Cause
+        { wch: 30 }, // Corrective Action
+        { wch: 30 }, // Preventive
+        { wch: 25 }, // อะไหล่ที่ตัดใช้
+        { wch: 18 }, // มูลค่าอะไหล่รวม
+        { wch: 18 }  // การตรวจรับงาน
+      ]
       const workbook = XLSX.utils.book_new()
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Maintenance_Work_Orders')
 
@@ -690,14 +745,55 @@ export default function WorkOrdersKanbanPage() {
                 {/* Column Header */}
                 <div className={`p-2.5 bg-white rounded-xl shadow-xs border-t-4 ${col.color} flex items-center justify-between mb-3`}>
                   <span className="font-extrabold text-xs text-stone-800 tracking-tight">{col.title}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${col.badge}`}>
-                    {colJobs.length}
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    {col.id === 'CLOSED' && colJobs.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setHideClosedCards(prev => !prev)}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold transition flex items-center gap-1 cursor-pointer bg-stone-100 hover:bg-stone-200 text-stone-700 border border-stone-300 shadow-2xs"
+                        title={hideClosedCards ? 'แสดงการ์ดปิดงานบนหน้าจอ' : 'ล้างการ์ดปิดงานออกจากหน้าจอ (ประวัติยังถูกเก็บถาวร)'}
+                      >
+                        {hideClosedCards ? '👁️ แสดง' : '🧹 ล้างจอ'}
+                      </button>
+                    )}
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${col.badge}`}>
+                      {colJobs.length}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Column Cards */}
                 <div className="overflow-y-auto space-y-2.5 flex-1 pr-1 no-scrollbar">
-                  {colJobs.length === 0 ? (
+                  {col.id === 'CLOSED' && hideClosedCards && colJobs.length > 0 ? (
+                    <div className="p-4 rounded-2xl border border-stone-200 bg-white shadow-2xs text-center space-y-2.5 my-1">
+                      <div className="w-9 h-9 mx-auto rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center font-bold text-sm">
+                        ✓
+                      </div>
+                      <div className="text-xs font-bold text-stone-800">
+                        ล้างหน้าจอแล้ว {colJobs.length} ใบงาน
+                      </div>
+                      <div className="text-[10px] text-stone-500 leading-relaxed px-1">
+                        ระบบจัดเก็บประวัติ Downtime และเวลา 6 ขั้นตอน (แจ้ง, รับ, ซ่อม, เสร็จ, ตรวจ, ปิด) ไว้อย่างถาวร
+                      </div>
+                      <div className="pt-1 space-y-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setHideClosedCards(false)}
+                          className="w-full py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-[11px] font-bold transition cursor-pointer border border-stone-200"
+                        >
+                          👁️ แสดงการ์ดบนหน้าจอ
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleExportExcel}
+                          className="w-full py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-[11px] font-bold transition cursor-pointer border border-emerald-300 flex items-center justify-center gap-1"
+                        >
+                          <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-700" />
+                          Export Excel ({colJobs.length})
+                        </button>
+                      </div>
+                    </div>
+                  ) : colJobs.length === 0 ? (
                     <div className="text-center py-10 text-[11px] text-stone-400 font-medium">
                       ไม่มีงานในขั้นตอนนี้
                     </div>

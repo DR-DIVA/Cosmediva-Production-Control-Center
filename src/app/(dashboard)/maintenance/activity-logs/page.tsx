@@ -181,6 +181,8 @@ export default function MaintenanceActivityLogsPage() {
           'แผนกผู้แจ้ง': parsed.requesterDept,
           'ความเร่งด่วน': parsed.urgency,
           'หมวดปัญหา': parsed.problemCategory,
+          'Downtime รวม': item.downtimeMinutes ? `${item.downtimeMinutes} นาที` : '-',
+          'สรุปไทม์ไลน์ 6 ขั้นตอน': item.timelineSummary || '-',
           'รายละเอียด / สิ่งที่เปลี่ยนแปลง': parsed.actionDetails,
           'สถานะ/ผลการตรวจ': item.status || '-',
           'เหตุผล / หมายเหตุ': item.reason || '-'
@@ -208,6 +210,8 @@ export default function MaintenanceActivityLogsPage() {
         { wch: 26 }, // แผนกผู้แจ้ง
         { wch: 16 }, // ความเร่งด่วน
         { wch: 30 }, // หมวดปัญหา
+        { wch: 16 }, // Downtime รวม
+        { wch: 60 }, // สรุปไทม์ไลน์ 6 ขั้นตอน
         { wch: 45 }, // รายละเอียด / สิ่งที่เปลี่ยนแปลง
         { wch: 18 }, // สถานะ/ผลการตรวจ
         { wch: 28 }  // เหตุผล / หมายเหตุ

@@ -428,6 +428,8 @@ export interface MaintenanceActivityLogItem {
   requesterDept?: string
   urgency?: string
   problemCategory?: string
+  downtimeMinutes?: number
+  timelineSummary?: string
 }
 
 export interface PmFrequencyInfo {

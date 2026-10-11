@@ -403,4 +403,163 @@ export function parseActivityLogDetails(
   }
 }
 
+export interface WorkOrderMilestones {
+  downtimeMinutes: number
+  // Step 1: แจ้ง
+  step1Time: string
+  step1User: string
+  // Step 2: รับ
+  step2Time: string
+  step2User: string
+  step2GapText: string
+  // Step 3: ซ่อม
+  step3Time: string
+  step3User: string
+  step3GapText: string
+  // Step 4: เสร็จ
+  step4Time: string
+  step4User: string
+  step4RepairText: string
+  // Step 5: ตรวจ
+  step5Time: string
+  step5User: string
+  step5GapText: string
+  // Step 6: ปิด
+  step6Time: string
+  step6User: string
+  step6GapText: string
+  // Timeline Summary
+  timelineSummary: string
+}
+
+/**
+ * Extract Downtime and 6-Stage Timeline Milestones (1 แจ้ง, 2 รับ, 3 ซ่อม, 4 เสร็จ, 5 ตรวจ, 6 ปิด)
+ * with dedicated User identities and duration gaps.
+ */
+export function getWorkOrderMilestones(wo: any): WorkOrderMilestones {
+  const formatTimeOnly = (dStr?: string | null) => {
+    if (!dStr) return '-'
+    const d = new Date(dStr)
+    if (isNaN(d.getTime())) return '-'
+    return d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+  }
+
+  // 1. แจ้ง
+  const t1 = wo.reported_at ? new Date(wo.reported_at).getTime() : null
+  const step1Time = wo.reported_at ? formatThaiDateTime(wo.reported_at) : '-'
+  const step1User = (wo.requester_name || '-').replace(/รามมา/g, 'ถมมา')
+
+  // Find users from status_logs if available
+  const logs = Array.isArray(wo.status_logs) ? wo.status_logs : []
+  const getLogActor = (status: string, fallback: string) => {
+    const l = logs.find((x: any) => x.to_status === status)
+    if (l && l.changed_by_name) return l.changed_by_name.replace(/รามมา/g, 'ถมมา')
+    return fallback.replace(/รามมา/g, 'ถมมา')
+  }
+
+  // 2. รับ
+  const t2 = wo.acknowledged_at ? new Date(wo.acknowledged_at).getTime() : null
+  const step2Time = wo.acknowledged_at ? formatThaiDateTime(wo.acknowledged_at) : '-'
+  const step2User = getLogActor('ACKNOWLEDGED', wo.assigned_technician_name || 'ช่างซ่อมบำรุง')
+  let step2GapText = '-'
+  if (t1 && t2) {
+    const diff = Math.max(0, Math.round((t2 - t1) / 60000))
+    step2GapText = `+${diff} นาที`
+  }
+
+  // 3. ซ่อม
+  const t3 = wo.repair_started_at ? new Date(wo.repair_started_at).getTime() : null
+  const step3Time = wo.repair_started_at ? formatThaiDateTime(wo.repair_started_at) : '-'
+  const step3User = getLogActor('IN_PROGRESS', wo.assigned_technician_name || 'ช่างซ่อมบำรุง')
+  let step3GapText = '-'
+  if (t2 && t3) {
+    const diff = Math.max(0, Math.round((t3 - t2) / 60000))
+    step3GapText = `+${diff} นาที`
+  }
+
+  // 4. เสร็จ
+  const t4 = wo.repair_completed_at ? new Date(wo.repair_completed_at).getTime() : null
+  const step4Time = wo.repair_completed_at ? formatThaiDateTime(wo.repair_completed_at) : '-'
+  const step4User = getLogActor('COMPLETED', wo.assigned_technician_name || 'ช่างซ่อมบำรุง')
+  let step4RepairText = '-'
+  if (wo.repair_time_minutes) {
+    step4RepairText = `${wo.repair_time_minutes} นาที`
+  } else if (t3 && t4) {
+    const diff = Math.max(0, Math.round((t4 - t3) / 60000))
+    step4RepairText = `${diff} นาที`
+  }
+
+  // 5. ตรวจ
+  const t5 = wo.verified_at ? new Date(wo.verified_at).getTime() : null
+  const step5Time = wo.verified_at ? formatThaiDateTime(wo.verified_at) : '-'
+  const step5User = (wo.verified_by_name || getLogActor('VERIFIED', '-')).replace(/รามมา/g, 'ถมมา')
+  let step5GapText = '-'
+  if (t4 && t5) {
+    const diff = Math.max(0, Math.round((t5 - t4) / 60000))
+    step5GapText = `+${diff} นาที`
+  }
+
+  // 6. ปิด
+  const t6 = wo.closed_at ? new Date(wo.closed_at).getTime() : null
+  const step6Time = wo.closed_at ? formatThaiDateTime(wo.closed_at) : '-'
+  const step6User = (wo.supervisor_name || getLogActor('CLOSED', 'ปิยะราช ถมมา')).replace(/รามมา/g, 'ถมมา')
+  let step6GapText = '-'
+  if (t5 && t6) {
+    const diff = Math.max(0, Math.round((t6 - t5) / 60000))
+    step6GapText = `+${diff} นาที`
+  }
+
+  // Downtime
+  let downtimeMinutes = Number(wo.total_downtime_minutes) || 0
+  if (downtimeMinutes === 0 && t1 && (t4 || t6)) {
+    downtimeMinutes = Math.max(0, Math.round(((t4 || t6)! - t1) / 60000))
+  }
+
+  // Build concise timeline string
+  const parts: string[] = []
+  if (wo.reported_at) {
+    parts.push(`1.แจ้ง: ${formatTimeOnly(wo.reported_at)} (${step1User})`)
+  }
+  if (wo.acknowledged_at) {
+    parts.push(`2.รับ: ${formatTimeOnly(wo.acknowledged_at)} (${step2GapText}, ${step2User})`)
+  }
+  if (wo.repair_started_at) {
+    parts.push(`3.ซ่อม: ${formatTimeOnly(wo.repair_started_at)} (${step3GapText}, ${step3User})`)
+  }
+  if (wo.repair_completed_at) {
+    parts.push(`4.เสร็จ: ${formatTimeOnly(wo.repair_completed_at)} (ซ่อม ${step4RepairText}, ${step4User})`)
+  }
+  if (wo.verified_at) {
+    parts.push(`5.ตรวจ: ${formatTimeOnly(wo.verified_at)} (${step5GapText}, ${step5User})`)
+  }
+  if (wo.closed_at) {
+    parts.push(`6.ปิด: ${formatTimeOnly(wo.closed_at)} (${step6GapText}, ${step6User})`)
+  }
+
+  const timelineSummary = parts.length > 0 ? parts.join(' ➔ ') : '-'
+
+  return {
+    downtimeMinutes,
+    step1Time,
+    step1User,
+    step2Time,
+    step2User,
+    step2GapText,
+    step3Time,
+    step3User,
+    step3GapText,
+    step4Time,
+    step4User,
+    step4RepairText,
+    step5Time,
+    step5User,
+    step5GapText,
+    step6Time,
+    step6User,
+    step6GapText,
+    timelineSummary
+  }
+}
+
+
 
