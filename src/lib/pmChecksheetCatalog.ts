@@ -197,6 +197,31 @@ export const PM_CHECKSHEET_CATALOG: Record<string, PMChecksheetTemplate> = {
       { id: 12, category: '5. HEATER', item: 'วัดกระแสของ Heater (U, V, W)', standard: 'กระแสกินไฟเท่ากันทุกเฟส ฮีตเตอร์ไม่ขาด', method: 'ใช้ Clamp Meter วัด', readings: { type: 'amp_uvw', fields: ['U', 'V', 'W'], unit: 'A' } },
       { id: 13, category: '6. ชุดรอกไฟฟ้า', item: 'วัดกระแสของรอกไฟฟ้า (A)', standard: 'กระแสไม่เกินพิกัด สลิงไม่แตก ไม่เป็นสนิม', method: 'ใช้ Clamp Meter วัด', readings: { type: 'amp_single', fields: ['Amp'], unit: 'A' } }
     ]
+  },
+
+  // 4. Automatic Twist Cap Capping Machine (ACAP-PK-001)
+  'ACAP-PK-001': {
+    machineCode: 'ACAP-PK-001',
+    machineName: 'Automatic twist cap capping machine',
+    location: 'Packing Area',
+    formCode: PM_FORM_CODE,
+    revision: PM_FORM_REVISION,
+    effectiveDate: PM_FORM_EFFECTIVE_DATE,
+    checklistVersion: 'Ver 1.2',
+    items: [
+      { id: 1, category: '1. ตรวจเช็คระบบไฟฟ้า', item: 'ตรวจเช็คสวิตช์ไฟ สายไฟ', standard: 'สายไฟสมบูรณ์ ไม่มีรอยแตก ขั้วต่อแน่น สวิตช์ทำงานคล่อง', method: 'ตรวจเช็คด้วยสายตาและการกดสั่งงาน' },
+      { id: 2, category: '1. ตรวจเช็คระบบไฟฟ้า', item: 'ตรวจเช็คปุ่ม Emergency Switch', standard: 'กดตัดระบบทันที และปลดล็อคได้ปกติ', method: 'กดทดสอบฉุกเฉินและปลดล็อค' },
+      { id: 3, category: '1. ตรวจเช็คระบบไฟฟ้า', item: 'ตรวจเช็คชุดควบคุมความเร็วมอเตอร์', standard: 'ปรับรอบความเร็วตอบสนองราบรื่น สม่ำเสมอ', method: 'ทดสอบปรับสปีดควบคุม' },
+      { id: 4, category: '1. ตรวจเช็คระบบไฟฟ้า', item: 'ตรวจเช็คการทำงานของมอเตอร์', standard: 'มอเตอร์หมุนราบเรียบ ไม่มีเสียงดังผิดปกติหรือกลิ่นไหม้', method: 'ตรวจการทำงานและฟังเสียง' },
+      { id: 5, category: '2. ตรวจเช็คอุปกรณ์ลม', item: 'ตรวจเช็คข้อต่อลม', standard: 'ข้อต่อลมแน่น ไม่แตกร้าว ไม่มีเสียงลมรั่วซึม', method: 'ตรวจเช็คด้วยสายตาและฟังเสียง' },
+      { id: 6, category: '2. ตรวจเช็คอุปกรณ์ลม', item: 'ตรวจเช็คกระบอกลม', standard: 'กระบอกลมเลื่อนราบรื่น แกนกระบอกไม่คดงอหรือมีรอยขูดขีด', method: 'ทดสอบการทำงาน' },
+      { id: 7, category: '3. ตรวจเช็คระบบลำเลียง', item: 'ตรวจเช็คการทำงานของ Switch on-off', standard: 'สวิตช์ทำงานคล่อง ไม่หลวม ไม่ติดขัด สั่งตัด-ต่อวงจรถูกต้อง', method: 'กดเปิด-ปิดทดสอบ' },
+      { id: 8, category: '3. ตรวจเช็คระบบลำเลียง', item: 'ตรวจเช็คมอเตอร์ระบบลำเลียง', standard: 'หมุนขับสายพานลำเลียงได้ราบเรียบ ไม่สะดุด', method: 'ตรวจการทำงานและฟังเสียง' },
+      { id: 9, category: '3. ตรวจเช็คระบบลำเลียง', item: 'อัดจารบี', standard: 'หล่อลื่นจุดหมุนและลูกปืนตามรอบ ไม่ฝืดเคือง', method: 'อัดจารบีตามจุดที่กำหนด' },
+      { id: 10, category: '3. ตรวจเช็คระบบลำเลียง', item: 'ตรวจเช็คเซ็นเซอร์', standard: 'ตรวจจับชิ้นงานได้อย่างแม่นยำ ไฟสถานะติด-ดับสัมพันธ์', method: 'ทดสอบการตรวจจับวัตถุ' },
+      { id: 11, category: '4. ตรวจเช็คระบบปิดฝา', item: 'ตรวจเช็คการทำงานของมอเตอร์', standard: 'หมุนขับชุดหัวปิดฝาได้ปกติ แรงบิดสม่ำเสมอ', method: 'ทดสอบการทำงาน' },
+      { id: 12, category: '4. ตรวจเช็คระบบปิดฝา', item: 'ตรวจเช็คยางลูกกลิ้ง', standard: 'ยางลูกกลิ้งไม่สึกหรอ ไม่แตกลายงา จับยึดฝาได้แน่นไม่ลื่น', method: 'ตรวจเช็คสภาพเนื้อยางด้วยสายตาและสัมผัส' }
+    ]
   }
 }
 
@@ -217,6 +242,7 @@ for (let i = 2; i <= 10; i++) {
 }
 PM_CHECKSHEET_CATALOG['FILL-PK'] = { ...PM_CHECKSHEET_CATALOG['FILL-PK-001'], machineCode: 'FILL-PK' }
 PM_CHECKSHEET_CATALOG['VACH-MX'] = { ...PM_CHECKSHEET_CATALOG['VACH-MX-001'], machineCode: 'VACH-MX' }
+PM_CHECKSHEET_CATALOG['ACAP-PK'] = { ...PM_CHECKSHEET_CATALOG['ACAP-PK-001'], machineCode: 'ACAP-PK' }
 
 /**
  * Lookup Function: Get matching PM Checksheet Template

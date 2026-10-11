@@ -225,13 +225,13 @@ export default function MachineChecklistManager({
   return (
     <div className="space-y-4">
       {/* Top Banner: Master Version Info & Action Buttons */}
-      <div className="bg-gradient-to-r from-stone-900 to-stone-950 text-white rounded-2xl p-4 sm:p-5 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="space-y-1">
+      <div className="bg-gradient-to-r from-stone-900 to-stone-950 text-white rounded-2xl p-4 sm:p-5 shadow-sm space-y-4 overflow-hidden">
+        <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4">
+          <div className="space-y-1.5 min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm font-bold text-emerald-400 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                DCC Controlled: MT-PF-001E (Rev.00)
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>DCC Controlled: MT-PF-001E (Rev.00)</span>
               </span>
               <span className="text-stone-500">•</span>
               <Badge className="bg-emerald-500/20 text-emerald-300 border-emerald-500/40 text-xs font-mono font-bold">
@@ -244,18 +244,18 @@ export default function MachineChecklistManager({
             <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
               รายการตรวจเช็คประจำเครื่อง (Machine-Specific PM Checklist)
             </h3>
-            <p className="text-xs text-stone-300">
+            <p className="text-xs text-stone-300 leading-relaxed">
               ควบคุมหัวข้อการตรวจเช็คเฉพาะสำหรับ <b className="text-yellow-400">{machineCode}</b> ({machineName}) เป็น Single Source of Truth
             </p>
           </div>
 
           {/* Action Button Group */}
-          <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 flex-wrap w-full xl:w-auto xl:justify-end pt-1 xl:pt-0">
             {/* Download Master Template from DCC */}
             <a
               href="/templates/dcc/MT-PF-001E-PM-Checksheet-Template.xlsx"
               download
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition shadow-2xs active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold bg-white/10 hover:bg-white/20 text-white border border-white/20 transition shadow-2xs active:scale-95"
               title="ดาวน์โหลดไฟล์ Excel แม่แบบมาตรฐานทางการของ DCC"
             >
               <Download className="w-3.5 h-3.5 text-[#D4AF37]" />
@@ -271,7 +271,7 @@ export default function MachineChecklistManager({
                 setChangeReason('')
                 setIsUploadModalOpen(true)
               }}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-sm active:scale-95"
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs gap-1.5 shadow-sm active:scale-95 py-2 h-auto"
             >
               <Upload className="w-3.5 h-3.5 text-white" />
               <span>📤 อัปโหลด Checklist ใหม่</span>
@@ -286,7 +286,7 @@ export default function MachineChecklistManager({
                 setIsEditModalOpen(true)
               }}
               variant="outline"
-              className="bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700 text-xs font-bold gap-1.5"
+              className="bg-stone-800 hover:bg-stone-700 text-stone-200 border-stone-700 text-xs font-bold gap-1.5 py-2 h-auto"
             >
               <Edit3 className="w-3.5 h-3.5 text-yellow-400" />
               <span>✏️ แก้ไขบนเว็บ</span>
@@ -297,7 +297,7 @@ export default function MachineChecklistManager({
               <a
                 href={`/maintenance/pm/${planCode}/eform`}
                 target="_blank"
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#D4AF37] hover:bg-[#b5952f] text-stone-950 transition shadow-2xs active:scale-95"
+                className="inline-flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold bg-[#D4AF37] hover:bg-[#b5952f] text-stone-950 transition shadow-2xs active:scale-95"
                 title="ดูหน้าแบบฟอร์ม DCC ฉบับพิมพ์"
               >
                 <Eye className="w-3.5 h-3.5" />

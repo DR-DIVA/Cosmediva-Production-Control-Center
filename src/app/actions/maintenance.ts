@@ -3211,73 +3211,148 @@ export async function parsePMChecklistExcel(base64Data: string): Promise<{
       return { success: false, error: 'ไม่พบชีตข้อมูลในไฟล์ Excel' }
     }
 
-    // Prefer MT-PF-001E sheet if present, otherwise first sheet
-    const targetSheetName = wb.SheetNames.find(n => n.toUpperCase().includes('MT-PF') || n.toUpperCase().includes('PM')) || wb.SheetNames[0]
+    // Check if any sheet matches machine code pattern or MT-PF / PM
+    const targetSheetName = wb.SheetNames.find(n => 
+      n.toUpperCase().includes('MT-PF') || 
+      n.toUpperCase().includes('PM') ||
+      /^[A-Z0-9]+-[A-Z0-9]+/.test(n.toUpperCase())
+    ) || wb.SheetNames[0]
     const ws = wb.Sheets[targetSheetName]
     if (!ws) {
       return { success: false, error: 'ไม่สามารถเปิดอ่านชีตข้อมูลได้' }
     }
 
-    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z60')
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1:Z80')
     const parsedItems: Array<{ id: number; item: string; standard: string; method: string; category: string }> = []
     let detectedForm = 'Generic'
 
     // Check if this is official MT-PF-001E format
-    // Search cells in first 15 rows for 'MT-PF-001E' or 'หัวข้อการตรวจสอบ'
+    // Search cells in first 20 rows for 'MT-PF-001E' or 'หัวข้อการตรวจสอบ' / 'จุดที่ทำการตรวจเช็ค'
     let isOfficialMTPF001E = false
     let headerRowIdx = -1
-    let itemColIdx = 1
-    let standardColIdx = 5
-    let methodColIdx = -1
     let categoryColIdx = -1
+    let pointColIdx = -1
+    let methodColIdx = -1
+    let standardColIdx = -1
 
     for (let r = 0; r <= Math.min(range.e.r, 20); r++) {
-      for (let c = 0; c <= Math.min(range.e.c, 20); c++) {
+      for (let c = 0; c <= Math.min(range.e.c, 25); c++) {
         const val = String(ws[XLSX.utils.encode_cell({ r, c })]?.v || '').trim()
         if (val.includes('MT-PF-001E') || val.includes('MT-WF-002D')) {
           isOfficialMTPF001E = true
         }
-        if (val.includes('หัวข้อการตรวจสอบ') || val.includes('รายการตรวจสอบ') || val.includes('รายการตรวจเช็ค')) {
+        if (val.includes('หัวข้อการตรวจสอบ')) {
           headerRowIdx = r
-          itemColIdx = c
+          categoryColIdx = c
         }
-        if (val.includes('จุดที่ทำการตรวจเช็ค') || val.includes('เกณฑ์มาตรฐาน') || val.includes('มาตรฐาน')) {
+        if (val.includes('จุดที่ทำการตรวจเช็ค')) {
+          headerRowIdx = r
+          pointColIdx = c
+        }
+        if (val.includes('เกณฑ์มาตรฐาน') || (val.includes('มาตรฐาน') && !val.includes('จุดที่ทำการตรวจเช็ค'))) {
           standardColIdx = c
         }
         if (val.includes('วิธีการตรวจ') || val.includes('วิธีตรวจ') || val.includes('วิธีการ')) {
           methodColIdx = c
         }
-        if (val.includes('หมวดหมู่') || val.includes('หมวดงาน') || val.includes('ระบบ')) {
-          categoryColIdx = c
-        }
       }
-      if (headerRowIdx !== -1) break
+      if (headerRowIdx !== -1 && (categoryColIdx !== -1 || pointColIdx !== -1)) break
     }
 
-    if (isOfficialMTPF001E || headerRowIdx !== -1) {
+    if (isOfficialMTPF001E || (categoryColIdx !== -1 && pointColIdx !== -1) || headerRowIdx !== -1) {
       detectedForm = isOfficialMTPF001E ? 'MT-PF-001E (DCC Standard)' : 'Excel Tabular'
       const startRow = (headerRowIdx !== -1 ? headerRowIdx : 11) + 1
+      let currentCategory = '1. ตรวจเช็คทั่วไป'
+      let currentCatNum = 1
+
+      // Default standard/method map based on keywords in inspection points
+      const inferStandardAndMethod = (pointText: string) => {
+        const t = pointText.toLowerCase()
+        if (t.includes('สวิตช์') || t.includes('switch') || t.includes('สายไฟ')) {
+          return { standard: 'สายไฟสมบูรณ์ ไม่มีรอยแตก ขั้วต่อแน่น สวิตช์ทำงานคล่อง', method: 'ตรวจเช็คด้วยสายตาและการกดสั่งงาน' }
+        }
+        if (t.includes('emergency')) {
+          return { standard: 'กดตัดระบบทันที และปลดล็อคได้ปกติ', method: 'กดทดสอบฉุกเฉินและปลดล็อค' }
+        }
+        if (t.includes('มอเตอร์') || t.includes('motor')) {
+          return { standard: 'มอเตอร์หมุนราบเรียบ ไม่มีเสียงดังผิดปกติหรือกลิ่นไหม้', method: 'ตรวจการทำงานและฟังเสียง' }
+        }
+        if (t.includes('ลม') || t.includes('กระบอกลม') || t.includes('ข้อต่อลม')) {
+          return { standard: 'ข้อต่อแน่น ไม่รั่วซึม กระบอกลมเลื่อนราบรื่น', method: 'ตรวจด้วยสายตาและฟังเสียงลม' }
+        }
+        if (t.includes('จารบี') || t.includes('น้ำมัน') || t.includes('หล่อลื่น')) {
+          return { standard: 'หล่อลื่นจุดหมุนและลูกปืนตามรอบ ไม่ฝืดเคือง', method: 'อัดจารบี/ตรวจระดับน้ำมัน' }
+        }
+        if (t.includes('เซ็นเซอร์') || t.includes('sensor')) {
+          return { standard: 'ตรวจจับชิ้นงานได้อย่างแม่นยำ ไฟสถานะทำงานสัมพันธ์', method: 'ทดสอบการตรวจจับวัตถุ' }
+        }
+        if (t.includes('ยาง') || t.includes('ลูกกลิ้ง')) {
+          return { standard: 'ยางลูกกลิ้งไม่สึกหรอ ไม่แตกลายงา จับยึดฝาได้แน่น', method: 'ตรวจสภาพเนื้อยางด้วยสายตาและสัมผัส' }
+        }
+        return { standard: 'ใช้งานได้ปกติ สมบูรณ์ตามมาตรฐาน', method: 'ตรวจเช็คด้วยสายตาและการทำงาน' }
+      }
 
       for (let r = startRow; r <= range.e.r; r++) {
-        // Stop if footer text is encountered
-        const firstColVal = String(ws[XLSX.utils.encode_cell({ r, c: 0 })]?.v || '').trim()
-        if (firstColVal.includes('รายละเอียดต้องการให้แก้ไข') || firstColVal.includes('ผู้ส่งมอบ') || firstColVal.includes('เรียบร้อย/พร้อมใช้งาน')) {
+        // Collect row cells to check for footer stops
+        const rowCells: string[] = []
+        for (let c = 0; c <= Math.min(range.e.c, 25); c++) {
+          rowCells.push(String(ws[XLSX.utils.encode_cell({ r, c })]?.v || '').trim())
+        }
+        const rowFullText = rowCells.join(' ')
+        if (
+          rowFullText.includes('รายละเอียดต้องการให้แก้ไข') ||
+          rowFullText.includes('ผู้ส่งมอบ') ||
+          rowFullText.includes('ผู้รับมอบ') ||
+          rowFullText.includes('เรียบร้อย/พร้อมใช้งาน') ||
+          rowFullText.includes('ไม่พร้อมใช้งาน')
+        ) {
           break
         }
 
-        const itemVal = String(ws[XLSX.utils.encode_cell({ r, c: itemColIdx })]?.v || '').trim()
-        const standardVal = String(ws[XLSX.utils.encode_cell({ r, c: standardColIdx })]?.v || '').trim()
-        const methodVal = methodColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: methodColIdx })]?.v || '').trim() : ''
-        const categoryVal = categoryColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: categoryColIdx })]?.v || '').trim() : ''
+        // Col A (No. / ลำดับ)
+        const colAVal = rowCells[0] || ''
+        
+        // Category text in Col B / categoryColIdx
+        const catVal = categoryColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: categoryColIdx })]?.v || '').trim() : ''
 
-        // If row has content
-        if (itemVal && itemVal !== 'หัวข้อการตรวจสอบ' && itemVal !== 'ผลการตรวจสอบ') {
+        // Inspection point text in pointColIdx or search between col B and R
+        let pointVal = pointColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: pointColIdx })]?.v || '').trim() : ''
+        if (!pointVal) {
+          // Check columns between categoryColIdx + 1 and 16
+          const startCol = categoryColIdx !== -1 ? categoryColIdx + 1 : 2
+          for (let c = startCol; c < 16; c++) {
+            const cellVal = String(ws[XLSX.utils.encode_cell({ r, c })]?.v || '').trim()
+            if (cellVal && cellVal !== '1' && cellVal !== '2' && cellVal !== '3' && !cellVal.includes('ผลการตรวจสอบ')) {
+              pointVal = cellVal
+              break
+            }
+          }
+        }
+
+        // If category is provided in this row, update currentCategory
+        if (catVal && catVal !== 'หัวข้อการตรวจสอบ' && catVal !== 'ผลการตรวจสอบ') {
+          if (/^\d+[\.\s]/.test(catVal)) {
+            currentCategory = catVal
+          } else if (colAVal && !isNaN(Number(colAVal))) {
+            currentCategory = `${colAVal}. ${catVal}`
+          } else {
+            currentCategory = `${currentCatNum}. ${catVal}`
+          }
+          currentCatNum++
+        }
+
+        // In MT-PF-001E: pointVal is the specific inspection checkpoint
+        if (pointVal && pointVal !== 'จุดที่ทำการตรวจเช็ค') {
+          const defaults = inferStandardAndMethod(pointVal)
+          const customStandard = standardColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: standardColIdx })]?.v || '').trim() : ''
+          const customMethod = methodColIdx !== -1 ? String(ws[XLSX.utils.encode_cell({ r, c: methodColIdx })]?.v || '').trim() : ''
+
           parsedItems.push({
             id: parsedItems.length + 1,
-            item: itemVal,
-            standard: standardVal || 'ใช้งานได้ปกติ สมบูรณ์ตามมาตรฐาน',
-            method: methodVal || 'ตรวจด้วยสายตาและการทำงาน',
-            category: categoryVal || `หมวดที่ ${Math.floor(parsedItems.length / 5) + 1}`
+            item: pointVal,
+            standard: customStandard || defaults.standard,
+            method: customMethod || defaults.method,
+            category: currentCategory
           })
         }
       }
@@ -3285,8 +3360,8 @@ export async function parsePMChecklistExcel(base64Data: string): Promise<{
       // Fallback: standard json rows parser
       const rawJson: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
       rawJson.forEach((row, idx) => {
-        const item = row['หัวข้อการตรวจสอบ'] || row['หัวข้อ'] || row['รายการตรวจเช็ค'] || row['รายการ'] || row['item'] || row['Item'] || ''
-        const standard = row['จุดที่ทำการตรวจเช็ค'] || row['เกณฑ์มาตรฐาน'] || row['มาตรฐาน'] || row['standard'] || row['Standard'] || 'ใช้งานได้ปกติ'
+        const item = row['จุดที่ทำการตรวจเช็ค'] || row['หัวข้อการตรวจสอบ'] || row['หัวข้อ'] || row['รายการตรวจเช็ค'] || row['รายการ'] || row['item'] || row['Item'] || ''
+        const standard = row['เกณฑ์มาตรฐาน'] || row['มาตรฐาน'] || row['standard'] || row['Standard'] || 'ใช้งานได้ปกติ'
         const method = row['วิธีการตรวจ'] || row['วิธีตรวจ'] || row['วิธีการ'] || row['method'] || 'ตรวจด้วยสายตา'
         const category = row['หมวดหมู่'] || row['หมวดงาน'] || row['category'] || 'ตรวจเช็คทั่วไป'
 
