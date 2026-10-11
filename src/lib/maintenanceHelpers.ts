@@ -256,3 +256,151 @@ export function formatThaiDateTime(dateStr?: string | null): string {
   return `${datePart} ${hours}:${minutes} น.`
 }
 
+export interface ParsedActivityDetail {
+  symptom: string           // อาการเสีย
+  location: string          // จุดเกิดเหตุ/สถานที่
+  repairType: string        // ประเภท
+  requesterDept: string     // แผนกผู้แจ้ง
+  urgency: string           // ความเร่งด่วน
+  problemCategory: string   // หมวดปัญหา
+  actionDetails: string     // รายละเอียด / สิ่งที่เปลี่ยนแปลง
+}
+
+/**
+ * Parse and separate bundled activity details into dedicated individual fields
+ * Supporting both explicit item breakdown fields and backward-compatible raw details strings.
+ */
+export function parseActivityLogDetails(
+  details?: string | null,
+  context?: {
+    symptom?: string | null
+    location?: string | null
+    repairType?: string | null
+    requesterDept?: string | null
+    urgency?: string | null
+    problemCategory?: string | null
+    symptomDescription?: string | null
+    symptomCategory?: string | null
+    priority?: string | null
+    requesterDepartment?: string | null
+    departmentName?: string | null
+    machineCode?: string | null
+    activityType?: string
+  }
+): ParsedActivityDetail {
+  const text = details || ''
+  const rawDesc = context?.symptomDescription || ''
+
+  // 1. จุดเกิดเหตุ/สถานที่
+  let location = context?.location || ''
+  if (!location || location === '-') {
+    const locMatch = (text + '\n' + rawDesc).match(/📍\s*จุดเกิดเหตุ\/สถานที่:\s*([^\n\r•]+)/)
+    if (locMatch) {
+      location = locMatch[1].trim()
+    } else if (context?.machineCode) {
+      const res = resolveDepartmentAndAreaFromCode(context.machineCode)
+      if (res?.area) location = res.area
+    }
+  }
+  if (!location) location = '-'
+
+  // 2. ประเภท
+  let repairType = context?.repairType || ''
+  if (!repairType || repairType === '-') {
+    const typeMatch = (text + '\n' + rawDesc).match(/\[ประเภท:\s*([^\]]+)\]/)
+    if (typeMatch) {
+      repairType = typeMatch[1].trim()
+    } else if (context?.activityType === 'PM_EXECUTED') {
+      repairType = 'บำรุงรักษาเชิงป้องกัน (PM)'
+    } else if (context?.activityType?.startsWith('MACHINE_')) {
+      repairType = 'ทะเบียนเครื่องจักร (Machine Master)'
+    }
+  }
+  if (!repairType) repairType = '-'
+
+  // 3. แผนกผู้แจ้ง
+  let requesterDept = context?.requesterDept || ''
+  if (!requesterDept || requesterDept === '-') {
+    const deptMatch = text.match(/•\s*แผนกผู้แจ้ง:\s*([^•\n\r]+)/)
+    if (deptMatch) {
+      requesterDept = deptMatch[1].trim()
+    } else if (context?.requesterDepartment) {
+      requesterDept = context.requesterDepartment
+    } else if (context?.departmentName) {
+      requesterDept = context.departmentName
+    }
+  }
+  if (!requesterDept) requesterDept = '-'
+
+  // 4. ความเร่งด่วน
+  let urgency = context?.urgency || ''
+  if (!urgency || urgency === '-') {
+    const urgMatch = text.match(/•\s*ความเร่งด่วน:\s*([^•\n\r]+)/)
+    if (urgMatch) {
+      urgency = urgMatch[1].trim()
+    } else if (context?.priority) {
+      urgency = 
+        context.priority === 'P1_CRITICAL' ? 'ด่วนฉุกเฉิน (P1)' :
+        context.priority === 'P2_HIGH' ? 'ด่วนสูง (P2)' :
+        context.priority === 'P3_NORMAL' ? 'ปกติ (P3)' :
+        context.priority === 'P4_LOW' ? 'ต่ำ (P4)' : context.priority
+    }
+  }
+  if (!urgency) urgency = '-'
+
+  // 5. หมวดปัญหา
+  let problemCategory = context?.problemCategory || ''
+  if (!problemCategory || problemCategory === '-') {
+    const catMatch = text.match(/•\s*หมวดปัญหา:\s*([^•\n\r]+)/)
+    if (catMatch) {
+      problemCategory = catMatch[1].trim()
+    } else if (context?.symptomCategory) {
+      problemCategory = context.symptomCategory
+    }
+  }
+  if (!problemCategory) problemCategory = '-'
+
+  // 6. อาการเสีย
+  let symptom = context?.symptom || ''
+  if (!symptom || symptom === '-') {
+    if (text.includes('อาการเสีย:')) {
+      let symPart = text.split('อาการเสีย:')[1]
+      symPart = symPart.split('• แผนกผู้แจ้ง:')[0]
+      symPart = symPart.split('• ความเร่งด่วน:')[0]
+      symPart = symPart.split('• หมวดปัญหา:')[0]
+      symPart = symPart.replace(/📍\s*จุดเกิดเหตุ\/สถานที่:[^\n\r]*/g, '')
+      symPart = symPart.replace(/\[ประเภท:[^\]]+\]/g, '')
+      symPart = symPart.trim()
+      if (symPart && symPart !== '-') symptom = symPart
+    } else if (rawDesc) {
+      let symPart = rawDesc
+      symPart = symPart.replace(/📍\s*จุดเกิดเหตุ\/สถานที่:[^\n\r]*/g, '')
+      symPart = symPart.replace(/\[ประเภท:[^\]]+\]/g, '')
+      symPart = symPart.trim()
+      if (symPart) symptom = symPart
+    } else if (context?.symptomCategory) {
+      symptom = context.symptomCategory
+    }
+  }
+  if (!symptom) symptom = '-'
+
+  // 7. Action details / สิ่งที่เปลี่ยนแปลง
+  let actionDetails = '-'
+  if (text.includes('การแก้ไข:') || text.includes('ผลการตรวจ:')) {
+    actionDetails = text
+  } else if (!text.includes('อาการเสีย:')) {
+    actionDetails = text.trim() || '-'
+  }
+
+  return {
+    symptom,
+    location,
+    repairType,
+    requesterDept,
+    urgency,
+    problemCategory,
+    actionDetails
+  }
+}
+
+

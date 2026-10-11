@@ -2825,6 +2825,65 @@ export async function getMaintenanceActivityLogs(params?: {
       return fallback || '-'
     }
 
+    const parseRepairDetailsFromWO = (wo: any, cleanCode: string, deptName: string, priorityThai: string) => {
+      const rawDesc = (wo.symptom_description || '').trim()
+      
+      // 1. จุดเกิดเหตุ/สถานที่
+      let location = '-'
+      const locMatch = rawDesc.match(/📍\s*จุดเกิดเหตุ\/สถานที่:\s*([^\n\r•]+)/)
+      if (locMatch) {
+        location = locMatch[1].trim()
+      } else if (cleanCode === 'FACILITY' && wo.requester_department_name) {
+        location = wo.requester_department_name.trim()
+      } else {
+        const res = resolveDepartmentAndAreaFromCode(cleanCode)
+        if (res?.area) location = res.area
+      }
+
+      // 2. ประเภท
+      let repairType = '-'
+      const typeMatch = rawDesc.match(/\[ประเภท:\s*([^\]]+)\]/)
+      if (typeMatch) {
+        repairType = typeMatch[1].trim()
+      } else if (wo.is_emergency_breakdown || wo.priority === 'P1_CRITICAL') {
+        repairType = 'แจ้งซ่อมด่วนฉุกเฉิน (กระทบการผลิต)'
+      } else if (cleanCode === 'FACILITY') {
+        repairType = 'แจ้งซ่อมบริการ & อาคารสถานที่'
+      } else {
+        repairType = 'แจ้งซ่อมทั่วไป (ไม่กระทบการผลิต)'
+      }
+
+      // 3. อาการเสีย
+      let cleanSymptom = rawDesc
+      cleanSymptom = cleanSymptom.replace(/📍\s*จุดเกิดเหตุ\/สถานที่:[^\n\r]*/g, '')
+      cleanSymptom = cleanSymptom.replace(/\[ประเภท:[^\]]+\]/g, '')
+      cleanSymptom = cleanSymptom.split('• แผนกผู้แจ้ง:')[0]
+      cleanSymptom = cleanSymptom.split('• ความเร่งด่วน:')[0]
+      cleanSymptom = cleanSymptom.split('• หมวดปัญหา:')[0]
+      cleanSymptom = cleanSymptom.trim()
+      if (!cleanSymptom || cleanSymptom === '-') {
+        cleanSymptom = wo.symptom_category || '-'
+      }
+
+      // 4. แผนกผู้แจ้ง
+      const requesterDept = wo.requester_department_name || deptName || '-'
+
+      // 5. ความเร่งด่วน
+      const urgency = priorityThai
+
+      // 6. หมวดปัญหา
+      const problemCategory = wo.symptom_category || '-'
+
+      return {
+        symptom: cleanSymptom,
+        location,
+        repairType,
+        requesterDept,
+        urgency,
+        problemCategory
+      }
+    }
+
     const items: MaintenanceActivityLogItem[] = []
     const recordedMachineCreateKeys = new Set<string>()
 
@@ -2839,6 +2898,7 @@ export async function getMaintenanceActivityLogs(params?: {
         const cleanCode = (log.machine_code || '').toUpperCase().trim()
         const deptName = getMachineDept(log.machine_code)
         const mName = log.machine_name || machineNameMap.get(cleanCode) || log.machine_code
+        const mLoc = resolveDepartmentAndAreaFromCode(cleanCode)?.area || '-'
 
         if (isCreate) {
           recordedMachineCreateKeys.add(log.machine_code)
@@ -2857,7 +2917,13 @@ export async function getMaintenanceActivityLogs(params?: {
             details: log.edit_reason || 'ขึ้นทะเบียนเครื่องจักรใหม่เข้าสู่ระบบ Machine Master',
             changes: log.changes_summary || [],
             status: 'ลงทะเบียนแล้ว',
-            reason: log.edit_reason
+            reason: log.edit_reason,
+            symptom: '-',
+            location: mLoc,
+            repairType: 'ทะเบียนเครื่องจักร (Machine Master)',
+            requesterDept: deptName,
+            urgency: '-',
+            problemCategory: 'ขึ้นทะเบียนเครื่องจักรใหม่'
           })
         } else {
           // Format changes summary into readable text
@@ -2882,7 +2948,13 @@ export async function getMaintenanceActivityLogs(params?: {
             details: changeText || log.edit_reason || 'มีการปรับปรุงข้อมูลในทะเบียนเครื่องจักร',
             changes: log.changes_summary || [],
             status: 'แก้ไขแล้ว',
-            reason: log.edit_reason
+            reason: log.edit_reason,
+            symptom: '-',
+            location: mLoc,
+            repairType: 'ทะเบียนเครื่องจักร (Machine Master)',
+            requesterDept: deptName,
+            urgency: '-',
+            problemCategory: 'ปรับปรุงข้อมูลเครื่องจักร'
           })
         }
       })
@@ -2892,6 +2964,9 @@ export async function getMaintenanceActivityLogs(params?: {
     if (machines && machines.length > 0) {
       machines.forEach((m: any) => {
         if (!recordedMachineCreateKeys.has(m.machine_code)) {
+          const mClean = (m.machine_code || '').toUpperCase().trim()
+          const mLoc = resolveDepartmentAndAreaFromCode(mClean)?.area || '-'
+          const mDept = m.department_name || getMachineDept(mClean)
           items.push({
             id: `machine-init-${m.id}`,
             timestamp: m.created_at,
@@ -2900,13 +2975,19 @@ export async function getMaintenanceActivityLogs(params?: {
             badgeColor: 'bg-emerald-50 text-emerald-800 border-emerald-300',
             machineCode: m.machine_code,
             machineName: m.machine_name,
-            departmentName: m.department_name,
+            departmentName: mDept,
             refNumber: m.machine_code,
             performedBy: (m.responsible_technician_name || 'ฝ่ายช่างซ่อมบำรุง').replace(/รามมา/g, 'ถมมา'),
             summary: `ขึ้นทะเบียนเครื่องจักร ${m.machine_code} - ${m.machine_name}`,
-            details: `สังกัด/แผนก: ${m.department_name || '-'} • หมวดหมู่: ${m.category || '-'} • สถานะ: ${m.status || 'Running'}`,
+            details: `สังกัด/แผนก: ${mDept} • หมวดหมู่: ${m.category || '-'} • สถานะ: ${m.status || 'Running'}`,
             status: m.status || 'Running',
-            reason: 'ขึ้นทะเบียนในระบบ Machine Master'
+            reason: 'ขึ้นทะเบียนในระบบ Machine Master',
+            symptom: '-',
+            location: mLoc,
+            repairType: 'ทะเบียนเครื่องจักร (Machine Master)',
+            requesterDept: mDept,
+            urgency: '-',
+            problemCategory: 'ขึ้นทะเบียนเครื่องจักรใหม่'
           })
         }
       })
@@ -2935,6 +3016,7 @@ export async function getMaintenanceActivityLogs(params?: {
           const cleanCode = (wo.machine_code || '').toUpperCase().trim()
           const deptName = getMachineDept(wo.machine_code, wo.department_name)
           const mName = wo.machine_name || machineNameMap.get(cleanCode) || wo.machine_code
+          const pmLoc = resolveDepartmentAndAreaFromCode(cleanCode)?.area || '-'
 
           items.push({
             id: `wo-pm-${wo.id}`,
@@ -2950,7 +3032,13 @@ export async function getMaintenanceActivityLogs(params?: {
             summary: `ดำเนินการตรวจเช็ค PM ประจำงวด (${wo.wo_number})`,
             details: `ผลการตรวจ: ${overallThai} [${readiness}] • ผู้ส่งมอบ (ช่าง): ${tech} • ผู้รับมอบ: ${owner}${diagData.executionNotes ? ` • หมายเหตุ: ${diagData.executionNotes}` : ''}`.replace(/รามมา/g, 'ถมมา'),
             status: overallThai,
-            reason: wo.symptom_description || 'รอบการบำรุงรักษาเชิงป้องกันตามแผน'
+            reason: wo.symptom_description || 'รอบการบำรุงรักษาเชิงป้องกันตามแผน',
+            symptom: 'งานตรวจเช็คบำรุงรักษาเชิงป้องกันตามแผน (PM)',
+            location: pmLoc,
+            repairType: 'บำรุงรักษาเชิงป้องกัน (PM)',
+            requesterDept: 'ฝ่ายซ่อมบำรุงและวิศวกรรม (Engineering & Facilities)',
+            urgency: 'ตามแผนงาน (PM)',
+            problemCategory: 'Preventive Maintenance'
           })
         } else {
           // Regular Repair Work Order
@@ -2964,6 +3052,8 @@ export async function getMaintenanceActivityLogs(params?: {
             wo.priority === 'P1_CRITICAL' ? 'ด่วนฉุกเฉิน (P1)' :
             wo.priority === 'P2_HIGH' ? 'ด่วนสูง (P2)' :
             wo.priority === 'P3_NORMAL' ? 'ปกติ (P3)' : 'ต่ำ (P4)'
+
+          const parsed = parseRepairDetailsFromWO(wo, cleanCode, deptName, priorityThai)
 
           items.push({
             id: `wo-req-${wo.id}`,
@@ -2979,7 +3069,13 @@ export async function getMaintenanceActivityLogs(params?: {
             summary: `ฝ่ายที่เกี่ยวข้องแจ้งซ่อม ${wo.machine_code} (${wo.wo_number})`,
             details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} • แผนกผู้แจ้ง: ${deptName} • ความเร่งด่วน: ${priorityThai} • หมวดปัญหา: ${wo.symptom_category || '-'}`,
             status: `สถานะ: ${wo.status || 'NEW'}`,
-            reason: wo.symptom_description || wo.symptom_category || 'แจ้งซ่อมเครื่องจักรขัดข้อง'
+            reason: wo.symptom_description || wo.symptom_category || 'แจ้งซ่อมเครื่องจักรขัดข้อง',
+            symptom: parsed.symptom,
+            location: parsed.location,
+            repairType: parsed.repairType,
+            requesterDept: parsed.requesterDept,
+            urgency: parsed.urgency,
+            problemCategory: parsed.problemCategory
           })
 
           // 2. Repair Acknowledged (ช่างรับงานซ่อม)
@@ -2998,7 +3094,13 @@ export async function getMaintenanceActivityLogs(params?: {
               summary: `ช่างรับงานซ่อม ${wo.wo_number}`,
               details: `อาการเสีย: ${wo.symptom_description || wo.symptom_category || '-'} (ผู้แจ้ง: ${(wo.requester_name || '-').replace(/รามมา/g, 'ถมมา')})`,
               status: wo.status,
-              reason: wo.symptom_category
+              reason: wo.symptom_category,
+              symptom: parsed.symptom,
+              location: parsed.location,
+              repairType: parsed.repairType,
+              requesterDept: parsed.requesterDept,
+              urgency: parsed.urgency,
+              problemCategory: parsed.problemCategory
             })
           }
 
@@ -3021,7 +3123,13 @@ export async function getMaintenanceActivityLogs(params?: {
               summary: `ซ่อมเสร็จและปิดงานซ่อม ${wo.wo_number}`,
               details: `การแก้ไข: ${wo.corrective_action || '-'} • สาเหตุ: ${wo.root_cause || '-'} • เวลาซ่อม: ${wo.repair_time_minutes || 0} นาที • ค่าอะไหล่: ฿${(wo.total_part_cost || 0).toLocaleString()} (ผู้ตรวจรับ: ${(wo.verified_by_name || '-').replace(/รามมา/g, 'ถมมา')})`,
               status: `ปิดงานแล้ว (${wo.status})`,
-              reason: wo.root_cause || wo.symptom_category
+              reason: wo.root_cause || wo.symptom_category,
+              symptom: parsed.symptom,
+              location: parsed.location,
+              repairType: parsed.repairType,
+              requesterDept: parsed.requesterDept,
+              urgency: parsed.urgency,
+              problemCategory: parsed.problemCategory
             })
           }
         }

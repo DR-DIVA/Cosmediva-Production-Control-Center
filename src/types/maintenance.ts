@@ -421,6 +421,13 @@ export interface MaintenanceActivityLogItem {
   changes?: MachineAuditChange[]
   status?: string
   reason?: string
+  // Structured breakdown fields for Excel export & rich display
+  symptom?: string
+  location?: string
+  repairType?: string
+  requesterDept?: string
+  urgency?: string
+  problemCategory?: string
 }
 
 export interface PmFrequencyInfo {

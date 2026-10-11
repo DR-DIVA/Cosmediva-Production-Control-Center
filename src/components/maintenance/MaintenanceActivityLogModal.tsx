@@ -32,7 +32,7 @@ import {
 import { MaintenanceActivityLogItem, MaintenanceActivityType } from '@/types/maintenance'
 import { getMaintenanceActivityLogs } from '@/app/actions/maintenance'
 import ThaiDateInput from '@/components/maintenance/ThaiDateInput'
-import { formatThaiDate, resolveDepartmentAndAreaFromCode } from '@/lib/maintenanceHelpers'
+import { formatThaiDate, resolveDepartmentAndAreaFromCode, parseActivityLogDetails } from '@/lib/maintenanceHelpers'
 import * as XLSX from 'xlsx'
 
 interface MaintenanceActivityLogModalProps {
@@ -174,6 +174,18 @@ export default function MaintenanceActivityLogModal({
           ? item.departmentName
           : resolveDepartmentAndAreaFromCode(item.machineCode)?.department || '-'
 
+        const parsed = parseActivityLogDetails(item.details, {
+          symptom: item.symptom,
+          location: item.location,
+          repairType: item.repairType,
+          requesterDept: item.requesterDept,
+          urgency: item.urgency,
+          problemCategory: item.problemCategory,
+          departmentName: dept,
+          machineCode: item.machineCode,
+          activityType: item.activityType
+        })
+
         return {
           'ลำดับ': idx + 1,
           'วันที่ (วว/ดด/ปปปป)': numericDateStr,
@@ -186,7 +198,13 @@ export default function MaintenanceActivityLogModal({
           'เลขที่อ้างอิง/ใบงาน': item.refNumber || '-',
           'ผู้ดำเนินการ': item.performedBy,
           'สรุปกิจกรรม': item.summary,
-          'รายละเอียด / สิ่งที่เปลี่ยนแปลง': item.details || '-',
+          'อาการเสีย': parsed.symptom,
+          'จุดเกิดเหตุ/สถานที่': parsed.location,
+          'ประเภท': parsed.repairType,
+          'แผนกผู้แจ้ง': parsed.requesterDept,
+          'ความเร่งด่วน': parsed.urgency,
+          'หมวดปัญหา': parsed.problemCategory,
+          'รายละเอียด / สิ่งที่เปลี่ยนแปลง': parsed.actionDetails,
           'สถานะ/ผลการตรวจ': item.status || '-',
           'เหตุผล / หมายเหตุ': item.reason || '-'
         }
@@ -198,18 +216,25 @@ export default function MaintenanceActivityLogModal({
       // Auto-fit column widths
       const colWidths = [
         { wch: 8 },  // ลำดับ
-        { wch: 15 }, // วันที่
+        { wch: 15 }, // วันที่ (วว/ดด/ปปปป)
+        { wch: 15 }, // วันที่แสดงผล
         { wch: 10 }, // เวลา
         { wch: 22 }, // ประเภทกิจกรรม
-        { wch: 16 }, // รหัสเครื่อง
-        { wch: 32 }, // ชื่อเครื่อง
-        { wch: 22 }, // แผนก
-        { wch: 18 }, // เลขที่ใบงาน
+        { wch: 16 }, // รหัสเครื่องจักร
+        { wch: 32 }, // ชื่อเครื่องจักร
+        { wch: 24 }, // สังกัด/แผนก
+        { wch: 18 }, // เลขที่อ้างอิง/ใบงาน
         { wch: 24 }, // ผู้ดำเนินการ
         { wch: 35 }, // สรุปกิจกรรม
-        { wch: 55 }, // รายละเอียด
-        { wch: 18 }, // สถานะ
-        { wch: 30 }  // เหตุผล
+        { wch: 35 }, // อาการเสีย
+        { wch: 28 }, // จุดเกิดเหตุ/สถานที่
+        { wch: 26 }, // ประเภท
+        { wch: 26 }, // แผนกผู้แจ้ง
+        { wch: 16 }, // ความเร่งด่วน
+        { wch: 30 }, // หมวดปัญหา
+        { wch: 45 }, // รายละเอียด / สิ่งที่เปลี่ยนแปลง
+        { wch: 18 }, // สถานะ/ผลการตรวจ
+        { wch: 28 }  // เหตุผล / หมายเหตุ
       ]
       ws['!cols'] = colWidths
 
@@ -618,6 +643,50 @@ export default function MaintenanceActivityLogModal({
                                 </span>
                               ))}
                             </div>
+                          ) : item.activityType === 'REPAIR_REQUESTED' || (item.symptom && item.symptom !== '-') ? (
+                            (() => {
+                              const p = parseActivityLogDetails(item.details, {
+                                symptom: item.symptom,
+                                location: item.location,
+                                repairType: item.repairType,
+                                requesterDept: item.requesterDept,
+                                urgency: item.urgency,
+                                problemCategory: item.problemCategory,
+                                departmentName: item.departmentName,
+                                machineCode: item.machineCode,
+                                activityType: item.activityType
+                              })
+                              return (
+                                <div className="mt-1 space-y-1.5">
+                                  <div className="text-[12px] font-semibold text-rose-950 bg-rose-50/70 border border-rose-200/60 rounded-lg px-2.5 py-1">
+                                    <span className="text-rose-700 font-bold mr-1.5">⚠️ อาการเสีย:</span>
+                                    {p.symptom}
+                                  </div>
+                                  <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
+                                    {p.location && p.location !== '-' && (
+                                      <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 border border-stone-200">
+                                        📍 <b>สถานที่:</b> {p.location}
+                                      </span>
+                                    )}
+                                    {p.repairType && p.repairType !== '-' && (
+                                      <span className="px-2 py-0.5 rounded-md bg-blue-50 text-blue-800 border border-blue-200">
+                                        🏷️ <b>ประเภท:</b> {p.repairType}
+                                      </span>
+                                    )}
+                                    {p.urgency && p.urgency !== '-' && (
+                                      <span className="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200">
+                                        ⚡ <b>ความเร่งด่วน:</b> {p.urgency}
+                                      </span>
+                                    )}
+                                    {p.problemCategory && p.problemCategory !== '-' && (
+                                      <span className="px-2 py-0.5 rounded-md bg-stone-100 text-stone-700 border border-stone-200">
+                                        หมวด: {p.problemCategory}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              )
+                            })()
                           ) : (
                             <div className="text-[11px] text-stone-600 leading-relaxed whitespace-pre-wrap">
                               {item.details || '-'}
