@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { 
   Search, 
@@ -23,14 +23,24 @@ import { toast } from 'sonner'
 import { CalibrationItem, CALIBRATION_ITEMS } from '@/lib/calibrationData'
 import { Button } from '@/components/ui/button'
 
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-const CURRENT_MONTH = 'SEP'
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const
+
+function getSystemCurrentMonth(): string {
+  const idx = new Date().getMonth()
+  return MONTHS[idx] || 'OCT'
+}
 
 interface CALManagementClientProps {
   initialItems?: CalibrationItem[]
 }
 
 export default function CALManagementClient({ initialItems }: CALManagementClientProps) {
+  const [currentMonth, setCurrentMonth] = useState<string>(getSystemCurrentMonth)
+
+  useEffect(() => {
+    const idx = new Date().getMonth()
+    setCurrentMonth(MONTHS[idx] || 'OCT')
+  }, [])
   // Load saved modifications from localStorage if available
   const [items, setItems] = useState<CalibrationItem[]>(() => {
     if (typeof window !== 'undefined') {
@@ -557,7 +567,7 @@ export default function CALManagementClient({ initialItems }: CALManagementClien
               </span>
               <span className="flex items-center gap-1">
                 <span className="w-2.5 h-2.5 rounded bg-amber-200 border border-amber-400 inline-block" />
-                <span>= เดือนปัจจุบัน ({CURRENT_MONTH})</span>
+                <span>= เดือนปัจจุบัน ({currentMonth})</span>
               </span>
             </div>
           </div>
@@ -574,7 +584,7 @@ export default function CALManagementClient({ initialItems }: CALManagementClien
                     <th
                       key={m}
                       className={`p-3 text-center min-w-[52px] ${
-                        m === CURRENT_MONTH ? 'bg-amber-100/70 text-amber-950 font-black border-x border-amber-300' : ''
+                        m === currentMonth ? 'bg-amber-100/70 text-amber-950 font-black border-x border-amber-300' : ''
                       }`}
                     >
                       {m}
@@ -604,7 +614,7 @@ export default function CALManagementClient({ initialItems }: CALManagementClien
 
                       {MONTHS.map((m) => {
                         const isScheduled = item.scheduled_month === m
-                        const isCurrent = m === CURRENT_MONTH
+                        const isCurrent = m === currentMonth
                         return (
                           <td
                             key={m}

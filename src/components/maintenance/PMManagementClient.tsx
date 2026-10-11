@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { MaintenancePMPlan, MaintenancePMAdjustmentLog, getPmFrequencyInfo } from '@/types/maintenance'
 import AdjustPMFrequencyModal from '@/components/maintenance/AdjustPMFrequencyModal'
@@ -13,14 +13,41 @@ interface Props {
   initialLogs: MaintenancePMAdjustmentLog[]
 }
 
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC']
-const CURRENT_MONTH = 'SEP' // September
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const
+
+const MONTH_NAMES_TH: Record<string, string> = {
+  JAN: 'มกราคม',
+  FEB: 'กุมภาพันธ์',
+  MAR: 'มีนาคม',
+  APR: 'เมษายน',
+  MAY: 'พฤษภาคม',
+  JUN: 'มิถุนายน',
+  JUL: 'กรกฎาคม',
+  AUG: 'สิงหาคม',
+  SEP: 'กันยายน',
+  OCT: 'ตุลาคม',
+  NOV: 'พฤศจิกายน',
+  DEC: 'ธันวาคม'
+}
+
+function getSystemCurrentMonth(): string {
+  const idx = new Date().getMonth()
+  return MONTHS[idx] || 'OCT'
+}
 
 export default function PMManagementClient({ initialPlans, initialLogs }: Props) {
   const router = useRouter()
   const [plans, setPlans] = useState<MaintenancePMPlan[]>(initialPlans)
   const [logs, setLogs] = useState<MaintenancePMAdjustmentLog[]>(initialLogs)
   const [activeTab, setActiveTab] = useState<'list' | 'matrix' | 'logs'>('list')
+  const [currentMonth, setCurrentMonth] = useState<string>(getSystemCurrentMonth)
+  const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear())
+
+  useEffect(() => {
+    const now = new Date()
+    setCurrentMonth(MONTHS[now.getMonth()] || 'OCT')
+    setCurrentYear(now.getFullYear())
+  }, [])
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDept, setSelectedDept] = useState('ALL')
   const [selectedFreq, setSelectedFreq] = useState('ALL')
@@ -545,7 +572,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
         <div className="bg-white border border-stone-200 rounded-2xl overflow-hidden shadow-xs">
           <div className="p-4 bg-stone-50 border-b border-stone-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             <div className="text-xs text-stone-600 font-medium">
-              ตารางแสดงกำหนดการบำรุงรักษาประจำปี 2026 (12 เดือน) | เดือนปัจจุบัน: <span className="text-[#8B7355] font-black underline">{CURRENT_MONTH} (กันยายน)</span>
+              ตารางแสดงกำหนดการบำรุงรักษาประจำปี {currentYear} (12 เดือน) | เดือนปัจจุบัน: <span className="text-[#8B7355] font-black underline">{currentMonth} ({MONTH_NAMES_TH[currentMonth] || 'ตุลาคม'})</span>
             </div>
             <div className="flex items-center gap-3 text-xs font-medium">
               <span className="flex items-center gap-1.5">
@@ -570,7 +597,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                     <th
                       key={m}
                       className={`p-3 text-center min-w-[50px] ${
-                        m === CURRENT_MONTH ? 'bg-amber-100/70 text-amber-950 font-black border-x border-amber-300' : ''
+                        m === currentMonth ? 'bg-amber-100/70 text-amber-950 font-black border-x border-amber-300' : ''
                       }`}
                     >
                       {m}
@@ -612,7 +639,7 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
 
                       {MONTHS.map((m) => {
                         const isScheduled = hasMonth(m)
-                        const isCurrent = m === CURRENT_MONTH
+                        const isCurrent = m === currentMonth
                         return (
                           <td
                             key={m}

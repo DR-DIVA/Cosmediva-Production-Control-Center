@@ -46,6 +46,12 @@ import MediaAttachmentViewer from '@/components/maintenance/MediaAttachmentViewe
 import NameAutocompleteInput from '@/components/maintenance/NameAutocompleteInput'
 import ExecutePMChecksheetModal from '@/components/maintenance/ExecutePMChecksheetModal'
 
+const MONTHS_LIST = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'] as const
+const MONTH_NAMES_TH: Record<string, string> = {
+  JAN: 'มกราคม', FEB: 'กุมภาพันธ์', MAR: 'มีนาคม', APR: 'เมษายน', MAY: 'พฤษภาคม', JUN: 'มิถุนายน',
+  JUL: 'กรกฎาคม', AUG: 'สิงหาคม', SEP: 'กันยายน', OCT: 'ตุลาคม', NOV: 'พฤศจิกายน', DEC: 'ธันวาคม'
+}
+
 /**
  * Format live elapsed duration in Thai
  */
@@ -99,9 +105,19 @@ export default function TechnicianCockpitPage() {
   }
 
   // PM Filter state
+  const currentMonthCode = useMemo(() => {
+    const idx = new Date().getMonth()
+    return MONTHS_LIST[idx] || 'OCT'
+  }, [])
+  const currentMonthNameTh = MONTH_NAMES_TH[currentMonthCode] || 'ตุลาคม'
+  const currentYear = useMemo(() => new Date().getFullYear(), [])
+
   const [selectedPlanForExecute, setSelectedPlanForExecute] = useState<MaintenancePMPlan | null>(null)
   const [pmSearchQuery, setPmSearchQuery] = useState('')
-  const [pmMonthFilter, setPmMonthFilter] = useState<'SEP' | 'ALL'>('SEP')
+  const [pmMonthFilter, setPmMonthFilter] = useState<string>(() => {
+    const idx = new Date().getMonth()
+    return MONTHS_LIST[idx] || 'OCT'
+  })
   const [pmDeptFilter, setPmDeptFilter] = useState('ALL')
   const [pmFreqFilter, setPmFreqFilter] = useState('ALL')
 
@@ -305,7 +321,7 @@ export default function TechnicianCockpitPage() {
   const totalFactoryBreakdownCount = workOrders.filter(w => !['CLOSED', 'VERIFIED'].includes(w.status)).length
 
   // Filter groups for PM Plans
-  const currentMonthPMCount = pmPlans.filter(p => p.schedule_months?.includes('SEP') || p.frequency_type === 'Monthly').length
+  const currentMonthPMCount = pmPlans.filter(p => p.schedule_months?.includes(currentMonthCode) || p.frequency_type === 'Monthly').length
 
   const pmDepartments = useMemo(() => {
     const set = new Set<string>()
@@ -1127,7 +1143,7 @@ export default function TechnicianCockpitPage() {
                 </h3>
               </div>
               <p className="text-xs text-cyan-100/80">
-                ระบบดึงรอบเครื่องจักรที่ต้องเข้าทำ PM ในเดือนปัจจุบัน (กันยายน 2026 - SEP) เพื่อให้ช่างเปิด E-Form ตรวจเช็คหน้างาน
+                ระบบดึงรอบเครื่องจักรที่ต้องเข้าทำ PM ในเดือนปัจจุบัน ({currentMonthNameTh} {currentYear} - {currentMonthCode}) เพื่อให้ช่างเปิด E-Form ตรวจเช็คหน้างาน
               </p>
             </div>
 
@@ -1170,11 +1186,16 @@ export default function TechnicianCockpitPage() {
               </label>
               <select
                 value={pmMonthFilter}
-                onChange={e => setPmMonthFilter(e.target.value as any)}
+                onChange={e => setPmMonthFilter(e.target.value)}
                 className="w-full p-2 rounded-xl border border-stone-200 bg-stone-50 text-xs font-semibold text-stone-800 focus:bg-white focus:outline-none focus:border-cyan-600"
               >
-                <option value="SEP">📍 กันยายน (SEP - เดือนปัจจุบัน)</option>
-                <option value="ALL">📅 ทั้งปี 2026 (ทุกเครื่องที่มีแผน PM)</option>
+                <option value={currentMonthCode}>📍 {currentMonthNameTh} ({currentMonthCode} - เดือนปัจจุบัน)</option>
+                <option value="ALL">📅 ทั้งปี {currentYear} (ทุกเครื่องที่มีแผน PM)</option>
+                {MONTHS_LIST.filter(m => m !== currentMonthCode).map(m => (
+                  <option key={m} value={m}>
+                    🗓️ {MONTH_NAMES_TH[m]} ({m})
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -1272,7 +1293,7 @@ export default function TechnicianCockpitPage() {
                         <div className="flex justify-between items-center">
                           <span className="text-stone-400">วันครบกำหนด:</span>
                           <span className="font-semibold font-mono text-stone-800">
-                            {plan.next_due_date ? new Date(plan.next_due_date).toLocaleDateString('th-TH') : 'กันยายน 2026'}
+                            {plan.next_due_date ? new Date(plan.next_due_date).toLocaleDateString('th-TH') : `${currentMonthNameTh} ${currentYear}`}
                           </span>
                         </div>
                         <div className="flex justify-between items-center">
