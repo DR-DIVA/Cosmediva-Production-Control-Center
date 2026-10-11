@@ -576,11 +576,11 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
             </div>
             <div className="flex items-center gap-3 text-xs font-medium">
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-cyan-600"></span>
-                <span className="text-stone-700">มีแผน PM</span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-bold font-mono bg-cyan-50 border border-cyan-300 text-cyan-900">PM1, PM2, PM3...</span>
+                <span className="text-stone-700">รอบความถี่ตามแผน</span>
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm bg-stone-200 border border-stone-300"></span>
+                <span className="text-stone-400 font-mono font-bold">-</span>
                 <span className="text-stone-400">ไม่มีรอบ</span>
               </span>
             </div>
@@ -646,8 +646,8 @@ export default function PMManagementClient({ initialPlans, initialLogs }: Props)
                             className={`p-2 text-center ${isCurrent ? 'bg-amber-50/50 border-x border-amber-200' : ''}`}
                           >
                             {isScheduled ? (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-bold bg-cyan-100 text-cyan-900 border border-cyan-300">
-                                PM
+                              <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-bold font-mono border ${freq.color} shadow-2xs`}>
+                                {freq.code}
                               </span>
                             ) : (
                               <span className="text-stone-300">-</span>
