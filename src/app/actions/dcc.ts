@@ -822,56 +822,304 @@ export async function getDCCBatchTraceability(queryKey: string) {
 }
 
 // =========================================================================
+// =========================================================================
 // ACTION: GET E-DAR WORKFLOW REQUESTS
 // =========================================================================
 export async function getDCCDarRequests() {
   return { success: true, data: SEED_DAR_REQUESTS }
 }
 
+export async function getDCCDarRequestById(id: string) {
+  const found = SEED_DAR_REQUESTS.find(d => d.id === id || d.darNumber === id)
+  if (!found) {
+    return { success: false, error: 'ไม่พบใบคำขอ DAR ในระบบ', data: null }
+  }
+  return { success: true, data: found }
+}
+
 // =========================================================================
-// ACTION: SUBMIT NEW E-DAR REQUEST
+// ACTION: SUBMIT NEW E-DAR REQUEST (7 SECTIONS DCC-PF-002A)
 // =========================================================================
-export async function submitDCCDarRequest(payload: {
-  requestType: 'NEW' | 'REVISE' | 'CANCEL'
+export interface SubmitDCCDarPayload {
+  requestType: 'NEW' | 'REVISE' | 'CANCEL' | 'EXTRA_COPY' | 'EXTEND_EXPIRY' | 'OTHER'
+  actionTypeDetail?: string
+  extraCopiesCount?: number
+  docLevel?: string
+  docCategory?: string
   docCode: string
   docTitle: string
   departmentCode: string
-  streamCode: string
+  streamCode?: string
   currentRev: string
   proposedRev: string
+  language?: 'TH' | 'EN' | 'BOTH'
+  usageFormat?: 'Paper' | 'File' | 'Both'
+  docReference?: string
   reasonForChange: string
-  initiatorName: string
   effectiveTargetDate: string
   trainingRequired: boolean
-}) {
-  const newId = `dar-2026-${String(SEED_DAR_REQUESTS.length + 1).padStart(3, '0')}`
+
+  // ส่วนที่ 3: ผู้ขอดำเนินการ & ผู้ทบทวน
+  initiatorName: string
+  initiatorEmpId?: string
+  initiatorPosition?: string
+  initiatorDept?: string
+  reviewerName?: string
+  reviewerEmpId?: string
+  reviewerPosition?: string
+  reviewerDept?: string
+
+  // ส่วนที่ 4: แผนกที่เกี่ยวข้อง (19 แผนก)
+  targetDepartments?: string[]
+}
+
+export async function submitDCCDarRequest(payload: SubmitDCCDarPayload) {
+  const nextSeq = SEED_DAR_REQUESTS.length + 1
+  const newId = `dar-2026-${String(nextSeq).padStart(3, '0')}`
+  const nowIsoDate = new Date().toISOString().slice(0, 10)
+  
+  const deptObj = DCC_DEPARTMENTS.find(d => d.code === payload.departmentCode)
+  const streamCode = payload.streamCode || deptObj?.streamCode || 'OMS'
+
   const newDar: DCCDarRequest = {
     id: newId,
-    darNumber: `DAR-2026-${String(SEED_DAR_REQUESTS.length + 1).padStart(3, '0')}`,
-    requestType: payload.requestType,
-    docCode: payload.docCode,
-    docTitle: payload.docTitle,
-    departmentCode: payload.departmentCode,
-    streamCode: payload.streamCode,
-    currentRev: payload.currentRev,
-    proposedRev: payload.proposedRev,
-    reasonForChange: payload.reasonForChange,
+    darNumber: `DAR-2026-${String(nextSeq).padStart(3, '0')}`,
     status: 'REVIEWING',
-    initiatorName: payload.initiatorName,
-    initiatorDate: new Date().toISOString().slice(0, 10),
-    reviewerName: `หัวหน้าแผนก ${payload.departmentCode}`,
-    reviewerStatus: 'PENDING',
-    dccCheckerName: 'DCC Officer',
-    dccStatus: 'PENDING',
-    finalApproverName: 'Plant Director (PDT)',
-    finalApprovalStatus: 'PENDING',
+    formCode: 'DCC-PF-002A',
+    formRevision: '02',
+    formEffectiveDate: '28 AUG 23',
+    copyNo: '1 (MASTER)',
+
+    // ส่วนที่ 1: การขอดำเนินการเอกสารควบคุม
+    requestType: payload.requestType,
+    actionTypeDetail: payload.actionTypeDetail,
+    extraCopiesCount: payload.extraCopiesCount,
+    dccOfficerName: 'DCC Officer (จิราพร)',
+    dccOfficerEmpId: 'DCCJRP101',
+    dccReceivedDate: nowIsoDate,
+
+    // ส่วนที่ 2: ข้อมูลเอกสารควบคุม
+    docLevel: payload.docLevel || 'TIER_4_FORM',
+    docCategory: payload.docCategory || 'แบบฟอร์ม (Form)',
+    docCode: payload.docCode.trim().toUpperCase(),
+    docTitle: payload.docTitle.trim(),
+    departmentCode: payload.departmentCode,
+    streamCode: streamCode,
+    currentRev: payload.currentRev || '00',
+    proposedRev: payload.proposedRev || '01',
+    language: payload.language || 'TH',
+    usageFormat: payload.usageFormat || 'Both',
+    docReference: payload.docReference,
+    reasonForChange: payload.reasonForChange,
     effectiveTargetDate: payload.effectiveTargetDate,
-    trainingRequired: payload.trainingRequired
+    trainingRequired: payload.trainingRequired,
+
+    // ส่วนที่ 3: พิจารณาบทบาทการจัดทำ
+    initiatorName: payload.initiatorName,
+    initiatorEmpId: payload.initiatorEmpId || '',
+    initiatorPosition: payload.initiatorPosition || 'ผู้ขอดำเนินการ',
+    initiatorDept: payload.initiatorDept || payload.departmentCode,
+    initiatorDate: nowIsoDate,
+    initiatorSign: payload.initiatorEmpId ? `${payload.initiatorName} [${payload.initiatorEmpId}]` : payload.initiatorName,
+
+    reviewerName: payload.reviewerName || `หัวหน้าแผนก ${payload.departmentCode}`,
+    reviewerEmpId: payload.reviewerEmpId || '',
+    reviewerPosition: payload.reviewerPosition || `หัวหน้าแผนก ${payload.departmentCode}`,
+    reviewerDept: payload.reviewerDept || payload.departmentCode,
+    reviewerDate: '',
+    reviewerStatus: 'PENDING',
+    reviewerComment: '',
+    
+    // DCC Checklist
+    dccCheckerName: 'DCC Officer (จิราพร)',
+    dccCheckerEmpId: 'DCCJRP101',
+    dccStatus: 'PENDING',
+    dccComment: '',
+
+    // ส่วนที่ 4: 19 แผนก
+    targetDepartments: payload.targetDepartments && payload.targetDepartments.length > 0 
+      ? payload.targetDepartments 
+      : [payload.departmentCode, 'PDT', 'QA', 'QC', 'MT'],
+
+    // ส่วนที่ 5: ผู้อนุมัติ
+    finalApproverName: 'Plant Director (PDT)',
+    finalApproverEmpId: 'pdtcps001',
+    finalApproverPosition: 'Plant Director (PDT) / QA Manager',
+    finalApprovalStatus: 'PENDING',
+
+    // ส่วนที่ 6: การแจกจ่ายและเรียกคืน
+    dccDistributionOfficerName: 'DCC Officer',
+    dccDistributionOfficerEmpId: '',
+    deptReceiverName: '',
+    deptReceiverEmpId: '',
+    deptReturnerName: '',
+    deptReturnerEmpId: '',
+    dccRecallOfficerName: 'DCC Officer',
+    dccRecallOfficerEmpId: '',
+
+    // ส่วนที่ 7: การทำลาย
+    originalDisposalMethod: 'STAMP_CANCEL',
+    copyDisposalMethod: 'SHRED',
+    disposalOfficerName: 'DCC Officer',
+    disposalApproverName: 'Plant Director (PDT)'
   }
 
   SEED_DAR_REQUESTS.unshift(newDar)
-  revalidatePath('/dcc')
+  try { revalidatePath('/dcc') } catch {}
   return { success: true, data: newDar }
+}
+
+// =========================================================================
+// ACTION: SIGN DCC DAR STEP (DIGITAL SIGN-OFFS WITH EMPLOYEE ID)
+// Supports all 10 workflow sign-offs
+// =========================================================================
+export type DCCSignStepKey =
+  | 'INITIATOR'           // 1. ผู้ขอดำเนินการ (ส่วนที่ 3)
+  | 'REVIEWER'            // 2. ผู้ทบทวน (ส่วนที่ 3)
+  | 'FINAL_APPROVAL'      // 3. ผู้อนุมัติให้ดำเนินการ (ส่วนที่ 5)
+  | 'DCC_REGISTER'        // 4. DCC ขึ้นทะเบียนและออกเลข DAR (ส่วนที่ 1)
+  | 'DCC_DISTRIBUTE'      // 5. DCC ผู้แจกจ่ายเอกสารใหม่ (ส่วนที่ 6)
+  | 'DEPT_RECEIVE'        // 6. ผู้รับเอกสารใหม่ (จากแผนก) (ส่วนที่ 6)
+  | 'DEPT_RETURN'         // 7. ผู้คืนเอกสารเก่าให้ DCC (ส่วนที่ 6)
+  | 'DCC_RECALL'          // 8. DCC รับเอกสารเก่าคืน (ส่วนที่ 6)
+  | 'DCC_DISPOSE'         // 9. ผู้ดำเนินการทำลาย DCC (ส่วนที่ 7)
+  | 'DISPOSAL_APPROVE'    // 10. ผู้อนุมัติทำลาย QA Mgr / PDT (ส่วนที่ 7)
+
+export async function signDCCDarStep(payload: {
+  darId: string
+  step: DCCSignStepKey
+  signerName: string
+  signerEmpId: string
+  position?: string
+  department?: string
+  comment?: string
+  method?: 'STAMP_CANCEL' | 'SHRED' | 'OTHER'
+  otherMethod?: string
+}) {
+  const dar = SEED_DAR_REQUESTS.find(d => d.id === payload.darId)
+  if (!dar) {
+    return { success: false, error: 'ไม่พบใบคำขอ DAR ในระบบ' }
+  }
+
+  const nowIsoDate = new Date().toISOString().slice(0, 10)
+  const signStamp = `${payload.signerName} (${payload.signerEmpId})`
+
+  switch (payload.step) {
+    case 'INITIATOR':
+      dar.initiatorName = payload.signerName
+      dar.initiatorEmpId = payload.signerEmpId
+      if (payload.position) dar.initiatorPosition = payload.position
+      if (payload.department) dar.initiatorDept = payload.department
+      dar.initiatorDate = nowIsoDate
+      dar.initiatorSign = signStamp
+      break
+
+    case 'REVIEWER':
+      dar.reviewerName = payload.signerName
+      dar.reviewerEmpId = payload.signerEmpId
+      if (payload.position) dar.reviewerPosition = payload.position
+      if (payload.department) dar.reviewerDept = payload.department
+      dar.reviewerDate = nowIsoDate
+      dar.reviewerStatus = 'APPROVED'
+      dar.reviewerComment = payload.comment || 'ทบทวนสอดคล้องตามมาตรฐานและหน้างาน อนุญาตให้ดำเนินการต่อ'
+      dar.reviewerSign = signStamp
+      if (dar.status === 'REVIEWING') dar.status = 'DCC_CHECKING'
+      break
+
+    case 'DCC_REGISTER':
+      dar.dccOfficerName = payload.signerName
+      dar.dccOfficerEmpId = payload.signerEmpId
+      dar.dccReceivedDate = nowIsoDate
+      dar.dccOfficerSign = signStamp
+      dar.dccCheckerName = payload.signerName
+      dar.dccCheckerEmpId = payload.signerEmpId
+      dar.dccStatus = 'APPROVED'
+      dar.dccComment = payload.comment || 'ตรวจสอบรูปแบบ รหัสเอกสาร และโครงสร้างสารบัญถูกต้องตามเกณฑ์ DCC'
+      break
+
+    case 'FINAL_APPROVAL':
+      dar.finalApproverName = payload.signerName
+      dar.finalApproverEmpId = payload.signerEmpId
+      if (payload.position) dar.finalApproverPosition = payload.position
+      dar.finalApprovalStatus = 'APPROVED'
+      dar.finalApprovalDate = nowIsoDate
+      dar.finalApprovalReason = payload.comment || 'อนุมัติให้ประกาศใช้เอกสารควบคุมตามระบบคุณภาพ'
+      dar.finalApproverSign = signStamp
+      dar.status = 'EFFECTIVE'
+
+      // AUTO-SYNC TO MAINTENANCE MODULE MASTER TEMPLATES!
+      const matchedTemplates = SEED_MASTER_TEMPLATES.filter(t => 
+        t.docCode.toUpperCase() === dar.docCode.toUpperCase() ||
+        (dar.docCode.toUpperCase().includes('MT-PF-001E') && t.docCode.toUpperCase().includes('MT-WF-002D')) ||
+        (dar.docCode.toUpperCase().includes('MT-WF-002D') && t.docCode.toUpperCase().includes('MT-PF-001E'))
+      )
+
+      matchedTemplates.forEach(t => {
+        t.revisionNo = dar.proposedRev
+        t.effectiveDate = dar.effectiveTargetDate || nowIsoDate
+        t.status = 'EFFECTIVE'
+      })
+      break
+
+    case 'DCC_DISTRIBUTE':
+      dar.dccDistributionOfficerName = payload.signerName
+      dar.dccDistributionOfficerEmpId = payload.signerEmpId
+      dar.dccDistributionDate = nowIsoDate
+      dar.dccDistributionSign = signStamp
+      if (dar.status === 'EFFECTIVE') dar.status = 'DISTRIBUTING'
+      break
+
+    case 'DEPT_RECEIVE':
+      dar.deptReceiverName = payload.signerName
+      dar.deptReceiverEmpId = payload.signerEmpId
+      dar.deptReceiverDept = payload.department || dar.departmentCode
+      dar.deptReceivedDate = nowIsoDate
+      dar.deptReceiverSign = signStamp
+      break
+
+    case 'DEPT_RETURN':
+      dar.deptReturnerName = payload.signerName
+      dar.deptReturnerEmpId = payload.signerEmpId
+      dar.deptReturnerDept = payload.department || dar.departmentCode
+      dar.deptReturnedDate = nowIsoDate
+      dar.deptReturnerSign = signStamp
+      break
+
+    case 'DCC_RECALL':
+      dar.dccRecallOfficerName = payload.signerName
+      dar.dccRecallOfficerEmpId = payload.signerEmpId
+      dar.dccRecallDate = nowIsoDate
+      dar.dccRecallSign = signStamp
+      break
+
+    case 'DCC_DISPOSE':
+      dar.disposalOfficerName = payload.signerName
+      dar.disposalOfficerEmpId = payload.signerEmpId
+      dar.disposalDate = nowIsoDate
+      dar.disposalOfficerSign = signStamp
+      if (payload.method) dar.originalDisposalMethod = payload.method
+      if (payload.otherMethod) dar.originalDisposalOther = payload.otherMethod
+      break
+
+    case 'DISPOSAL_APPROVE':
+      dar.disposalApproverName = payload.signerName
+      dar.disposalApproverEmpId = payload.signerEmpId
+      if (payload.position) dar.disposalApproverPosition = payload.position
+      dar.disposalApprovalDate = nowIsoDate
+      dar.disposalApproverSign = signStamp
+      dar.status = 'EFFECTIVE'
+      break
+  }
+
+  try { revalidatePath('/dcc') } catch {}
+  try { revalidatePath('/maintenance') } catch {}
+  try { revalidatePath('/maintenance/pm') } catch {}
+
+  return { 
+    success: true, 
+    data: dar, 
+    message: `ลงนามขั้นตอน ${payload.step} โดย ${signStamp} เรียบร้อยแล้ว` 
+  }
 }
 
 // =========================================================================
@@ -894,45 +1142,16 @@ export async function getDCCMasterTemplateByCode(docCode: string): Promise<DCCMa
 export async function approveDCCDarRequest(payload: {
   darId: string
   approverName?: string
+  approverEmpId?: string
   comments?: string
 }) {
-  const dar = SEED_DAR_REQUESTS.find(d => d.id === payload.darId)
-  if (!dar) {
-    return { success: false, error: 'ไม่พบใบคำขอ DAR นี้ในระบบ' }
-  }
-
-  // Update DAR status to EFFECTIVE
-  dar.status = 'EFFECTIVE'
-  dar.reviewerStatus = 'APPROVED'
-  dar.dccStatus = 'APPROVED'
-  dar.finalApprovalStatus = 'APPROVED'
-  dar.finalApprovalDate = new Date().toISOString().slice(0, 10)
-  if (payload.approverName) {
-    dar.finalApproverName = payload.approverName
-  }
-
-  // Auto-update matched master templates (e.g. MT-PF-001E or MT-WF-002D)
-  const matchedTemplates = SEED_MASTER_TEMPLATES.filter(t => 
-    t.docCode.toUpperCase() === dar.docCode.toUpperCase() ||
-    (dar.docCode.toUpperCase().includes('MT-PF-001E') && t.docCode.toUpperCase().includes('MT-WF-002D')) ||
-    (dar.docCode.toUpperCase().includes('MT-WF-002D') && t.docCode.toUpperCase().includes('MT-PF-001E'))
-  )
-
-  matchedTemplates.forEach(t => {
-    t.revisionNo = dar.proposedRev
-    t.effectiveDate = dar.effectiveTargetDate || new Date().toISOString().slice(0, 10)
-    t.status = 'EFFECTIVE'
+  return signDCCDarStep({
+    darId: payload.darId,
+    step: 'FINAL_APPROVAL',
+    signerName: payload.approverName || 'Plant Director (PDT)',
+    signerEmpId: payload.approverEmpId || 'pdtcps001',
+    position: 'Plant Director (PDT)',
+    comment: payload.comments || 'อนุมัติให้ประกาศใช้เอกสารควบคุม และซิงค์ Revision ไปยังโมดูล Maintenance อัตโนมัติ'
   })
-
-  try { revalidatePath('/dcc') } catch {}
-  try { revalidatePath('/maintenance') } catch {}
-  try { revalidatePath('/maintenance/pm') } catch {}
-
-  return { 
-    success: true, 
-    data: dar, 
-    updatedTemplatesCount: matchedTemplates.length,
-    message: `อนุมัติคำขอ ${dar.darNumber} สำเร็จ และอัปเดต Revision เป็น Rev.${dar.proposedRev} ไปยังโมดูล Maintenance อัตโนมัติแล้ว` 
-  }
 }
 
