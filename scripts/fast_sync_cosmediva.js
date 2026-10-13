@@ -1,4 +1,4 @@
-﻿const fs = require('fs');
+const fs = require('fs');
 const pg = require('pg');
 const xlsx = require('xlsx');
 
@@ -7,9 +7,15 @@ const client = new pg.Client({
   ssl: { rejectUnauthorized: false }
 });
 
-const FOLDER_PATH = 'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx';
-const DOWNLOADS_PATH = 'C:/Users/hp/Downloads/ทะเบียนพนักงาน_รวม_2026.xlsx';
-const EXCEL_PATH = fs.existsSync(FOLDER_PATH) ? FOLDER_PATH : DOWNLOADS_PATH;
+const path = require('path');
+
+const FOLDER_CANDIDATES = [
+  path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx'),
+  'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx',
+  path.join(process.env.USERPROFILE || '', 'Downloads/ทะเบียนพนักงาน_รวม_2026.xlsx'),
+  'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx'
+];
+const EXCEL_PATH = FOLDER_CANDIDATES.find(p => fs.existsSync(p)) || FOLDER_CANDIDATES[1];
 
 async function main() {
   const startTime = Date.now();

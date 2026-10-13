@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import pg from 'pg';
 
 const { Client } = pg;
@@ -24,7 +25,13 @@ const TROUBLESHOOTING_KEYWORDS = [
 async function run() {
   try {
     console.log('Reading [LINE]CMD Maintenance.txt...');
-    const content = fs.readFileSync('c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Maintenance.txt', 'utf-8');
+    const candidates = [
+      path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Maintenance.txt'),
+      'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Maintenance.txt',
+      'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Maintenance.txt'
+    ];
+    const targetFile = candidates.find(p => fs.existsSync(p)) || candidates[1];
+    const content = fs.readFileSync(targetFile, 'utf-8');
     const lines = content.split(/\r?\n/);
     console.log(`Total lines: ${lines.length}`);
 

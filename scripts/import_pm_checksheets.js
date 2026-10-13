@@ -4,7 +4,12 @@ const XLSX = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config({ path: '.env.local' });
 
-const folder = 'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/PM Check Sheet';
+const candidates = [
+  path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/PM Check Sheet'),
+  'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/PM Check Sheet',
+  'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/PM Check Sheet'
+];
+const folder = candidates.find(p => fs.existsSync(p)) || 'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/PM Check Sheet';
 const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 function parseSheetItems(ws) {

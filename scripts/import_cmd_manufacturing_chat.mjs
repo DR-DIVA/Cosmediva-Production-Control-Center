@@ -1,4 +1,5 @@
 import fs from 'fs';
+import path from 'path';
 import pg from 'pg';
 
 const { Client } = pg;
@@ -28,7 +29,12 @@ const MAINTENANCE_KEYWORDS = [
 ];
 
 async function run() {
-  const filePath = 'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt';
+  const candidates = [
+    path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt'),
+    'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt',
+    'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt'
+  ];
+  const filePath = candidates.find(p => fs.existsSync(p)) || candidates[1];
   console.log(`Reading ${filePath}...`);
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split(/\r?\n/);
