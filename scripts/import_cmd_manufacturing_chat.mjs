@@ -30,11 +30,12 @@ const MAINTENANCE_KEYWORDS = [
 
 async function run() {
   const candidates = [
+    path.resolve('./data/[LINE]CMD Manufacturing.txt'),
     path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt'),
     'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt',
     'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/[LINE]CMD Manufacturing.txt'
   ];
-  const filePath = candidates.find(p => fs.existsSync(p)) || candidates[1];
+  const filePath = candidates.find(p => fs.existsSync(p)) || candidates[0];
   console.log(`Reading ${filePath}...`);
   const content = fs.readFileSync(filePath, 'utf-8');
   const lines = content.split(/\r?\n/);

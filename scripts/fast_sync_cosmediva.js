@@ -10,12 +10,13 @@ const client = new pg.Client({
 const path = require('path');
 
 const FOLDER_CANDIDATES = [
+  path.join(__dirname, '../data/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx'),
   path.join(process.env.USERPROFILE || '', 'Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx'),
   'C:/Users/Dr.Nuch/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx',
   path.join(process.env.USERPROFILE || '', 'Downloads/ทะเบียนพนักงาน_รวม_2026.xlsx'),
   'c:/Users/hp/Dropbox/AI AGENT/Antigravity/Update PD Daily Status/ทะเบียนพนักงาน คอสเมดิวา_2026.xlsx'
 ];
-const EXCEL_PATH = FOLDER_CANDIDATES.find(p => fs.existsSync(p)) || FOLDER_CANDIDATES[1];
+const EXCEL_PATH = FOLDER_CANDIDATES.find(p => fs.existsSync(p)) || FOLDER_CANDIDATES[0];
 
 async function main() {
   const startTime = Date.now();
