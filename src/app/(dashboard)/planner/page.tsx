@@ -11,7 +11,7 @@ import {
   Clock, AlertTriangle, Activity, History, TrendingUp, Layers, Sparkles, 
   RefreshCw, BarChart3, Package, ShieldCheck, ArrowUpRight, CheckSquare,
   ArrowUpDown, ArrowUp, ArrowDown, Eye, EyeOff, Search, RotateCcw, UserCheck, User,
-  Printer, Lock, Gift
+  Printer, Lock, Gift, FileText
 } from 'lucide-react'
 import {
   Table,
@@ -53,6 +53,7 @@ import {
   getPlanCategoryLabel,
   cleanDisplayNote,
   extractUserComment,
+  updateUserManualNote,
   isTaskStartedByShopfloor,
   isTaskCompleted,
   canResetStartedTask,
@@ -198,6 +199,20 @@ export default function PlannerPage() {
     reason: string
     isSubmitting: boolean
   } | null>(null)
+
+  // Task Step Note Dialog State (ใส่หมายเหตุประจำขั้นตอน)
+  const [taskNoteModal, setTaskNoteModal] = useState<{
+    isOpen: boolean
+    logId: string
+    lotNo: string
+    sku: string
+    processName: string
+    tanks: string
+    existingFullNote: string
+    userNote: string
+    isSubmitting: boolean
+  } | null>(null)
+
 
   useEffect(() => {
     const fetchUser = async () => {
@@ -711,6 +726,52 @@ const fetchAllProductionLots = async (client: any) => {
     } catch (e: any) {
       toast.error("ยกเลิกการเริ่มงานไม่สำเร็จ: " + e.message)
       fetchData()
+    }
+  }
+
+  const handleOpenTaskNote = (log: any, lot: any, process: any) => {
+    const userComment = extractUserComment(log.note)
+    const tankRange = (log.tank_start && log.tank_end) 
+      ? (log.tank_start === log.tank_end ? `ถัง ${log.tank_start}` : `ถัง ${log.tank_start} - ${log.tank_end}`)
+      : ''
+    setTaskNoteModal({
+      isOpen: true,
+      logId: log.id,
+      lotNo: lot?.lot_no || '-',
+      sku: lot?.products?.sku || lot?.products?.product_name || '-',
+      processName: process?.process_name || 'งานผลิต',
+      tanks: tankRange,
+      existingFullNote: log.note || '',
+      userNote: userComment,
+      isSubmitting: false
+    })
+  }
+
+  const handleSaveTaskNote = async () => {
+    if (!taskNoteModal) return
+    const { logId, existingFullNote, userNote } = taskNoteModal
+    setTaskNoteModal(prev => prev ? { ...prev, isSubmitting: true } : null)
+
+    try {
+      const updatedFullNote = updateUserManualNote(existingFullNote, userNote)
+      const { error } = await supabase
+        .from('production_logs')
+        .update({
+          note: updatedFullNote,
+          updated_at: new Date().toISOString(),
+          updated_by: currentUserId || currentUserInfo?.id || '54168226-988e-4d63-93d2-1a742aafdd84'
+        })
+        .eq('id', logId)
+
+      if (error) throw error
+
+      setLogs(prev => prev.map(l => l.id === logId ? { ...l, note: updatedFullNote } : l))
+      toast.success('บันทึกหมายเหตุขั้นตอนเรียบร้อยแล้ว')
+      setTaskNoteModal(null)
+    } catch (err: any) {
+      console.error('Error saving task note:', err)
+      toast.error('บันทึกหมายเหตุไม่สำเร็จ: ' + err.message)
+      setTaskNoteModal(prev => prev ? { ...prev, isSubmitting: false } : null)
     }
   }
 
@@ -2814,6 +2875,7 @@ const fetchAllProductionLots = async (client: any) => {
                         const canReset = canResetStartedTask(log)
                         const isEditable = canEdit && !isStarted
                         const isDateEditable = canEdit && !isCompleted
+                        const userComment = extractUserComment(log.note)
 
                         return (
                           <TableRow key={log.id} className={cn("hover:bg-slate-100/50", isStarted ? "bg-slate-50/70" : "bg-[#F8F6F0]/")}>
@@ -2834,7 +2896,7 @@ const fetchAllProductionLots = async (client: any) => {
                               )}
                             </TableCell>
                             <TableCell colSpan={4} className="pl-8 py-2">
-                              <div className="flex items-center gap-2 border-l-2 border-slate-300 pl-4 h-full py-1">
+                              <div className="flex items-center gap-2 border-l-2 border-slate-300 pl-4 h-full py-1 flex-wrap">
                                 <div className={cn("w-2 h-2 rounded-full", pt.color.split(' ')[0].replace('bg-', 'bg-').replace('-100', '-500'))}></div>
                                 
                                 {isEditable ? (
@@ -2917,6 +2979,19 @@ const fetchAllProductionLots = async (client: any) => {
                                     </button>
                                   )
                                 })()}
+
+                                {/* User Note Tag Preview */}
+                                {userComment && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenTaskNote(log, lot, process)}
+                                    className="text-[11px] text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-300 px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 transition-colors max-w-[280px] truncate ml-1.5 shadow-2xs font-medium shrink-0"
+                                    title={`หมายเหตุ: ${userComment} (คลิกเพื่อแก้ไข)`}
+                                  >
+                                    <FileText className="w-3 h-3 text-amber-700 shrink-0" />
+                                    <span className="truncate">{userComment}</span>
+                                  </button>
+                                )}
                               </div>
                             </TableCell>
                             {(() => {
@@ -3020,7 +3095,28 @@ const fetchAllProductionLots = async (client: any) => {
                                 </Select>
                               )}
                             </TableCell>
-                            <TableCell colSpan={2}></TableCell>
+                            <TableCell colSpan={2} className="py-2 text-right pr-4">
+                              <div className="flex items-center justify-end gap-1.5">
+                                {canEdit && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleOpenTaskNote(log, lot, process)}
+                                    className={cn(
+                                      "h-7 text-xs px-2.5 rounded-md flex items-center gap-1.5 transition-colors border shadow-2xs cursor-pointer",
+                                      userComment 
+                                        ? "text-amber-800 bg-amber-50 hover:bg-amber-100 border-amber-300 font-medium"
+                                        : "text-slate-400 hover:text-slate-700 hover:bg-slate-100 border-dashed border-slate-300"
+                                    )}
+                                    title={userComment ? `หมายเหตุ: ${userComment}` : "คลิกเพื่อใส่หมายเหตุของขั้นตอนงานนี้"}
+                                  >
+                                    <FileText className={cn("w-3.5 h-3.5", userComment ? "text-amber-700" : "text-slate-400")} />
+                                    <span>{userComment ? "แก้ไขหมายเหตุ" : "+ หมายเหตุ"}</span>
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
                           </TableRow>
                         )
                       })}
@@ -3952,6 +4048,109 @@ const fetchAllProductionLots = async (client: any) => {
               disabled={resetStartModal?.isSubmitting}
             >
               {resetStartModal?.isSubmitting ? "กำลังยกเลิก..." : "↩️ ยืนยันยกเลิกเริ่มงาน"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Task Step Note Modal (ใส่หมายเหตุประจำขั้นตอน) */}
+      <Dialog open={!!taskNoteModal?.isOpen} onOpenChange={(open) => !open && setTaskNoteModal(null)}>
+        <DialogContent className="sm:max-w-[480px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-slate-800 text-base">
+              <span className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center text-amber-800 text-base">
+                📝
+              </span>
+              หมายเหตุขั้นตอนงาน (Task Note)
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-500">
+              บันทึกคำชี้แจงหรือหมายเหตุเพิ่มเติมประจำขั้นตอนนี้ เพื่อให้ฝ่ายวางแผนและหน้างานเห็นข้อมูลตรงกัน
+            </DialogDescription>
+          </DialogHeader>
+
+          {taskNoteModal && (
+            <div className="space-y-4 py-2 text-xs">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-slate-700">
+                <div className="flex justify-between">
+                  <span className="text-slate-500">LOT / SKU:</span>
+                  <span className="font-bold">{taskNoteModal.lotNo} ({taskNoteModal.sku})</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-500">ขั้นตอน:</span>
+                  <span className="font-semibold text-blue-700">
+                    {taskNoteModal.processName} {taskNoteModal.tanks ? `(${taskNoteModal.tanks})` : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Quick Template Chips */}
+              <div className="space-y-1.5">
+                <Label className="text-[11px] font-semibold text-slate-600">ข้อความด่วนที่ใช้บ่อย (คลิกเพื่อเลือก):</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    "ถัง 1-2 ชั่ง/ผสมรวมกันเป็น Batch ใหญ่",
+                    "รวม Batch ผลิต (ไม่ได้แยกถังหน้างาน)",
+                    "รอผลตรวจ Micro Lab ก่อนเข้าบรรจุ",
+                    "รอเปลี่ยนฟอยล์ / บรรจุภัณฑ์",
+                    "ปรับสูตรร่วมกับทีม R&D",
+                    "พักสารรออุณหภูมิลดลงก่อนผสมต่อ"
+                  ].map((preset, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        const current = taskNoteModal.userNote.trim()
+                        if (!current) {
+                          setTaskNoteModal({ ...taskNoteModal, userNote: preset })
+                        } else if (!current.includes(preset)) {
+                          setTaskNoteModal({ ...taskNoteModal, userNote: `${current} | ${preset}` })
+                        }
+                      }}
+                      className="text-[10px] bg-slate-100 hover:bg-amber-50 hover:text-amber-900 hover:border-amber-300 text-slate-600 border border-slate-200 px-2 py-1 rounded transition-colors text-left cursor-pointer"
+                    >
+                      + {preset}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  รายละเอียดหมายเหตุ (Remarks)
+                </Label>
+                <Textarea
+                  value={taskNoteModal.userNote}
+                  onChange={(e) => setTaskNoteModal({ ...taskNoteModal, userNote: e.target.value })}
+                  placeholder="เช่น ถัง 1-2 ผสมรวมเป็น Batch ใหญ่ หรือ รอเคลียร์ไลน์บรรจุ..."
+                  className="min-h-[90px] text-xs bg-white resize-none"
+                  rows={3}
+                />
+                <span className="text-[10px] text-slate-400">
+                  * หมายเหตุนี้สามารถแก้ไขหรือเพิ่มได้ตลอดเวลา แม้งานจะเสร็จสิ้น (DONE) ไปแล้ว เพื่อความเข้าใจที่ตรงกัน
+                </span>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="text-xs"
+              onClick={() => setTaskNoteModal(null)}
+              disabled={taskNoteModal?.isSubmitting}
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="text-xs bg-[#D4AF37] hover:bg-[#B8962A] text-white font-medium shadow-xs"
+              onClick={handleSaveTaskNote}
+              disabled={taskNoteModal?.isSubmitting}
+            >
+              {taskNoteModal?.isSubmitting ? "กำลังบันทึก..." : "💾 บันทึกหมายเหตุ"}
             </Button>
           </DialogFooter>
         </DialogContent>

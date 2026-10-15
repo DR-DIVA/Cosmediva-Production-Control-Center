@@ -100,6 +100,7 @@ export function extractUserComment(note?: string | null): string {
   if (!note) return ''
   let cleaned = cleanDisplayNote(note)
   cleaned = cleaned
+    .replace(/\[1st_batch\]/gi, '')
     .replace(/\[เลื่อนแผนเป็น .*?\]/g, '')
     .replace(/\*?\s*\(เลื่อนแผนเป็น .*?\)/g, '')
     .replace(/\[เลื่อนเป็น .*?\]/g, '')
@@ -110,6 +111,45 @@ export function extractUserComment(note?: string | null): string {
     .trim()
   return cleaned
 }
+
+/**
+ * Updates or sets the user's manual comment/note while preserving system tags like [PLAN_RESCHEDULE:...], [RESET_START:...], [1st_batch].
+ */
+export function updateUserManualNote(
+  existingNote: string | null | undefined,
+  newUserNote: string
+): string {
+  if (!existingNote) return (newUserNote || '').trim()
+
+  const systemTags: string[] = []
+
+  // Preserve automated reschedule summaries and JSON tags
+  const rescheduleSummary = existingNote.match(/\[เลื่อนแผนเป็น .*?\]/)?.[0]
+  const rescheduleTag = existingNote.match(/\[PLAN_RESCHEDULE:.*?\]/)?.[0]
+  const resetTag = existingNote.match(/\[RESET_START:.*?\]/)?.[0]
+  const delayReasonTag = existingNote.match(/\[เหตุผลล่าช้าหน้างาน:.*?\]/)?.[0]
+  const actualDelayTag = existingNote.match(/\[ACTUAL_DELAY:.*?\]/)?.[0]
+  const delayTrackingTag = existingNote.match(/\[DELAY_TRACKING:.*?\]/)?.[0]
+
+  if (rescheduleSummary) systemTags.push(rescheduleSummary)
+  if (rescheduleTag) systemTags.push(rescheduleTag)
+  if (resetTag) systemTags.push(resetTag)
+  if (delayReasonTag) systemTags.push(delayReasonTag)
+  if (actualDelayTag) systemTags.push(actualDelayTag)
+  if (delayTrackingTag) systemTags.push(delayTrackingTag)
+
+  if (existingNote.toLowerCase().includes('[1st_batch]')) {
+    systemTags.push('[1st_batch]')
+  }
+
+  const cleanUser = (newUserNote || '').trim()
+  if (systemTags.length === 0) {
+    return cleanUser
+  }
+
+  return cleanUser ? `${systemTags.join(' ')}\n${cleanUser}` : systemTags.join(' ')
+}
+
 
 /**
  * Formats plan rescheduling metadata into structured string to store in production_logs.note

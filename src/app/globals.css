@@ -150,6 +150,26 @@
   -webkit-overflow-scrolling: touch;
 }
 
+/* Custom Gold Scrollbar for Sidebar */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #D4AF37 rgba(45, 39, 33, 0.6);
+}
+.sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: #D4AF37;
+  border-radius: 4px;
+}
+.sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: #E5C158;
+}
+
+
 @media print {
   @page {
     size: A4 portrait;
