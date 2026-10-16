@@ -302,6 +302,17 @@ export default function MyTasksPage() {
                }
             }
             if (!merged) {
+              const initialDetails: any = {};
+              if (nextProcessName === 'รอ QC') {
+                const s = parseInt(sourceTask.tank_start) || 1;
+                const e = parseInt(sourceTask.tank_end) || s;
+                for (let k = s; k <= e; k++) {
+                  initialDetails[k] = 'WAITING';
+                  initialDetails[`${k}_history`] = [
+                    { status: 'MX ส่ง QC (Overview)', timestamp: new Date().toISOString(), user: 'Overview' }
+                  ];
+                }
+              }
               await supabase.from('production_logs').insert({
                 production_lot_id: lotId,
                 process_id: nextProc.id,
@@ -310,7 +321,8 @@ export default function MyTasksPage() {
                 tank_start: sourceTask.tank_start,
                 tank_end: sourceTask.tank_end,
                 total_tanks: sourceTask.total_tanks || sourceTask.production_lots?.total_tanks,
-                piece_quantity: extraData?.piece_quantity || sourceTask.piece_quantity
+                piece_quantity: extraData?.piece_quantity || sourceTask.piece_quantity,
+                tank_details: initialDetails
               })
             }
           }
@@ -569,6 +581,15 @@ export default function MyTasksPage() {
                }
             }
             if (!merged) {
+              const initialDetails: any = {};
+              if (nextProcessName === 'รอ QC') {
+                for (let k = originalStart; k <= completedEnd; k++) {
+                  initialDetails[k] = 'WAITING';
+                  initialDetails[`${k}_history`] = [
+                    { status: 'MX ส่ง QC (Overview)', timestamp: new Date().toISOString(), user: 'Overview' }
+                  ];
+                }
+              }
               await supabase.from('production_logs').insert({
                 production_lot_id: lotId,
                 process_id: nextProc.id,
@@ -577,7 +598,8 @@ export default function MyTasksPage() {
                 tank_start: originalStart,
                 tank_end: completedEnd,
                 total_tanks: activeStartTask.total_tanks || activeStartTask.production_lots?.total_tanks,
-                piece_quantity: manualPieces ? parseFloat(manualPieces) : null
+                piece_quantity: manualPieces ? parseFloat(manualPieces) : null,
+                tank_details: initialDetails
               })
             }
           }

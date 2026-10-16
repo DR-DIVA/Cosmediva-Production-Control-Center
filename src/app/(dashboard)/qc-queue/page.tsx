@@ -602,7 +602,7 @@ export default function QCQueuePage() {
       toast.error('สิทธิ์ของคุณไม่สามารถแก้ไขสถานะ QC ได้');
       return;
     }
-    if (currentStatus === 'LOCKED' || !currentStatus) return
+    // Allow clicking even if LOCKED / not started so QC can unlock and record pass/hold/reject directly!
     setActiveTank({ task, tankNum })
     setStatusAction(null)
     setReasonText('')
@@ -742,13 +742,16 @@ export default function QCQueuePage() {
 
       const { data: mixProc } = await supabase.from('processes').select('id').eq('process_name', 'ผสม').single()
       if (mixProc) {
-        const { data: existingMix } = await supabase.from('production_logs')
-          .select('id, tank_details')
+        const { data: allMixes } = await supabase.from('production_logs')
+          .select('id, tank_details, tank_start, tank_end')
           .eq('production_lot_id', task.production_lot_id)
           .eq('process_id', mixProc.id)
-          .eq('tank_start', task.tank_start)
-          .eq('tank_end', task.tank_end)
-          .maybeSingle()
+
+        const existingMix = (allMixes || []).find(m => {
+          const s = parseInt(m.tank_start) || 1
+          const e = parseInt(m.tank_end) || s
+          return tankNum >= s && tankNum <= e
+        })
         
         if (existingMix) {
           let mixDetails = { ...(existingMix.tank_details || {}) }
@@ -765,8 +768,8 @@ export default function QCQueuePage() {
           mixDetails[mixHistoryKey] = mixHistory
           
           let allMixDone = true;
-          const mixStart = parseInt(task.tank_start) || 1;
-          const mixEnd = parseInt(task.tank_end) || 1;
+          const mixStart = parseInt(existingMix.tank_start) || 1;
+          const mixEnd = parseInt(existingMix.tank_end) || mixStart;
           for (let i = mixStart; i <= mixEnd; i++) {
              const s = mixDetails[i]?.status || mixDetails[i] || 'WAITING';
              if (s !== 'DONE' && s !== 'SENT_TO_QC' && s !== 'QC_PASS' && s !== 'SENT_TO_PACKING') {
@@ -2256,7 +2259,8 @@ export default function QCQueuePage() {
                                       {Array.from({ length: totalInBatch }).map((_, idx) => {
                                         const t = start + idx
                                         const tankStatus = details[t] || 'LOCKED'
-                                        let color = "text-slate-300 bg-white border-slate-200 opacity-60 cursor-not-allowed"
+                                        const isLocked = !tankStatus || tankStatus === 'LOCKED'
+                                        let color = "text-slate-400 bg-slate-50 border-slate-200 hover:border-amber-400 hover:bg-amber-50/60 hover:text-amber-800 cursor-pointer shadow-2xs"
                                         let animate = ""
                                         if (tankStatus === 'WAITING' || tankStatus === 'IN_PROGRESS') { color = "text-yellow-600 bg-yellow-50 border-yellow-300 shadow-sm cursor-pointer hover:bg-yellow-100 hover:scale-105"; animate = "animate-pulse" }
                                         else if (tankStatus === 'QC_PASS') { color = "text-green-600 bg-green-50 border-green-300 shadow-sm cursor-pointer hover:bg-green-100 hover:scale-105" }
@@ -2297,7 +2301,13 @@ export default function QCQueuePage() {
                                               )
                                             })}
                                           </div>
-                                        ) : null
+                                        ) : (
+                                          <div className="space-y-1">
+                                            <p className="font-semibold text-amber-300 border-b border-slate-700 pb-1 mb-1">ถังที่ {t}</p>
+                                            <p className="text-xs text-slate-300">สถานะ: รอส่งมอบจากฝ่ายผสม</p>
+                                            <p className="text-[11px] text-amber-200 mt-1">💡 QC สามารถคลิกที่ถังนี้เพื่อปลดล็อกและบันทึกผลตรวจ (PASS / HOLD / REJECT) ได้ทันที</p>
+                                          </div>
+                                        )
 
                                         const problemStatuses = Array.from(new Set(history.filter((h: any) => ['PAUSED', 'FAILED', 'REPROCESS'].includes(h.status)).map((h: any) => {
                                           if (h.status === 'PAUSED') return 'HOLD'
@@ -2313,6 +2323,9 @@ export default function QCQueuePage() {
                                                 <div onClick={() => handleTankClick(task, t, tankStatus)} className={`relative flex flex-col items-center justify-center p-3 rounded-xl border-2 transition-all duration-200 cursor-pointer ${color} ${animate}`}>
                                                   <FlaskConical className="w-8 h-8 mb-1" />
                                                   <span className="text-xs font-bold text-slate-700">ถัง {t}</span>
+                                                  {isLocked && (
+                                                    <span className="text-[9px] font-medium text-slate-500 bg-slate-200/80 px-1 rounded-sm mt-0.5">รอส่งมอบ</span>
+                                                  )}
                                                   {problemStatuses.length > 0 && (
                                                     <div className="flex flex-col items-center mt-1 space-y-[2px]">
                                                       {problemStatuses.map(ps => (
@@ -2694,9 +2707,27 @@ export default function QCQueuePage() {
       <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
-            <DialogTitle>อัปเดตสถานะ QC Bulk (ถังที่ {activeTank?.tankNum})</DialogTitle>
+            <DialogTitle className="flex items-center justify-between">
+              <span>อัปเดตสถานะ QC Bulk (ถังที่ {activeTank?.tankNum})</span>
+              {(!activeTank?.task?.tank_details?.[activeTank?.tankNum] || activeTank?.task?.tank_details?.[activeTank?.tankNum] === 'LOCKED') && (
+                <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-300 text-[10px]">
+                  ปลดล็อกตรวจรับ
+                </Badge>
+              )}
+            </DialogTitle>
           </DialogHeader>
-          <div className="py-4 space-y-6">
+          <div className="py-4 space-y-4">
+            {(!activeTank?.task?.tank_details?.[activeTank?.tankNum] || activeTank?.task?.tank_details?.[activeTank?.tankNum] === 'LOCKED') && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-semibold text-amber-800">ถังนี้ยังไม่ได้รับสัญญาณส่งมอบอัตโนมัติจากฝ่ายผสม</p>
+                  <p className="text-slate-600 mt-0.5">
+                    หากหน้างานจริงผสมเสร็จแล้วและตัวอย่างพร้อมตรวจ QC สามารถกดเลือกผลตรวจ (PASS / HOLD / REJECT) เพื่อบันทึกรับงานได้ทันทีค่ะ
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-3">
               <Button 
                 variant={statusAction === 'QC_PASS' ? 'default' : 'outline'} 

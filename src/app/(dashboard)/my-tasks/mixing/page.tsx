@@ -406,11 +406,33 @@ export default function MixingTasksPage() {
             .eq('process_id', qcProcess.id)
             
           const currentTankNum = Number(currentTank);
-          const targetQCLog = (qcLogs || []).find(l => {
-            const s = parseInt(l.tank_start) || 1;
-            const e = parseInt(l.tank_end) || s;
-            return currentTankNum >= s && currentTankNum <= e;
-          });
+          const validQCLogs = (qcLogs || []).filter(l => l.tank_start !== null && l.tank_end !== null);
+
+          // 1. Try exact range match on active tasks first
+          let targetQCLog = validQCLogs.find(l => 
+            l.status !== 'COMPLETED' && l.status !== 'CANCELLED' &&
+            Number(l.tank_start) === Number(task.tank_start) && 
+            Number(l.tank_end) === Number(task.tank_end)
+          );
+
+          // 2. If no exact match, find any active task covering this tank
+          if (!targetQCLog) {
+            targetQCLog = validQCLogs.find(l => {
+              if (l.status === 'COMPLETED' || l.status === 'CANCELLED') return false;
+              const s = parseInt(l.tank_start);
+              const e = parseInt(l.tank_end) || s;
+              return currentTankNum >= s && currentTankNum <= e;
+            });
+          }
+
+          // 3. Fallback to any valid task covering this tank
+          if (!targetQCLog) {
+            targetQCLog = validQCLogs.find(l => {
+              const s = parseInt(l.tank_start);
+              const e = parseInt(l.tank_end) || s;
+              return currentTankNum >= s && currentTankNum <= e;
+            });
+          }
 
           if (targetQCLog) {
             const qcDetails = typeof targetQCLog.tank_details === 'object' && targetQCLog.tank_details !== null 
@@ -429,10 +451,12 @@ export default function MixingTasksPage() {
             }).eq('id', targetQCLog.id)
           } else {
             const start = parseInt(task.tank_start) || 1
-            const end = parseInt(task.tank_end) || 1
+            const end = parseInt(task.tank_end) || start
             const initialQCDetails: any = {}
             for(let i=start; i<=end; i++) {
-               initialQCDetails[i] = (i === currentTankNum) ? 'WAITING' : 'LOCKED'
+               const mxState = details[i]?.status || details[i];
+               const isReadyForQC = (i === currentTankNum) || mxState === 'SENT_TO_QC' || mxState === 'QC_PASS' || mxState === 'SENT_TO_PACKING';
+               initialQCDetails[i] = isReadyForQC ? 'WAITING' : 'LOCKED';
                if (i === currentTankNum) {
                  initialQCDetails[`${i}_history`] = [
                    { status: 'MX ส่ง QC', timestamp: new Date().toISOString(), user: currentUser }
@@ -460,11 +484,30 @@ export default function MixingTasksPage() {
             .eq('process_id', packingProcess.id)
             
           const currentTankNum = Number(currentTank);
-          const targetPackingLog = (packingLogs || []).find(l => {
-            const s = parseInt(l.tank_start) || 1;
-            const e = parseInt(l.tank_end) || s;
-            return currentTankNum >= s && currentTankNum <= e;
-          });
+          const validPackingLogs = (packingLogs || []).filter(l => l.tank_start !== null && l.tank_end !== null);
+
+          let targetPackingLog = validPackingLogs.find(l => 
+            l.status !== 'COMPLETED' && l.status !== 'CANCELLED' &&
+            Number(l.tank_start) === Number(task.tank_start) && 
+            Number(l.tank_end) === Number(task.tank_end)
+          );
+
+          if (!targetPackingLog) {
+            targetPackingLog = validPackingLogs.find(l => {
+              if (l.status === 'COMPLETED' || l.status === 'CANCELLED') return false;
+              const s = parseInt(l.tank_start);
+              const e = parseInt(l.tank_end) || s;
+              return currentTankNum >= s && currentTankNum <= e;
+            });
+          }
+
+          if (!targetPackingLog) {
+            targetPackingLog = validPackingLogs.find(l => {
+              const s = parseInt(l.tank_start);
+              const e = parseInt(l.tank_end) || s;
+              return currentTankNum >= s && currentTankNum <= e;
+            });
+          }
 
           if (targetPackingLog) {
             const packingDetails = typeof targetPackingLog.tank_details === 'object' && targetPackingLog.tank_details !== null 
@@ -481,7 +524,7 @@ export default function MixingTasksPage() {
             }
           } else {
             const start = parseInt(task.tank_start) || 1
-            const end = parseInt(task.tank_end) || 1
+            const end = parseInt(task.tank_end) || start
             const initialPackingDetails: any = {}
             for(let i=start; i<=end; i++) {
                initialPackingDetails[i] = (i === currentTankNum) ? 'WAITING' : 'LOCKED'
