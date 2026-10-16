@@ -614,11 +614,20 @@ export default function QCQueuePage() {
 
     const { task, tankNum } = activeTank
     const currentStatus = task.tank_details?.[tankNum]
+    const isLocked = !currentStatus || currentStatus === 'LOCKED'
     const isReturningToPass = statusAction === 'QC_PASS' && (currentStatus === 'PAUSED' || currentStatus === 'REPROCESS' || currentStatus === 'FAILED')
     const isChangingFromPassOrFailed = (currentStatus === 'QC_PASS' || currentStatus === 'FAILED') && statusAction !== currentStatus
 
-    if ((statusAction !== 'QC_PASS' || isReturningToPass || isChangingFromPassOrFailed) && !reasonText.trim()) {
-      toast.error(isReturningToPass || isChangingFromPassOrFailed ? 'กรุณาระบุผลการตรวจสอบซ้ำ / เหตุผลการแก้ไข' : 'กรุณาระบุเหตุผล')
+    const isReasonMandatory = isLocked || (statusAction !== 'QC_PASS' || isReturningToPass || isChangingFromPassOrFailed)
+
+    if (isReasonMandatory && !reasonText.trim()) {
+      if (isLocked) {
+        toast.error('กรุณาระบุเหตุผลในการปลดล็อกตรวจรับถัง เพื่อบันทึกเป็น Audit Trail')
+      } else if (isReturningToPass || isChangingFromPassOrFailed) {
+        toast.error('กรุณาระบุผลการตรวจสอบซ้ำ / เหตุผลการแก้ไข')
+      } else {
+        toast.error('กรุณาระบุเหตุผล')
+      }
       return
     }
 
@@ -626,11 +635,15 @@ export default function QCQueuePage() {
     const historyKey = `${tankNum}_history`
     const history = [...(details[historyKey] || [])]
 
+    const noteToSave = isLocked 
+      ? `[ปลดล็อกตรวจรับ]: ${reasonText.trim()}`
+      : reasonText.trim()
+
     history.push({
       status: statusAction,
       user: currentUser,
       timestamp: new Date().toISOString(),
-      note: reasonText.trim()
+      note: noteToSave
     })
     
     details[tankNum] = statusAction
@@ -652,6 +665,11 @@ export default function QCQueuePage() {
       let newNote = task.note || ''
       const cleanReason = reasonText.replace(/\n/g, ' ')
       
+      if (isLocked) {
+        const unlockTag = `[QC ปลดล็อกตรวจรับ] ถัง ${tankNum}: ${cleanReason}`
+        newNote = newNote ? `${newNote}\n${unlockTag}` : unlockTag
+      }
+
       if (statusAction === 'PAUSED' || statusAction === 'FAILED' || statusAction === 'REPROCESS') {
         newStatus = 'PAUSED'
         const issueType = statusAction === 'PAUSED' ? '[QC HOLD]' : statusAction === 'FAILED' ? '[QC REJECT]' : '[QC REPROCESS]'
@@ -763,7 +781,7 @@ export default function QCQueuePage() {
             status: mixStatus,
             user: currentUser,
             timestamp: new Date().toISOString(),
-            note: reasonText.trim()
+            note: noteToSave
           })
           mixDetails[mixHistoryKey] = mixHistory
           
@@ -2305,7 +2323,7 @@ export default function QCQueuePage() {
                                           <div className="space-y-1">
                                             <p className="font-semibold text-amber-300 border-b border-slate-700 pb-1 mb-1">ถังที่ {t}</p>
                                             <p className="text-xs text-slate-300">สถานะ: รอส่งมอบจากฝ่ายผสม</p>
-                                            <p className="text-[11px] text-amber-200 mt-1">💡 QC สามารถคลิกที่ถังนี้เพื่อปลดล็อกและบันทึกผลตรวจ (PASS / HOLD / REJECT) ได้ทันที</p>
+                                            <p className="text-[11px] text-amber-200 mt-1">💡 QC สามารถคลิกเพื่อปลดล็อกตรวจรับ (ระบบจะให้ระบุเหตุผลเพื่อเป็น Audit Trail)</p>
                                           </div>
                                         )
 
@@ -2705,82 +2723,149 @@ export default function QCQueuePage() {
 
       {/* Status Dialog (Bulk) */}
       <Dialog open={isStatusDialogOpen} onOpenChange={setIsStatusDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center justify-between">
-              <span>อัปเดตสถานะ QC Bulk (ถังที่ {activeTank?.tankNum})</span>
-              {(!activeTank?.task?.tank_details?.[activeTank?.tankNum] || activeTank?.task?.tank_details?.[activeTank?.tankNum] === 'LOCKED') && (
-                <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-300 text-[10px]">
-                  ปลดล็อกตรวจรับ
-                </Badge>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="py-4 space-y-4">
-            {(!activeTank?.task?.tank_details?.[activeTank?.tankNum] || activeTank?.task?.tank_details?.[activeTank?.tankNum] === 'LOCKED') && (
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 flex items-start gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div>
-                  <p className="font-semibold text-amber-800">ถังนี้ยังไม่ได้รับสัญญาณส่งมอบอัตโนมัติจากฝ่ายผสม</p>
-                  <p className="text-slate-600 mt-0.5">
-                    หากหน้างานจริงผสมเสร็จแล้วและตัวอย่างพร้อมตรวจ QC สามารถกดเลือกผลตรวจ (PASS / HOLD / REJECT) เพื่อบันทึกรับงานได้ทันทีค่ะ
-                  </p>
-                </div>
-              </div>
-            )}
-            <div className="grid grid-cols-2 gap-3">
-              <Button 
-                variant={statusAction === 'QC_PASS' ? 'default' : 'outline'} 
-                className={`${statusAction === 'QC_PASS' ? 'bg-green-600 hover:bg-green-700 text-white' : 'hover:bg-green-50 hover:text-green-600'}`}
-                onClick={() => setStatusAction('QC_PASS')}
-              >
-                PASS (ผ่าน)
-              </Button>
-              <Button 
-                variant={statusAction === 'PAUSED' ? 'default' : 'outline'} 
-                className={`${statusAction === 'PAUSED' ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'hover:bg-orange-50 hover:text-orange-500'}`}
-                onClick={() => setStatusAction('PAUSED')}
-              >
-                HOLD (กัก)
-              </Button>
-              <Button 
-                variant={statusAction === 'FAILED' ? 'default' : 'outline'} 
-                className={`${statusAction === 'FAILED' ? 'bg-red-500 hover:bg-red-600 text-white' : 'hover:bg-red-50 hover:text-red-500'}`}
-                onClick={() => setStatusAction('FAILED')}
-              >
-                REJECT (ไม่ผ่าน)
-              </Button>
-              <Button 
-                variant={statusAction === 'REPROCESS' ? 'default' : 'outline'} 
-                className={`${statusAction === 'REPROCESS' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'hover:bg-purple-50 hover:text-purple-500'}`}
-                onClick={() => setStatusAction('REPROCESS')}
-              >
-                REPROCESS (แก้)
-              </Button>
-            </div>
+        <DialogContent className="sm:max-w-[440px]">
+          {(() => {
+            const currentTankStatus = activeTank?.task?.tank_details?.[activeTank?.tankNum]
+            const isTankLocked = !currentTankStatus || currentTankStatus === 'LOCKED'
+            const isReturningToPass = statusAction === 'QC_PASS' && (currentTankStatus === 'PAUSED' || currentTankStatus === 'REPROCESS' || currentTankStatus === 'FAILED')
+            const isChanging = (currentTankStatus === 'QC_PASS' || currentTankStatus === 'FAILED') && statusAction !== currentTankStatus
+            const isReasonRequired = isTankLocked || statusAction !== 'QC_PASS' || isReturningToPass || isChanging
+            const isSaveDisabled = !statusAction || (isReasonRequired && !reasonText.trim())
 
-            <div className="space-y-2">
-              <Label>
-                หมายเหตุ / เหตุผล / วิธีแก้ไข <span className="text-red-500">{(statusAction !== 'QC_PASS' || (statusAction === 'QC_PASS' && (activeTank?.task?.tank_details?.[activeTank.tankNum] === 'PAUSED' || activeTank?.task?.tank_details?.[activeTank.tankNum] === 'REPROCESS'))) && '*'}</span>
-              </Label>
-              <Textarea 
-                placeholder={
-                  statusAction === 'QC_PASS' && (activeTank?.task?.tank_details?.[activeTank.tankNum] === 'PAUSED' || activeTank?.task?.tank_details?.[activeTank.tankNum] === 'REPROCESS')
-                    ? "ระบุวิธีแก้ไข หรือผลการตรวจสอบซ้ำ (บังคับกรอกเมื่อกลับมา PASS)"
-                    : "ระบุเหตุผล (บังคับกรอกกรณี HOLD, REJECT, REPROCESS)"
-                }
-                value={reasonText}
-                onChange={(e) => setReasonText(e.target.value)}
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsStatusDialogOpen(false)}>ยกเลิก</Button>
-            <Button onClick={handleStatusConfirm} disabled={!statusAction} className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white">
-              บันทึกสถานะ
-            </Button>
-          </DialogFooter>
+            return (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center justify-between">
+                    <span>อัปเดตสถานะ QC Bulk (ถังที่ {activeTank?.tankNum})</span>
+                    {isTankLocked && (
+                      <Badge variant="outline" className="text-amber-700 bg-amber-50 border-amber-300 text-[10px]">
+                        ปลดล็อกตรวจรับ
+                      </Badge>
+                    )}
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="py-3 space-y-3.5">
+                  {isTankLocked && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-2.5 text-xs text-amber-900 space-y-1">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-800">
+                        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                        <span>ถังนี้ยังไม่ได้รับสัญญาณส่งมอบจากฝ่ายผสม (สถานะสีเทา)</span>
+                      </div>
+                      <p className="text-slate-600 leading-relaxed text-[11px]">
+                        ตามมาตรฐาน GMP เพื่อป้องกันการกดข้ามขั้นตอน QC ต้องระบุเหตุผลในการปลดล็อกตรวจรับ (เช่น ได้รับตัวอย่างแล้ว หรือผสมรวม Batch) เพื่อบันทึกเป็น Audit Trail
+                      </p>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <Button 
+                      variant={statusAction === 'QC_PASS' ? 'default' : 'outline'} 
+                      className={`${statusAction === 'QC_PASS' ? 'bg-green-600 hover:bg-green-700 text-white' : 'hover:bg-green-50 hover:text-green-600'}`}
+                      onClick={() => setStatusAction('QC_PASS')}
+                    >
+                      PASS (ผ่าน)
+                    </Button>
+                    <Button 
+                      variant={statusAction === 'PAUSED' ? 'default' : 'outline'} 
+                      className={`${statusAction === 'PAUSED' ? 'bg-orange-500 hover:bg-orange-600 text-white' : 'hover:bg-orange-50 hover:text-orange-500'}`}
+                      onClick={() => setStatusAction('PAUSED')}
+                    >
+                      HOLD (กัก)
+                    </Button>
+                    <Button 
+                      variant={statusAction === 'FAILED' ? 'default' : 'outline'} 
+                      className={`${statusAction === 'FAILED' ? 'bg-red-500 hover:bg-red-600 text-white' : 'hover:bg-red-50 hover:text-red-500'}`}
+                      onClick={() => setStatusAction('FAILED')}
+                    >
+                      REJECT (ไม่ผ่าน)
+                    </Button>
+                    <Button 
+                      variant={statusAction === 'REPROCESS' ? 'default' : 'outline'} 
+                      className={`${statusAction === 'REPROCESS' ? 'bg-purple-500 hover:bg-purple-600 text-white' : 'hover:bg-purple-50 hover:text-purple-500'}`}
+                      onClick={() => setStatusAction('REPROCESS')}
+                    >
+                      REPROCESS (แก้)
+                    </Button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-slate-700">
+                        หมายเหตุ / เหตุผล / วิธีแก้ไข {isReasonRequired && <span className="text-red-500 font-bold">* (บังคับกรอก)</span>}
+                      </Label>
+                      {isTankLocked && (
+                        <span className="text-[10px] text-amber-700 font-medium">
+                          Audit Trail บังคับ
+                        </span>
+                      )}
+                    </div>
+
+                    {isTankLocked && (
+                      <div className="space-y-1.5 pt-0.5">
+                        <div className="text-[11px] text-slate-500 font-medium">
+                          เลือกเหตุผลด่วน (คลิกเพื่อใส่):
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            'ได้รับตัวอย่าง Bulk จากหน้างานพร้อมตรวจแล้ว',
+                            'ผสมรวม Batch ใหญ่กับถังก่อนหน้า',
+                            'หน้างานผสมเสร็จแล้วแต่ระบบยังไม่ส่งสัญญาณ',
+                            'ได้รับคำสั่งพิเศษให้ QC ตรวจด่วนก่อน'
+                          ].map((chip) => (
+                            <button
+                              key={chip}
+                              type="button"
+                              onClick={() => setReasonText(chip)}
+                              className={`text-[11px] px-2.5 py-1 rounded-md border transition-all text-left ${
+                                reasonText === chip
+                                  ? 'bg-amber-600 text-white border-amber-600 font-medium shadow-xs'
+                                  : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-200'
+                              }`}
+                            >
+                              + {chip}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Textarea 
+                      placeholder={
+                        isTankLocked
+                          ? "ระบุเหตุผลการปลดล็อกตรวจรับ (บังคับกรอก เช่น ได้รับตัวอย่างจากหน้างานแล้ว หรือผสมรวม Batch)"
+                          : statusAction === 'QC_PASS' && (currentTankStatus === 'PAUSED' || currentTankStatus === 'REPROCESS')
+                          ? "ระบุวิธีแก้ไข หรือผลการตรวจสอบซ้ำ (บังคับกรอกเมื่อกลับมา PASS)"
+                          : "ระบุเหตุผล (บังคับกรอกกรณี HOLD, REJECT, REPROCESS)"
+                      }
+                      value={reasonText}
+                      onChange={(e) => setReasonText(e.target.value)}
+                      className={`min-h-[85px] text-xs ${isReasonRequired && !reasonText.trim() ? 'border-amber-300 focus-visible:ring-amber-400' : ''}`}
+                    />
+                    {isReasonRequired && !reasonText.trim() && (
+                      <p className="text-[11px] text-amber-700">
+                        ⚠️ กรุณาเลือกเหตุผลด่วนด้านบน หรือพิมพ์เหตุผลก่อนกดบันทึก
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t">
+                  <Button variant="outline" size="sm" onClick={() => setIsStatusDialogOpen(false)}>
+                    ยกเลิก
+                  </Button>
+                  <Button 
+                    size="sm"
+                    onClick={handleStatusConfirm} 
+                    disabled={isSaveDisabled} 
+                    className="bg-[#D4AF37] hover:bg-[#D4AF37]-hover text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {isTankLocked ? 'บันทึกและปลดล็อก' : 'บันทึกสถานะ'}
+                  </Button>
+                </DialogFooter>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
