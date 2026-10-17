@@ -32,6 +32,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Forward webhook events to DIVA AI Task Intelligence Webhook Bridge
+    try {
+      fetch('https://diva-ai-task-intelligence-production.up.railway.app/api/mtex/webhook', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }).catch((err) => {
+        console.warn('[LINE Webhook Forward to DIVA AI Error]:', err?.message)
+      })
+    } catch (fwdErr: any) {
+      console.warn('[LINE Webhook Forward to DIVA AI Dispatch Error]:', fwdErr?.message)
+    }
+
     const config = await getLineChannelConfig('maintenance')
     const token = config?.channel_access_token
 
